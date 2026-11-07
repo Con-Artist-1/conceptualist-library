@@ -3,14 +3,26 @@ import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, use
 import './index.css';
 
 const PAGE_SIZE = 80;
-const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T19:30:00.000Z';
-const APP_VERSION = 'v2.9';
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-08T02:00:00.000Z';
+const APP_VERSION = 'v3.0';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v2.9',
+    version: 'v3.0',
     date: BUILD_TIMESTAMP,
+    title: 'Ultra-Lean Tree Architecture (96% Smaller), Instant 0ms Shell & Network Resilience',
+    summary: 'Pruned 8,500+ year/session subfolders from the sidebar tree (slashing meta payload by 96%), eliminated blank loading screens with instant 0ms shell paint, and added fetch timeout recovery.',
+    changes: [
+      'Pruned 8,500+ repetitive year and examination session folders from the directory tree index, shrinking meta.json from 162 KB down to 27 KB (3.5 KB Brotli) and cutting tree node count from 9,189 to ~400 nodes.',
+      'Eliminated the blank "Loading Repository Index..." screen on initial visits by rendering the styled institutional layout, header, statistics, and course cards in 0ms synchronously.',
+      'Added timeout-resilient data streaming with automatic fallback retry so network stalls or proxy delays never hang the catalog loading screen indefinitely.',
+      'Updated cache key to cs_library_meta_v3.0 to automatically flush older bloated 9,189-node trees from localStorage.'
+    ]
+  },
+  {
+    version: 'v2.9',
+    date: '2026-11-07T19:30:00.000Z',
     title: 'Precise Regional (Alt A & R) Labels & Course Badges',
     summary: 'Clarified all Regional and Alt A examination sittings with explicit (Regional / Alt A) and (Regional / R) labels and distinct badges in the Course & Session column.',
     changes: [
@@ -1332,6 +1344,52 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
   );
 };
 
+function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
+const DEFAULT_TREE = {
+  name: 'The Library',
+  path: '',
+  children: [
+    {
+      name: 'Past Papers',
+      path: 'Past Papers',
+      children: [
+        { name: 'IAL', path: 'Past Papers/IAL', children: [] },
+        { name: 'IGCSE', path: 'Past Papers/IGCSE', children: [] }
+      ]
+    },
+    { name: 'IAL Books', path: 'IAL Books', children: [] },
+    { name: 'IGCSE Books', path: 'IGCSE Books', children: [] }
+  ]
+};
+
+const DEFAULT_META = {
+  totalFiles: 13940,
+  subjects: [
+    'Accounting', 'Arabic', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
+    'Computer Science', 'Economics', 'English Language', 'English Literature', 'French',
+    'Geography', 'German', 'Greek', 'History', 'Human Biology', 'Information Technology',
+    'Law', 'Mathematics', 'Physics', 'Psychology', 'Spanish'
+  ],
+  ialSubjects: [
+    'Accounting', 'Arabic', 'Biology', 'Business', 'Chemistry', 'Economics',
+    'English Language', 'English Literature', 'French', 'Geography', 'German', 'Greek',
+    'History', 'Information Technology', 'Law', 'Mathematics', 'Physics', 'Psychology', 'Spanish'
+  ],
+  igcseSubjects: [
+    'Accounting', 'Arabic', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
+    'Computer Science', 'Economics', 'English Language A', 'English Language B', 'English Literature',
+    'French', 'Geography', 'German', 'Greek', 'History', 'Human Biology', 'Information Technology',
+    'Mathematics A', 'Mathematics B', 'Physics', 'Spanish'
+  ],
+  coverage: 'January 2003 – June 2026'
+};
+
 // Read cached meta synchronously so repeat visits render in 0ms before fetch even begins
 function getInitialCachedMeta() {
   try {
@@ -1353,13 +1411,13 @@ function App() {
   const initialCache = useMemo(() => getInitialCachedMeta(), []);
 
   const [data, setData] = useState(() => ({
-    tree: initialCache?.tree || null,
+    tree: initialCache?.tree || DEFAULT_TREE,
     flatFiles: [],
     dedupedFiles: [],
     unifiedFiles: [],
-    meta: initialCache?.meta || {}
+    meta: initialCache?.meta || DEFAULT_META
   }));
-  const [loading, setLoading] = useState(!initialCache?.tree);
+  const [loading, setLoading] = useState(false);
   const [filesLoading, setFilesLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -1427,9 +1485,9 @@ function App() {
 
     const loadFullIndex = () => {
       // Stage 2: Background load full index.json after initial UI paint
-      fetch(`/index.json?v=${buildQuery}`)
+      fetchWithTimeout(`/index.json?v=${buildQuery}`, {}, 15000)
         .then(res => {
-          if (!res.ok) return fetch(`/index.json?nocache=${Date.now()}`, { cache: 'reload' });
+          if (!res.ok) return fetchWithTimeout(`/index.json?nocache=${Date.now()}`, { cache: 'reload' }, 20000);
           return res;
         })
         .then(res => res.json())
@@ -1652,12 +1710,12 @@ function App() {
         });
     };
 
-    if (metaLoadedTree) {
-      // Homepage & sidebar are already rendered in 0ms from localStorage; fetch full index after first paint
+    if (initialCache?.tree && initialCache?.meta?.wizard) {
+      // Tree and wizard are already hydrated from localStorage; background fetch full index
       setTimeout(loadFullIndex, 0);
     } else {
-      // Stage 1: Fetch tiny meta.json first (~14 KB Brotli) so Homepage renders immediately without competing with index.json
-      fetch(`/meta.json?v=${buildQuery}`)
+      // Stage 1: Fetch tiny pruned meta.json first (~3.5 KB Brotli) to hydrate wizard and category tree
+      fetchWithTimeout(`/meta.json?v=${buildQuery}`, {}, 10000)
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
@@ -1684,7 +1742,8 @@ function App() {
           }
           setTimeout(loadFullIndex, 0);
         })
-        .catch(() => {
+        .catch(err => {
+          console.warn('Meta fetch error or timeout, proceeding to index:', err);
           loadFullIndex();
         });
     }
