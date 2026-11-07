@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8C0045"/>
+      <stop offset="100%" stop-color="#5A002C"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="100%" stop-color="#FDBF57"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Shield/Rounded Square -->
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="url(#bgGrad)" stroke="#FDBF57" stroke-width="12"/>
+  <!-- Open Book Base -->
+  <path d="M 160 170 Q 256 140 352 170 L 352 340 Q 256 310 160 340 Z" fill="none" stroke="url(#goldGrad)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 256 155 L 256 325" stroke="url(#goldGrad)" stroke-width="18" stroke-linecap="round"/>
+  <!-- Styled C Emblem -->
+  <path d="M 360 210 C 310 145, 190 145, 140 225 C 95 290, 130 380, 215 400 C 290 415, 360 370, 365 330" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+</svg>

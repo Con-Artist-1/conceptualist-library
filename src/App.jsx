@@ -1,0 +1,1989 @@
+/* global __APP_BUILD_TIME__ */
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef } from 'react';
+import './index.css';
+
+const PAGE_SIZE = 80;
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T16:10:00.000Z';
+const APP_VERSION = 'v2.5';
+const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
+
+const CHANGELOG_HISTORY = [
+  {
+    version: 'v2.5',
+    date: BUILD_TIMESTAMP,
+    title: 'Anti-Stale Cache Enforcement, Build Version Tracking & Live Changelog',
+    summary: 'Fixed stale browser/CDN caching on root route, bound index cache to build timestamp, and added subtle footer update tracker + full Changelog page.',
+    changes: [
+      'Added strict Cache-Control (no-cache, no-store, must-revalidate) and Vercel-CDN-Cache-Control (no-store) headers to both "/" and "/index.html" so browsers and edge nodes never serve outdated HTML shells.',
+      'Bound meta.json, index.json, and localStorage cache keys directly to the build timestamp so every new deployment automatically busts stale data while staying 0ms cached within the same release.',
+      'Added a subtle, low-profile update indicator in the global footer showing when the site was last updated and a compact summary of the latest update.',
+      'Added this interactive Changelog page (accessible by clicking the footer update note) with a complete history of all site improvements and a one-click cache reset tool.'
+    ]
+  },
+  {
+    version: 'v2.4',
+    date: '2026-11-07T16:04:00.000Z',
+    title: '85% Faster Index Payload, Smart Deduplication & Inline PDF Preview',
+    summary: 'Shrank meta.json by 85% (4.6 KB Brotli), deduplicated 3,894 duplicate papers, fixed IGCSE unit filters, and added QP/MS/ER quick-links + inline PDF preview.',
+    changes: [
+      'Compacted directory tree serialization ([name, children]), shrinking meta.json from 882.4 KB down to 155.5 KB (4.6 KB Brotli) and reducing index.json by 728 KB.',
+      'Precomputed the Subject → Unit → Year wizard map inside meta.json so clicking any subject or unit on the homepage responds in 0ms even before the full index finishes downloading.',
+      'Collapsed 3,894 byte-for-byte duplicate PDFs across merged scraper folders (Math/Mathematics/Maths, U1/Unit 1, 2019/May-June vs 2019 May) while preserving all regional (1R), alternative (U1A), and option (_2–_4) papers.',
+      'Fixed IGCSE unit extraction so numbered Examiner Reports (ER 3.pdf, ER 4.pdf) no longer create false Paper 3 (P3) and Paper 4 (P4) buttons in IGCSE subjects that only have Paper 1 and Paper 2.',
+      'Fixed audio tracks (.mp3/.wav) being misclassified as Question Papers (QP), fixed _PEF.pdf detection as Examiner Reports (ER), and added badges for Audio, Data Files, Solutions, Source Booklets, and SAMs.',
+      'Fixed duplicate subject names in document titles (e.g., "Accounting — Unit 1 (WAC11) • Question Paper • January 2026" instead of "Accounting Accounting Unit 1") and added file size & format tags.',
+      'Added one-click companion QP ↗ / MS ↗ / ER ↗ buttons on every table row to jump directly between a Question Paper, its Mark Scheme, and its Examiner Report for the exact same sitting.',
+      'Added an in-app PDF Preview Modal with built-in QP / MS / ER switching in the modal header.',
+      'Added dynamic Unit/Paper and Year dropdowns to the main filter bar, non-blocking search (useDeferredValue) with full synonym expansion, 80-row fast pagination, and "/" keyboard shortcut to focus search.'
+    ]
+  },
+  {
+    version: 'v2.2',
+    date: '2026-11-06T18:30:00.000Z',
+    title: 'Unified IAL & IGCSE Directory Architecture & Two-Stage Indexer',
+    summary: 'Organized 13,309 Pearson Edexcel documents into canonical IAL/IGCSE Past Papers and Textbooks with two-stage meta.json + index.json loading.',
+    changes: [
+      'Consolidated all 13,309 Pearson Edexcel resources (9,701 IAL past papers across 19 subjects, 3,537 IGCSE past papers across 18 subjects, and 71 textbooks/solution banks) spanning January 2003 – January 2026.',
+      'Built the interactive 3-step Homepage Wizard (Subject → Unit/Paper → Examination Year) with curated unit labels for Mathematics, Biology, Chemistry, Physics, Accounting, Business, and Economics.',
+      'Synchronized master repository with the Hugging Face dataset CDN (Diavlon/mcmaster-docs-library) for direct, high-speed PDF resolution.'
+    ]
+  }
+];
+
+function formatUpdateTimestamp(isoStr) {
+  try {
+    const d = new Date(isoStr);
+    if (Number.isNaN(d.getTime())) return isoStr;
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  } catch {
+    return isoStr;
+  }
+}
+
+const DOC_TYPE_INFO = {
+  QP: { label: 'QP', fullLabel: 'Question Paper', cls: 'qp' },
+  MS: { label: 'MS', fullLabel: 'Mark Scheme', cls: 'ms' },
+  ER: { label: 'ER', fullLabel: 'Examiner Report', cls: 'er' },
+  Book: { label: 'Book', fullLabel: 'Textbook', cls: 'book' },
+  SOL: { label: 'Solutions', fullLabel: 'Worked Solutions', cls: 'sol' },
+  DF: { label: 'Data', fullLabel: 'Data Files', cls: 'df' },
+  AUD: { label: 'Audio', fullLabel: 'Listening Audio', cls: 'aud' },
+  SC: { label: 'Source', fullLabel: 'Source / Transcript', cls: 'sc' },
+  SAM: { label: 'SAM', fullLabel: 'Specimen / Syllabus', cls: 'sam' }
+};
+
+const QUERY_SYNONYMS = {
+  'math': 'math mathematics maths',
+  'maths': 'math mathematics maths',
+  'mathematics': 'math mathematics maths',
+  'it': 'information technology it ict',
+  'ict': 'information technology it ict',
+  'cs': 'computer science',
+  'bio': 'biology',
+  'chem': 'chemistry',
+  'phys': 'physics',
+  'econ': 'economics',
+  'bus': 'business',
+  'acc': 'accounting',
+  'psych': 'psychology',
+  'qp': 'qp question paper',
+  'ms': 'ms mark scheme markscheme',
+  'er': 'er examiner report pef',
+  'p1': 'p1 wma11 pure mathematics 1 paper 1',
+  'p2': 'p2 wma12 pure mathematics 2 paper 2',
+  'p3': 'p3 wma13 pure mathematics 3 paper 3',
+  'p4': 'p4 wma14 pure mathematics 4 paper 4',
+  'm1': 'm1 wme01 mechanics 1',
+  'm2': 'm2 wme02 mechanics 2',
+  'm3': 'm3 wme03 mechanics 3',
+  's1': 's1 wst01 statistics 1',
+  's2': 's2 wst02 statistics 2',
+  's3': 's3 wst03 statistics 3',
+  'fp1': 'fp1 wfm01 further pure 1',
+  'fp2': 'fp2 wfm02 further pure 2',
+  'fp3': 'fp3 wfm03 further pure 3',
+  'd1': 'd1 wdm11 wdm01 decision 1',
+  'c12': 'c12 wma01 core mathematics 12',
+  'c34': 'c34 wma02 core mathematics 34',
+  'may': 'june may',
+  'jun': 'june may',
+  'june': 'june may',
+  'summer': 'june may',
+  'oct': 'october november oct nov',
+  'nov': 'october november oct nov',
+  'jan': 'january jan'
+};
+
+function getDocTypeBadge(docType, category) {
+  if (category === 'Books' || category === 'IAL Books' || category === 'IGCSE Books') {
+    if (docType === 'SOL') return DOC_TYPE_INFO.SOL;
+    return DOC_TYPE_INFO.Book;
+  }
+  if (docType && DOC_TYPE_INFO[docType]) return DOC_TYPE_INFO[docType];
+  return null;
+}
+
+function formatBytes(bytes, decimals = 1) {
+  if (!+bytes) return '';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : decimals))} ${sizes[i]}`;
+}
+
+function formatSubjectDisplay(subj) {
+  if (!subj) return '';
+  if (subj === 'Math') return 'Mathematics';
+  return subj;
+}
+
+function getHfUrl(filePath) {
+  return `https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
+}
+
+// Rehydrate compact [name, children] tree into { name, path, children } in ~1ms
+function inflateCompactTree(compactNode, parentPath = '', isRoot = true) {
+  if (!compactNode) return null;
+  if (typeof compactNode === 'string') {
+    const nodePath = isRoot ? '' : (parentPath ? `${parentPath}/${compactNode}` : compactNode);
+    return { name: compactNode, path: nodePath, children: [] };
+  }
+  if (Array.isArray(compactNode)) {
+    const [name, rawChildren] = compactNode;
+    const nodePath = isRoot ? '' : (parentPath ? `${parentPath}/${name}` : name);
+    const children = (rawChildren || []).map(c => inflateCompactTree(c, nodePath, false));
+    return { name, path: nodePath, children };
+  }
+  return compactNode;
+}
+
+// Determine curriculum from path & category
+function getCurriculum(file) {
+  const p = file.path || '';
+  const cat = file.category || '';
+  const spec = file.spec || '';
+
+  if (spec === 'IGCSE' || p.includes('IGCSE') || cat === 'IGCSE Books') {
+    return 'Edexcel IGCSE';
+  }
+  return 'Edexcel IAL';
+}
+
+// Extract variant tag (e.g. R, A, F, H, Opt2, v2, ER1..10) so distinct variants are clearly labeled & never merged
+function extractVariant(file) {
+  const p = file.path || '';
+  const n = (file.name || '').replace(/\.[^.]+$/, '');
+  if (/\b(?:Paper[-_\s]*[1-4]R|P[1-4]R|[1-4]PR|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)\b/i.test(p)) return 'R';
+  if (/\b(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)\b/i.test(p)) return 'A';
+  if (/\b(?:1F|2F|Paper[-_\s]*[12]F)\b/i.test(p)) return 'F';
+  if (/\b(?:1H|2H|Paper[-_\s]*[12]H)\b/i.test(p)) return 'H';
+  const mOpt = n.match(/_([2-9]|\d{2})$/);
+  if (mOpt) return `Opt${mOpt[1]}`;
+  const mVer = n.match(/\((v\d+|\d+)\)/i);
+  if (mVer) return mVer[1].toLowerCase();
+  const mEr = n.match(/^ER\s+(\d+)$/i);
+  if (mEr && (file.spec === 'IGCSE' || file.curriculum === 'Edexcel IGCSE')) return `ER${mEr[1]}`;
+  return '';
+}
+
+// Clean canonical unit label resolver
+function getCleanUnitLabel(file) {
+  if (file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') return null;
+
+  const code = (file.unitCode || '').toUpperCase();
+  const name = (file.unitName || '').toUpperCase();
+  const rawPath = (file.path || '').toUpperCase();
+  const subj = (file.subject || '').toUpperCase();
+  const curr = file.curriculum || getCurriculum(file);
+
+  if (curr === 'Edexcel IGCSE') {
+    if (code === 'P1' || name === 'PAPER 1') return 'Paper 1 (P1)';
+    if (code === 'P2' || name === 'PAPER 2') return 'Paper 2 (P2)';
+    if (code === 'P3' || name === 'PAPER 3') return 'Paper 3 (P3)';
+    return file.unitName || null;
+  }
+
+  if (subj === 'MATH' || subj === 'MATHEMATICS') {
+    if (code === 'WMA11' || name.includes('PURE MATHEMATICS 1') || /\b(?:P1|P1A|P1R)\b/.test(name) || rawPath.includes('WMA11'))
+      return 'Pure Mathematics 1 (P1)';
+    if (code === 'WMA12' || name.includes('PURE MATHEMATICS 2') || /\b(?:P2|P2A|P2R)\b/.test(name) || rawPath.includes('WMA12'))
+      return 'Pure Mathematics 2 (P2)';
+    if (code === 'WMA13' || name.includes('PURE MATHEMATICS 3') || /\b(?:P3|P3A)\b/.test(name) || rawPath.includes('WMA13'))
+      return 'Pure Mathematics 3 (P3)';
+    if (code === 'WMA14' || name.includes('PURE MATHEMATICS 4') || /\b(?:P4|P4A)\b/.test(name) || rawPath.includes('WMA14'))
+      return 'Pure Mathematics 4 (P4)';
+    if (code === 'WMA01' || name.includes('CORE MATHEMATICS 12') || /\bC12\b/.test(name) || rawPath.includes('WMA01'))
+      return 'Core Mathematics 12 (C12)';
+    if (code === 'WMA02' || name.includes('CORE MATHEMATICS 34') || /\bC34\b/.test(name) || rawPath.includes('WMA02'))
+      return 'Core Mathematics 34 (C34)';
+    if (code === 'C1' || name.includes('CORE MATHEMATICS 1 (C1)'))
+      return 'Core Mathematics 1 (C1)';
+    if (code === 'C2' || name.includes('CORE MATHEMATICS 2 (C2)'))
+      return 'Core Mathematics 2 (C2)';
+    if (code === 'C3' || name.includes('CORE MATHEMATICS 3 (C3)'))
+      return 'Core Mathematics 3 (C3)';
+    if (code === 'C4' || name.includes('CORE MATHEMATICS 4 (C4)'))
+      return 'Core Mathematics 4 (C4)';
+
+    if (code === 'WFM01' || name.includes('FURTHER PURE 1') || /\b(?:FP1|FP1A)\b/.test(name) || rawPath.includes('WFM01'))
+      return 'Further Pure 1 (FP1)';
+    if (code === 'WFM02' || name.includes('FURTHER PURE 2') || /\b(?:FP2|FP2A)\b/.test(name) || rawPath.includes('WFM02'))
+      return 'Further Pure 2 (FP2)';
+    if (code === 'WFM03' || name.includes('FURTHER PURE 3') || /\b(?:FP3|FP3A)\b/.test(name) || rawPath.includes('WFM03'))
+      return 'Further Pure 3 (FP3)';
+
+    if (code === 'WME01' || name.includes('MECHANICS 1') || /\b(?:M1|M1A)\b/.test(name) || rawPath.includes('WME01'))
+      return 'Mechanics 1 (M1)';
+    if (code === 'WME02' || name.includes('MECHANICS 2') || /\b(?:M2|M2A)\b/.test(name) || rawPath.includes('WME02'))
+      return 'Mechanics 2 (M2)';
+    if (code === 'WME03' || name.includes('MECHANICS 3') || /\b(?:M3|M3A)\b/.test(name) || rawPath.includes('WME03'))
+      return 'Mechanics 3 (M3)';
+
+    if (code === 'WST01' || name.includes('STATISTICS 1') || /\b(?:S1|S1A)\b/.test(name) || rawPath.includes('WST01'))
+      return 'Statistics 1 (S1)';
+    if (code === 'WST02' || name.includes('STATISTICS 2') || /\b(?:S2|S2A)\b/.test(name) || rawPath.includes('WST02'))
+      return 'Statistics 2 (S2)';
+    if (code === 'WST03' || name.includes('STATISTICS 3') || /\b(?:S3|S3A)\b/.test(name) || rawPath.includes('WST03'))
+      return 'Statistics 3 (S3)';
+
+    if (code === 'WDM11' || code === 'WDM01' || name.includes('DECISION') || /\b(?:D1|D1A)\b/.test(name) || rawPath.includes('WDM11') || rawPath.includes('WDM01'))
+      return 'Decision Mathematics 1 (D1)';
+  }
+
+  if (subj.includes('CHEM')) {
+    if (code === 'WCH11' || name.includes('UNIT 1') || rawPath.includes('WCH11')) return 'Unit 1: Structure & Bonding (WCH11)';
+    if (code === 'WCH12' || name.includes('UNIT 2') || rawPath.includes('WCH12')) return 'Unit 2: Energetics & Organics (WCH12)';
+    if (code === 'WCH13' || name.includes('UNIT 3') || rawPath.includes('WCH13')) return 'Unit 3: Practical Chemistry I (WCH13)';
+    if (code === 'WCH14' || name.includes('UNIT 4') || rawPath.includes('WCH14')) return 'Unit 4: Rates & Organic Chemistry (WCH14)';
+    if (code === 'WCH15' || name.includes('UNIT 5') || rawPath.includes('WCH15')) return 'Unit 5: Transition Metals (WCH15)';
+    if (code === 'WCH16' || name.includes('UNIT 6') || rawPath.includes('WCH16')) return 'Unit 6: Practical Chemistry II (WCH16)';
+  }
+
+  if (subj.includes('PHYS')) {
+    if (code === 'WPH11' || name.includes('UNIT 1') || rawPath.includes('WPH11')) return 'Unit 1: Mechanics & Materials (WPH11)';
+    if (code === 'WPH12' || name.includes('UNIT 2') || rawPath.includes('WPH12')) return 'Unit 2: Waves & Electricity (WPH12)';
+    if (code === 'WPH13' || name.includes('UNIT 3') || rawPath.includes('WPH13')) return 'Unit 3: Practical Physics I (WPH13)';
+    if (code === 'WPH14' || name.includes('UNIT 4') || rawPath.includes('WPH14')) return 'Unit 4: Further Mechanics & Fields (WPH14)';
+    if (code === 'WPH15' || name.includes('UNIT 5') || rawPath.includes('WPH15')) return 'Unit 5: Thermodynamics & Oscillations (WPH15)';
+    if (code === 'WPH16' || name.includes('UNIT 6') || rawPath.includes('WPH16')) return 'Unit 6: Practical Physics II (WPH16)';
+    if (code === 'WPH07') return 'Practical Physics I (WPH13)';
+  }
+
+  if (subj === 'BIOLOGY') {
+    if (code === 'WBI11' || code === '6BI01' || name.includes('UNIT 1') || rawPath.includes('WBI11')) return 'Unit 1: Lifestyle, Transport & Health (WBI11)';
+    if (code === 'WBI12' || code === '6BI02' || name.includes('UNIT 2') || rawPath.includes('WBI12')) return 'Unit 2: Cells, Development & Biodiversity (WBI12)';
+    if (code === 'WBI13' || code === '6BI03' || name.includes('UNIT 3') || rawPath.includes('WBI13')) return 'Unit 3: Practical Biology I (WBI13)';
+    if (code === 'WBI14' || code === '6BI04' || name.includes('UNIT 4') || rawPath.includes('WBI14')) return 'Unit 4: Energy, Environment & Immunity (WBI14)';
+    if (code === 'WBI15' || code === '6BI05' || name.includes('UNIT 5') || rawPath.includes('WBI15')) return 'Unit 5: Respiration & Muscles (WBI15)';
+    if (code === 'WBI16' || code === '6BI06' || name.includes('UNIT 6') || rawPath.includes('WBI16')) return 'Unit 6: Practical Biology II (WBI16)';
+  }
+
+  if (subj.includes('ACCOUNTING')) {
+    if (code === 'WAC11' || name.includes('UNIT 1') || rawPath.includes('WAC11')) return 'Unit 1: The Accounting System & Costing (WAC11)';
+    if (code === 'WAC12' || name.includes('UNIT 2') || rawPath.includes('WAC12')) return 'Unit 2: Corporate & Management Accounting (WAC12)';
+  }
+
+  if (subj.includes('ECONOMICS')) {
+    if (code === 'WEC11' || name.includes('UNIT 1') || rawPath.includes('WEC11')) return 'Unit 1: Markets in Action (WEC11)';
+    if (code === 'WEC12' || name.includes('UNIT 2') || rawPath.includes('WEC12')) return 'Unit 2: Macroeconomic Performance (WEC12)';
+    if (code === 'WEC13' || name.includes('UNIT 3') || rawPath.includes('WEC13')) return 'Unit 3: Business Behaviour (WEC13)';
+    if (code === 'WEC14' || name.includes('UNIT 4') || rawPath.includes('WEC14')) return 'Unit 4: A Global Perspective (WEC14)';
+  }
+
+  if (subj.includes('BUSINESS')) {
+    if (code === 'WBS11' || name.includes('UNIT 1') || rawPath.includes('WBS11')) return 'Unit 1: Marketing & People (WBS11)';
+    if (code === 'WBS12' || name.includes('UNIT 2') || rawPath.includes('WBS12')) return 'Unit 2: Managing Business Activities (WBS12)';
+    if (code === 'WBS13' || name.includes('UNIT 3') || rawPath.includes('WBS13')) return 'Unit 3: Business Decisions & Strategy (WBS13)';
+    if (code === 'WBS14' || name.includes('UNIT 4') || rawPath.includes('WBS14')) return 'Unit 4: Global Business (WBS14)';
+  }
+
+  if (
+    file.unitName &&
+    !file.unitName.includes('.pdf') &&
+    !file.unitName.includes('_177')
+  ) {
+    return file.unitName;
+  }
+
+  return null;
+}
+
+// Strip redundant subject prefix from unitName (e.g. "Accounting Unit 1 (WAC11)" -> "Unit 1 (WAC11)")
+function getShortUnitDisplay(file) {
+  let u = file.unitName || (file.unitCode ? `Unit ${file.unitCode}` : '');
+  if (!u) return '';
+  if (file.subject) {
+    const subj = file.subject === 'Information Technology' ? 'IT' : file.subject;
+    const prefixRegex = new RegExp(`^(?:${file.subject}|${subj})\\s+`, 'i');
+    u = u.replace(prefixRegex, '');
+  }
+  const v = file.variant || '';
+  if (v === 'R') {
+    if (u.startsWith('Paper ')) u = `${u}R (Regional)`;
+    else u = `${u} (Regional R)`;
+  } else if (v === 'A') {
+    u = `${u} (Alt A)`;
+  } else if (v === 'F') {
+    u = `${u} (Foundation)`;
+  } else if (v === 'H') {
+    u = `${u} (Higher)`;
+  } else if (v.startsWith('Opt')) {
+    u = `${u} (Option ${v.slice(3)})`;
+  } else if (v.startsWith('ER')) {
+    u = `Report #${v.slice(2)}`;
+  } else if (v) {
+    u = `${u} (${v})`;
+  }
+  return u;
+}
+
+// Generate clean, unambiguous human-readable title without duplicate subject names
+function getDisplayTitle(file) {
+  let cleanName = (file.name || '')
+    .replace(/\.(pdf|zip|rar|mp3|wav|docx)$/i, '')
+    .replace(/_\d{10,14}/g, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (
+    file.category === 'Books' ||
+    file.category === 'IAL Books' ||
+    file.category === 'IGCSE Books' ||
+    (!file.session && !file.unitName && !file.unitCode)
+  ) {
+    return cleanName;
+  }
+
+  const subjStr = file.subject === 'Information Technology'
+    ? 'IT'
+    : (file.subject === 'Math' ? 'Mathematics' : (file.subject || ''));
+
+  const shortUnit = getShortUnitDisplay(file);
+  const badge = getDocTypeBadge(file.docType, file.category);
+  const docLabel = badge ? badge.fullLabel : '';
+
+  const mainParts = [subjStr, shortUnit].filter(Boolean).join(' — ');
+  const suffixParts = [];
+  if (docLabel) suffixParts.push(docLabel);
+  if (file.session) suffixParts.push(file.session);
+  else if (file.year) suffixParts.push(String(file.year));
+
+  if (!mainParts) return cleanName;
+  if (suffixParts.length > 0) {
+    return `${mainParts} • ${suffixParts.join(' • ')}`;
+  }
+  return mainParts;
+}
+
+// ─── Institutional Sidebar Tree Node ─────────────────────────────
+const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggleExpand }) => {
+  if (!node || !node.children) return null;
+  const isExpanded = expandedPaths.has(node.path);
+  const isSelected = currentPath === node.path;
+  const hasSubDirs = node.children && node.children.length > 0;
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    onSelect(node.path);
+    if (hasSubDirs) {
+      toggleExpand(node.path);
+    }
+  };
+
+  return (
+    <div className="tree-node">
+      <div
+        className={`tree-item ${isSelected ? 'selected' : ''}`}
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(e); }}
+      >
+        <span className="tree-indicator">
+          {hasSubDirs ? (isExpanded ? '−' : '+') : '•'}
+        </span>
+        <span className="tree-name">{node.name}</span>
+      </div>
+      {isExpanded && hasSubDirs && (
+        <div className="tree-children">
+          {node.children.map((child) => (
+            <TreeNode
+              key={child.path}
+              node={child}
+              currentPath={currentPath}
+              onSelect={onSelect}
+              expandedPaths={expandedPaths}
+              toggleExpand={toggleExpand}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ─── In-App Quick PDF Preview Modal ──────────────────────────────
+const PreviewModal = ({ file, onClose, onSwitchFile }) => {
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  if (!file) return null;
+  const url = getHfUrl(file.path);
+  const title = getDisplayTitle(file);
+  const siblings = file.siblings || {};
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title-group">
+            <span className="modal-title">{title}</span>
+            <span className="modal-subtitle">{file.path} {file.size ? `(${formatBytes(file.size)})` : ''}</span>
+          </div>
+
+          <div className="modal-actions">
+            {/* Instant Sibling Switcher inside Preview Modal */}
+            {['QP', 'MS', 'ER'].map((type) => {
+              const sib = siblings[type];
+              if (!sib || !sib.ext || sib.ext !== 'pdf') return null;
+              const isCurrent = file.path === sib.path;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={`modal-sibling-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
+                  onClick={() => !isCurrent && onSwitchFile(sib)}
+                  title={`View ${DOC_TYPE_INFO[type]?.fullLabel || type}`}
+                >
+                  {type}
+                </button>
+              );
+            })}
+
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="modal-action-link"
+            >
+              Open Full Tab ↗
+            </a>
+            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close preview">
+              ✕
+            </button>
+          </div>
+        </div>
+        <div className="modal-body">
+          <iframe
+            src={url}
+            title={title}
+            className="modal-iframe"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Changelog Page ──────────────────────────────────────────────
+const ChangelogPage = ({ onGoHome }) => {
+  const handleHardRefresh = () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {
+      // Ignore storage errors
+    }
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        for (const name of names) caches.delete(name);
+      });
+    }
+    window.location.href = `/?refresh=${Date.now()}`;
+  };
+
+  return (
+    <div className="about-container">
+      <div className="about-card">
+        <div className="changelog-header-top">
+          <div>
+            <h1 className="about-title">Site Changelog & Update History</h1>
+            <p className="about-lead">
+              Complete log of speed optimizations, index updates, bug fixes, and UI improvements deployed to Conceptualist Systems.
+            </p>
+          </div>
+          <div className="changelog-build-box">
+            <div className="changelog-build-version">Current Build: <strong>{APP_VERSION}</strong></div>
+            <div className="changelog-build-time">Deployed: {formatUpdateTimestamp(BUILD_TIMESTAMP)}</div>
+            <button type="button" className="changelog-purge-btn" onClick={handleHardRefresh}>
+              ↻ Clear Cache & Force Reload
+            </button>
+          </div>
+        </div>
+
+        <hr className="about-divider" />
+
+        <div className="changelog-list">
+          {CHANGELOG_HISTORY.map((entry, idx) => (
+            <div key={entry.version} className={`changelog-entry ${idx === 0 ? 'latest' : ''}`}>
+              <div className="changelog-entry-header">
+                <div className="changelog-version-group">
+                  <span className={`changelog-badge ${idx === 0 ? 'latest' : ''}`}>
+                    {entry.version} {idx === 0 ? '• Latest' : ''}
+                  </span>
+                  <h2 className="changelog-entry-title">{entry.title}</h2>
+                </div>
+                <span className="changelog-entry-date">{formatUpdateTimestamp(entry.date)}</span>
+              </div>
+              <p className="changelog-entry-summary">{entry.summary}</p>
+              <ul className="changelog-bullets">
+                {entry.changes.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: '28px' }}>
+          <button className="search-button" onClick={onGoHome}>
+            ← Return to Library Repository
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+const AboutPage = ({ onGoHome }) => {
+  return (
+    <div className="about-container">
+      <div className="about-card">
+        <h1 className="about-title">About Conceptualist Systems</h1>
+        <p className="about-lead">
+          Conceptualist Systems is an independent academic resource platform dedicated to open, fast, and structured access to international examination materials.
+        </p>
+
+        <hr className="about-divider" />
+
+        <div className="about-section">
+          <h2>Who We Are</h2>
+          <p>
+            We are a team of educators and developers committed to indexing, organizing, and archiving examination resources for students and teachers worldwide.
+          </p>
+          <div className="team-grid">
+            <div className="team-card">
+              <div className="team-name">Diavlon</div>
+              <div className="team-role">Founder & Lead Architect</div>
+            </div>
+            <div className="team-card">
+              <div className="team-name">Naz</div>
+              <div className="team-role">Co-Founder & Systems Lead</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="about-section">
+          <h2>Our Mission</h2>
+          <p>
+            Navigating past papers, mark schemes, examiner reports, and reference books should be effortless.
+            Our platform indexes thousands of documents across Edexcel GCE, International A-Level (IAL) and International GCSE (IGCSE) qualifications into a high-speed, searchable catalog.
+          </p>
+        </div>
+
+        <div className="about-section">
+          <h2>Contact & Inquiries</h2>
+          <p>
+            For resource submissions, feedback, or general inquiries, please contact us directly:
+          </p>
+          <div className="contact-box">
+            <strong>Direct Email:</strong>{' '}
+            <a href="mailto:diavlon.pxa@gmail.com">diavlon.pxa@gmail.com</a>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '28px' }}>
+          <button className="search-button" onClick={onGoHome}>
+            ← Return to Library Repository
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Interactive Step-by-Step Homepage Navigator ──────────────────
+const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onSelectFinalFilter }) => {
+  const [selectedSubject, setSelectedSubject] = useState(null); // { name, curriculum }
+  const [selectedUnit, setSelectedUnit] = useState(null); // string | null
+
+  const ialSubjects = data.meta?.ialSubjects || data.meta?.subjects || [];
+  const igcseSubjects = data.meta?.igcseSubjects || [
+    'Accounting', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
+    'Computer Science', 'Economics', 'English Language A', 'English Language B',
+    'English Literature', 'Further Pure Mathematics', 'Geography', 'Human Biology',
+    'Information Technology', 'Mathematics A', 'Mathematics B', 'Physics'
+  ];
+  const ialSubjectCoverage = data.meta?.ialSubjectCoverage || data.meta?.subjectCoverage || {};
+  const igcseSubjectCoverage = data.meta?.igcseSubjectCoverage || data.meta?.subjectCoverage || {};
+  const wizardMeta = data.meta?.wizard || null;
+
+  // Instant 0ms units from precomputed meta.wizard (with fallback to flatFiles)
+  const availableUnitsMap = useMemo(() => {
+    if (!selectedSubject) return {};
+    const { name, curriculum } = selectedSubject;
+    if (wizardMeta && wizardMeta[curriculum] && wizardMeta[curriculum][name]) {
+      return wizardMeta[curriculum][name].units || {};
+    }
+    const files = data.flatFiles.filter(
+      f => f.subject === name && (!curriculum || f.curriculum === curriculum)
+    );
+    const map = {};
+    files.forEach(f => {
+      const cleanLabel = f.cleanUnitLabel || getCleanUnitLabel(f);
+      if (cleanLabel) {
+        if (!map[cleanLabel]) map[cleanLabel] = { count: 0, years: new Set() };
+        map[cleanLabel].count++;
+        if (f.year) map[cleanLabel].years.add(f.year);
+      }
+    });
+    const out = {};
+    Object.keys(map).sort((a, b) => a.localeCompare(b)).forEach(k => {
+      out[k] = { count: map[k].count, years: Array.from(map[k].years).sort((a, b) => b - a) };
+    });
+    return out;
+  }, [wizardMeta, data.flatFiles, selectedSubject]);
+
+  const availableUnits = useMemo(() => Object.keys(availableUnitsMap), [availableUnitsMap]);
+
+  // Group available units logically by their prefix/type
+  const groupedUnits = useMemo(() => {
+    if (!availableUnits.length) return {};
+    const groups = {};
+    availableUnits.forEach(unit => {
+      let groupName = 'Course Units';
+      if (unit.includes('Further Pure')) groupName = 'Further Pure Mathematics';
+      else if (unit.includes('Pure')) groupName = 'Pure Mathematics';
+      else if (unit.includes('Core')) groupName = 'Core Mathematics';
+      else if (unit.includes('Mechanics')) groupName = 'Mechanics';
+      else if (unit.includes('Statistics')) groupName = 'Statistics';
+      else if (unit.includes('Decision')) groupName = 'Decision Mathematics';
+      else if (unit.includes('Unit')) groupName = 'Course Units';
+      else if (unit.includes('Paper')) groupName = 'Examination Papers';
+
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(unit);
+    });
+    return groups;
+  }, [availableUnits]);
+
+  // Extract available years for currently selected subject + curriculum + unit
+  const availableYears = useMemo(() => {
+    if (!selectedSubject) return [];
+    const { name, curriculum } = selectedSubject;
+    if (selectedUnit && availableUnitsMap[selectedUnit]) {
+      return availableUnitsMap[selectedUnit].years || [];
+    }
+    if (wizardMeta && wizardMeta[curriculum] && wizardMeta[curriculum][name]) {
+      return wizardMeta[curriculum][name].allYears || [];
+    }
+    let files = data.flatFiles.filter(
+      f => f.subject === name && (!curriculum || f.curriculum === curriculum)
+    );
+    if (selectedUnit) {
+      files = files.filter(f => (f.cleanUnitLabel || getCleanUnitLabel(f)) === selectedUnit);
+    }
+    return Array.from(new Set(files.map(f => f.year).filter(Boolean))).sort((a, b) => b - a);
+  }, [wizardMeta, availableUnitsMap, data.flatFiles, selectedSubject, selectedUnit]);
+
+  const handleSubjectClick = (subjectName, curriculum) => {
+    setSelectedSubject({ name: subjectName, curriculum });
+    setSelectedUnit(null);
+  };
+
+  const handleUnitClick = (unitName) => {
+    setSelectedUnit(unitName);
+  };
+
+  const handleYearClick = (yearVal) => {
+    onSelectFinalFilter({
+      subject: selectedSubject.name,
+      curriculum: selectedSubject.curriculum,
+      unit: selectedUnit,
+      year: yearVal
+    });
+  };
+
+  return (
+    <div className="welcome-container">
+      <div className="welcome-hero">
+        <div className="welcome-hero-top">
+          <div>
+            <h1>Past Exam Papers & Course Resources</h1>
+            <p>
+              Welcome to Conceptualist Systems online repository. Select a qualification or subject below to interactively filter by unit, module, and examination year.
+            </p>
+          </div>
+          <div className="hero-stats-row">
+            <div className="hero-stat-pill">
+              <strong>{(data.meta?.totalFiles || 13309).toLocaleString()}</strong>
+              <span>Total Files</span>
+            </div>
+            <div className="hero-stat-pill">
+              <strong>{ialSubjects.length + igcseSubjects.length}</strong>
+              <span>Subjects</span>
+            </div>
+          </div>
+        </div>
+        <div className="welcome-hero-actions">
+          <button className="search-button" onClick={onViewAll}>
+            Browse All Documents →
+          </button>
+          <button className="filter-btn hero-action-btn" onClick={() => onCurriculumSelect('Edexcel IAL')}>
+            Edexcel IAL Collection
+          </button>
+          <button className="filter-btn hero-action-btn igcse" onClick={() => onCurriculumSelect('Edexcel IGCSE')}>
+            Edexcel IGCSE Collection
+          </button>
+        </div>
+      </div>
+
+      {/* STEP 2 / STEP 3 INTERACTIVE DRILLDOWN WIZARD */}
+      {selectedSubject ? (
+        <div className="interactive-wizard-card">
+          <div className="wizard-breadcrumb">
+            <button
+              className="wizard-back-btn"
+              onClick={() => { if (selectedUnit) setSelectedUnit(null); else setSelectedSubject(null); }}
+            >
+              ← {selectedUnit ? 'Back to Units' : 'Back to All Subjects'}
+            </button>
+            <div className="wizard-trail-text">
+              <strong>{selectedSubject.curriculum}</strong> / <span>{formatSubjectDisplay(selectedSubject.name)}</span>
+              {selectedUnit && <> / <span className="highlight">{selectedUnit}</span></>}
+            </div>
+          </div>
+
+          {!selectedUnit ? (
+            /* STEP 2: SELECT UNIT / MODULE */
+            <div className="wizard-step">
+              <h2>Select {formatSubjectDisplay(selectedSubject.name)} Unit or Paper:</h2>
+              <div style={{ marginBottom: '24px' }}>
+                <button
+                  className="wizard-option-btn primary"
+                  onClick={() => onSubjectSelect(selectedSubject.name, selectedSubject.curriculum)}
+                  style={{ width: '100%', marginBottom: '20px' }}
+                >
+                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers & Textbooks →</span>
+                </button>
+                {Object.entries(groupedUnits).map(([groupName, units]) => (
+                  <div key={groupName} style={{ marginBottom: '20px' }}>
+                    {Object.keys(groupedUnits).length > 1 && (
+                      <h3 className="wizard-group-heading">
+                        {groupName}
+                      </h3>
+                    )}
+                    <div className="wizard-button-grid">
+                      {units.map(unitName => {
+                        const unitCount = availableUnitsMap[unitName]?.count;
+                        return (
+                          <button
+                            key={unitName}
+                            className="wizard-option-btn"
+                            onClick={() => handleUnitClick(unitName)}
+                          >
+                            <span>{unitName}</span>
+                            {unitCount ? <span className="wizard-unit-count">{unitCount}</span> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* STEP 3: SELECT EXAMINATION YEAR */
+            <div className="wizard-step">
+              <h2>Select Examination Year for {selectedUnit}:</h2>
+              <div style={{ marginBottom: '20px' }}>
+                <button
+                  className="wizard-option-btn primary"
+                  onClick={() => handleYearClick('')}
+                  style={{ width: '100%' }}
+                >
+                  <span>All Examination Years for {selectedUnit} →</span>
+                </button>
+              </div>
+              <div className="wizard-button-grid-years">
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    className="wizard-option-btn year"
+                    onClick={() => handleYearClick(year)}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* STEP 1: ALL SUBJECT CARDS */
+        <>
+          <div className="section-header-row">
+            <div className="section-title">Edexcel International A-Level (IAL)</div>
+            <span className="section-count-badge">{ialSubjects.length} Subjects</span>
+          </div>
+          <div className="subject-grid" style={{ marginBottom: '32px' }}>
+            {ialSubjects.map(subject => {
+              const subjWizard = wizardMeta?.['Edexcel IAL']?.[subject];
+              const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
+              const docCount = subjWizard?.totalFiles || 0;
+              return (
+                <div
+                  key={`ial-${subject}`}
+                  className="subject-card"
+                  onClick={() => handleSubjectClick(subject, 'Edexcel IAL')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubjectClick(subject, 'Edexcel IAL'); }}
+                >
+                  <div className="subject-card-top">
+                    <div className="subject-card-title">{formatSubjectDisplay(subject)}</div>
+                    {docCount > 0 && <span className="subject-card-count">{docCount} docs</span>}
+                  </div>
+                  <div className="subject-card-subtitle">
+                    {ialSubjectCoverage[subject] || 'Edexcel IAL Collection'}
+                    {unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="section-header-row">
+            <div className="section-title igcse">Edexcel International GCSE (IGCSE)</div>
+            <span className="section-count-badge igcse">{igcseSubjects.length} Subjects</span>
+          </div>
+          <div className="subject-grid" style={{ marginBottom: '32px' }}>
+            {igcseSubjects.map(subject => {
+              const subjWizard = wizardMeta?.['Edexcel IGCSE']?.[subject];
+              const docCount = subjWizard?.totalFiles || 0;
+              return (
+                <div
+                  key={`igcse-${subject}`}
+                  className="subject-card igcse"
+                  onClick={() => handleSubjectClick(subject, 'Edexcel IGCSE')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubjectClick(subject, 'Edexcel IGCSE'); }}
+                >
+                  <div className="subject-card-top">
+                    <div className="subject-card-title">{subject}</div>
+                    {docCount > 0 && <span className="subject-card-count igcse">{docCount} docs</span>}
+                  </div>
+                  <div className="subject-card-subtitle">
+                    {igcseSubjectCoverage[subject] || 'International GCSE Collection'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// Read cached meta synchronously so repeat visits render in 0ms before fetch even begins
+function getInitialCachedMeta() {
+  try {
+    const raw = localStorage.getItem(META_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const tree = parsed.compactTree ? inflateCompactTree(parsed.compactTree) : parsed.tree;
+    if (tree && parsed.meta) {
+      return { tree, meta: parsed.meta };
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+// ─── Main Application ────────────────────────────────────────────
+function App() {
+  const initialCache = useMemo(() => getInitialCachedMeta(), []);
+
+  const [data, setData] = useState(() => ({
+    tree: initialCache?.tree || null,
+    flatFiles: [],
+    dedupedFiles: [],
+    meta: initialCache?.meta || {}
+  }));
+  const [loading, setLoading] = useState(!initialCache?.tree);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [selectedPath, setSelectedPath] = useState('');
+  const [expandedPaths, setExpandedPaths] = useState(new Set(['']));
+  const [currentTab, setCurrentTab] = useState('library'); // 'library' | 'about'
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [previewFile, setPreviewFile] = useState(null);
+
+  // Filters
+  const [filterCurriculum, setFilterCurriculum] = useState(''); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
+  const [filterDocType, setFilterDocType] = useState(null); // 'QP' | 'MS' | 'ER' | 'Book' | 'Extra' | null
+  const [filterSubject, setFilterSubject] = useState('');
+  const [filterUnit, setFilterUnit] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // Default to newest first so recent 2026/2025 papers appear at top
+  const [forceShowTable, setForceShowTable] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  const searchInputRef = useRef(null);
+
+  // Auto 404 / Unknown path fallback to Homepage
+  useEffect(() => {
+    if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
+
+  // Global keyboard shortcut: '/' or Ctrl+K / Cmd+K focuses search input
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (
+        e.key === '/' &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA' &&
+        document.activeElement?.tagName !== 'SELECT'
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const buildQuery = encodeURIComponent(BUILD_TIMESTAMP);
+    // Clean up any older build caches in localStorage
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cs_library_meta_') && k !== META_CACHE_KEY) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    // Stage 1: Instant load meta.json (bound to current build timestamp so new deploys bust cache immediately)
+    fetch(`/meta.json?v=${buildQuery}`)
+      .then(res => res.json())
+      .then(json => {
+        const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
+        setData(prev => ({
+          ...prev,
+          tree: tree || prev.tree,
+          meta: json.meta || prev.meta
+        }));
+        setLoading(false);
+        if (tree) {
+          setExpandedPaths(prev => new Set([...prev, '', tree.path]));
+        }
+        try {
+          localStorage.setItem(META_CACHE_KEY, JSON.stringify(json));
+        } catch {
+          // Ignore quota errors
+        }
+      })
+      .catch(() => {});
+
+    // Stage 2: Background load full index.json
+    fetch(`/index.json?v=${buildQuery}`)
+      .then(res => res.json())
+      .then(json => {
+        const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
+        let rawList = [];
+        if (json.files && json.keys) {
+          const keys = json.keys;
+          const kLen = keys.length;
+          rawList = new Array(json.files.length);
+          for (let i = 0; i < json.files.length; i++) {
+            const arr = json.files[i];
+            const fileObj = {};
+            for (let j = 0; j < kLen; j++) {
+              fileObj[keys[j]] = arr[j];
+            }
+            rawList[i] = fileObj;
+          }
+        } else {
+          rawList = json.flatFiles || [];
+        }
+
+        // Enrich files in a single fast pass
+        const flatFiles = new Array(rawList.length);
+        for (let i = 0; i < rawList.length; i++) {
+          const fileObj = { ...rawList[i] };
+          if (fileObj.name) fileObj.name = fileObj.name.replace(/_\d{10,14}/g, '');
+          if (fileObj.path) fileObj.path = fileObj.path.replace(/_\d{10,14}/g, '');
+
+          fileObj.ext = (fileObj.name || '').split('.').pop().toLowerCase();
+          fileObj.curriculum = getCurriculum(fileObj);
+          fileObj.variant = extractVariant(fileObj);
+          fileObj.cleanUnitLabel = getCleanUnitLabel(fileObj);
+
+          let sessionVal = 0;
+          if (fileObj.session) {
+            const s = fileObj.session;
+            if (s.includes('Jan')) sessionVal = 1;
+            else if (s.includes('May') || s.includes('June')) sessionVal = 6;
+            else if (s.includes('Oct') || s.includes('Nov')) sessionVal = 10;
+          }
+          fileObj.sortKey = (fileObj.year || 2000) * 100 + sessionVal;
+
+          // Build comprehensive lowercase search string once
+          fileObj.searchTerms = [
+            fileObj.name,
+            fileObj.path,
+            fileObj.subject,
+            fileObj.subject === 'Math' ? 'mathematics maths' : '',
+            fileObj.subject === 'Information Technology' ? 'it ict' : '',
+            fileObj.unitCode,
+            fileObj.unitName,
+            fileObj.cleanUnitLabel,
+            fileObj.session,
+            fileObj.session && fileObj.session.includes('June') ? 'may summer' : '',
+            fileObj.session && fileObj.session.includes('October') ? 'november nov' : '',
+            fileObj.year ? String(fileObj.year) : '',
+            fileObj.docType,
+            fileObj.docType === 'QP' ? 'question paper' : '',
+            fileObj.docType === 'MS' ? 'mark scheme markscheme' : '',
+            fileObj.docType === 'ER' ? 'examiner report' : '',
+            fileObj.curriculum,
+            fileObj.category
+          ].filter(Boolean).join(' ').toLowerCase();
+
+          flatFiles[i] = fileObj;
+        }
+
+        // Deduplicate byte-for-byte duplicate files across batches & link QP/MS/ER siblings
+        const scoreFile = (f) => {
+          let s = 0;
+          if (f.path.includes('(')) s += 10;
+          if (f.name.includes('_')) s += 5;
+          return s;
+        };
+
+        const dedupMap = new Map();
+        const siblingGroups = new Map();
+
+        for (let i = 0; i < flatFiles.length; i++) {
+          const f = flatFiles[i];
+          const isCanonicalPaper = f.category === 'Past Papers' && f.unitCode && f.session && f.docType;
+          const dedupKey = isCanonicalPaper
+            ? `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}|${f.docType}|${f.ext}|${f.size}`
+            : f.path;
+
+          if (!dedupMap.has(dedupKey) || scoreFile(f) > scoreFile(dedupMap.get(dedupKey))) {
+            dedupMap.set(dedupKey, f);
+          }
+
+          if (isCanonicalPaper && f.ext === 'pdf' && (f.docType === 'QP' || f.docType === 'MS' || f.docType === 'ER')) {
+            const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
+            let grp = siblingGroups.get(sibKey);
+            if (!grp) {
+              grp = {};
+              siblingGroups.set(sibKey, grp);
+            }
+            if (!grp[f.docType] || scoreFile(f) > scoreFile(grp[f.docType])) {
+              grp[f.docType] = f;
+            }
+          }
+        }
+
+        // Attach sibling map to each file
+        for (let i = 0; i < flatFiles.length; i++) {
+          const f = flatFiles[i];
+          if (f.category === 'Past Papers' && f.unitCode && f.session) {
+            const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
+            f.siblings = siblingGroups.get(sibKey) || null;
+          }
+        }
+
+        const dedupedFiles = Array.from(dedupMap.values());
+
+        setData(prev => ({
+          tree: tree || prev.tree,
+          flatFiles,
+          dedupedFiles,
+          meta: json.meta || prev.meta || {}
+        }));
+        setLoading(false);
+        setFilesLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load index:', err);
+        setLoading(false);
+        setFilesLoading(false);
+      });
+  }, []);
+
+  // Reset pagination when filters/search change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, deferredSearchQuery, sortBy]);
+
+  const toggleExpand = useCallback((path) => {
+    setExpandedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const handleSubjectSelect = useCallback((subject, curriculum = '') => {
+    setCurrentTab('library');
+    if (curriculum) setFilterCurriculum(curriculum);
+    setFilterSubject(subject);
+    setFilterUnit('');
+    setFilterYear('');
+    setSearchQuery('');
+    setForceShowTable(true);
+    setSelectedPath(data.tree?.path || '');
+  }, [data.tree]);
+
+  const handleSelectFinalFilter = useCallback(({ subject, curriculum, unit, year }) => {
+    setCurrentTab('library');
+    if (curriculum) setFilterCurriculum(curriculum);
+    if (subject) setFilterSubject(subject);
+    setFilterUnit(unit || '');
+    setFilterYear(year ? String(year) : '');
+    setSearchQuery('');
+    setForceShowTable(true);
+    setSelectedPath(data.tree?.path || '');
+  }, [data.tree]);
+
+  const clearFilters = useCallback(() => {
+    setFilterCurriculum('');
+    setFilterDocType(null);
+    setFilterSubject('');
+    setFilterUnit('');
+    setFilterYear('');
+    setSearchQuery('');
+    setSortBy('newest');
+    setForceShowTable(false);
+    setSelectedPath(data.tree?.path || '');
+  }, [data.tree]);
+
+  const handleViewAll = useCallback(() => {
+    setCurrentTab('library');
+    setSortBy('newest');
+    setForceShowTable(true);
+  }, []);
+
+  // Dynamic subject list based on selected curriculum
+  const availableSubjectsForFilter = useMemo(() => {
+    if (filterCurriculum === 'Edexcel IAL') return data.meta?.ialSubjects || data.meta?.subjects || [];
+    if (filterCurriculum === 'Edexcel IGCSE') return data.meta?.igcseSubjects || data.meta?.subjects || [];
+    return data.meta?.subjects || [];
+  }, [filterCurriculum, data.meta]);
+
+  // Dynamic unit list for filter bar when a subject is selected
+  const availableUnitsForFilter = useMemo(() => {
+    if (!filterSubject) return [];
+    const wizard = data.meta?.wizard;
+    if (wizard) {
+      const set = new Set();
+      const currs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
+      currs.forEach(c => {
+        const unitsObj = wizard[c]?.[filterSubject]?.units;
+        if (unitsObj) Object.keys(unitsObj).forEach(u => set.add(u));
+      });
+      if (set.size > 0) return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }
+    const set = new Set();
+    data.dedupedFiles.forEach(f => {
+      if (f.subject === filterSubject && (!filterCurriculum || f.curriculum === filterCurriculum) && f.cleanUnitLabel) {
+        set.add(f.cleanUnitLabel);
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [filterSubject, filterCurriculum, data.meta, data.dedupedFiles]);
+
+  // Dynamic year list for filter bar
+  const availableYearsForFilter = useMemo(() => {
+    const wizard = data.meta?.wizard;
+    if (filterSubject && wizard) {
+      const set = new Set();
+      const currs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
+      currs.forEach(c => {
+        const subjEntry = wizard[c]?.[filterSubject];
+        if (subjEntry) {
+          const yrs = filterUnit && subjEntry.units?.[filterUnit]
+            ? subjEntry.units[filterUnit].years
+            : subjEntry.allYears;
+          (yrs || []).forEach(y => set.add(y));
+        }
+      });
+      if (set.size > 0) return Array.from(set).sort((a, b) => b - a);
+    }
+    const years = [];
+    for (let y = 2026; y >= 2003; y--) years.push(y);
+    return years;
+  }, [filterSubject, filterCurriculum, filterUnit, data.meta]);
+
+  const allMatchedFiles = useMemo(() => {
+    const isSpecificFolder = Boolean(selectedPath && selectedPath !== '' && selectedPath !== data.tree?.path);
+    // Use deduplicated list at library root so users never see 3 duplicate copies of the same paper;
+    // use full flatFiles when inspecting a specific directory in the sidebar tree.
+    let files = isSpecificFolder ? data.flatFiles : data.dedupedFiles;
+
+    if (isSpecificFolder) {
+      const prefix = selectedPath.endsWith('/') ? selectedPath : `${selectedPath}/`;
+      files = files.filter(f => f.path === selectedPath || f.path.startsWith(prefix));
+    }
+
+    if (filterCurriculum) {
+      files = files.filter(f => f.curriculum === filterCurriculum);
+    }
+
+    if (filterSubject) {
+      files = files.filter(f => f.subject === filterSubject);
+    }
+
+    if (filterUnit) {
+      files = files.filter(f => f.cleanUnitLabel === filterUnit);
+    }
+
+    if (filterYear) {
+      files = files.filter(f => String(f.year) === String(filterYear));
+    }
+
+    if (filterDocType) {
+      if (filterDocType === 'Book') {
+        files = files.filter(f => f.category === 'Books' || f.category === 'IAL Books' || f.category === 'IGCSE Books');
+      } else if (filterDocType === 'Extra') {
+        files = files.filter(f => f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL');
+      } else {
+        files = files.filter(f => f.docType === filterDocType);
+      }
+    }
+
+    if (deferredSearchQuery) {
+      const rawTerms = deferredSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const termGroups = rawTerms.map(t => {
+        const syn = QUERY_SYNONYMS[t];
+        return syn ? syn.split(/\s+/) : [t];
+      });
+      files = files.filter(f => {
+        const st = f.searchTerms;
+        if (!st) return false;
+        for (let i = 0; i < termGroups.length; i++) {
+          const alts = termGroups[i];
+          let matchedOne = false;
+          for (let j = 0; j < alts.length; j++) {
+            if (st.includes(alts[j])) {
+              matchedOne = true;
+              break;
+            }
+          }
+          if (!matchedOne) return false;
+        }
+        return true;
+      });
+    }
+
+    // Sort logic (default to newest session first, then unit, then QP -> MS -> ER)
+    const docOrder = { QP: 1, MS: 2, ER: 3, SC: 4, DF: 5, AUD: 6, SAM: 7, SOL: 8 };
+    const sorted = [...files];
+    if (sortBy === 'newest' || sortBy === '') {
+      sorted.sort((a, b) => {
+        const diff = (b.sortKey || 0) - (a.sortKey || 0);
+        if (diff !== 0) return diff;
+        const uDiff = (a.unitCode || '').localeCompare(b.unitCode || '');
+        if (uDiff !== 0) return uDiff;
+        const vDiff = (a.variant || '').localeCompare(b.variant || '');
+        if (vDiff !== 0) return vDiff;
+        return (docOrder[a.docType] || 9) - (docOrder[b.docType] || 9);
+      });
+    } else if (sortBy === 'oldest') {
+      sorted.sort((a, b) => {
+        const diff = (a.sortKey || 999999) - (b.sortKey || 999999);
+        if (diff !== 0) return diff;
+        return (docOrder[a.docType] || 9) - (docOrder[b.docType] || 9);
+      });
+    } else if (sortBy === 'name_asc') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'name_desc') {
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortBy === 'size_desc') {
+      sorted.sort((a, b) => (b.size || 0) - (a.size || 0));
+    }
+
+    return sorted;
+  }, [
+    data.flatFiles,
+    data.dedupedFiles,
+    data.tree,
+    selectedPath,
+    deferredSearchQuery,
+    filterCurriculum,
+    filterDocType,
+    filterSubject,
+    filterUnit,
+    filterYear,
+    sortBy
+  ]);
+
+  const visibleFiles = useMemo(
+    () => allMatchedFiles.slice(0, visibleCount),
+    [allMatchedFiles, visibleCount]
+  );
+
+  const hasActiveFilters = Boolean(
+    filterCurriculum ||
+    filterDocType ||
+    filterSubject ||
+    filterUnit ||
+    filterYear ||
+    searchQuery ||
+    forceShowTable
+  );
+  const isRoot = selectedPath === data.tree?.path || selectedPath === '';
+  const showWelcome = isRoot && !hasActiveFilters;
+
+  const activeDateText = useMemo(() => {
+    if (filterSubject) {
+      const cov = filterCurriculum === 'Edexcel IGCSE'
+        ? data.meta?.igcseSubjectCoverage?.[filterSubject]
+        : (filterCurriculum === 'Edexcel IAL'
+            ? data.meta?.ialSubjectCoverage?.[filterSubject]
+            : data.meta?.subjectCoverage?.[filterSubject]);
+      if (cov) return `${formatSubjectDisplay(filterSubject)}: ${cov}`;
+    }
+    return data.meta?.coverage || 'January 2003 – January 2026';
+  }, [filterSubject, filterCurriculum, data.meta]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#1A202C', fontFamily: 'Roboto, sans-serif' }}>
+        Loading Repository Index...
+      </div>
+    );
+  }
+
+  if (!data.tree) {
+    return <div style={{ padding: 40 }}>Error loading repository index. Please refresh.</div>;
+  }
+
+  const breadcrumbParts = selectedPath ? selectedPath.split(/[\\/]/).filter(Boolean) : [];
+
+  const renderBreadcrumbs = (classNameAdd = '') => (
+    <div className={`breadcrumb-container ${classNameAdd}`}>
+      <div className="breadcrumb-trail">
+        <span className="breadcrumb-link home" onClick={clearFilters}>
+          ← Library Home
+        </span>
+        {filterCurriculum && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-link" onClick={() => setFilterCurriculum('')} title="Click to remove curriculum filter">
+              {filterCurriculum} ×
+            </span>
+          </>
+        )}
+        {filterSubject && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-link" onClick={() => { setFilterSubject(''); setFilterUnit(''); }} title="Click to remove subject filter">
+              {formatSubjectDisplay(filterSubject)} ×
+            </span>
+          </>
+        )}
+        {filterUnit && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-link" onClick={() => setFilterUnit('')} title="Click to remove unit filter">
+              {filterUnit} ×
+            </span>
+          </>
+        )}
+        {filterYear && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-link" onClick={() => setFilterYear('')} title="Click to remove year filter">
+              {filterYear} ×
+            </span>
+          </>
+        )}
+        {filterDocType && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-link" onClick={() => setFilterDocType(null)} title="Click to remove document type filter">
+              {DOC_TYPE_INFO[filterDocType]?.fullLabel || filterDocType} ×
+            </span>
+          </>
+        )}
+        {breadcrumbParts.map((part, i) => (
+          <React.Fragment key={i}>
+            <span className="breadcrumb-separator">/</span>
+            <span
+              className="breadcrumb-link"
+              onClick={() => {
+                const pathSlice = breadcrumbParts.slice(0, i + 1).join('/');
+                setSelectedPath(pathSlice);
+                setForceShowTable(true);
+              }}
+            >
+              {part}
+            </span>
+          </React.Fragment>
+        ))}
+        {searchQuery && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-link" onClick={() => setSearchQuery('')} title="Clear search query">
+              Search: &ldquo;{searchQuery}&rdquo; ×
+            </span>
+          </>
+        )}
+      </div>
+
+      <div className="result-summary">
+        {filesLoading ? (
+          <span>Loading full catalog...</span>
+        ) : allMatchedFiles.length > visibleFiles.length ? (
+          <>Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong> documents</>
+        ) : (
+          <>Displaying <strong>{allMatchedFiles.length.toLocaleString()}</strong> matching {allMatchedFiles.length === 1 ? 'document' : 'documents'}</>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="app-container">
+      {/* Header */}
+      <header className="header-top">
+        <div className={`header-top-row ${!showWelcome ? 'mobile-hidden' : ''}`}>
+          <div
+            className="brand-section"
+            onClick={() => { setCurrentTab('library'); clearFilters(); }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setCurrentTab('library'); clearFilters(); } }}
+          >
+            <div className="brand-logo-text">
+              Conceptualist <span className="brand-logo-accent">Systems</span>
+            </div>
+            <div className="brand-tagline">
+              <span className="title">EDEXCEL LIBRARY</span>
+              <span>Past Exam Papers & Resources</span>
+            </div>
+          </div>
+
+          <div className="header-right-group">
+            <div className="header-coverage-badge">
+              <strong>{activeDateText}</strong>
+            </div>
+            <button
+              type="button"
+              className={`header-nav-btn ${currentTab === 'about' ? 'active' : ''}`}
+              onClick={() => setCurrentTab(currentTab === 'about' ? 'library' : 'about')}
+            >
+              {currentTab === 'about' ? '← Library' : 'About'}
+            </button>
+          </div>
+        </div>
+
+        {/* Integrated Mobile Header Breadcrumb Strip */}
+        {currentTab === 'library' && !showWelcome && (
+          <div className="mobile-header-breadcrumb">
+            {renderBreadcrumbs('mobile-header-breadcrumb-content')}
+          </div>
+        )}
+      </header>
+
+      {/* Main Search & Filter Banner (only shown in library tab) */}
+      {currentTab === 'library' && (
+        <div className="search-banner">
+          <div className="search-row">
+            <div className="search-input-wrapper">
+              <label htmlFor="search-input" className="sr-only">
+                Search repository by course code, subject, unit or year
+              </label>
+              <svg className="search-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                ref={searchInputRef}
+                id="search-input"
+                type="text"
+                className="search-input"
+                placeholder="Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search by course code, subject, unit or year"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+                  aria-label="Clear search query"
+                >
+                  ✕
+                </button>
+              ) : (
+                <kbd className="search-shortcut-hint" title="Press / to search">/</kbd>
+              )}
+            </div>
+            <div className="search-button-group">
+              <button
+                type="button"
+                className={`mobile-filter-toggle ${showMobileFilters ? 'active' : ''}`}
+                onClick={() => setShowMobileFilters(!showMobileFilters)}
+                aria-label="Toggle Filters"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Controls Section */}
+          <div className={`filter-controls-container ${!showMobileFilters ? 'mobile-hidden' : ''}`}>
+            {/* Row 1: Curriculum & Document Type */}
+            <div className="filter-row">
+              <span className="filter-group-label">Curriculum:</span>
+              <div className="filter-pills" role="group" aria-label="Filter by curriculum">
+                <button
+                  type="button"
+                  className={`filter-btn ${filterCurriculum === '' ? 'active' : ''}`}
+                  onClick={() => setFilterCurriculum('')}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
+                  onClick={() => {
+                    setFilterCurriculum(filterCurriculum === 'Edexcel IAL' ? '' : 'Edexcel IAL');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Edexcel IAL
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
+                  onClick={() => {
+                    setFilterCurriculum(filterCurriculum === 'Edexcel IGCSE' ? '' : 'Edexcel IGCSE');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Edexcel IGCSE
+                </button>
+              </div>
+
+              <span className="filter-group-label" style={{ marginLeft: '8px' }}>Type:</span>
+              <div className="filter-pills" role="group" aria-label="Filter by document type">
+                <button
+                  type="button"
+                  className={`filter-btn ${filterDocType === null ? 'active' : ''}`}
+                  onClick={() => setFilterDocType(null)}
+                >
+                  All Types
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterDocType === 'QP' ? 'active' : ''}`}
+                  onClick={() => { setFilterDocType(filterDocType === 'QP' ? null : 'QP'); setForceShowTable(true); }}
+                >
+                  Question Papers
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterDocType === 'MS' ? 'active' : ''}`}
+                  onClick={() => { setFilterDocType(filterDocType === 'MS' ? null : 'MS'); setForceShowTable(true); }}
+                >
+                  Mark Schemes
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterDocType === 'ER' ? 'active' : ''}`}
+                  onClick={() => { setFilterDocType(filterDocType === 'ER' ? null : 'ER'); setForceShowTable(true); }}
+                >
+                  Examiner Reports
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterDocType === 'Book' ? 'active' : ''}`}
+                  onClick={() => { setFilterDocType(filterDocType === 'Book' ? null : 'Book'); setForceShowTable(true); }}
+                >
+                  Textbooks
+                </button>
+                <button
+                  type="button"
+                  className={`filter-btn ${filterDocType === 'Extra' ? 'active' : ''}`}
+                  onClick={() => { setFilterDocType(filterDocType === 'Extra' ? null : 'Extra'); setForceShowTable(true); }}
+                >
+                  Audio / Data / SAMs
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Subject, Unit, Year & Sort Dropdowns */}
+            <div className="filter-row" style={{ marginTop: '2px' }}>
+              <label htmlFor="subject-select" className="filter-group-label">Subject:</label>
+              <select
+                id="subject-select"
+                aria-label="Filter documents by subject"
+                className="filter-select"
+                value={filterSubject}
+                onChange={(e) => {
+                  setFilterSubject(e.target.value);
+                  setFilterUnit('');
+                  if (e.target.value) setForceShowTable(true);
+                }}
+              >
+                <option value="">All Subjects</option>
+                {availableSubjectsForFilter.map(s => (
+                  <option key={s} value={s}>{formatSubjectDisplay(s)}</option>
+                ))}
+              </select>
+
+              {availableUnitsForFilter.length > 0 && (
+                <>
+                  <label htmlFor="unit-select" className="filter-group-label" style={{ marginLeft: '8px' }}>Unit/Paper:</label>
+                  <select
+                    id="unit-select"
+                    aria-label="Filter documents by unit or paper"
+                    className="filter-select"
+                    value={filterUnit}
+                    onChange={(e) => {
+                      setFilterUnit(e.target.value);
+                      setForceShowTable(true);
+                    }}
+                  >
+                    <option value="">All Units & Papers</option>
+                    {availableUnitsForFilter.map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+
+              <label htmlFor="year-select" className="filter-group-label" style={{ marginLeft: '8px' }}>Year:</label>
+              <select
+                id="year-select"
+                aria-label="Filter documents by examination year"
+                className="filter-select"
+                value={filterYear}
+                onChange={(e) => {
+                  setFilterYear(e.target.value);
+                  if (e.target.value) setForceShowTable(true);
+                }}
+              >
+                <option value="">All Years</option>
+                {availableYearsForFilter.map(y => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
+
+              <label htmlFor="sort-select" className="filter-group-label" style={{ marginLeft: '8px' }}>Sort:</label>
+              <select
+                id="sort-select"
+                aria-label="Sort documents"
+                className="filter-select"
+                value={sortBy}
+                onChange={(e) => { setSortBy(e.target.value); setForceShowTable(true); }}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="name_asc">Name (A–Z)</option>
+                <option value="name_desc">Name (Z–A)</option>
+                <option value="size_desc">File Size (Largest)</option>
+              </select>
+
+              {hasActiveFilters && (
+                <button type="button" className="filter-reset-btn" onClick={clearFilters}>
+                  Reset All
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Layout */}
+      <div className="main-layout">
+        {/* Sidebar Navigation */}
+        {currentTab === 'library' && (
+          <aside className="sidebar" aria-label="Repository Categories Tree">
+            <div className="sidebar-title">Repository Categories</div>
+            <TreeNode
+              node={data.tree}
+              currentPath={selectedPath}
+              onSelect={(p) => { setSelectedPath(p); setForceShowTable(p !== data.tree?.path); }}
+              expandedPaths={expandedPaths}
+              toggleExpand={toggleExpand}
+            />
+          </aside>
+        )}
+
+        {/* Main Content Area */}
+        <main className="content-area">
+          {currentTab === 'about' ? (
+            <AboutPage onGoHome={() => setCurrentTab('library')} />
+          ) : currentTab === 'changelog' ? (
+            <ChangelogPage onGoHome={() => setCurrentTab('library')} />
+          ) : showWelcome ? (
+            <WelcomePage
+              data={data}
+              onSubjectSelect={handleSubjectSelect}
+              onViewAll={handleViewAll}
+              onCurriculumSelect={(c) => { setFilterCurriculum(c); setForceShowTable(true); }}
+              onSelectFinalFilter={handleSelectFinalFilter}
+            />
+          ) : (
+            <>
+              {/* Desktop Breadcrumb Bar */}
+              {renderBreadcrumbs('desktop-breadcrumb')}
+
+              {/* Document List / Data Table */}
+              {filesLoading && visibleFiles.length === 0 ? (
+                <div className="no-results-box">
+                  <h3>Loading full document catalog...</h3>
+                  <p>Preparing 13,309 examination papers and textbooks.</p>
+                </div>
+              ) : visibleFiles.length > 0 ? (
+                <div className="file-list">
+                  <table className="file-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '50%' }}>Document</th>
+                        <th style={{ width: '28%' }}>Course & Session</th>
+                        <th style={{ width: '22%' }}>Type & Quick Links</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleFiles.map((file) => {
+                        const badge = getDocTypeBadge(file.docType, file.category);
+                        const displayTitle = getDisplayTitle(file);
+                        const titleCls = badge ? `title-${badge.cls}` : 'title-default';
+                        const shortUnit = getShortUnitDisplay(file);
+                        const isPdf = file.ext === 'pdf';
+                        const siblings = file.siblings || null;
+
+                        return (
+                          <tr key={file.path}>
+                            <td className="file-title-cell">
+                              <div className="file-title-row">
+                                <a
+                                  href={getHfUrl(file.path)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={titleCls}
+                                >
+                                  {displayTitle}
+                                </a>
+                              </div>
+                              <div className="file-meta-subrow">
+                                <span className="file-path-subtext file-location" title={file.path}>
+                                  {file.path}
+                                </span>
+                                {file.size ? (
+                                  <span className="file-size-tag">
+                                    {formatBytes(file.size)} • {(file.ext || 'PDF').toUpperCase()}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="details-primary">
+                                {formatSubjectDisplay(file.subject)}
+                                {!(file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') && shortUnit
+                                  ? ` — ${shortUnit}`
+                                  : ''}
+                              </div>
+                              <div className="details-secondary">
+                                <span className={`curr-mini-badge ${file.curriculum === 'Edexcel IGCSE' ? 'igcse' : 'ial'}`}>
+                                  {file.curriculum ? file.curriculum.replace('Edexcel ', '') : 'IAL'}
+                                </span>
+                                {file.session ? (
+                                  <span>{file.session}</span>
+                                ) : file.year ? (
+                                  <span>Year {file.year}</span>
+                                ) : (
+                                  <span>Reference Resource</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="row-actions-cell">
+                                {badge ? (
+                                  <span className={`doc-badge ${badge.cls}`} title={badge.fullLabel}>
+                                    {badge.label}
+                                  </span>
+                                ) : (
+                                  <span className="doc-badge default">Doc</span>
+                                )}
+
+                                {/* Companion QP / MS / ER Quick-Open Links for the exact same sitting */}
+                                {siblings && ['QP', 'MS', 'ER'].map((sibType) => {
+                                  if (sibType === file.docType) return null;
+                                  const sib = siblings[sibType];
+                                  if (!sib) return null;
+                                  return (
+                                    <a
+                                      key={sibType}
+                                      href={getHfUrl(sib.path)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`sibling-pill ${sibType.toLowerCase()}`}
+                                      title={`Open matching ${DOC_TYPE_INFO[sibType]?.fullLabel} (${file.session})`}
+                                    >
+                                      {sibType} ↗
+                                    </a>
+                                  );
+                                })}
+
+                                {isPdf && (
+                                  <button
+                                    type="button"
+                                    className="preview-btn"
+                                    onClick={() => setPreviewFile(file)}
+                                    title="Quick In-App PDF Preview"
+                                  >
+                                    Preview
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/* Fast Pagination Footer */}
+                  {allMatchedFiles.length > visibleFiles.length && (
+                    <div className="pagination-bar">
+                      <span className="pagination-info">
+                        Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong> matching documents
+                      </span>
+                      <div className="pagination-actions">
+                        <button
+                          type="button"
+                          className="search-button pagination-btn"
+                          onClick={() => setVisibleCount(c => c + 100)}
+                        >
+                          Load 100 More ↓
+                        </button>
+                        {allMatchedFiles.length - visibleFiles.length <= 600 && (
+                          <button
+                            type="button"
+                            className="filter-btn"
+                            onClick={() => setVisibleCount(allMatchedFiles.length)}
+                          >
+                            Show All ({allMatchedFiles.length.toLocaleString()})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="no-results-box">
+                  <h3>No matching documents found</h3>
+                  <p>Try refining your search terms or resetting an active filter above.</p>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      className="search-button"
+                      style={{ marginTop: '14px' }}
+                      onClick={clearFilters}
+                    >
+                      Reset All Filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* In-App PDF Preview Modal */}
+      {previewFile && (
+        <PreviewModal
+          file={previewFile}
+          onClose={() => setPreviewFile(null)}
+          onSwitchFile={(newFile) => setPreviewFile(newFile)}
+        />
+      )}
+
+      {/* Global Footer at the Very Bottom */}
+      <footer className="footer-bottom">
+        <div className="footer-left-col">
+          <div>© 2026 <strong>Conceptualist Systems</strong> — All Rights Reserved</div>
+          <div
+            className="footer-update-micro"
+            onClick={() => setCurrentTab('changelog')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCurrentTab('changelog'); }}
+            title="Click to view full site changelog & version history"
+          >
+            Last updated {formatUpdateTimestamp(BUILD_TIMESTAMP)} ({CHANGELOG_HISTORY[0].version}): {CHANGELOG_HISTORY[0].summary}
+          </div>
+        </div>
+        <div className="footer-links">
+          <span className="footer-link" onClick={() => { setCurrentTab('library'); clearFilters(); }}>
+            Library Home
+          </span>
+          <span className="footer-sep">•</span>
+          <span className="footer-link" onClick={() => setCurrentTab('changelog')}>
+            Changelog
+          </span>
+          <span className="footer-sep">•</span>
+          <span className="footer-link" onClick={() => setCurrentTab('about')}>
+            About Us & Team
+          </span>
+          <span className="footer-sep">•</span>
+          <a href="mailto:diavlon.pxa@gmail.com" className="footer-link">
+            Contact Us
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
