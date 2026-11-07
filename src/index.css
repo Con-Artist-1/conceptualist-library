@@ -1383,6 +1383,12 @@ a:hover {
   color: var(--igcse-blue);
 }
 
+.curr-mini-badge.regional {
+  background: #FFF8E7;
+  color: #7A5200;
+  border: 1px solid #E2D3B3;
+}
+
 /* Row Actions & Companion Quick-Links */
 .row-actions-cell {
   display: flex;

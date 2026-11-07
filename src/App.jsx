@@ -3,14 +3,25 @@ import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, use
 import './index.css';
 
 const PAGE_SIZE = 80;
-const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T18:36:00.000Z';
-const APP_VERSION = 'v2.8';
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T19:30:00.000Z';
+const APP_VERSION = 'v2.9';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v2.8',
+    version: 'v2.9',
     date: BUILD_TIMESTAMP,
+    title: 'Precise Regional (Alt A & R) Labels & Course Badges',
+    summary: 'Clarified all Regional and Alt A examination sittings with explicit (Regional / Alt A) and (Regional / R) labels and distinct badges in the Course & Session column.',
+    changes: [
+      'Standardized title labeling so students can instantly distinguish standard series from Regional (R) and IAL Alternate (Alt A) variants.',
+      'Added high-visibility, Ivy-League styled [Regional] and [Regional (Alt A)] badges in the Course & Session column.',
+      'Expanded search indexing to seamlessly match "alt", "alta", "alt a", "regional", and "r".'
+    ]
+  },
+  {
+    version: 'v2.8',
+    date: '2026-11-07T18:36:00.000Z',
     title: '631 New 2024–2026 IAL & IGCSE Past Papers (May/June 2026, Jan 2025 & Modular) + Cache Recovery',
     summary: 'Expanded repository to 13,940 verified Pearson Edexcel files (+631 new papers across May/June 2026, Jan 2025, Oct/Nov 2024, and IGCSE Modular) plus one-click crash cache recovery.',
     changes: [
@@ -174,7 +185,11 @@ const QUERY_SYNONYMS = {
   'october': 'october november oct nov',
   'november': 'october november oct nov',
   'jan': 'january jan',
-  'january': 'january jan'
+  'january': 'january jan',
+  'alt': 'alt alta regional variant',
+  'alta': 'alt alta regional variant',
+  'regional': 'regional reg alt alta r',
+  'reg': 'regional reg alt alta r'
 };
 
 // Canonical academic vocabulary for <0.05ms Damerau-Levenshtein typo tolerance & prefix matching
@@ -523,30 +538,30 @@ function getShortUnitDisplay(file) {
   }
   const v = file.variant || '';
   if (v === 'R') {
-    if (u.startsWith('Paper ')) u = `${u}R (Regional)`;
-    else u = `${u} (Regional)`;
+    if (u.startsWith('Paper ')) u = `${u}R (Regional / R)`;
+    else u = `${u} (Regional / R)`;
   } else if (v === 'A') {
-    u = `${u} (Regional)`;
+    u = `${u} (Regional / Alt A)`;
   } else if (v === 'F') {
     u = `${u} (Foundation)`;
   } else if (v === 'F-R') {
-    u = `${u}R (Foundation Regional)`;
+    u = `${u}R (Regional / Foundation R)`;
   } else if (v === 'H') {
     u = `${u} (Higher)`;
   } else if (v === 'H-R') {
-    u = `${u}R (Higher Regional)`;
+    u = `${u}R (Regional / Higher R)`;
   } else if (v === 'Mod') {
     u = `${u} (Modular)`;
   } else if (v === 'R-Mod') {
-    u = `${u}R (Modular Regional)`;
+    u = `${u}R (Regional / Modular R)`;
   } else if (v === 'H-Mod') {
     u = `${u} (Higher Modular)`;
   } else if (v === 'H-R-Mod') {
-    u = `${u}R (Higher Modular Regional)`;
+    u = `${u}R (Regional / Higher Modular R)`;
   } else if (v === 'F-Mod') {
     u = `${u} (Foundation Modular)`;
   } else if (v === 'F-R-Mod') {
-    u = `${u}R (Foundation Modular Regional)`;
+    u = `${u}R (Regional / Foundation Modular R)`;
   } else if (v.startsWith('Opt')) {
     u = `${u} (Option ${v.slice(3)})`;
   } else if (v.startsWith('ER')) {
@@ -1477,7 +1492,8 @@ function App() {
                 (fileObj.unitCode || '') + ' ' +
                 (fileObj.unitName || '') + ' ' +
                 (fileObj.cleanUnitLabel || '') + ' ' +
-                (isReg ? 'regional ' : '') +
+                (isReg ? 'regional reg r ' : '') +
+                (v === 'A' ? 'alt alta variant ' : '') +
                 s + ' ' +
                 (s.includes('June') ? 'may summer ' : s.includes('October') ? 'november nov ' : '') +
                 (fileObj.year || '') + ' ' +
@@ -2452,6 +2468,11 @@ function App() {
                                   <span>Year {file.year}</span>
                                 ) : (
                                   <span>Reference Resource</span>
+                                )}
+                                {Boolean(file.variant === 'R' || file.variant === 'A' || (file.variant && file.variant.includes('R'))) && (
+                                  <span className="curr-mini-badge regional" title="Regional examination series">
+                                    {file.variant === 'A' ? 'Regional (Alt A)' : 'Regional'}
+                                  </span>
                                 )}
                               </div>
                             </td>
