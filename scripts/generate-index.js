@@ -705,14 +705,42 @@ const subjectCoverage = computeCoverageMap(flatFiles, allSubjects);
 const ialSubjectCoverage = computeCoverageMap(flatFiles.filter(f => f.spec === 'IAL'), ialSubjects);
 const igcseSubjectCoverage = computeCoverageMap(flatFiles.filter(f => f.spec === 'IGCSE'), igcseSubjects);
 
-// Extract paper/unit variant (e.g. R, A, F, H, Opt2, v2, ER1..10) so distinct variants are never merged
+// Extract variant tag (e.g. R, A, F, H, Mod, OptA, Opt2, v2, ER1..10) so distinct variants are clearly labeled & never merged
 function extractVariant(file) {
   const p = file.path || '';
   const n = (file.name || '').replace(/\.[^.]+$/, '');
-  if (/\b(?:Paper[-_\s]*[1-4]R|P[1-4]R|[1-4]PR|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)\b/i.test(p)) return 'R';
-  if (/\b(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)\b/i.test(p)) return 'A';
-  if (/\b(?:1F|2F|Paper[-_\s]*[12]F)\b/i.test(p)) return 'F';
-  if (/\b(?:1H|2H|Paper[-_\s]*[12]H)\b/i.test(p)) return 'H';
+  const isMod = /modular|(?:^|[^a-z0-9])4w[a-z]{1,2}[1-3]/i.test(p);
+
+  if (file.subject === 'History') {
+    const mHist = n.match(/(?:Unit[-_\s]*[1-4]|WHI0[1-4][-_\s]*1)([A-D])\b/i);
+    if (mHist) return `Opt${mHist[1].toUpperCase()}`;
+  }
+
+  if (file.subject === 'Computer Science') {
+    const mCs = p.match(/(?:^|[^A-Z0-9])P2([A-C])(?:[^A-Z0-9]|$)/i);
+    if (mCs) return `P2${mCs[1].toUpperCase()}`;
+  }
+
+  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*[12]F[-_\s]*R?|Foundation)(?:[^A-Z0-9]|$)/i.test(p);
+  const isH = /(?:^|[^A-Z0-9])(?:[12]H[-_]?R?|Paper[-_\s]*[12]H[-_\s]*R?|4WM[12]H|Higher)(?:[^A-Z0-9]|$)/i.test(p);
+  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*[1-4][FH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-3][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][BCPFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)(?:[^A-Z0-9]|$)/i.test(p);
+
+  if (isMod) {
+    if (isF && isR) return 'F-R-Mod';
+    if (isH && isR) return 'H-R-Mod';
+    if (isF) return 'F-Mod';
+    if (isH) return 'H-Mod';
+    if (isR) return 'R-Mod';
+    return 'Mod';
+  }
+
+  if (isF && isR) return 'F-R';
+  if (isH && isR) return 'H-R';
+  if (isF) return 'F';
+  if (isH) return 'H';
+  if (isR) return 'R';
+
+  if (/(?:^|[^A-Z0-9])(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)(?:[^A-Z0-9]|$)/i.test(p)) return 'A';
   const mOpt = n.match(/_([2-9]|\d{2})$/);
   if (mOpt) return `Opt${mOpt[1]}`;
   const mVer = n.match(/\((v\d+|\d+)\)/i);
@@ -812,7 +840,19 @@ function getDirectoryOnlyTree(node) {
   };
 }
 
-const directoryTree = getDirectoryOnlyTree(tree);
+function getShallowTree(node, maxDepth = 2, depth = 0) {
+  if (!node) return null;
+  const dirChildren = depth < maxDepth
+    ? (node.children || []).filter(c => c.children).map(c => getShallowTree(c, maxDepth, depth + 1))
+    : [];
+  return {
+    name: node.name,
+    path: node.path,
+    children: dirChildren
+  };
+}
+
+const shallowTree = getShallowTree(tree, 2);
 
 // Compact tree representation [name, children] to slash meta.json size by 85%
 function getCompactTree(node) {
@@ -826,7 +866,7 @@ function getCompactTree(node) {
 
 const compactTree = getCompactTree(tree);
 
-const keys = ["name", "path", "size", "subject", "docType", "year", "session", "sortKey", "unitCode", "unitName", "spec", "category"];
+const keys = ["name", "path", "size", "subject", "docType", "year", "session", "sortKey", "unitCode", "unitName", "spec", "category", "variant", "cleanUnitLabel"];
 const files = flatFiles.map(f => [
   f.name,
   f.path,
@@ -839,7 +879,9 @@ const files = flatFiles.map(f => [
   f.unitCode,
   f.unitName,
   f.spec,
-  f.category
+  f.category,
+  extractVariant(f),
+  getCleanUnitLabel(f)
 ]);
 
 const metaInfo = {
@@ -856,7 +898,7 @@ const metaInfo = {
 };
 
 const output = {
-  tree: directoryTree,
+  tree: shallowTree,
   compactTree,
   keys,
   files,
@@ -864,7 +906,7 @@ const output = {
 };
 
 const metaOutput = {
-  tree: directoryTree,
+  tree: shallowTree,
   compactTree,
   meta: metaInfo
 };
@@ -877,7 +919,7 @@ const metaPath = path.join(publicDir, 'meta.json');
 fs.writeFileSync(metaPath, JSON.stringify(metaOutput));
 
 const rootLiveIndexPath = path.join(TARGET_DIR, 'live_index.json');
-fs.writeFileSync(rootLiveIndexPath, JSON.stringify({ tree: directoryTree, keys, files, meta: metaInfo }));
+fs.writeFileSync(rootLiveIndexPath, JSON.stringify({ tree: shallowTree, compactTree, keys, files, meta: metaInfo }));
 
 console.log(`Index generated successfully at ${outputPath}`);
 console.log(`Indexed ${flatFiles.length} files (${ialSubjects.length} IAL subjects, ${igcseSubjects.length} IGCSE subjects).`);

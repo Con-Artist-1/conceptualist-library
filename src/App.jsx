@@ -1408,108 +1408,87 @@ function App() {
       // Ignore storage errors
     }
 
-    // Stage 1: Instant load meta.json (bound to current build timestamp so new deploys bust cache immediately)
-    fetch(`/meta.json?v=${buildQuery}`)
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then(json => {
-        const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
-        if (tree) {
-          setData(prev => ({
-            ...prev,
-            tree: tree || prev.tree,
-            meta: json.meta || prev.meta
-          }));
-          setLoading(false);
-          setExpandedPaths(prev => new Set([...prev, '', tree.path]));
-        }
-        try {
-          localStorage.setItem(META_CACHE_KEY, JSON.stringify({
-            compactTree: json.compactTree,
-            meta: json.meta
-          }));
-        } catch {
-          // Ignore quota errors
-        }
-      })
-      .catch(() => {
-        // Do not set loading=false here; let Stage 2 index.json populate tree & meta
-      });
+    let metaLoadedTree = Boolean(initialCache?.tree);
 
-    // Stage 2: Background load full index.json (with automatic cache-reload retry if needed)
-    fetch(`/index.json?v=${buildQuery}`)
-      .then(res => {
-        if (!res.ok) return fetch(`/index.json?nocache=${Date.now()}`, { cache: 'reload' });
-        return res;
-      })
-      .then(res => res.json())
-      .then(json => {
-        const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
-        let rawList = [];
-        if (json.files && json.keys) {
-          const keys = json.keys;
-          const kLen = keys.length;
-          rawList = new Array(json.files.length);
-          for (let i = 0; i < json.files.length; i++) {
-            const arr = json.files[i];
-            const fileObj = {};
-            for (let j = 0; j < kLen; j++) {
-              fileObj[keys[j]] = arr[j];
+    const loadFullIndex = () => {
+      // Stage 2: Background load full index.json after initial UI paint
+      fetch(`/index.json?v=${buildQuery}`)
+        .then(res => {
+          if (!res.ok) return fetch(`/index.json?nocache=${Date.now()}`, { cache: 'reload' });
+          return res;
+        })
+        .then(res => res.json())
+        .then(json => {
+          setTimeout(() => {
+            const tree = !metaLoadedTree
+              ? (json.compactTree ? inflateCompactTree(json.compactTree) : json.tree)
+              : null;
+            let rawList = [];
+            if (json.files && json.keys) {
+              const keys = json.keys;
+              const kLen = keys.length;
+              rawList = new Array(json.files.length);
+              for (let i = 0; i < json.files.length; i++) {
+                const arr = json.files[i];
+                const fileObj = {};
+                for (let j = 0; j < kLen; j++) {
+                  fileObj[keys[j]] = arr[j];
+                }
+                rawList[i] = fileObj;
+              }
+            } else {
+              rawList = json.flatFiles || [];
             }
-            rawList[i] = fileObj;
-          }
-        } else {
-          rawList = json.flatFiles || [];
-        }
 
-        // Enrich files in a single fast pass
-        const flatFiles = new Array(rawList.length);
-        for (let i = 0; i < rawList.length; i++) {
-          const fileObj = { ...rawList[i] };
-          if (fileObj.name) fileObj.name = fileObj.name.replace(/_\d{10,14}/g, '');
-          if (fileObj.path) fileObj.path = fileObj.path.replace(/_\d{10,14}/g, '');
+            // Enrich files in a single ultra-fast pass using precomputed variant & cleanUnitLabel
+            const flatFiles = new Array(rawList.length);
+            for (let i = 0; i < rawList.length; i++) {
+              const fileObj = rawList[i];
+              if (fileObj.name && fileObj.name.includes('_17')) fileObj.name = fileObj.name.replace(/_\d{10,14}/g, '');
+              if (fileObj.path && fileObj.path.includes('_17')) fileObj.path = fileObj.path.replace(/_\d{10,14}/g, '');
 
-          fileObj.ext = (fileObj.name || '').split('.').pop().toLowerCase();
-          fileObj.curriculum = getCurriculum(fileObj);
-          fileObj.variant = extractVariant(fileObj);
-          fileObj.cleanUnitLabel = getCleanUnitLabel(fileObj);
+              const dotIdx = fileObj.name ? fileObj.name.lastIndexOf('.') : -1;
+              fileObj.ext = dotIdx !== -1 ? fileObj.name.slice(dotIdx + 1).toLowerCase() : '';
+              fileObj.curriculum = fileObj.spec === 'IGCSE' || fileObj.category === 'IGCSE Books' ? 'Edexcel IGCSE' : 'Edexcel IAL';
+              if (fileObj.variant === undefined) fileObj.variant = extractVariant(fileObj);
+              if (fileObj.cleanUnitLabel === undefined) fileObj.cleanUnitLabel = getCleanUnitLabel(fileObj);
 
-          let sessionVal = 0;
-          if (fileObj.session) {
-            const s = fileObj.session;
-            if (s.includes('Jan')) sessionVal = 1;
-            else if (s.includes('May') || s.includes('June')) sessionVal = 6;
-            else if (s.includes('Oct') || s.includes('Nov')) sessionVal = 10;
-          }
-          fileObj.sortKey = (fileObj.year || 2000) * 100 + sessionVal;
+              if (!fileObj.sortKey) {
+                let sessionVal = 0;
+                const s = fileObj.session;
+                if (s) {
+                  if (s.includes('Jan')) sessionVal = 1;
+                  else if (s.includes('May') || s.includes('June')) sessionVal = 6;
+                  else if (s.includes('Oct') || s.includes('Nov')) sessionVal = 10;
+                }
+                fileObj.sortKey = (fileObj.year || 2000) * 100 + sessionVal;
+              }
 
-          // Build comprehensive lowercase search string once
-          fileObj.searchTerms = [
-            fileObj.name,
-            fileObj.path,
-            fileObj.subject,
-            fileObj.subject === 'Math' ? 'mathematics maths' : '',
-            fileObj.subject === 'Information Technology' ? 'it ict' : '',
-            fileObj.unitCode,
-            fileObj.unitName,
-            fileObj.cleanUnitLabel,
-            (fileObj.variant === 'R' || fileObj.variant === 'A' || (fileObj.variant && fileObj.variant.includes('R'))) ? 'regional' : '',
-            fileObj.session,
-            fileObj.session && fileObj.session.includes('June') ? 'may summer' : '',
-            fileObj.session && fileObj.session.includes('October') ? 'november nov' : '',
-            fileObj.year ? String(fileObj.year) : '',
-            fileObj.docType,
-            fileObj.docType === 'QP' ? 'question paper' : '',
-            fileObj.docType === 'MS' ? 'mark scheme markscheme' : '',
-            fileObj.docType === 'ER' ? 'examiner report' : '',
-            fileObj.curriculum,
-            fileObj.category
-          ].filter(Boolean).join(' ').toLowerCase();
+              const v = fileObj.variant || '';
+              const isReg = v === 'R' || v === 'A' || v.includes('R');
+              const s = fileObj.session || '';
+              const dt = fileObj.docType || '';
 
-          flatFiles[i] = fileObj;
-        }
+              fileObj.searchTerms = (
+                (fileObj.name || '') + ' ' +
+                (fileObj.path || '') + ' ' +
+                (fileObj.subject || '') + ' ' +
+                (fileObj.subject === 'Math' ? 'mathematics maths ' : fileObj.subject === 'Information Technology' ? 'it ict ' : '') +
+                (fileObj.unitCode || '') + ' ' +
+                (fileObj.unitName || '') + ' ' +
+                (fileObj.cleanUnitLabel || '') + ' ' +
+                (isReg ? 'regional ' : '') +
+                s + ' ' +
+                (s.includes('June') ? 'may summer ' : s.includes('October') ? 'november nov ' : '') +
+                (fileObj.year || '') + ' ' +
+                dt + ' ' +
+                (dt === 'QP' ? 'question paper ' : dt === 'MS' ? 'mark scheme markscheme ' : dt === 'ER' ? 'examiner report ' : '') +
+                fileObj.curriculum + ' ' +
+                (fileObj.category || '')
+              ).toLowerCase();
+
+              flatFiles[i] = fileObj;
+            }
 
         // Deduplicate byte-for-byte duplicate files across batches & link QP/MS/ER siblings
         const scoreFile = (f) => {
@@ -1639,22 +1618,61 @@ function App() {
           delete item.searchChunks;
         }
 
-        setData(prev => ({
-          tree: tree || prev.tree,
-          flatFiles,
-          dedupedFiles,
-          unifiedFiles,
-          meta: json.meta || prev.meta || {}
-        }));
-        setLoading(false);
-        setFilesLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load index:', err);
-        setLoading(false);
-        setFilesLoading(false);
-      });
-  }, []);
+            setData(prev => ({
+              tree: tree || prev.tree,
+              flatFiles,
+              dedupedFiles,
+              unifiedFiles,
+              meta: json.meta || prev.meta || {}
+            }));
+            setLoading(false);
+            setFilesLoading(false);
+          }, 0);
+        })
+        .catch(err => {
+          console.error('Failed to load index:', err);
+          setLoading(false);
+          setFilesLoading(false);
+        });
+    };
+
+    if (metaLoadedTree) {
+      // Homepage & sidebar are already rendered in 0ms from localStorage; fetch full index after first paint
+      setTimeout(loadFullIndex, 0);
+    } else {
+      // Stage 1: Fetch tiny meta.json first (~14 KB Brotli) so Homepage renders immediately without competing with index.json
+      fetch(`/meta.json?v=${buildQuery}`)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(json => {
+          const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
+          if (tree) {
+            metaLoadedTree = true;
+            setData(prev => ({
+              ...prev,
+              tree: tree || prev.tree,
+              meta: json.meta || prev.meta
+            }));
+            setLoading(false);
+            setExpandedPaths(prev => new Set([...prev, '', tree.path]));
+          }
+          try {
+            localStorage.setItem(META_CACHE_KEY, JSON.stringify({
+              compactTree: json.compactTree,
+              meta: json.meta
+            }));
+          } catch {
+            // Ignore quota errors
+          }
+          setTimeout(loadFullIndex, 0);
+        })
+        .catch(() => {
+          loadFullIndex();
+        });
+    }
+  }, [initialCache]);
 
   // Reset pagination when filters/search change
   useEffect(() => {
