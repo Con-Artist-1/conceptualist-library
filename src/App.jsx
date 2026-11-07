@@ -524,9 +524,9 @@ function getShortUnitDisplay(file) {
   const v = file.variant || '';
   if (v === 'R') {
     if (u.startsWith('Paper ')) u = `${u}R (Regional)`;
-    else u = `${u} (Regional R)`;
+    else u = `${u} (Regional)`;
   } else if (v === 'A') {
-    u = `${u} (Alt A)`;
+    u = `${u} (Regional)`;
   } else if (v === 'F') {
     u = `${u} (Foundation)`;
   } else if (v === 'F-R') {
@@ -1495,6 +1495,7 @@ function App() {
             fileObj.unitCode,
             fileObj.unitName,
             fileObj.cleanUnitLabel,
+            (fileObj.variant === 'R' || fileObj.variant === 'A' || (fileObj.variant && fileObj.variant.includes('R'))) ? 'regional' : '',
             fileObj.session,
             fileObj.session && fileObj.session.includes('June') ? 'may summer' : '',
             fileObj.session && fileObj.session.includes('October') ? 'november nov' : '',
