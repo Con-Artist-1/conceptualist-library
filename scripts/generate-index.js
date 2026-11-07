@@ -444,12 +444,12 @@ function extractUnitInfo(pathStr, subject, spec) {
     }
   }
 
-  // 5. IGCSE Paper shorthand (Paper1, Paper1R, P1, P2, QP 1, MS 2, 4IT1_02, 4BS1-02R)
+  // 5. IGCSE Paper shorthand (Paper1, Paper1R, P1, P2, Unit1, Modular 2B, 4WBI1, 4WM2H, QP 1, MS 2, 4IT1_02, 4MA1-1F, 4PH1-1P)
   // Note: Do NOT map standalone 'ER 1..10.pdf' in IGCSE to P1..P4 because AutomatePapers numbered ERs sequentially (ER 1..10) across variants!
   if (spec === 'IGCSE') {
-    const igcsePaperMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:Paper[-_\s]*([1-3])[A-Z0-9]*|P([1-3])[A-Z0-9]*|(?:QP|MS)[-_\s]+([1-3])[A-Z]*|4[A-Z]{2}[01][-_. ]0([1-3])[A-Z]*)(?:[^A-Z0-9]|$)/i);
+    const igcsePaperMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:Paper[-_\s]*([1-3])[A-Z0-9]*|Unit[-_\s]*([1-3])[A-Z0-9]*|Modular[-_\s]*([1-3])[A-Z0-9]*|P([1-3])[A-Z0-9]*|(?:QP|MS)[-_\s]+([1-3])[A-Z]*|4[A-Z]{2}[01][-_. ]0?([1-3])[A-Z]*|4W[A-Z]{1,2}([1-3])[A-Z0-9]*)(?:[^A-Z0-9]|$)/i);
     if (igcsePaperMatch) {
-      const pNum = igcsePaperMatch[1] || igcsePaperMatch[2] || igcsePaperMatch[3] || igcsePaperMatch[4];
+      const pNum = igcsePaperMatch[1] || igcsePaperMatch[2] || igcsePaperMatch[3] || igcsePaperMatch[4] || igcsePaperMatch[5] || igcsePaperMatch[6] || igcsePaperMatch[7];
       return {
         unitCode: `P${pNum}`,
         unitName: `Paper ${pNum}`

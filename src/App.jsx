@@ -3,14 +3,26 @@ import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, use
 import './index.css';
 
 const PAGE_SIZE = 80;
-const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T17:18:00.000Z';
-const APP_VERSION = 'v2.7';
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T18:36:00.000Z';
+const APP_VERSION = 'v2.8';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v2.7',
+    version: 'v2.8',
     date: BUILD_TIMESTAMP,
+    title: '631 New 2024–2026 IAL & IGCSE Past Papers (May/June 2026, Jan 2025 & Modular) + Cache Recovery',
+    summary: 'Expanded repository to 13,940 verified Pearson Edexcel files (+631 new papers across May/June 2026, Jan 2025, Oct/Nov 2024, and IGCSE Modular) plus one-click crash cache recovery.',
+    changes: [
+      'Added 631 verified, unwatermarked Pearson Edexcel past papers (QP, MS, ER, and practical data files), bringing the total indexed archive from 13,309 to 13,940 files.',
+      'Added May/June 2026 IAL & IGCSE series across Accounting, Biology, Business, Chemistry, Economics, English Language/Literature, Geography, History, Law, Mathematics, Physics, and Psychology.',
+      'Added IGCSE Modular (Unit 1 & Unit 2, 2024–2026) papers for Accounting, Biology, Chemistry, Commerce, Economics, Geography, History, Physics, and Religious Studies, plus Foundation/Higher Regional (F-R / H-R) and Computer Science P2 variants.',
+      'Added backward-compatible tree indexing and a dedicated "Clear Cache & Force Reload" recovery screen so returning browsers with older cached shells self-heal automatically.'
+    ]
+  },
+  {
+    version: 'v2.7',
+    date: '2026-11-07T17:18:00.000Z',
     title: 'Institutional McMaster/Ivy-League Styling, Unified Sittings & Typo-Tolerant Fuzzy Search',
     summary: 'Refined muted burgundy/slate institutional palette, removed all emojis, unified QP/MS/ER into single sitting rows (~65% less clutter), and added typo-tolerant fuzzy + shorthand search.',
     changes: [
@@ -330,14 +342,45 @@ function getCurriculum(file) {
   return 'Edexcel IAL';
 }
 
-// Extract variant tag (e.g. R, A, F, H, Opt2, v2, ER1..10) so distinct variants are clearly labeled & never merged
+// Extract variant tag (e.g. R, A, F, H, Mod, OptA, Opt2, v2, ER1..10) so distinct variants are clearly labeled & never merged
 function extractVariant(file) {
   const p = file.path || '';
   const n = (file.name || '').replace(/\.[^.]+$/, '');
-  if (/\b(?:Paper[-_\s]*[1-4]R|P[1-4]R|[1-4]PR|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)\b/i.test(p)) return 'R';
-  if (/\b(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)\b/i.test(p)) return 'A';
-  if (/\b(?:1F|2F|Paper[-_\s]*[12]F)\b/i.test(p)) return 'F';
-  if (/\b(?:1H|2H|Paper[-_\s]*[12]H)\b/i.test(p)) return 'H';
+  const isMod = /modular|(?:^|[^a-z0-9])4w[a-z]{1,2}[1-3]/i.test(p);
+
+  // IAL History route options (Unit1A..Unit4D)
+  if (file.subject === 'History') {
+    const mHist = n.match(/(?:Unit[-_\s]*[1-4]|WHI0[1-4][-_\s]*1)([A-D])\b/i);
+    if (mHist) return `Opt${mHist[1].toUpperCase()}`;
+  }
+
+  // IGCSE Computer Science Paper 2 programming language options (P2A, P2B, P2C)
+  if (file.subject === 'Computer Science') {
+    const mCs = p.match(/(?:^|[^A-Z0-9])P2([A-C])(?:[^A-Z0-9]|$)/i);
+    if (mCs) return `P2${mCs[1].toUpperCase()}`;
+  }
+
+  // IGCSE Mathematics A Foundation / Higher (+ Regional / Modular)
+  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*[12]F[-_\s]*R?|Foundation)(?:[^A-Z0-9]|$)/i.test(p);
+  const isH = /(?:^|[^A-Z0-9])(?:[12]H[-_]?R?|Paper[-_\s]*[12]H[-_\s]*R?|4WM[12]H|Higher)(?:[^A-Z0-9]|$)/i.test(p);
+  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*[1-4][FH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-3][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][BCPFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)(?:[^A-Z0-9]|$)/i.test(p);
+
+  if (isMod) {
+    if (isF && isR) return 'F-R-Mod';
+    if (isH && isR) return 'H-R-Mod';
+    if (isF) return 'F-Mod';
+    if (isH) return 'H-Mod';
+    if (isR) return 'R-Mod';
+    return 'Mod';
+  }
+
+  if (isF && isR) return 'F-R';
+  if (isH && isR) return 'H-R';
+  if (isF) return 'F';
+  if (isH) return 'H';
+  if (isR) return 'R';
+
+  if (/(?:^|[^A-Z0-9])(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)(?:[^A-Z0-9]|$)/i.test(p)) return 'A';
   const mOpt = n.match(/_([2-9]|\d{2})$/);
   if (mOpt) return `Opt${mOpt[1]}`;
   const mVer = n.match(/\((v\d+|\d+)\)/i);
@@ -486,8 +529,24 @@ function getShortUnitDisplay(file) {
     u = `${u} (Alt A)`;
   } else if (v === 'F') {
     u = `${u} (Foundation)`;
+  } else if (v === 'F-R') {
+    u = `${u}R (Foundation Regional)`;
   } else if (v === 'H') {
     u = `${u} (Higher)`;
+  } else if (v === 'H-R') {
+    u = `${u}R (Higher Regional)`;
+  } else if (v === 'Mod') {
+    u = `${u} (Modular)`;
+  } else if (v === 'R-Mod') {
+    u = `${u}R (Modular Regional)`;
+  } else if (v === 'H-Mod') {
+    u = `${u} (Higher Modular)`;
+  } else if (v === 'H-R-Mod') {
+    u = `${u}R (Higher Modular Regional)`;
+  } else if (v === 'F-Mod') {
+    u = `${u} (Foundation Modular)`;
+  } else if (v === 'F-R-Mod') {
+    u = `${u}R (Foundation Modular Regional)`;
   } else if (v.startsWith('Opt')) {
     u = `${u} (Option ${v.slice(3)})`;
   } else if (v.startsWith('ER')) {
