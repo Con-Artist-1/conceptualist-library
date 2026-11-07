@@ -3,14 +3,26 @@ import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, use
 import './index.css';
 
 const PAGE_SIZE = 80;
-const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T16:10:00.000Z';
-const APP_VERSION = 'v2.5';
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-07T16:55:00.000Z';
+const APP_VERSION = 'v2.6';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v2.5',
+    version: 'v2.6',
     date: BUILD_TIMESTAMP,
+    title: 'Unified Exam Sitting Rows & Side-by-Side (QP + MS) Split Preview',
+    summary: 'Unified Question Papers, Mark Schemes, and Examiner Reports into single exam sitting rows (~65% fewer rows to scroll) with one-click QP/MS/ER buttons and side-by-side split PDF preview.',
+    changes: [
+      'Unified matching Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), and listening audio/data attachments from the same exam sitting into a single consolidated row — reducing list clutter by ~65% (from 9,415 individual file rows down to ~3,500 unified exam sittings).',
+      'Added dedicated one-click action buttons ("📄 Question Paper ↗", "✓ Mark Scheme ↗", "📊 Examiner Report ↗") directly on every unified row so students can open either the paper or mark scheme immediately.',
+      'Upgraded the in-app PDF Preview Modal with a "⚡ Split View (QP + MS)" mode to view the Question Paper on the left and the Mark Scheme on the right side-by-side.',
+      'Added a "View: Unified Sittings / Individual Files" toggle in the filter bar so users can switch between consolidated sittings and individual files anytime.'
+    ]
+  },
+  {
+    version: 'v2.5',
+    date: '2026-11-07T16:10:00.000Z',
     title: 'Anti-Stale Cache Enforcement, Build Version Tracking & Live Changelog',
     summary: 'Fixed stale browser/CDN caching on root route, bound index cache to build timestamp, and added subtle footer update tracker + full Changelog page.',
     changes: [
@@ -382,6 +394,18 @@ function getDisplayTitle(file) {
   return mainParts;
 }
 
+// Generate clean unified sitting title (e.g. "Mathematics — Unit 1 (WMA11) • January 2025")
+function getUnifiedSittingTitle(file) {
+  const subjStr = file.subject === 'Information Technology'
+    ? 'IT'
+    : (file.subject === 'Math' ? 'Mathematics' : (file.subject || ''));
+  const shortUnit = getShortUnitDisplay(file);
+  const mainParts = [subjStr, shortUnit].filter(Boolean).join(' — ');
+  const timePart = file.session || (file.year ? String(file.year) : '');
+  if (!mainParts) return getDisplayTitle(file);
+  return timePart ? `${mainParts} • ${timePart}` : mainParts;
+}
+
 // ─── Institutional Sidebar Tree Node ─────────────────────────────
 const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggleExpand }) => {
   if (!node || !node.children) return null;
@@ -430,8 +454,10 @@ const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggl
   );
 });
 
-// ─── In-App Quick PDF Preview Modal ──────────────────────────────
+// ─── In-App Quick PDF Preview Modal (with QP + MS Split View) ────
 const PreviewModal = ({ file, onClose, onSwitchFile }) => {
+  const [splitMode, setSplitMode] = useState(false);
+
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 'Escape') onClose();
@@ -442,16 +468,22 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
 
   if (!file) return null;
   const url = getHfUrl(file.path);
-  const title = getDisplayTitle(file);
   const siblings = file.siblings || {};
+  const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
+  const activeSplit = splitMode && canSplit;
+  const title = activeSplit ? `${getUnifiedSittingTitle(file)} — Split View (QP + MS)` : getDisplayTitle(file);
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal-container ${activeSplit ? 'modal-split-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-group">
             <span className="modal-title">{title}</span>
-            <span className="modal-subtitle">{file.path} {file.size ? `(${formatBytes(file.size)})` : ''}</span>
+            <span className="modal-subtitle">
+              {activeSplit
+                ? `Left: ${siblings.QP.name} • Right: ${siblings.MS.name}`
+                : `${file.path} ${file.size ? `(${formatBytes(file.size)})` : ''}`}
+            </span>
           </div>
 
           <div className="modal-actions">
@@ -459,19 +491,33 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             {['QP', 'MS', 'ER'].map((type) => {
               const sib = siblings[type];
               if (!sib || !sib.ext || sib.ext !== 'pdf') return null;
-              const isCurrent = file.path === sib.path;
+              const isCurrent = !activeSplit && file.path === sib.path;
               return (
                 <button
                   key={type}
                   type="button"
                   className={`modal-sibling-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
-                  onClick={() => !isCurrent && onSwitchFile(sib)}
+                  onClick={() => {
+                    setSplitMode(false);
+                    if (file.path !== sib.path) onSwitchFile(sib);
+                  }}
                   title={`View ${DOC_TYPE_INFO[type]?.fullLabel || type}`}
                 >
-                  {type}
+                  {type === 'QP' ? '📄 QP' : type === 'MS' ? '✓ MS' : '📊 ER'}
                 </button>
               );
             })}
+
+            {canSplit && (
+              <button
+                type="button"
+                className={`modal-sibling-btn split ${activeSplit ? 'active' : ''}`}
+                onClick={() => setSplitMode(prev => !prev)}
+                title="View Question Paper and Mark Scheme side-by-side"
+              >
+                ⚡ Split (QP + MS)
+              </button>
+            )}
 
             <a
               href={url}
@@ -486,12 +532,33 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             </button>
           </div>
         </div>
-        <div className="modal-body">
-          <iframe
-            src={url}
-            title={title}
-            className="modal-iframe"
-          />
+        <div className={`modal-body ${activeSplit ? 'split-grid' : ''}`}>
+          {activeSplit ? (
+            <>
+              <div className="modal-split-pane">
+                <div className="modal-split-label qp">📄 Question Paper (QP)</div>
+                <iframe
+                  src={getHfUrl(siblings.QP.path)}
+                  title="Question Paper"
+                  className="modal-iframe"
+                />
+              </div>
+              <div className="modal-split-pane">
+                <div className="modal-split-label ms">✓ Mark Scheme (MS)</div>
+                <iframe
+                  src={getHfUrl(siblings.MS.path)}
+                  title="Mark Scheme"
+                  className="modal-iframe"
+                />
+              </div>
+            </>
+          ) : (
+            <iframe
+              src={url}
+              title={title}
+              className="modal-iframe"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -933,6 +1000,7 @@ function App() {
     tree: initialCache?.tree || null,
     flatFiles: [],
     dedupedFiles: [],
+    unifiedFiles: [],
     meta: initialCache?.meta || {}
   }));
   const [loading, setLoading] = useState(!initialCache?.tree);
@@ -941,9 +1009,10 @@ function App() {
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [selectedPath, setSelectedPath] = useState('');
   const [expandedPaths, setExpandedPaths] = useState(new Set(['']));
-  const [currentTab, setCurrentTab] = useState('library'); // 'library' | 'about'
+  const [currentTab, setCurrentTab] = useState('library'); // 'library' | 'about' | 'changelog'
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [previewFile, setPreviewFile] = useState(null);
+  const [viewMode, setViewMode] = useState('unified'); // 'unified' | 'separate'
 
   // Filters
   const [filterCurriculum, setFilterCurriculum] = useState(''); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
@@ -1134,10 +1203,93 @@ function App() {
 
         const dedupedFiles = Array.from(dedupMap.values());
 
+        // Build Unified Exam Sitting entries so each exam sitting (QP + MS + ER + extras) is a single row
+        const sittingMap = new Map();
+        const unifiedFiles = [];
+        const DOC_PRIORITY = ['QP', 'MS', 'ER', 'SOL', 'AUD', 'SC', 'DF', 'SAM'];
+
+        for (let i = 0; i < dedupedFiles.length; i++) {
+          const f = dedupedFiles[i];
+          const canUnify =
+            f.category === 'Past Papers' &&
+            f.unitCode &&
+            f.session &&
+            f.docType &&
+            !String(f.variant || '').startsWith('ER');
+
+          if (!canUnify) {
+            unifiedFiles.push({
+              ...f,
+              isUnifiedSitting: false,
+              docs: f.docType ? { [f.docType]: f } : {},
+              docTypes: f.docType ? [f.docType] : [],
+              paths: [f.path],
+              fileCount: 1,
+              totalSize: f.size || 0
+            });
+            continue;
+          }
+
+          const sittingKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
+          let group = sittingMap.get(sittingKey);
+          if (!group) {
+            group = {
+              id: sittingKey,
+              isUnifiedSitting: true,
+              spec: f.spec,
+              curriculum: f.curriculum,
+              category: f.category,
+              subject: f.subject,
+              unitCode: f.unitCode,
+              unitName: f.unitName,
+              cleanUnitLabel: f.cleanUnitLabel,
+              variant: f.variant,
+              year: f.year,
+              session: f.session,
+              sortKey: f.sortKey,
+              docs: {},
+              paths: [],
+              searchChunks: [],
+              totalSize: 0
+            };
+            sittingMap.set(sittingKey, group);
+            unifiedFiles.push(group);
+          }
+
+          if (!group.docs[f.docType] || scoreFile(f) > scoreFile(group.docs[f.docType])) {
+            group.docs[f.docType] = f;
+          }
+          group.paths.push(f.path);
+          group.searchChunks.push(f.searchTerms);
+          group.totalSize += (f.size || 0);
+        }
+
+        // Finalize unified sitting metadata in one fast pass
+        for (let i = 0; i < unifiedFiles.length; i++) {
+          const item = unifiedFiles[i];
+          if (!item.isUnifiedSitting) continue;
+          const docTypes = DOC_PRIORITY.filter(t => Boolean(item.docs[t]));
+          const primary = item.docs.QP || item.docs.MS || item.docs.ER || item.docs[docTypes[0]];
+          const folderPath = (primary.path || '').split('/').slice(0, -1).join('/') || primary.path;
+          item.docTypes = docTypes;
+          item.fileCount = docTypes.length;
+          item.primaryFile = primary;
+          item.name = primary.name;
+          item.path = primary.path;
+          item.folderPath = folderPath;
+          item.ext = primary.ext;
+          item.size = item.totalSize;
+          item.docType = primary.docType;
+          item.siblings = primary.siblings;
+          item.searchTerms = item.searchChunks.join(' ');
+          delete item.searchChunks;
+        }
+
         setData(prev => ({
           tree: tree || prev.tree,
           flatFiles,
           dedupedFiles,
+          unifiedFiles,
           meta: json.meta || prev.meta || {}
         }));
         setLoading(false);
@@ -1153,7 +1305,7 @@ function App() {
   // Reset pagination when filters/search change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, deferredSearchQuery, sortBy]);
+  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, deferredSearchQuery, sortBy, viewMode]);
 
   const toggleExpand = useCallback((path) => {
     setExpandedPaths(prev => {
@@ -1257,13 +1409,23 @@ function App() {
 
   const allMatchedFiles = useMemo(() => {
     const isSpecificFolder = Boolean(selectedPath && selectedPath !== '' && selectedPath !== data.tree?.path);
-    // Use deduplicated list at library root so users never see 3 duplicate copies of the same paper;
-    // use full flatFiles when inspecting a specific directory in the sidebar tree.
-    let files = isSpecificFolder ? data.flatFiles : data.dedupedFiles;
+    const useUnified = viewMode === 'unified';
+
+    let files = useUnified
+      ? data.unifiedFiles
+      : (isSpecificFolder ? data.flatFiles : data.dedupedFiles);
 
     if (isSpecificFolder) {
       const prefix = selectedPath.endsWith('/') ? selectedPath : `${selectedPath}/`;
-      files = files.filter(f => f.path === selectedPath || f.path.startsWith(prefix));
+      if (useUnified) {
+        files = files.filter(f =>
+          f.path === selectedPath ||
+          f.path.startsWith(prefix) ||
+          (f.paths && f.paths.some(p => p === selectedPath || p.startsWith(prefix)))
+        );
+      } else {
+        files = files.filter(f => f.path === selectedPath || f.path.startsWith(prefix));
+      }
     }
 
     if (filterCurriculum) {
@@ -1286,7 +1448,16 @@ function App() {
       if (filterDocType === 'Book') {
         files = files.filter(f => f.category === 'Books' || f.category === 'IAL Books' || f.category === 'IGCSE Books');
       } else if (filterDocType === 'Extra') {
-        files = files.filter(f => f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL');
+        if (useUnified) {
+          files = files.filter(f =>
+            f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL ||
+            f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL'
+          );
+        } else {
+          files = files.filter(f => f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL');
+        }
+      } else if (useUnified) {
+        files = files.filter(f => Boolean(f.docs?.[filterDocType] || f.docType === filterDocType));
       } else {
         files = files.filter(f => f.docType === filterDocType);
       }
@@ -1347,6 +1518,7 @@ function App() {
   }, [
     data.flatFiles,
     data.dedupedFiles,
+    data.unifiedFiles,
     data.tree,
     selectedPath,
     deferredSearchQuery,
@@ -1355,7 +1527,8 @@ function App() {
     filterSubject,
     filterUnit,
     filterYear,
-    sortBy
+    sortBy,
+    viewMode
   ]);
 
   const visibleFiles = useMemo(
@@ -1476,9 +1649,17 @@ function App() {
         {filesLoading ? (
           <span>Loading full catalog...</span>
         ) : allMatchedFiles.length > visibleFiles.length ? (
-          <>Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong> documents</>
+          <>
+            Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong>{' '}
+            {viewMode === 'unified' ? 'exam sittings' : 'documents'}
+          </>
         ) : (
-          <>Displaying <strong>{allMatchedFiles.length.toLocaleString()}</strong> matching {allMatchedFiles.length === 1 ? 'document' : 'documents'}</>
+          <>
+            Displaying <strong>{allMatchedFiles.length.toLocaleString()}</strong> matching{' '}
+            {viewMode === 'unified'
+              ? (allMatchedFiles.length === 1 ? 'exam sitting' : 'exam sittings')
+              : (allMatchedFiles.length === 1 ? 'document' : 'documents')}
+          </>
         )}
       </div>
     </div>
@@ -1731,6 +1912,26 @@ function App() {
                 <option value="size_desc">File Size (Largest)</option>
               </select>
 
+              <span className="filter-group-label" style={{ marginLeft: '8px' }}>View:</span>
+              <div className="view-mode-toggle" role="group" aria-label="Toggle Unified Sittings vs Individual Files">
+                <button
+                  type="button"
+                  className={`view-mode-btn ${viewMode === 'unified' ? 'active' : ''}`}
+                  onClick={() => setViewMode('unified')}
+                  title="Combine QP, MS, and ER from the same sitting into one row"
+                >
+                  ✨ Unified Sittings
+                </button>
+                <button
+                  type="button"
+                  className={`view-mode-btn ${viewMode === 'separate' ? 'active' : ''}`}
+                  onClick={() => setViewMode('separate')}
+                  title="Show every file as a separate row"
+                >
+                  Individual Files
+                </button>
+              </div>
+
               {hasActiveFilters && (
                 <button type="button" className="filter-reset-btn" onClick={clearFilters}>
                   Reset All
@@ -1787,38 +1988,53 @@ function App() {
                   <table className="file-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '50%' }}>Document</th>
-                        <th style={{ width: '28%' }}>Course & Session</th>
-                        <th style={{ width: '22%' }}>Type & Quick Links</th>
+                        <th style={{ width: viewMode === 'unified' ? '42%' : '50%' }}>
+                          {viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
+                        </th>
+                        <th style={{ width: viewMode === 'unified' ? '23%' : '28%' }}>Course & Session</th>
+                        <th style={{ width: viewMode === 'unified' ? '35%' : '22%' }}>
+                          {viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {visibleFiles.map((file) => {
-                        const badge = getDocTypeBadge(file.docType, file.category);
-                        const displayTitle = getDisplayTitle(file);
-                        const titleCls = badge ? `title-${badge.cls}` : 'title-default';
+                        const isUnified = Boolean(viewMode === 'unified' && file.isUnifiedSitting);
+                        const activeDoc = isUnified
+                          ? ((filterDocType && file.docs?.[filterDocType]) || file.primaryFile || file)
+                          : file;
+                        const badge = getDocTypeBadge(activeDoc.docType, activeDoc.category);
+                        const displayTitle = isUnified ? getUnifiedSittingTitle(file) : getDisplayTitle(file);
+                        const titleCls = isUnified ? 'title-unified' : (badge ? `title-${badge.cls}` : 'title-default');
                         const shortUnit = getShortUnitDisplay(file);
-                        const isPdf = file.ext === 'pdf';
+                        const isPdf = activeDoc.ext === 'pdf';
                         const siblings = file.siblings || null;
+                        const docs = file.docs || {};
 
                         return (
-                          <tr key={file.path}>
+                          <tr key={file.id || file.path} className={isUnified ? 'unified-sitting-row' : ''}>
                             <td className="file-title-cell">
                               <div className="file-title-row">
                                 <a
-                                  href={getHfUrl(file.path)}
+                                  href={getHfUrl(activeDoc.path)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className={titleCls}
+                                  title={isUnified ? `Open ${DOC_TYPE_INFO[activeDoc.docType]?.fullLabel || 'Document'} (${displayTitle})` : displayTitle}
                                 >
                                   {displayTitle}
                                 </a>
                               </div>
                               <div className="file-meta-subrow">
-                                <span className="file-path-subtext file-location" title={file.path}>
-                                  {file.path}
+                                <span className="file-path-subtext file-location" title={isUnified ? file.folderPath : file.path}>
+                                  {isUnified ? file.folderPath : file.path}
                                 </span>
-                                {file.size ? (
+                                {isUnified ? (
+                                  <span className="unified-count-tag">
+                                    {file.fileCount} {file.fileCount === 1 ? 'file' : 'files'} ({file.docTypes.join(' • ')})
+                                    {file.totalSize ? ` • ${formatBytes(file.totalSize)}` : ''}
+                                  </span>
+                                ) : file.size ? (
                                   <span className="file-size-tag">
                                     {formatBytes(file.size)} • {(file.ext || 'PDF').toUpperCase()}
                                   </span>
@@ -1837,7 +2053,7 @@ function App() {
                                   {file.curriculum ? file.curriculum.replace('Edexcel ', '') : 'IAL'}
                                 </span>
                                 {file.session ? (
-                                  <span>{file.session}</span>
+                                  <span className="session-pill-tag">{file.session}</span>
                                 ) : file.year ? (
                                   <span>Year {file.year}</span>
                                 ) : (
@@ -1846,45 +2062,140 @@ function App() {
                               </div>
                             </td>
                             <td>
-                              <div className="row-actions-cell">
-                                {badge ? (
-                                  <span className={`doc-badge ${badge.cls}`} title={badge.fullLabel}>
-                                    {badge.label}
-                                  </span>
-                                ) : (
-                                  <span className="doc-badge default">Doc</span>
-                                )}
-
-                                {/* Companion QP / MS / ER Quick-Open Links for the exact same sitting */}
-                                {siblings && ['QP', 'MS', 'ER'].map((sibType) => {
-                                  if (sibType === file.docType) return null;
-                                  const sib = siblings[sibType];
-                                  if (!sib) return null;
-                                  return (
+                              {isUnified ? (
+                                <div className="unified-actions-cell">
+                                  {docs.QP && (
                                     <a
-                                      key={sibType}
-                                      href={getHfUrl(sib.path)}
+                                      href={getHfUrl(docs.QP.path)}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className={`sibling-pill ${sibType.toLowerCase()}`}
-                                      title={`Open matching ${DOC_TYPE_INFO[sibType]?.fullLabel} (${file.session})`}
+                                      className="unified-doc-btn qp"
+                                      title={`Open Question Paper — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
                                     >
-                                      {sibType} ↗
+                                      <span>📄 Question Paper</span>
+                                      <span className="btn-arrow">↗</span>
                                     </a>
-                                  );
-                                })}
+                                  )}
+                                  {docs.MS && (
+                                    <a
+                                      href={getHfUrl(docs.MS.path)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="unified-doc-btn ms"
+                                      title={`Open Mark Scheme — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
+                                    >
+                                      <span>✓ Mark Scheme</span>
+                                      <span className="btn-arrow">↗</span>
+                                    </a>
+                                  )}
+                                  {docs.ER && (
+                                    <a
+                                      href={getHfUrl(docs.ER.path)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="unified-doc-btn er"
+                                      title={`Open Examiner Report — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
+                                    >
+                                      <span>📊 Examiner Report</span>
+                                      <span className="btn-arrow">↗</span>
+                                    </a>
+                                  )}
+                                  {['AUD', 'SC', 'DF', 'SOL', 'SAM'].map((extraType) => {
+                                    const extraDoc = docs[extraType];
+                                    if (!extraDoc) return null;
+                                    const labelMap = {
+                                      AUD: '🎧 Audio',
+                                      SC: '📄 Source',
+                                      DF: '📎 Data',
+                                      SOL: '📘 Solutions',
+                                      SAM: '📋 Specimen'
+                                    };
+                                    return (
+                                      <a
+                                        key={extraType}
+                                        href={getHfUrl(extraDoc.path)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="unified-doc-btn extra"
+                                        title={`Open ${DOC_TYPE_INFO[extraType]?.fullLabel || extraType} — ${extraDoc.name}`}
+                                      >
+                                        <span>{labelMap[extraType] || extraType}</span>
+                                        <span className="btn-arrow">↗</span>
+                                      </a>
+                                    );
+                                  })}
+                                  {isPdf && (
+                                    <button
+                                      type="button"
+                                      className="unified-preview-btn"
+                                      onClick={() => setPreviewFile(activeDoc)}
+                                      title="Quick In-App Preview & Side-by-Side (QP + MS) Split View"
+                                    >
+                                      👁 Preview
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="row-actions-cell">
+                                  {viewMode === 'unified' ? (
+                                    <a
+                                      href={getHfUrl(file.path)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`unified-doc-btn ${badge?.cls === 'book' || badge?.cls === 'sol' ? 'book' : (badge?.cls || 'extra')}`}
+                                    >
+                                      <span>
+                                        {badge?.cls === 'book'
+                                          ? '📘 Open Textbook'
+                                          : badge?.cls === 'sol'
+                                            ? '📘 Worked Solutions'
+                                            : `📄 Open ${badge?.fullLabel || 'Resource'}`}
+                                      </span>
+                                      <span className="btn-arrow">↗</span>
+                                    </a>
+                                  ) : (
+                                    <>
+                                      {badge ? (
+                                        <span className={`doc-badge ${badge.cls}`} title={badge.fullLabel}>
+                                          {badge.label}
+                                        </span>
+                                      ) : (
+                                        <span className="doc-badge default">Doc</span>
+                                      )}
 
-                                {isPdf && (
-                                  <button
-                                    type="button"
-                                    className="preview-btn"
-                                    onClick={() => setPreviewFile(file)}
-                                    title="Quick In-App PDF Preview"
-                                  >
-                                    Preview
-                                  </button>
-                                )}
-                              </div>
+                                      {/* Companion QP / MS / ER Quick-Open Links for the exact same sitting */}
+                                      {siblings && ['QP', 'MS', 'ER'].map((sibType) => {
+                                        if (sibType === file.docType) return null;
+                                        const sib = siblings[sibType];
+                                        if (!sib) return null;
+                                        return (
+                                          <a
+                                            key={sibType}
+                                            href={getHfUrl(sib.path)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className={`sibling-pill ${sibType.toLowerCase()}`}
+                                            title={`Open matching ${DOC_TYPE_INFO[sibType]?.fullLabel} (${file.session})`}
+                                          >
+                                            {sibType} ↗
+                                          </a>
+                                        );
+                                      })}
+                                    </>
+                                  )}
+
+                                  {isPdf && (
+                                    <button
+                                      type="button"
+                                      className={viewMode === 'unified' ? 'unified-preview-btn' : 'preview-btn'}
+                                      onClick={() => setPreviewFile(activeDoc)}
+                                      title="Quick In-App PDF Preview"
+                                    >
+                                      {viewMode === 'unified' ? '👁 Preview' : 'Preview'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         );
