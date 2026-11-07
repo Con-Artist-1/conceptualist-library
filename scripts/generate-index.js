@@ -856,6 +856,7 @@ const metaInfo = {
 };
 
 const output = {
+  tree: directoryTree,
   compactTree,
   keys,
   files,
@@ -863,6 +864,7 @@ const output = {
 };
 
 const metaOutput = {
+  tree: directoryTree,
   compactTree,
   meta: metaInfo
 };

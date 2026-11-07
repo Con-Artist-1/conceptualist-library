@@ -708,23 +708,162 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
   );
 };
 
+// Global utility to purge all browser caches, storage, and service workers and force a clean reload
+function forcePurgeCacheAndReload() {
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+    sessionStorage.setItem('cs_auto_healed', '1');
+  } catch {
+    // Ignore storage errors
+  }
+  const tasks = [];
+  if (typeof window !== 'undefined' && 'caches' in window) {
+    tasks.push(
+      caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => {})
+    );
+  }
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    tasks.push(
+      navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).catch(() => {})
+    );
+  }
+  Promise.all(tasks).finally(() => {
+    window.location.replace(`/?reset=${Date.now()}`);
+  });
+}
+
+// ─── Institutional Crash / Stale Cache Recovery Screen ───────────
+const CrashRecoveryScreen = ({ errorMsg }) => {
+  useEffect(() => {
+    // Automatically self-heal once per session if a returning user hits a stale-cache error
+    try {
+      if (!sessionStorage.getItem('cs_auto_healed')) {
+        sessionStorage.setItem('cs_auto_healed', '1');
+        forcePurgeCacheAndReload();
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+  }, []);
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#F2F1ED',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px',
+      fontFamily: 'Roboto, Inter, sans-serif'
+    }}>
+      <div style={{
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #C8C4BC',
+        borderTop: '4px solid #6F1D2B',
+        borderRadius: '3px',
+        maxWidth: '540px',
+        width: '100%',
+        padding: '32px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+      }}>
+        <div style={{
+          fontSize: '11px',
+          fontWeight: 800,
+          textTransform: 'uppercase',
+          letterSpacing: '0.6px',
+          color: '#6F1D2B',
+          marginBottom: '6px'
+        }}>
+          Conceptualist Systems — Repository Recovery
+        </div>
+        <h1 style={{
+          fontSize: '20px',
+          fontWeight: 800,
+          color: '#1A1D20',
+          marginBottom: '10px'
+        }}>
+          Outdated Browser Cache Detected
+        </h1>
+        <p style={{
+          fontSize: '14px',
+          color: '#2E343B',
+          lineHeight: 1.55,
+          marginBottom: '20px'
+        }}>
+          Your browser attempted to load an older cached version of the repository index after a recent site update. Click the button below to purge stale cache data and load the latest catalog.
+        </p>
+        {errorMsg && (
+          <div style={{
+            fontSize: '11.5px',
+            fontFamily: 'Roboto Mono, monospace',
+            backgroundColor: '#F2F1ED',
+            border: '1px solid #E2DFD9',
+            padding: '8px 12px',
+            color: '#525860',
+            marginBottom: '20px',
+            wordBreak: 'break-word'
+          }}>
+            Diagnostic: {errorMsg}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={forcePurgeCacheAndReload}
+            style={{
+              backgroundColor: '#6F1D2B',
+              color: '#FFFFFF',
+              border: '1px solid #6F1D2B',
+              borderRadius: '2px',
+              padding: '10px 20px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            Clear Cache &amp; Force Reload
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              color: '#1A1D20',
+              border: '1px solid #C8C4BC',
+              borderRadius: '2px',
+              padding: '10px 16px',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Standard Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorMsg: '' };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMsg: error?.message || 'Unexpected runtime error' };
+  }
+  render() {
+    if (this.state.hasError) {
+      return <CrashRecoveryScreen errorMsg={this.state.errorMsg} />;
+    }
+    return this.props.children;
+  }
+}
+
 // ─── Changelog Page ──────────────────────────────────────────────
 const ChangelogPage = ({ onGoHome }) => {
-  const handleHardRefresh = () => {
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      // Ignore storage errors
-    }
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        for (const name of names) caches.delete(name);
-      });
-    }
-    window.location.href = `/?refresh=${Date.now()}`;
-  };
-
   return (
     <div className="about-container">
       <div className="about-card">
@@ -738,7 +877,7 @@ const ChangelogPage = ({ onGoHome }) => {
           <div className="changelog-build-box">
             <div className="changelog-build-version">Current Build: <strong>{APP_VERSION}</strong></div>
             <div className="changelog-build-time">Deployed: {formatUpdateTimestamp(BUILD_TIMESTAMP)}</div>
-            <button type="button" className="changelog-purge-btn" onClick={handleHardRefresh}>
+            <button type="button" className="changelog-purge-btn" onClick={forcePurgeCacheAndReload}>
               Clear Cache &amp; Force Reload
             </button>
           </div>
@@ -1212,28 +1351,40 @@ function App() {
 
     // Stage 1: Instant load meta.json (bound to current build timestamp so new deploys bust cache immediately)
     fetch(`/meta.json?v=${buildQuery}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(json => {
         const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
-        setData(prev => ({
-          ...prev,
-          tree: tree || prev.tree,
-          meta: json.meta || prev.meta
-        }));
-        setLoading(false);
         if (tree) {
+          setData(prev => ({
+            ...prev,
+            tree: tree || prev.tree,
+            meta: json.meta || prev.meta
+          }));
+          setLoading(false);
           setExpandedPaths(prev => new Set([...prev, '', tree.path]));
         }
         try {
-          localStorage.setItem(META_CACHE_KEY, JSON.stringify(json));
+          localStorage.setItem(META_CACHE_KEY, JSON.stringify({
+            compactTree: json.compactTree,
+            meta: json.meta
+          }));
         } catch {
           // Ignore quota errors
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // Do not set loading=false here; let Stage 2 index.json populate tree & meta
+      });
 
-    // Stage 2: Background load full index.json
+    // Stage 2: Background load full index.json (with automatic cache-reload retry if needed)
     fetch(`/index.json?v=${buildQuery}`)
+      .then(res => {
+        if (!res.ok) return fetch(`/index.json?nocache=${Date.now()}`, { cache: 'reload' });
+        return res;
+      })
       .then(res => res.json())
       .then(json => {
         const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
@@ -1727,14 +1878,14 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#1A202C', fontFamily: 'Roboto, sans-serif' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: '#1A1D20', fontFamily: 'Roboto, sans-serif' }}>
         Loading Repository Index...
       </div>
     );
   }
 
   if (!data.tree) {
-    return <div style={{ padding: 40 }}>Error loading repository index. Please refresh.</div>;
+    return <CrashRecoveryScreen errorMsg="Repository directory tree missing or stale cache encountered." />;
   }
 
   const breadcrumbParts = selectedPath ? selectedPath.split(/[\\/]/).filter(Boolean) : [];
@@ -2462,4 +2613,10 @@ function App() {
   );
 }
 
-export default App;
+export default function RootApp() {
+  return (
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
+  );
+}
