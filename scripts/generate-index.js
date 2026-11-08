@@ -840,20 +840,6 @@ function getDirectoryOnlyTree(node) {
   };
 }
 
-function getShallowTree(node, maxDepth = 2, depth = 0) {
-  if (!node) return null;
-  const dirChildren = depth < maxDepth
-    ? (node.children || []).filter(c => c.children).map(c => getShallowTree(c, maxDepth, depth + 1))
-    : [];
-  return {
-    name: node.name,
-    path: node.path,
-    children: dirChildren
-  };
-}
-
-const shallowTree = getShallowTree(tree, 2);
-
 function isYearOrSessionDir(name) {
   if (/^\d{4}$/.test(name)) return true;
   if (/^\d{4}[-_\s]+[A-Za-z]+$/i.test(name)) return true;
@@ -861,8 +847,28 @@ function isYearOrSessionDir(name) {
   return false;
 }
 
+// Clean pruned directory tree { name, path, children } preserving all qualifications, subjects, and unit modules,
+// but pruning ~8,500 repetitive year and examination session folders
+function getCleanDirectoryTree(node, depth = 0) {
+  if (!node) return null;
+  if (depth > 2 && isYearOrSessionDir(node.name)) return null;
+
+  const dirChildren = (node.children || [])
+    .filter(c => c.children && !isYearOrSessionDir(c.name))
+    .map(c => getCleanDirectoryTree(c, depth + 1))
+    .filter(Boolean);
+
+  return {
+    name: node.name,
+    path: node.path,
+    children: dirChildren
+  };
+}
+
+const cleanTree = getCleanDirectoryTree(tree);
+
 // Compact tree representation [name, children] pruned of year/session directories
-// Slashes meta.json size from 162 KB down to ~20 KB (96% tree size reduction) while keeping 100% of qualifications, subjects, and units
+// Slashes meta.json size from 162 KB down to ~27 KB (96% tree size reduction) while keeping 100% of qualifications, subjects, and units
 function getCompactTree(node, depth = 0) {
   if (!node) return null;
   if (depth > 2 && isYearOrSessionDir(node.name)) return null;
@@ -910,7 +916,7 @@ const metaInfo = {
 };
 
 const output = {
-  tree: shallowTree,
+  tree: cleanTree,
   compactTree,
   keys,
   files,
@@ -918,7 +924,7 @@ const output = {
 };
 
 const metaOutput = {
-  tree: shallowTree,
+  tree: cleanTree,
   compactTree,
   meta: metaInfo
 };
@@ -931,7 +937,7 @@ const metaPath = path.join(publicDir, 'meta.json');
 fs.writeFileSync(metaPath, JSON.stringify(metaOutput));
 
 const rootLiveIndexPath = path.join(TARGET_DIR, 'live_index.json');
-fs.writeFileSync(rootLiveIndexPath, JSON.stringify({ tree: shallowTree, compactTree, keys, files, meta: metaInfo }));
+fs.writeFileSync(rootLiveIndexPath, JSON.stringify({ tree: cleanTree, compactTree, keys, files, meta: metaInfo }));
 
 console.log(`Index generated successfully at ${outputPath}`);
 console.log(`Indexed ${flatFiles.length} files (${ialSubjects.length} IAL subjects, ${igcseSubjects.length} IGCSE subjects).`);
