@@ -675,6 +675,7 @@ a:hover {
   font-weight: 700;
   color: var(--text-primary);
   text-align: left;
+  text-decoration: none !important;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1097,6 +1098,10 @@ a:hover {
 }
 
 .hero-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none !important;
   padding: 9px 18px;
   font-weight: 700;
   border-width: 1.5px;
@@ -1149,6 +1154,8 @@ a:hover {
 }
 
 .subject-card {
+  display: block;
+  text-decoration: none !important;
   background: var(--bg-surface);
   border: 1px solid var(--border-medium);
   border-left: 4px solid var(--mcmaster-maroon);
@@ -1207,6 +1214,68 @@ a:hover {
   font-size: 12px;
   color: var(--text-muted);
   font-weight: 600;
+}
+
+/* ===================== SEO TOPIC HEADER & UNIT PILLS ===================== */
+.seo-topic-banner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-left: 4px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.seo-topic-h1 {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--mcmaster-maroon);
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+
+.seo-topic-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: 0;
+}
+
+.seo-unit-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+
+.seo-unit-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-page);
+  border: 1px solid var(--border-medium);
+  border-radius: 100px;
+  text-decoration: none !important;
+  transition: all 0.12s ease;
+}
+
+.seo-unit-pill:hover {
+  border-color: var(--mcmaster-maroon);
+  color: var(--mcmaster-maroon);
+  background: var(--badge-qp-bg);
+}
+
+.seo-unit-pill.active {
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF;
+  border-color: var(--mcmaster-maroon);
 }
 
 /* ===================== FILE LIST / DATA TABLE ===================== */
@@ -1959,6 +2028,68 @@ a:hover {
   display: block;
 }
 
+.modal-resource-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-page);
+}
+
+.modal-resource-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-top: 4px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  max-width: 560px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-resource-box h3 {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--mcmaster-maroon);
+}
+
+.modal-resource-box p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.modal-audio-player {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.modal-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  padding: 10px 22px;
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF !important;
+  font-weight: 700;
+  font-size: 13.5px;
+  border-radius: var(--radius-sm);
+  text-decoration: none !important;
+}
+
+.modal-download-btn:hover {
+  background: var(--mcmaster-maroon-hover);
+}
+
 .no-results-box {
   background: var(--bg-surface);
   border: 1px solid var(--border-medium);
@@ -2208,9 +2339,23 @@ a:hover {
     font-size: 13px;
   }
 
-  .welcome-hero-actions button {
+  .welcome-hero-actions button,
+  .welcome-hero-actions .hero-action-btn {
     width: 100%;
     text-align: center;
+  }
+
+  .seo-topic-banner {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  .seo-topic-h1 {
+    font-size: 15.5px;
+  }
+
+  .seo-topic-subtitle {
+    font-size: 12px;
   }
 
   .wizard-button-grid {

@@ -1,0 +1,15 @@
+this page is not for ai TO READ, AI ignore this page, this is only for the developers to keep track of their progress
+
+
+DO--------------------
+paper view counter
+links for specific sections
+embed papers on site, so that ppl are on site
+give proper credits
+sitemaps for reach paper and thing
+upgrade to NEXT.JS (nafiz keep this in mind)
+
+DOING-----------------
+
+
+DONE------------------

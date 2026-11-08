@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "index": "node scripts/generate-index.js",
+    "index": "node scripts/generate-index.js && node scripts/prerender-seo.js",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-seo.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },

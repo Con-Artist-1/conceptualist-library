@@ -1,13 +1,35 @@
 /* global __APP_BUILD_TIME__ */
 import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef } from 'react';
 import './index.css';
+import {
+  SITE_URL,
+  buildRoutePath,
+  parseRouteFromLocation,
+  getSeoMetadata,
+  buildJsonLd,
+  getCurriculumSlug,
+  getSubjectSlug,
+  getUnitSlug
+} from './seoRoutes.js';
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-08T02:00:00.000Z';
-const APP_VERSION = 'v3.4';
+const APP_VERSION = 'v3.5';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v3.5',
+    date: BUILD_TIMESTAMP,
+    title: 'Direct Subject & Unit URLs, On-Site Paper Reader & SEO Indexing',
+    summary: 'Introduced dedicated shareable URLs for every qualification, subject, unit, and examination sitting, defaulted all papers to open directly inside the on-site reader, and added full search engine indexing.',
+    changes: [
+      'Dedicated subject & unit routes: Every Edexcel IAL and IGCSE qualification, subject, and unit now has its own clean, shareable URL (e.g. /ial/mathematics/pure-mathematics-1-p1).',
+      '100% on-site paper viewing: Clicking any examination title, Question Paper [QP], Mark Scheme [MS], Examiner Report [ER], or Textbook now opens directly in the on-site viewer without bouncing you to external tabs.',
+      'Direct paper share links: Added one-click shareable URLs inside the reader modal so you can send classmates a direct link to any exact sitting or Split View.',
+      'Search engine pre-rendering & sitemap: Added static route pre-rendering, structured Schema.org JSON-LD breadcrumbs, and a complete 240+ page XML sitemap.'
+    ]
+  },
   {
     version: 'v3.4',
     date: BUILD_TIMESTAMP,
@@ -238,7 +260,25 @@ const QUERY_SYNONYMS = {
   'alt': 'alt alta regional variant',
   'alta': 'alt alta regional variant',
   'regional': 'regional reg alt alta r',
-  'reg': 'regional reg alt alta r'
+  'reg': 'regional reg alt alta r',
+  '4ma1': '4ma1 mathematics a igcse',
+  '4mb1': '4mb1 mathematics b igcse',
+  '4pm1': '4pm1 further pure mathematics igcse',
+  '4ph1': '4ph1 physics igcse',
+  '4ch1': '4ch1 chemistry igcse',
+  '4bi1': '4bi1 biology igcse',
+  '4hb1': '4hb1 human biology igcse',
+  '4ac1': '4ac1 accounting igcse',
+  '4ec1': '4ec1 economics igcse',
+  '4bs1': '4bs1 business igcse',
+  '4cm1': '4cm1 commerce igcse',
+  '4cp0': '4cp0 computer science igcse',
+  '4it1': '4it1 information technology igcse',
+  '4ea1': '4ea1 english language a igcse',
+  '4eb1': '4eb1 english language b igcse',
+  '4et1': '4et1 english literature igcse',
+  '4ge1': '4ge1 geography igcse',
+  '4hi1': '4hi1 history igcse'
 };
 
 // Canonical academic vocabulary for <0.05ms Damerau-Levenshtein typo tolerance & prefix matching
@@ -257,7 +297,8 @@ const SEARCH_VOCAB = [
   'wch11', 'wch12', 'wch13', 'wch14', 'wch15', 'wch16',
   'wph11', 'wph12', 'wph13', 'wph14', 'wph15', 'wph16',
   'wac11', 'wac12', 'wec11', 'wec12', 'wec13', 'wec14',
-  'wbs11', 'wbs12', 'wbs13', 'wbs14'
+  'wbs11', 'wbs12', 'wbs13', 'wbs14',
+  '4ma1', '4mb1', '4pm1', '4ph1', '4ch1', '4bi1', '4hb1', '4ac1', '4ec1', '4bs1', '4cp0', '4it1'
 ];
 
 // Fast bounded Damerau-Levenshtein distance (supports insertions, deletions, substitutions, and adjacent transpositions)
@@ -720,8 +761,8 @@ const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggl
   );
 });
 
-// ─── In-App Quick PDF Preview Modal (with Default Fullscreen Split View) ────
-const PreviewModal = ({ file, onClose }) => {
+// ─── In-App Quick PDF & Resource Preview Modal (with Default Fullscreen Split View) ────
+const PreviewModal = ({ file, initialView, onClose, onViewChange }) => {
   const siblings = useMemo(() => ({
     ...(file?.siblings || {}),
     ...(file?.docs || {})
@@ -730,10 +771,22 @@ const PreviewModal = ({ file, onClose }) => {
   const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
-  // On mobile portrait, default to single QP view for maximum readable document height; on desktop, default to split view
-  const [activeView, setActiveView] = useState(() => (
-    isMobile ? (file?.docType || (siblings.QP ? 'QP' : 'split')) : (canSplit ? 'split' : (file?.docType || 'QP'))
-  ));
+  // Resolve initial view: honor explicit user click (QP / MS / ER / split / extra), else mobile single / desktop split
+  const [activeView, setActiveView] = useState(() => {
+    if (initialView) {
+      if (initialView === 'split') return canSplit ? 'split' : (file?.docType || 'QP');
+      return initialView;
+    }
+    return isMobile
+      ? (file?.docType || (siblings.QP ? 'QP' : 'split'))
+      : (canSplit ? 'split' : (file?.docType || 'QP'));
+  });
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleSelectView = useCallback((nextView) => {
+    setActiveView(nextView);
+    if (onViewChange) onViewChange(nextView);
+  }, [onViewChange]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -743,20 +796,22 @@ const PreviewModal = ({ file, onClose }) => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  if (!file) return null;
+  // Resolve current active single document when not in split mode
+  const currentDoc = useMemo(() => {
+    if (!file) return null;
+    if (activeView && siblings[activeView]) return siblings[activeView];
+    return file.primaryFile || file;
+  }, [activeView, siblings, file]);
+
+  if (!file || !currentDoc) return null;
 
   const isSplit = activeView === 'split' && canSplit;
 
-  // Resolve current active single document when not in split mode
-  const currentDoc = useMemo(() => {
-    if (activeView === 'QP' && siblings.QP) return siblings.QP;
-    if (activeView === 'MS' && siblings.MS) return siblings.MS;
-    if (activeView === 'ER' && siblings.ER) return siblings.ER;
-    return siblings[activeView] || file.primaryFile || file;
-  }, [activeView, siblings, file]);
-
   const singleUrl = getHfUrl(currentDoc.path);
   const singleTitle = getDisplayTitle(currentDoc);
+  const currentExt = (currentDoc.ext || '').toLowerCase();
+  const isAudio = currentExt === 'mp3' || currentExt === 'wav' || currentDoc.docType === 'AUD';
+  const isArchive = currentExt === 'zip' || currentExt === 'rar' || currentDoc.docType === 'DF';
 
   const modalTitle = isSplit
     ? `${getUnifiedSittingTitle(file)} — Split View (QP + MS)`
@@ -766,7 +821,18 @@ const PreviewModal = ({ file, onClose }) => {
     ? `Left: ${siblings.QP?.name || ''} • Right: ${siblings.MS?.name || ''}`
     : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
 
-  const openTabUrl = isSplit ? getHfUrl(siblings.QP?.path) : singleUrl;
+  const downloadUrl = isSplit ? getHfUrl(siblings.QP?.path) : singleUrl;
+
+  const handleCopyShareLink = () => {
+    try {
+      const shareUrl = window.location.href;
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      // Ignore clipboard errors
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={modalTitle}>
@@ -779,14 +845,22 @@ const PreviewModal = ({ file, onClose }) => {
             </div>
 
             <div className="modal-header-controls">
+              <button
+                type="button"
+                className="modal-action-link"
+                onClick={handleCopyShareLink}
+                title="Copy direct on-site link to this examination paper"
+              >
+                {copiedLink ? 'Copied Link ✓' : 'Share Link 🔗'}
+              </button>
               <a
-                href={openTabUrl}
+                href={downloadUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="modal-action-link"
-                title="Open document in new browser tab"
+                title="Download or open raw file"
               >
-                Open Tab ↗
+                Download ⬇
               </a>
               <button
                 type="button"
@@ -802,20 +876,30 @@ const PreviewModal = ({ file, onClose }) => {
 
           <div className="modal-actions" role="tablist" aria-label="Document view tabs">
             {/* Instant Sibling Switcher inside Preview Modal */}
-            {['QP', 'MS', 'ER'].map((type) => {
+            {['QP', 'MS', 'ER', 'AUD', 'SC', 'SOL', 'SAM', 'DF'].map((type) => {
               const sib = siblings[type];
-              if (!sib || !sib.ext || sib.ext !== 'pdf') return null;
+              if (!sib) return null;
               const isCurrent = !isSplit && (activeView === type || currentDoc.path === sib.path);
+              const desktopLabels = {
+                QP: 'Question Paper [QP]',
+                MS: 'Mark Scheme [MS]',
+                ER: 'Examiner Report [ER]',
+                AUD: 'Listening Audio [AUD]',
+                SC: 'Source Booklet [SC]',
+                SOL: 'Worked Solutions [SOL]',
+                SAM: 'Specimen [SAM]',
+                DF: 'Data Files [DF]'
+              };
               return (
                 <button
                   key={type}
                   type="button"
                   className={`modal-sibling-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
-                  onClick={() => setActiveView(type)}
+                  onClick={() => handleSelectView(type)}
                   title={`Focus on ${DOC_TYPE_INFO[type]?.fullLabel || type} only`}
                 >
                   <span className="modal-btn-desktop-text">
-                    {type === 'QP' ? 'Question Paper [QP]' : type === 'MS' ? 'Mark Scheme [MS]' : 'Examiner Report [ER]'}
+                    {desktopLabels[type] || type}
                   </span>
                   <span className="modal-btn-mobile-text">{type}</span>
                 </button>
@@ -826,7 +910,7 @@ const PreviewModal = ({ file, onClose }) => {
               <button
                 type="button"
                 className={`modal-sibling-btn split ${isSplit ? 'active' : ''}`}
-                onClick={() => setActiveView('split')}
+                onClick={() => handleSelectView('split')}
                 title="View Question Paper and Mark Scheme side-by-side"
               >
                 <span className="modal-btn-desktop-text">Split View (QP + MS)</span>
@@ -841,9 +925,15 @@ const PreviewModal = ({ file, onClose }) => {
               <div className="modal-split-pane">
                 <div className="modal-split-label qp">
                   <span>Question Paper (QP)</span>
-                  <a href={getHfUrl(siblings.QP.path)} target="_blank" rel="noreferrer" className="modal-pane-link" title="Open QP in new tab">
-                    Open Tab ↗
-                  </a>
+                  <button
+                    type="button"
+                    className="modal-pane-link"
+                    onClick={() => handleSelectView('QP')}
+                    title="Expand Question Paper to full screen"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Full View ⤢
+                  </button>
                 </div>
                 <iframe
                   src={getHfUrl(siblings.QP.path)}
@@ -854,9 +944,15 @@ const PreviewModal = ({ file, onClose }) => {
               <div className="modal-split-pane">
                 <div className="modal-split-label ms">
                   <span>Mark Scheme (MS)</span>
-                  <a href={getHfUrl(siblings.MS.path)} target="_blank" rel="noreferrer" className="modal-pane-link" title="Open MS in new tab">
-                    Open Tab ↗
-                  </a>
+                  <button
+                    type="button"
+                    className="modal-pane-link"
+                    onClick={() => handleSelectView('MS')}
+                    title="Expand Mark Scheme to full screen"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Full View ⤢
+                  </button>
                 </div>
                 <iframe
                   src={getHfUrl(siblings.MS.path)}
@@ -865,6 +961,32 @@ const PreviewModal = ({ file, onClose }) => {
                 />
               </div>
             </>
+          ) : isAudio && currentExt !== 'zip' ? (
+            <div className="modal-resource-card">
+              <div className="modal-resource-box">
+                <h3>{singleTitle}</h3>
+                <p>Official Pearson Edexcel Listening Examination Audio Recording ({currentDoc.name})</p>
+                <audio controls autoPlay src={singleUrl} style={{ width: '100%', marginTop: '16px', marginBottom: '16px' }}>
+                  Your browser does not support the audio element.
+                </audio>
+                <a href={singleUrl} download className="search-button" style={{ display: 'inline-block', textDecoration: 'none' }}>
+                  Download Audio File ({formatBytes(currentDoc.size)}) ⬇
+                </a>
+              </div>
+            </div>
+          ) : isArchive || (currentExt && currentExt !== 'pdf') ? (
+            <div className="modal-resource-card">
+              <div className="modal-resource-box">
+                <h3>{singleTitle}</h3>
+                <p>
+                  This examination resource is packaged as a <strong>{(currentExt || 'ZIP').toUpperCase()}</strong> archive ({formatBytes(currentDoc.size)}).
+                  Download the archive below to access the practical examination data files or audio tracks.
+                </p>
+                <a href={singleUrl} download className="search-button" style={{ display: 'inline-block', marginTop: '16px', textDecoration: 'none' }}>
+                  Download {(currentExt || 'Archive').toUpperCase()} ({formatBytes(currentDoc.size)}) ⬇
+                </a>
+              </div>
+            </div>
           ) : (
             <iframe
               key={currentDoc.path}
@@ -891,12 +1013,12 @@ function forcePurgeCacheAndReload() {
   const tasks = [];
   if (typeof window !== 'undefined' && 'caches' in window) {
     tasks.push(
-      caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => {})
+      caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => { })
     );
   }
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     tasks.push(
-      navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).catch(() => {})
+      navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))).catch(() => { })
     );
   }
   Promise.all(tasks).finally(() => {
@@ -1106,11 +1228,27 @@ const AboutPage = ({ onGoHome }) => {
           <div className="team-grid">
             <div className="team-card">
               <div className="team-name">Diavlon</div>
-              <div className="team-role">Founder & Lead Architect</div>
+              <div className="team-role">Co-Founder & CTO</div>
             </div>
+
             <div className="team-card">
               <div className="team-name">Naz</div>
-              <div className="team-role">Co-Founder & Systems Lead</div>
+              <div className="team-role">Co-Founder & CTO</div>
+            </div>
+
+            <div className="team-card">
+              <div className="team-name">Jemison Flaren</div>
+              <div className="team-role">Systems Architect</div>
+            </div>
+
+            <div className="team-card">
+              <div className="team-name">Gemin Arghen</div>
+              <div className="team-role">Infrastructure Engineer</div>
+            </div>
+
+            <div className="team-card">
+              <div className="team-name">Claudis Oppen</div>
+              <div className="team-role">Research & Intelligence Lead</div>
             </div>
           </div>
         </div>
@@ -1271,12 +1409,22 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
           <button className="search-button" onClick={onViewAll}>
             Browse All Documents →
           </button>
-          <button className="filter-btn hero-action-btn" onClick={() => onCurriculumSelect('Edexcel IAL')}>
+          <a
+            href="/ial"
+            className="filter-btn hero-action-btn"
+            style={{ textDecoration: 'none' }}
+            onClick={(e) => { e.preventDefault(); onCurriculumSelect('Edexcel IAL'); }}
+          >
             Edexcel IAL Collection
-          </button>
-          <button className="filter-btn hero-action-btn igcse" onClick={() => onCurriculumSelect('Edexcel IGCSE')}>
+          </a>
+          <a
+            href="/igcse"
+            className="filter-btn hero-action-btn igcse"
+            style={{ textDecoration: 'none' }}
+            onClick={(e) => { e.preventDefault(); onCurriculumSelect('Edexcel IGCSE'); }}
+          >
             Edexcel IGCSE Collection
-          </button>
+          </a>
         </div>
       </div>
 
@@ -1301,13 +1449,14 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
             <div className="wizard-step">
               <h2>Select {formatSubjectDisplay(selectedSubject.name)} Unit or Paper:</h2>
               <div style={{ marginBottom: '24px' }}>
-                <button
+                <a
+                  href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}`}
                   className="wizard-option-btn primary"
-                  onClick={() => onSubjectSelect(selectedSubject.name, selectedSubject.curriculum)}
-                  style={{ width: '100%', marginBottom: '20px' }}
+                  onClick={(e) => { e.preventDefault(); onSubjectSelect(selectedSubject.name, selectedSubject.curriculum); }}
+                  style={{ width: '100%', marginBottom: '20px', textDecoration: 'none' }}
                 >
                   <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers & Textbooks →</span>
-                </button>
+                </a>
                 {Object.entries(groupedUnits).map(([groupName, units]) => (
                   <div key={groupName} style={{ marginBottom: '20px' }}>
                     {Object.keys(groupedUnits).length > 1 && (
@@ -1318,15 +1467,18 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
                     <div className="wizard-button-grid">
                       {units.map(unitName => {
                         const unitCount = availableUnitsMap[unitName]?.count;
+                        const unitHref = `/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(unitName)}`;
                         return (
-                          <button
+                          <a
                             key={unitName}
+                            href={unitHref}
                             className="wizard-option-btn"
-                            onClick={() => handleUnitClick(unitName)}
+                            style={{ textDecoration: 'none' }}
+                            onClick={(e) => { e.preventDefault(); handleUnitClick(unitName); }}
                           >
                             <span>{unitName}</span>
                             {unitCount ? <span className="wizard-unit-count">{unitCount}</span> : null}
-                          </button>
+                          </a>
                         );
                       })}
                     </div>
@@ -1339,23 +1491,26 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
             <div className="wizard-step">
               <h2>Select Examination Year for {selectedUnit}:</h2>
               <div style={{ marginBottom: '20px' }}>
-                <button
+                <a
+                  href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(selectedUnit)}`}
                   className="wizard-option-btn primary"
-                  onClick={() => handleYearClick('')}
-                  style={{ width: '100%' }}
+                  onClick={(e) => { e.preventDefault(); handleYearClick(''); }}
+                  style={{ width: '100%', textDecoration: 'none' }}
                 >
                   <span>All Examination Years for {selectedUnit} →</span>
-                </button>
+                </a>
               </div>
               <div className="wizard-button-grid-years">
                 {availableYears.map(year => (
-                  <button
+                  <a
                     key={year}
+                    href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(selectedUnit)}?year=${year}`}
                     className="wizard-option-btn year"
-                    onClick={() => handleYearClick(year)}
+                    style={{ textDecoration: 'none' }}
+                    onClick={(e) => { e.preventDefault(); handleYearClick(year); }}
                   >
                     {year}
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -1373,14 +1528,14 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
               const subjWizard = wizardMeta?.['Edexcel IAL']?.[subject];
               const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
               const docCount = subjWizard?.totalFiles || 0;
+              const subjHref = `/ial/${getSubjectSlug(subject)}`;
               return (
-                <div
+                <a
                   key={`ial-${subject}`}
+                  href={subjHref}
                   className="subject-card"
-                  onClick={() => handleSubjectClick(subject, 'Edexcel IAL')}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubjectClick(subject, 'Edexcel IAL'); }}
+                  style={{ textDecoration: 'none', display: 'block' }}
+                  onClick={(e) => { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IAL'); }}
                 >
                   <div className="subject-card-top">
                     <div className="subject-card-title">{formatSubjectDisplay(subject)}</div>
@@ -1390,7 +1545,7 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
                     {ialSubjectCoverage[subject] || 'Edexcel IAL Collection'}
                     {unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -1403,14 +1558,14 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
             {igcseSubjects.map(subject => {
               const subjWizard = wizardMeta?.['Edexcel IGCSE']?.[subject];
               const docCount = subjWizard?.totalFiles || 0;
+              const subjHref = `/igcse/${getSubjectSlug(subject)}`;
               return (
-                <div
+                <a
                   key={`igcse-${subject}`}
+                  href={subjHref}
                   className="subject-card igcse"
-                  onClick={() => handleSubjectClick(subject, 'Edexcel IGCSE')}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubjectClick(subject, 'Edexcel IGCSE'); }}
+                  style={{ textDecoration: 'none', display: 'block' }}
+                  onClick={(e) => { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IGCSE'); }}
                 >
                   <div className="subject-card-top">
                     <div className="subject-card-title">{subject}</div>
@@ -1419,7 +1574,7 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
                   <div className="subject-card-subtitle">
                     {igcseSubjectCoverage[subject] || 'International GCSE Collection'}
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -1588,6 +1743,11 @@ function getInitialCachedMeta() {
 // ─── Main Application ────────────────────────────────────────────
 function App() {
   const initialCache = useMemo(() => getInitialCachedMeta(), []);
+  const initialRoute = useMemo(() => (
+    typeof window !== 'undefined'
+      ? parseRouteFromLocation(window.location.pathname, window.location.search, initialCache?.meta || DEFAULT_META)
+      : {}
+  ), [initialCache]);
 
   const [data, setData] = useState(() => ({
     tree: initialCache?.tree || DEFAULT_TREE,
@@ -1600,33 +1760,196 @@ function App() {
   const [filesLoading, setFilesLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialRoute.searchQuery || '');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [selectedPath, setSelectedPath] = useState('');
   const [expandedPaths, setExpandedPaths] = useState(new Set(['']));
-  const [currentTab, setCurrentTab] = useState('library'); // 'library' | 'about' | 'changelog'
+  const [currentTab, setCurrentTab] = useState(initialRoute.currentTab || 'library'); // 'library' | 'about' | 'changelog'
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [previewFile, setPreviewFile] = useState(null);
+  const [previewInitialView, setPreviewInitialView] = useState(initialRoute.viewParam || '');
+  const [pendingPaperParam, setPendingPaperParam] = useState(initialRoute.paperParam || '');
   const [viewMode, setViewMode] = useState('unified'); // 'unified' | 'separate'
 
-  // Filters
-  const [filterCurriculum, setFilterCurriculum] = useState(''); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
-  const [filterDocType, setFilterDocType] = useState(null); // 'QP' | 'MS' | 'ER' | 'Book' | 'Extra' | null
-  const [filterSubject, setFilterSubject] = useState('');
-  const [filterUnit, setFilterUnit] = useState('');
-  const [filterYear, setFilterYear] = useState('');
+  // Filters initialized directly from URL route
+  const [filterCurriculum, setFilterCurriculum] = useState(initialRoute.filterCurriculum || ''); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
+  const [filterDocType, setFilterDocType] = useState(initialRoute.filterDocType || null); // 'QP' | 'MS' | 'ER' | 'Book' | 'Extra' | null
+  const [filterSubject, setFilterSubject] = useState(initialRoute.filterSubject || '');
+  const [filterUnit, setFilterUnit] = useState(initialRoute.filterUnit || '');
+  const [filterYear, setFilterYear] = useState(initialRoute.filterYear || '');
   const [sortBy, setSortBy] = useState('newest'); // Default to newest first so recent 2026/2025 papers appear at top
-  const [forceShowTable, setForceShowTable] = useState(false);
+  const [forceShowTable, setForceShowTable] = useState(Boolean(initialRoute.forceShowTable));
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const searchInputRef = useRef(null);
+  const isPopStateRef = useRef(false);
 
-  // Auto 404 / Unknown path fallback to Homepage
-  useEffect(() => {
-    if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
-      window.history.replaceState(null, '', '/');
-    }
+  const openOnSiteReader = useCallback((fileObj, preferredView = '') => {
+    if (!fileObj) return;
+    setPreviewInitialView(preferredView);
+    setPreviewFile(fileObj);
   }, []);
+
+  // Handle browser Back/Forward navigation across all routes and modals
+  useEffect(() => {
+    const handlePopState = () => {
+      isPopStateRef.current = true;
+      const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
+      setCurrentTab(parsed.currentTab || 'library');
+      setFilterCurriculum(parsed.filterCurriculum || '');
+      setFilterSubject(parsed.filterSubject || '');
+      setFilterUnit(parsed.filterUnit || '');
+      setFilterYear(parsed.filterYear || '');
+      setFilterDocType(parsed.filterDocType || null);
+      setSearchQuery(parsed.searchQuery || '');
+      setForceShowTable(Boolean(parsed.forceShowTable));
+      setPreviewInitialView(parsed.viewParam || '');
+      if (parsed.paperParam) {
+        const found =
+          data.unifiedFiles.find(f => f.id === parsed.paperParam || f.path === parsed.paperParam) ||
+          data.flatFiles.find(f => f.path === parsed.paperParam);
+        if (found) setPreviewFile(found);
+        else setPendingPaperParam(parsed.paperParam);
+      } else {
+        setPreviewFile(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [data.meta, data.unifiedFiles, data.flatFiles]);
+
+  // Re-resolve unit slug from URL once wizard metadata finishes hydrating on cold visits
+  useEffect(() => {
+    if (!data.meta?.wizard) return;
+    const segments = (window.location.pathname || '/').split('/').filter(Boolean);
+    if (segments.length >= 3 && !filterUnit) {
+      const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
+      if (parsed.filterUnit) {
+        setFilterCurriculum(parsed.filterCurriculum);
+        setFilterSubject(parsed.filterSubject);
+        setFilterUnit(parsed.filterUnit);
+        setForceShowTable(true);
+      }
+    }
+  }, [data.meta, filterUnit]);
+
+  // Resolve ?paper= deep link once catalog finishes loading
+  useEffect(() => {
+    if (!pendingPaperParam) return;
+    if (data.unifiedFiles.length === 0 && data.flatFiles.length === 0) return;
+    const found =
+      data.unifiedFiles.find(f => f.id === pendingPaperParam || f.path === pendingPaperParam) ||
+      data.flatFiles.find(f => f.path === pendingPaperParam);
+    if (found) {
+      setPreviewFile(found);
+    }
+    setPendingPaperParam('');
+  }, [pendingPaperParam, data.unifiedFiles, data.flatFiles]);
+
+  // Synchronize current route state to browser URL and dynamic SEO <head> + Schema.org JSON-LD
+  const seoMeta = useMemo(() => getSeoMetadata({
+    currentTab,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterYear,
+    filterDocType,
+    meta: data.meta
+  }), [currentTab, filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, data.meta]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Wait for wizard metadata before overwriting a 3-segment unit URL on a cold cache visit
+    const pathSegments = (window.location.pathname || '/').split('/').filter(Boolean);
+    const waitingForUnitHydration = pathSegments.length >= 3 && !filterUnit && !data.meta?.wizard;
+
+    if (!waitingForUnitHydration) {
+      const nextUrl = buildRoutePath({
+        currentTab,
+        filterCurriculum,
+        filterSubject,
+        filterUnit,
+        filterYear,
+        filterDocType,
+        searchQuery: deferredSearchQuery,
+        previewFile,
+        previewMode: previewInitialView
+      });
+      const currentUrl = `${window.location.pathname}${window.location.search}`;
+      if (currentUrl !== nextUrl) {
+        if (isPopStateRef.current) {
+          isPopStateRef.current = false;
+        } else if (deferredSearchQuery) {
+          window.history.replaceState(null, '', nextUrl);
+        } else {
+          window.history.pushState(null, '', nextUrl);
+        }
+      } else {
+        isPopStateRef.current = false;
+      }
+    }
+
+    // Update document title, meta description, canonical URL, OpenGraph, and JSON-LD schema
+    const pageTitle = previewFile
+      ? `${getUnifiedSittingTitle(previewFile)} — Past Paper & Mark Scheme | Conceptualist Systems`
+      : seoMeta.title;
+    document.title = pageTitle;
+
+    const setMetaTag = (selector, attrName, attrVal, contentVal) => {
+      let el = document.querySelector(selector);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attrName, attrVal);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', contentVal);
+    };
+
+    setMetaTag('meta[name="description"]', 'name', 'description', seoMeta.description);
+    setMetaTag('meta[name="keywords"]', 'name', 'keywords', seoMeta.keywords);
+    setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
+    setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
+    setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
+    setMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
+
+    let canonicalEl = document.querySelector('link[rel="canonical"]');
+    if (!canonicalEl) {
+      canonicalEl = document.createElement('link');
+      canonicalEl.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonicalEl);
+    }
+    canonicalEl.setAttribute('href', seoMeta.canonicalUrl);
+
+    let ldScript = document.getElementById('seo-json-ld');
+    if (!ldScript) {
+      ldScript = document.createElement('script');
+      ldScript.id = 'seo-json-ld';
+      ldScript.type = 'application/ld+json';
+      document.head.appendChild(ldScript);
+    }
+    const jsonLdObj = buildJsonLd({
+      currentTab,
+      filterCurriculum,
+      filterSubject,
+      filterUnit,
+      seo: seoMeta,
+      meta: data.meta
+    });
+    ldScript.textContent = JSON.stringify(jsonLdObj);
+  }, [
+    currentTab,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterYear,
+    filterDocType,
+    deferredSearchQuery,
+    previewFile,
+    previewInitialView,
+    seoMeta,
+    data.meta
+  ]);
 
   // Global keyboard shortcut: '/' or Ctrl+K / Cmd+K focuses search input
   useEffect(() => {
@@ -1750,133 +2073,133 @@ function App() {
               flatFiles[i] = fileObj;
             }
 
-        // Deduplicate byte-for-byte duplicate files across batches & link QP/MS/ER siblings
-        const scoreFile = (f) => {
-          let s = 0;
-          if (f.path.includes('(')) s += 10;
-          if (f.name.includes('_')) s += 5;
-          return s;
-        };
-
-        const dedupMap = new Map();
-        const siblingGroups = new Map();
-
-        for (let i = 0; i < flatFiles.length; i++) {
-          const f = flatFiles[i];
-          const isCanonicalPaper = f.category === 'Past Papers' && f.unitCode && f.session && f.docType;
-          const dedupKey = isCanonicalPaper
-            ? `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}|${f.docType}|${f.ext}|${f.size}`
-            : f.path;
-
-          if (!dedupMap.has(dedupKey) || scoreFile(f) > scoreFile(dedupMap.get(dedupKey))) {
-            dedupMap.set(dedupKey, f);
-          }
-
-          if (isCanonicalPaper && f.ext === 'pdf' && (f.docType === 'QP' || f.docType === 'MS' || f.docType === 'ER')) {
-            const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
-            let grp = siblingGroups.get(sibKey);
-            if (!grp) {
-              grp = {};
-              siblingGroups.set(sibKey, grp);
-            }
-            if (!grp[f.docType] || scoreFile(f) > scoreFile(grp[f.docType])) {
-              grp[f.docType] = f;
-            }
-          }
-        }
-
-        // Attach sibling map to each file
-        for (let i = 0; i < flatFiles.length; i++) {
-          const f = flatFiles[i];
-          if (f.category === 'Past Papers' && f.unitCode && f.session) {
-            const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
-            f.siblings = siblingGroups.get(sibKey) || null;
-          }
-        }
-
-        const dedupedFiles = Array.from(dedupMap.values());
-
-        // Build Unified Exam Sitting entries so each exam sitting (QP + MS + ER + extras) is a single row
-        const sittingMap = new Map();
-        const unifiedFiles = [];
-        const DOC_PRIORITY = ['QP', 'MS', 'ER', 'SOL', 'AUD', 'SC', 'DF', 'SAM'];
-
-        for (let i = 0; i < dedupedFiles.length; i++) {
-          const f = dedupedFiles[i];
-          const canUnify =
-            f.category === 'Past Papers' &&
-            f.unitCode &&
-            f.session &&
-            f.docType &&
-            !String(f.variant || '').startsWith('ER');
-
-          if (!canUnify) {
-            unifiedFiles.push({
-              ...f,
-              isUnifiedSitting: false,
-              docs: f.docType ? { [f.docType]: f } : {},
-              docTypes: f.docType ? [f.docType] : [],
-              paths: [f.path],
-              fileCount: 1,
-              totalSize: f.size || 0
-            });
-            continue;
-          }
-
-          const sittingKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
-          let group = sittingMap.get(sittingKey);
-          if (!group) {
-            group = {
-              id: sittingKey,
-              isUnifiedSitting: true,
-              spec: f.spec,
-              curriculum: f.curriculum,
-              category: f.category,
-              subject: f.subject,
-              unitCode: f.unitCode,
-              unitName: f.unitName,
-              cleanUnitLabel: f.cleanUnitLabel,
-              variant: f.variant,
-              year: f.year,
-              session: f.session,
-              sortKey: f.sortKey,
-              docs: {},
-              paths: [],
-              searchChunks: [],
-              totalSize: 0
+            // Deduplicate byte-for-byte duplicate files across batches & link QP/MS/ER siblings
+            const scoreFile = (f) => {
+              let s = 0;
+              if (f.path.includes('(')) s += 10;
+              if (f.name.includes('_')) s += 5;
+              return s;
             };
-            sittingMap.set(sittingKey, group);
-            unifiedFiles.push(group);
-          }
 
-          if (!group.docs[f.docType] || scoreFile(f) > scoreFile(group.docs[f.docType])) {
-            group.docs[f.docType] = f;
-          }
-          group.paths.push(f.path);
-          group.searchChunks.push(f.searchTerms);
-          group.totalSize += (f.size || 0);
-        }
+            const dedupMap = new Map();
+            const siblingGroups = new Map();
 
-        // Finalize unified sitting metadata in one fast pass
-        for (let i = 0; i < unifiedFiles.length; i++) {
-          const item = unifiedFiles[i];
-          if (!item.isUnifiedSitting) continue;
-          const docTypes = DOC_PRIORITY.filter(t => Boolean(item.docs[t]));
-          const primary = item.docs.QP || item.docs.MS || item.docs.ER || item.docs[docTypes[0]];
-          const folderPath = (primary.path || '').split('/').slice(0, -1).join('/') || primary.path;
-          item.docTypes = docTypes;
-          item.fileCount = docTypes.length;
-          item.primaryFile = primary;
-          item.name = primary.name;
-          item.path = primary.path;
-          item.folderPath = folderPath;
-          item.ext = primary.ext;
-          item.size = item.totalSize;
-          item.docType = primary.docType;
-          item.siblings = primary.siblings;
-          item.searchTerms = item.searchChunks.join(' ');
-          delete item.searchChunks;
-        }
+            for (let i = 0; i < flatFiles.length; i++) {
+              const f = flatFiles[i];
+              const isCanonicalPaper = f.category === 'Past Papers' && f.unitCode && f.session && f.docType;
+              const dedupKey = isCanonicalPaper
+                ? `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}|${f.docType}|${f.ext}|${f.size}`
+                : f.path;
+
+              if (!dedupMap.has(dedupKey) || scoreFile(f) > scoreFile(dedupMap.get(dedupKey))) {
+                dedupMap.set(dedupKey, f);
+              }
+
+              if (isCanonicalPaper && f.ext === 'pdf' && (f.docType === 'QP' || f.docType === 'MS' || f.docType === 'ER')) {
+                const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
+                let grp = siblingGroups.get(sibKey);
+                if (!grp) {
+                  grp = {};
+                  siblingGroups.set(sibKey, grp);
+                }
+                if (!grp[f.docType] || scoreFile(f) > scoreFile(grp[f.docType])) {
+                  grp[f.docType] = f;
+                }
+              }
+            }
+
+            // Attach sibling map to each file
+            for (let i = 0; i < flatFiles.length; i++) {
+              const f = flatFiles[i];
+              if (f.category === 'Past Papers' && f.unitCode && f.session) {
+                const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
+                f.siblings = siblingGroups.get(sibKey) || null;
+              }
+            }
+
+            const dedupedFiles = Array.from(dedupMap.values());
+
+            // Build Unified Exam Sitting entries so each exam sitting (QP + MS + ER + extras) is a single row
+            const sittingMap = new Map();
+            const unifiedFiles = [];
+            const DOC_PRIORITY = ['QP', 'MS', 'ER', 'SOL', 'AUD', 'SC', 'DF', 'SAM'];
+
+            for (let i = 0; i < dedupedFiles.length; i++) {
+              const f = dedupedFiles[i];
+              const canUnify =
+                f.category === 'Past Papers' &&
+                f.unitCode &&
+                f.session &&
+                f.docType &&
+                !String(f.variant || '').startsWith('ER');
+
+              if (!canUnify) {
+                unifiedFiles.push({
+                  ...f,
+                  isUnifiedSitting: false,
+                  docs: f.docType ? { [f.docType]: f } : {},
+                  docTypes: f.docType ? [f.docType] : [],
+                  paths: [f.path],
+                  fileCount: 1,
+                  totalSize: f.size || 0
+                });
+                continue;
+              }
+
+              const sittingKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
+              let group = sittingMap.get(sittingKey);
+              if (!group) {
+                group = {
+                  id: sittingKey,
+                  isUnifiedSitting: true,
+                  spec: f.spec,
+                  curriculum: f.curriculum,
+                  category: f.category,
+                  subject: f.subject,
+                  unitCode: f.unitCode,
+                  unitName: f.unitName,
+                  cleanUnitLabel: f.cleanUnitLabel,
+                  variant: f.variant,
+                  year: f.year,
+                  session: f.session,
+                  sortKey: f.sortKey,
+                  docs: {},
+                  paths: [],
+                  searchChunks: [],
+                  totalSize: 0
+                };
+                sittingMap.set(sittingKey, group);
+                unifiedFiles.push(group);
+              }
+
+              if (!group.docs[f.docType] || scoreFile(f) > scoreFile(group.docs[f.docType])) {
+                group.docs[f.docType] = f;
+              }
+              group.paths.push(f.path);
+              group.searchChunks.push(f.searchTerms);
+              group.totalSize += (f.size || 0);
+            }
+
+            // Finalize unified sitting metadata in one fast pass
+            for (let i = 0; i < unifiedFiles.length; i++) {
+              const item = unifiedFiles[i];
+              if (!item.isUnifiedSitting) continue;
+              const docTypes = DOC_PRIORITY.filter(t => Boolean(item.docs[t]));
+              const primary = item.docs.QP || item.docs.MS || item.docs.ER || item.docs[docTypes[0]];
+              const folderPath = (primary.path || '').split('/').slice(0, -1).join('/') || primary.path;
+              item.docTypes = docTypes;
+              item.fileCount = docTypes.length;
+              item.primaryFile = primary;
+              item.name = primary.name;
+              item.path = primary.path;
+              item.folderPath = folderPath;
+              item.ext = primary.ext;
+              item.size = item.totalSize;
+              item.docType = primary.docType;
+              item.siblings = primary.siblings;
+              item.searchTerms = item.searchChunks.join(' ');
+              delete item.searchChunks;
+            }
 
             setData(prev => ({
               tree: tree || prev.tree,
@@ -2208,13 +2531,27 @@ function App() {
   const isRoot = selectedPath === data.tree?.path || selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
+  const getOnSitePaperUrl = useCallback((fileObj, preferredView = '') => {
+    return buildRoutePath({
+      currentTab: 'library',
+      filterCurriculum: filterCurriculum || fileObj?.curriculum || '',
+      filterSubject: filterSubject || fileObj?.subject || '',
+      filterUnit: filterUnit || fileObj?.cleanUnitLabel || '',
+      filterYear,
+      filterDocType,
+      searchQuery: deferredSearchQuery,
+      previewFile: fileObj,
+      previewMode: preferredView
+    });
+  }, [filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, deferredSearchQuery]);
+
   const activeDateText = useMemo(() => {
     if (filterSubject) {
       const cov = filterCurriculum === 'Edexcel IGCSE'
         ? data.meta?.igcseSubjectCoverage?.[filterSubject]
         : (filterCurriculum === 'Edexcel IAL'
-            ? data.meta?.ialSubjectCoverage?.[filterSubject]
-            : data.meta?.subjectCoverage?.[filterSubject]);
+          ? data.meta?.ialSubjectCoverage?.[filterSubject]
+          : data.meta?.subjectCoverage?.[filterSubject]);
       if (cov) return `${formatSubjectDisplay(filterSubject)}: ${cov}`;
     }
     return data.meta?.coverage || 'January 2003 – January 2026';
@@ -2647,6 +2984,47 @@ function App() {
               {/* Desktop Breadcrumb Bar */}
               {renderBreadcrumbs('desktop-breadcrumb')}
 
+              {/* SEO Contextual Topic Header & Unit Explorer */}
+              {(filterCurriculum || filterSubject || filterUnit || filterDocType === 'Book') && (
+                <section className="seo-topic-banner" aria-label="Course Collection Overview">
+                  <div className="seo-topic-header">
+                    <div>
+                      <h1 className="seo-topic-h1">{seoMeta.h1}</h1>
+                      <p className="seo-topic-subtitle">{seoMeta.subtitle}</p>
+                    </div>
+                  </div>
+                  {filterSubject && availableUnitsForFilter.length > 0 && (
+                    <nav className="seo-unit-pills" aria-label={`${formatSubjectDisplay(filterSubject)} Units and Papers`}>
+                      <a
+                        href={buildRoutePath({ currentTab: 'library', filterCurriculum: filterCurriculum || 'Edexcel IAL', filterSubject })}
+                        className={`seo-unit-pill ${!filterUnit ? 'active' : ''}`}
+                        onClick={(e) => { e.preventDefault(); setFilterUnit(''); }}
+                      >
+                        All Units ({availableUnitsForFilter.length})
+                      </a>
+                      {availableUnitsForFilter.map(u => {
+                        const unitHref = buildRoutePath({
+                          currentTab: 'library',
+                          filterCurriculum: filterCurriculum || 'Edexcel IAL',
+                          filterSubject,
+                          filterUnit: u
+                        });
+                        return (
+                          <a
+                            key={u}
+                            href={unitHref}
+                            className={`seo-unit-pill ${filterUnit === u ? 'active' : ''}`}
+                            onClick={(e) => { e.preventDefault(); setFilterUnit(filterUnit === u ? '' : u); }}
+                          >
+                            {u}
+                          </a>
+                        );
+                      })}
+                    </nav>
+                  )}
+                </section>
+              )}
+
               {/* Document List / Data Table */}
               {filesLoading && visibleFiles.length === 0 ? (
                 <div className="no-results-box">
@@ -2680,17 +3058,26 @@ function App() {
                         const isPdf = activeDoc.ext === 'pdf';
                         const siblings = file.siblings || null;
                         const docs = file.docs || {};
+                        const hasSplitPair = Boolean(
+                          (docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ||
+                          (siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf')
+                        );
+                        const defaultViewMode = isUnified
+                          ? (hasSplitPair ? 'split' : (activeDoc.docType || 'QP'))
+                          : (activeDoc.docType || 'QP');
 
                         return (
                           <tr key={file.id || file.path} className={isUnified ? 'unified-sitting-row' : ''}>
                             <td className="file-title-cell">
                               <div className="file-title-row">
                                 <a
-                                  href={getHfUrl(activeDoc.path)}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  href={getOnSitePaperUrl(file, defaultViewMode)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    openOnSiteReader(file, defaultViewMode);
+                                  }}
                                   className={titleCls}
-                                  title={isUnified ? `Open ${DOC_TYPE_INFO[activeDoc.docType]?.fullLabel || 'Document'} (${displayTitle})` : displayTitle}
+                                  title={isUnified ? `View ${displayTitle} on-site` : `View ${displayTitle} on-site`}
                                 >
                                   {displayTitle}
                                 </a>
@@ -2741,11 +3128,13 @@ function App() {
                                 <div className="unified-actions-cell">
                                   {docs.QP && (
                                     <a
-                                      href={getHfUrl(docs.QP.path)}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                      href={getOnSitePaperUrl(file, 'QP')}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openOnSiteReader(file, 'QP');
+                                      }}
                                       className="unified-doc-btn qp"
-                                      title={`Open Question Paper — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
+                                      title={`View Question Paper on-site — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
                                     >
                                       <span className="desktop-btn-label">Question Paper </span>
                                       <span className="btn-code">[QP]</span>
@@ -2753,11 +3142,13 @@ function App() {
                                   )}
                                   {docs.MS && (
                                     <a
-                                      href={getHfUrl(docs.MS.path)}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                      href={getOnSitePaperUrl(file, 'MS')}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openOnSiteReader(file, 'MS');
+                                      }}
                                       className="unified-doc-btn ms"
-                                      title={`Open Mark Scheme — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
+                                      title={`View Mark Scheme on-site — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
                                     >
                                       <span className="desktop-btn-label">Mark Scheme </span>
                                       <span className="btn-code">[MS]</span>
@@ -2765,11 +3156,13 @@ function App() {
                                   )}
                                   {docs.ER && (
                                     <a
-                                      href={getHfUrl(docs.ER.path)}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                      href={getOnSitePaperUrl(file, 'ER')}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openOnSiteReader(file, 'ER');
+                                      }}
                                       className="unified-doc-btn er"
-                                      title={`Open Examiner Report — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
+                                      title={`View Examiner Report on-site — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
                                     >
                                       <span className="desktop-btn-label">Examiner Report </span>
                                       <span className="btn-code">[ER]</span>
@@ -2788,11 +3181,13 @@ function App() {
                                     return (
                                       <a
                                         key={extraType}
-                                        href={getHfUrl(extraDoc.path)}
-                                        target="_blank"
-                                        rel="noreferrer"
+                                        href={getOnSitePaperUrl(file, extraType)}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          openOnSiteReader(file, extraType);
+                                        }}
                                         className="unified-doc-btn extra"
-                                        title={`Open ${DOC_TYPE_INFO[extraType]?.fullLabel || extraType} — ${extraDoc.name}`}
+                                        title={`View ${DOC_TYPE_INFO[extraType]?.fullLabel || extraType} on-site — ${extraDoc.name}`}
                                       >
                                         <span>{labelMap[extraType] || extraType}</span>
                                         <span className="btn-code">[{extraType}]</span>
@@ -2803,7 +3198,7 @@ function App() {
                                     <button
                                       type="button"
                                       className={`unified-preview-btn ${Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'split-btn' : ''}`}
-                                      onClick={() => setPreviewFile(file)}
+                                      onClick={() => openOnSiteReader(file, Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'split' : (activeDoc.docType || 'QP'))}
                                       title={Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? "Open Question Paper and Mark Scheme side-by-side in Split View" : "Quick In-App PDF Preview"}
                                     >
                                       {Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'Split View' : 'Preview'}
@@ -2814,9 +3209,11 @@ function App() {
                                 <div className="row-actions-cell">
                                   {viewMode === 'unified' ? (
                                     <a
-                                      href={getHfUrl(file.path)}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                      href={getOnSitePaperUrl(file, file.docType || 'Book')}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openOnSiteReader(file, file.docType || 'Book');
+                                      }}
                                       className={`unified-doc-btn ${badge?.cls === 'book' || badge?.cls === 'sol' ? 'book' : (badge?.cls || 'extra')}`}
                                     >
                                       <span>
@@ -2846,13 +3243,15 @@ function App() {
                                         return (
                                           <a
                                             key={sibType}
-                                            href={getHfUrl(sib.path)}
-                                            target="_blank"
-                                            rel="noreferrer"
+                                            href={getOnSitePaperUrl(sib, sibType)}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              openOnSiteReader(sib, sibType);
+                                            }}
                                             className={`sibling-pill ${sibType.toLowerCase()}`}
-                                            title={`Open matching ${DOC_TYPE_INFO[sibType]?.fullLabel} (${file.session})`}
+                                            title={`View matching ${DOC_TYPE_INFO[sibType]?.fullLabel} (${file.session}) on-site`}
                                           >
-                                            {sibType} ↗
+                                            {sibType}
                                           </a>
                                         );
                                       })}
@@ -2863,7 +3262,7 @@ function App() {
                                     <button
                                       type="button"
                                       className={viewMode === 'unified' ? 'unified-preview-btn' : 'preview-btn'}
-                                      onClick={() => setPreviewFile(activeDoc)}
+                                      onClick={() => openOnSiteReader(activeDoc, Boolean(siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf') ? 'split' : (activeDoc.docType || 'QP'))}
                                       title={Boolean(siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf') ? "Open Question Paper and Mark Scheme side-by-side in Split View" : "Quick In-App PDF Preview"}
                                     >
                                       {Boolean(siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf') ? 'Split View' : 'Preview'}
@@ -2948,9 +3347,14 @@ function App() {
       {/* In-App PDF Preview Modal */}
       {previewFile && (
         <PreviewModal
-          key={previewFile.id || previewFile.path}
+          key={`${previewFile.id || previewFile.path}-${previewInitialView}`}
           file={previewFile}
-          onClose={() => setPreviewFile(null)}
+          initialView={previewInitialView}
+          onViewChange={(v) => setPreviewInitialView(v)}
+          onClose={() => {
+            setPreviewFile(null);
+            setPreviewInitialView('');
+          }}
         />
       )}
 
@@ -2970,17 +3374,71 @@ function App() {
           </div>
         </div>
         <div className="footer-links">
-          <span className="footer-link" onClick={() => { setCurrentTab('library'); clearFilters(); }}>
+          <a
+            href="/"
+            className="footer-link"
+            onClick={(e) => { e.preventDefault(); setCurrentTab('library'); clearFilters(); }}
+          >
             Library Home
-          </span>
+          </a>
           <span className="footer-sep">•</span>
-          <span className="footer-link" onClick={() => setCurrentTab('changelog')}>
+          <a
+            href="/ial"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters();
+              setFilterCurriculum('Edexcel IAL');
+              setForceShowTable(true);
+            }}
+          >
+            Edexcel IAL
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/igcse"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters();
+              setFilterCurriculum('Edexcel IGCSE');
+              setForceShowTable(true);
+            }}
+          >
+            Edexcel IGCSE
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/textbooks"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters();
+              setFilterDocType('Book');
+              setForceShowTable(true);
+            }}
+          >
+            Textbooks
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/changelog"
+            className="footer-link"
+            onClick={(e) => { e.preventDefault(); setCurrentTab('changelog'); }}
+          >
             Changelog
-          </span>
+          </a>
           <span className="footer-sep">•</span>
-          <span className="footer-link" onClick={() => setCurrentTab('about')}>
+          <a
+            href="/about"
+            className="footer-link"
+            onClick={(e) => { e.preventDefault(); setCurrentTab('about'); }}
+          >
             About Us & Team
-          </span>
+          </a>
           <span className="footer-sep">•</span>
           <a href="mailto:diavlon.pxa@gmail.com" className="footer-link">
             Contact Us
