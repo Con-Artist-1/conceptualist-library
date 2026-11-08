@@ -66,6 +66,151 @@ export const IGCSE_SUBJECTS_DEFAULT = [
   'Mathematics A', 'Mathematics B', 'Physics'
 ];
 
+export const DEFAULT_UNIT_LABELS = {
+  'Edexcel IAL': {
+    'Accounting': [
+      'Unit 1: The Accounting System & Costing (WAC11)',
+      'Unit 2: Corporate & Management Accounting (WAC12)'
+    ],
+    'Biology': [
+      'Unit 1: Lifestyle, Transport & Health (WBI11)',
+      'Unit 2: Cells, Development & Biodiversity (WBI12)',
+      'Unit 3: Practical Biology I (WBI13)',
+      'Unit 4: Energy, Environment & Immunity (WBI14)',
+      'Unit 5: Respiration & Muscles (WBI15)',
+      'Unit 6: Practical Biology II (WBI16)'
+    ],
+    'Business': [
+      'Unit 1: Marketing & People (WBS11)',
+      'Unit 2: Managing Business Activities (WBS12)',
+      'Unit 3: Business Decisions & Strategy (WBS13)',
+      'Unit 4: Global Business (WBS14)'
+    ],
+    'Chemistry': [
+      'Unit 1: Structure & Bonding (WCH11)',
+      'Unit 2: Energetics & Organics (WCH12)',
+      'Unit 3: Practical Chemistry I (WCH13)',
+      'Unit 4: Rates & Organic Chemistry (WCH14)',
+      'Unit 5: Transition Metals (WCH15)',
+      'Unit 6: Practical Chemistry II (WCH16)'
+    ],
+    'Economics': [
+      'Unit 1: Markets in Action (WEC11)',
+      'Unit 2: Macroeconomic Performance (WEC12)',
+      'Unit 3: Business Behaviour (WEC13)',
+      'Unit 4: A Global Perspective (WEC14)'
+    ],
+    'Information Technology': [
+      'IT Unit 1 (WIT11)',
+      'IT Unit 2 (WIT12)',
+      'IT Unit 3 (WIT13)',
+      'IT Unit 4 (WIT14)'
+    ],
+    'Math': [
+      'Core Mathematics 1 (C1)',
+      'Core Mathematics 12 (C12)',
+      'Core Mathematics 2 (C2)',
+      'Core Mathematics 3 (C3)',
+      'Core Mathematics 34 (C34)',
+      'Core Mathematics 4 (C4)',
+      'Decision Mathematics 1 (D1)',
+      'Further Pure 1 (FP1)',
+      'Further Pure 2 (FP2)',
+      'Further Pure 3 (FP3)',
+      'Mechanics 1 (M1)',
+      'Mechanics 2 (M2)',
+      'Mechanics 3 (M3)',
+      'Pure Mathematics 1 (P1)',
+      'Pure Mathematics 2 (P2)',
+      'Pure Mathematics 3 (P3)',
+      'Pure Mathematics 4 (P4)',
+      'Statistics 1 (S1)',
+      'Statistics 2 (S2)',
+      'Statistics 3 (S3)'
+    ],
+    'Physics': [
+      'Practical Physics I (WPH13)',
+      'Unit 1: Mechanics & Materials (WPH11)',
+      'Unit 2: Waves & Electricity (WPH12)',
+      'Unit 3: Practical Physics I (WPH13)',
+      'Unit 4: Further Mechanics & Fields (WPH14)',
+      'Unit 5: Thermodynamics & Oscillations (WPH15)',
+      'Unit 6: Practical Physics II (WPH16)'
+    ],
+    'Psychology': [
+      'Psychology Unit 1 (WPS01)',
+      'Psychology Unit 2 (WPS02)',
+      'Psychology Unit 3 (WPS03)',
+      'Psychology Unit 4 (WPS04)'
+    ],
+    'Arabic': ['Arabic Unit 1 (WAA01)', 'Arabic Unit 2 (WAA02)'],
+    'English Language': [
+      'English Language Unit 1 (WEN01)',
+      'English Language Unit 2 (WEN02)',
+      'English Language Unit 3 (WEN03)',
+      'English Language Unit 4 (WEN04)'
+    ],
+    'English Literature': [
+      'English Literature Unit 1 (WET01)',
+      'English Literature Unit 2 (WET02)',
+      'English Literature Unit 3 (WET03)',
+      'English Literature Unit 4 (WET04)'
+    ],
+    'French': [
+      'French Unit 1 (WFR01)',
+      'French Unit 2 (WFR02)',
+      'French Unit 3 (WFR03)',
+      'French Unit 4 (WFR04)'
+    ],
+    'Geography': [
+      'Geography Unit 1 (WGE01)',
+      'Geography Unit 2 (WGE02)',
+      'Geography Unit 3 (WGE03)',
+      'Geography Unit 4 (WGE04)'
+    ],
+    'German': [
+      'German Unit 1 (WGN01)',
+      'German Unit 2 (WGN02)',
+      'German Unit 3 (WGN03)',
+      'German Unit 4 (WGN04)'
+    ],
+    'Greek': ['Greek Unit 1 (WGK01)', 'Greek Unit 2 (WGK02)'],
+    'History': [
+      'History Unit 1 (WHI01)',
+      'History Unit 2 (WHI02)',
+      'History Unit 3 (WHI03)',
+      'History Unit 4 (WHI04)'
+    ],
+    'Law': ['Law Paper 1 (YLA1)', 'Law Paper 2 (YLA2)'],
+    'Spanish': [
+      'Spanish Unit 1 (WSP01)',
+      'Spanish Unit 2 (WSP02)',
+      'Spanish Unit 3 (WSP03)',
+      'Spanish Unit 4 (WSP04)'
+    ]
+  },
+  'Edexcel IGCSE': {
+    'Accounting': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Biology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Business': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Chemistry': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Economics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Further Pure Mathematics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Human Biology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Information Technology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Mathematics A': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Physics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Bangla': ['Paper 1 (P1)'],
+    'Commerce': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Computer Science': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'English Language A': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'English Language B': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'English Literature': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
+    'Geography': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Mathematics B': ['Paper 1 (P1)', 'Paper 2 (P2)']
+  }
+};
+
 export function slugify(text) {
   if (!text) return '';
   return String(text)
@@ -146,8 +291,10 @@ export function resolveUnitFromSlug(unitSlug, curriculum, subject, meta) {
   if (!unitSlug || !subject) return '';
   const clean = unitSlug.toLowerCase().trim();
   const curr = curriculum || 'Edexcel IAL';
-  const unitsObj = meta?.wizard?.[curr]?.[subject]?.units || {};
-  const unitLabels = Object.keys(unitsObj);
+  const unitsObj = meta?.wizard?.[curr]?.[subject]?.units;
+  const unitLabels = unitsObj
+    ? Object.keys(unitsObj)
+    : (DEFAULT_UNIT_LABELS[curr]?.[subject] || []);
 
   // 1. Exact slug match
   for (const label of unitLabels) {
@@ -187,6 +334,7 @@ export function buildRoutePath({
   filterDocType = null,
   searchQuery = '',
   previewFile = null,
+  pendingPaperParam = '',
   previewMode = ''
 }) {
   if (currentTab === 'about') return '/about';
@@ -226,9 +374,9 @@ export function buildRoutePath({
   if (searchQuery && searchQuery.trim()) {
     params.set('q', searchQuery.trim());
   }
-  if (previewFile) {
-    const paperKey = previewFile.id || previewFile.path || '';
-    if (paperKey) params.set('paper', paperKey);
+  const paperKey = previewFile ? (previewFile.id || previewFile.path || '') : (pendingPaperParam || '');
+  if (paperKey) {
+    params.set('paper', paperKey);
     if (previewMode) params.set('view', previewMode);
   }
 
