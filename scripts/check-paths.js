@@ -31,3 +31,4 @@ for (const f of data.files) {
 }
 console.log('Forward slash IAL count:', forwardSlashIal);
 console.log('Backslash IAL count:', backSlashIal);
+

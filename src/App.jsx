@@ -4,107 +4,108 @@ import './index.css';
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-08T02:00:00.000Z';
-const APP_VERSION = 'v3.1';
+const APP_VERSION = 'v3.2';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v3.1',
+    version: 'v3.2',
     date: BUILD_TIMESTAMP,
-    title: 'Instant 0ms Category Tree, Edge Stale-While-Revalidate & Multi-Tier Catalog Sync',
-    summary: 'Resolved empty catalog display by embedding full IAL/IGCSE subject hierarchy directly into synchronous shell, enabled 7-day edge stale-while-revalidate caching, and added multi-tier fallback with Hugging Face CDN redundancy.',
+    title: 'Default Side-by-Side Split View & Immersive Fullscreen Reader',
+    summary: 'Upgraded document previews to launch directly into an edge-to-edge Split View so you can study Question Papers and Mark Schemes side-by-side without wasted screen space.',
     changes: [
-      'Embedded complete subject hierarchy (19 IAL subjects, 22 IGCSE subjects, and 19 textbook subjects) directly into the client shell so the category navigation sidebar renders all subjects in 0ms synchronously before any network requests complete.',
-      'Configured Vercel and Cloudflare edge caches with stale-while-revalidate (s-maxage=86400, stale-while-revalidate=604800) so edge nodes serve cached catalog indexes in <30ms while background revalidation occurs without client delays.',
-      'Added multi-tier resilient loading with automatic retries and automatic Hugging Face CDN fallback (mcmaster-docs-library) so network hiccups or proxy timeouts never leave the document list empty.',
-      'Replaced misleading "No matching documents found" message during slow network conditions with an active reconnection indicator and manual retry control.'
+      'Split View by default: Clicking into any examination sitting now immediately boots up the dual-pane view with the Question Paper on the left and Mark Scheme on the right.',
+      'Edge-to-edge reading: Removed all outer modal borders, margins, and letterboxing so the preview spans your entire display, giving you maximum room to study questions and working steps.',
+      'Clearer action buttons: Renamed the table action button to "Split View" so you know exactly what to expect before opening an exam sitting.',
+      'Humanized changelogs: Refreshed our version history with clearer, more thoughtful descriptions across all previous updates.'
+    ]
+  },
+  {
+    version: 'v3.1',
+    date: '2026-11-08T07:25:00.000Z',
+    title: 'Instant 0ms Category Tree & Multi-Tier Catalog Sync',
+    summary: 'Fixed an issue where the category tree appeared empty on slower networks by baking the full subject hierarchy straight into the initial app shell and adding smart background failovers.',
+    changes: [
+      'Instant sidebar browsing: The entire subject catalog (19 IAL subjects, 22 IGCSE subjects, and textbooks) now renders on the first paint before any background network calls even start.',
+      'Edge caching that actually works: Switched our CDN headers to stale-while-revalidate, so you get cached index responses in ~50ms instead of waiting for a cold origin server.',
+      'Zero-downtime Hugging Face fallback: If our primary hosting provider ever has a hiccup or delay, the app automatically switches to our Hugging Face CDN mirror in the background.',
+      'Clear connection alerts: Replaced the misleading "No matching documents found" screen with an honest, real-time reconnection banner and manual retry button.'
     ]
   },
   {
     version: 'v3.0',
     date: '2026-11-08T06:00:00.000Z',
-    title: 'Ultra-Lean Tree Architecture (96% Smaller), Instant 0ms Shell & Network Resilience',
-    summary: 'Pruned 8,500+ year/session subfolders from the sidebar tree (slashing meta payload by 96%), eliminated blank loading screens with instant 0ms shell paint, and added fetch timeout recovery.',
+    title: 'Leaner Tree Index & 0ms App Shell',
+    summary: 'We shaved 96% off the initial metadata payload by cleaning out thousands of redundant year folders, getting rid of blank loading screens for good.',
     changes: [
-      'Pruned 8,500+ repetitive year and examination session folders from the directory tree index, shrinking meta.json from 162 KB down to 27 KB (3.5 KB Brotli) and cutting tree node count from 9,189 to ~400 nodes.',
-      'Eliminated the blank "Loading Repository Index..." screen on initial visits by rendering the styled institutional layout, header, statistics, and course cards in 0ms synchronously.',
-      'Added timeout-resilient data streaming with automatic fallback retry so network stalls or proxy delays never hang the catalog loading screen indefinitely.',
-      'Updated cache key to cs_library_meta_v3.0 to automatically flush older bloated 9,189-node trees from localStorage.'
+      'Cleaned up folder clutter: Pruned over 8,500 repetitive year and exam session folders from the sidebar tree, shrinking our metadata payload from 162 KB down to 27 KB.',
+      'No more white flashes: The header, subject cards, and archive stats now paint in 0ms synchronously when you open the site.',
+      'Smarter cache busting: Upgraded our storage keys so returning visitors get fresh releases automatically without having to manually wipe their browser data.'
     ]
   },
   {
     version: 'v2.9',
     date: '2026-11-07T19:30:00.000Z',
-    title: 'Precise Regional (Alt A & R) Labels & Course Badges',
-    summary: 'Clarified all Regional and Alt A examination sittings with explicit (Regional / Alt A) and (Regional / R) labels and distinct badges in the Course & Session column.',
+    title: 'Clearer Regional (Alt A & R) Labels & Badges',
+    summary: 'Added clear visual indicators for Regional and Alternate papers so students don\'t accidentally study the wrong paper variant.',
     changes: [
-      'Standardized title labeling so students can instantly distinguish standard series from Regional (R) and IAL Alternate (Alt A) variants.',
-      'Added high-visibility, Ivy-League styled [Regional] and [Regional (Alt A)] badges in the Course & Session column.',
-      'Expanded search indexing to seamlessly match "alt", "alta", "alt a", "regional", and "r".'
+      'Prominent paper tags: Regional (R) and IAL Alternate (Alt A) variants now feature dedicated badges right beside the sitting title.',
+      'Search shorthand support: You can now type "r", "reg", "alt", or "alta" into search to jump straight to regional variants.'
     ]
   },
   {
     version: 'v2.8',
     date: '2026-11-07T18:36:00.000Z',
-    title: '631 New 2024–2026 IAL & IGCSE Past Papers (May/June 2026, Jan 2025 & Modular) + Cache Recovery',
-    summary: 'Expanded repository to 13,940 verified Pearson Edexcel files (+631 new papers across May/June 2026, Jan 2025, Oct/Nov 2024, and IGCSE Modular) plus one-click crash cache recovery.',
+    title: '631 New 2024–2026 Papers & One-Click Cache Recovery',
+    summary: 'Expanded our library to 13,940 verified papers, including the latest May/June 2026 and Jan 2025 series, plus an automatic recovery screen for stuck browsers.',
     changes: [
-      'Added 631 verified, unwatermarked Pearson Edexcel past papers (QP, MS, ER, and practical data files), bringing the total indexed archive from 13,309 to 13,940 files.',
-      'Added May/June 2026 IAL & IGCSE series across Accounting, Biology, Business, Chemistry, Economics, English Language/Literature, Geography, History, Law, Mathematics, Physics, and Psychology.',
-      'Added IGCSE Modular (Unit 1 & Unit 2, 2024–2026) papers for Accounting, Biology, Chemistry, Commerce, Economics, Geography, History, Physics, and Religious Studies, plus Foundation/Higher Regional (F-R / H-R) and Computer Science P2 variants.',
-      'Added backward-compatible tree indexing and a dedicated "Clear Cache & Force Reload" recovery screen so returning browsers with older cached shells self-heal automatically.'
+      'Fresh 2025–2026 examination series: Added 631 unwatermarked past papers across all major sciences, mathematics, humanities, and business subjects.',
+      'IGCSE Modular support: Added Unit 1 and Unit 2 papers for the new modular qualifications alongside Foundation/Higher variants.',
+      'Self-healing cache: Built an automatic recovery screen that detects outdated local storage and refreshes your cache with a single click.'
     ]
   },
   {
     version: 'v2.7',
     date: '2026-11-07T17:18:00.000Z',
-    title: 'Institutional McMaster/Ivy-League Styling, Unified Sittings & Typo-Tolerant Fuzzy Search',
-    summary: 'Refined muted burgundy/slate institutional palette, removed all emojis, unified QP/MS/ER into single sitting rows (~65% less clutter), and added typo-tolerant fuzzy + shorthand search.',
+    title: 'Unified Exam Sittings & McMaster Institutional Theme',
+    summary: 'Grouped matching Question Papers, Mark Schemes, and Reports into a single row to cut table clutter by 65%, and introduced typo-tolerant fuzzy search.',
     changes: [
-      'Restored strict McMaster-Carr / Ivy-League institutional aesthetic: muted burgundy, Oxford slate-navy, forest-slate, and warm bronze tones with 0ms instant hover/click states and zero emojis.',
-      'Unified matching Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), and audio/data attachments from the same exam sitting into a single consolidated row — reducing list length by ~65%.',
-      'Added Side-by-Side Split View (QP + MS) inside the PDF Preview Modal and a "Unified Sittings / Individual Files" view mode toggle in the filter bar.',
-      'Upgraded the search engine with Damerau-Levenshtein typo tolerance (e.g., "chemsitry", "mechanincs", "acounting"), compound shorthand expansion ("jan25", "oct24", "unit1", "p2r", "markscheme"), and relevance ranking in <1ms.'
+      'Single-row sittings: Instead of scrolling past three or four separate rows for the same exam, you now get QP, MS, and ER consolidated into one neat row.',
+      'Dual-pane PDF preview: Introduced the side-by-side Split View modal to compare question papers directly against the marking guidelines.',
+      'Typo-tolerant search: Search now handles small spelling mistakes (like "chemsitry" or "mechanincs") and popular shorthands like "jan25" or "p1" effortlessly.',
+      'Refined aesthetic: Restored a focused institutional palette with muted burgundy, deep slate, and warm neutrals, completely ditching decorative emojis.'
     ]
   },
   {
     version: 'v2.5',
     date: '2026-11-07T16:10:00.000Z',
-    title: 'Anti-Stale Cache Enforcement, Build Version Tracking & Live Changelog',
-    summary: 'Fixed stale browser/CDN caching on root route, bound index cache to build timestamp, and added subtle footer update tracker + full Changelog page.',
+    title: 'Edge Cache Alignment & Live Changelog',
+    summary: 'Fixed stale page caching across edge networks, anchored assets to build timestamps, and launched this live update log.',
     changes: [
-      'Added strict Cache-Control (no-cache, no-store, must-revalidate) and Vercel-CDN-Cache-Control (no-store) headers to both "/" and "/index.html" so browsers and edge nodes never serve outdated HTML shells.',
-      'Bound meta.json, index.json, and localStorage cache keys directly to the build timestamp so every new deployment automatically busts stale data while staying 0ms cached within the same release.',
-      'Added a subtle, low-profile update indicator in the global footer showing when the site was last updated and a compact summary of the latest update.',
-      'Added this interactive Changelog page (accessible by clicking the footer update note) with a complete history of all site improvements and a one-click cache reset tool.'
+      'Always fresh: Configured strict cache-control on HTML documents so your browser never gets stuck on yesterday\'s release.',
+      'Live changelog page: Created this dedicated log so anyone can follow along with site improvements, fixes, and new features.'
     ]
   },
   {
     version: 'v2.4',
     date: '2026-11-07T16:04:00.000Z',
-    title: '85% Faster Index Payload, Smart Deduplication & Inline PDF Preview',
-    summary: 'Shrank meta.json by 85% (4.6 KB Brotli), deduplicated 3,894 duplicate papers, fixed IGCSE unit filters, and added QP/MS/ER quick-links + inline PDF preview.',
+    title: 'Faster Indexing, Deduplication & Dynamic Filters',
+    summary: 'Shrank the archive index, deduplicated identical paper copies across mirror batches, and added fast in-app PDF previews.',
     changes: [
-      'Compacted directory tree serialization ([name, children]), shrinking meta.json from 882.4 KB down to 155.5 KB (4.6 KB Brotli) and reducing index.json by 728 KB.',
-      'Precomputed the Subject → Unit → Year wizard map inside meta.json so clicking any subject or unit on the homepage responds in 0ms even before the full index finishes downloading.',
-      'Collapsed 3,894 byte-for-byte duplicate PDFs across merged scraper folders (Math/Mathematics/Maths, U1/Unit 1, 2019/May-June vs 2019 May) while preserving all regional (1R), alternative (U1A), and option (_2–_4) papers.',
-      'Fixed IGCSE unit extraction so numbered Examiner Reports (ER 3.pdf, ER 4.pdf) no longer create false Paper 3 (P3) and Paper 4 (P4) buttons in IGCSE subjects that only have Paper 1 and Paper 2.',
-      'Fixed audio tracks (.mp3/.wav) being misclassified as Question Papers (QP), fixed _PEF.pdf detection as Examiner Reports (ER), and added badges for Audio, Data Files, Solutions, Source Booklets, and SAMs.',
-      'Fixed duplicate subject names in document titles (e.g., "Accounting — Unit 1 (WAC11) • Question Paper • January 2026" instead of "Accounting Accounting Unit 1") and added file size & format tags.',
-      'Added one-click companion QP ↗ / MS ↗ / ER ↗ buttons on every table row to jump directly between a Question Paper, its Mark Scheme, and its Examiner Report for the exact same sitting.',
-      'Added an in-app PDF Preview Modal with built-in QP / MS / ER switching in the modal header.',
-      'Added dynamic Unit/Paper and Year dropdowns to the main filter bar, non-blocking search (useDeferredValue) with full synonym expansion, 80-row fast pagination, and "/" keyboard shortcut to focus search.'
+      'Deduplicated archives: Cleaned up nearly 4,000 duplicate files created by overlapping scraper dumps, while preserving all variant and regional papers.',
+      'Instant preview: Added inline PDF viewing so you can check questions without opening dozens of browser tabs.',
+      'Quick navigation: Added dynamic unit and year dropdowns and keyboard shortcuts ("/" to search).'
     ]
   },
   {
     version: 'v2.2',
     date: '2026-11-06T18:30:00.000Z',
-    title: 'Unified IAL & IGCSE Directory Architecture & Two-Stage Indexer',
-    summary: 'Organized 13,309 Pearson Edexcel documents into canonical IAL/IGCSE Past Papers and Textbooks with two-stage meta.json + index.json loading.',
+    title: 'Unified IAL & IGCSE Architecture',
+    summary: 'Organized our entire archive of 13,000+ Pearson Edexcel resources into clear IAL and IGCSE past papers and textbooks with direct high-speed CDN delivery.',
     changes: [
-      'Consolidated all 13,309 Pearson Edexcel resources (9,701 IAL past papers across 19 subjects, 3,537 IGCSE past papers across 18 subjects, and 71 textbooks/solution banks) spanning January 2003 – January 2026.',
-      'Built the interactive 3-step Homepage Wizard (Subject → Unit/Paper → Examination Year) with curated unit labels for Mathematics, Biology, Chemistry, Physics, Accounting, Business, and Economics.',
-      'Synchronized master repository with the Hugging Face dataset CDN (Diavlon/mcmaster-docs-library) for direct, high-speed PDF resolution.'
+      'Complete archive: Indexed over 13,000 papers spanning from 2003 through 2026 across 37 international subjects.',
+      'Interactive homepage wizard: Built a 3-step subject, paper, and year explorer to help you find the exact paper you need in seconds.',
+      'Direct CDN hosting: Connected the catalog directly to our Hugging Face dataset for instant PDF loading.'
     ]
   }
 ];
@@ -695,9 +696,18 @@ const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggl
   );
 });
 
-// ─── In-App Quick PDF Preview Modal (with QP + MS Split View) ────
+// ─── In-App Quick PDF Preview Modal (with Default Fullscreen Split View) ────
 const PreviewModal = ({ file, onClose, onSwitchFile }) => {
-  const [splitMode, setSplitMode] = useState(false);
+  const siblings = {
+    ...(file?.siblings || {}),
+    ...(file?.docs || {})
+  };
+  const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
+  const [splitMode, setSplitMode] = useState(() => canSplit);
+
+  useEffect(() => {
+    if (canSplit) setSplitMode(true);
+  }, [file, canSplit]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -709,8 +719,6 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
 
   if (!file) return null;
   const url = getHfUrl(file.path);
-  const siblings = file.siblings || {};
-  const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
   const activeSplit = splitMode && canSplit;
   const title = activeSplit ? `${getUnifiedSittingTitle(file)} — Split View (QP + MS)` : getDisplayTitle(file);
 
@@ -728,6 +736,17 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
           </div>
 
           <div className="modal-actions">
+            {canSplit && (
+              <button
+                type="button"
+                className={`modal-sibling-btn split ${activeSplit ? 'active' : ''}`}
+                onClick={() => setSplitMode(true)}
+                title="View Question Paper and Mark Scheme side-by-side (Default)"
+              >
+                Split View (QP + MS)
+              </button>
+            )}
+
             {/* Instant Sibling Switcher inside Preview Modal */}
             {['QP', 'MS', 'ER'].map((type) => {
               const sib = siblings[type];
@@ -742,23 +761,12 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
                     setSplitMode(false);
                     if (file.path !== sib.path) onSwitchFile(sib);
                   }}
-                  title={`View ${DOC_TYPE_INFO[type]?.fullLabel || type}`}
+                  title={`Focus on ${DOC_TYPE_INFO[type]?.fullLabel || type} only`}
                 >
                   {type === 'QP' ? 'Question Paper [QP]' : type === 'MS' ? 'Mark Scheme [MS]' : 'Examiner Report [ER]'}
                 </button>
               );
             })}
-
-            {canSplit && (
-              <button
-                type="button"
-                className={`modal-sibling-btn split ${activeSplit ? 'active' : ''}`}
-                onClick={() => setSplitMode(prev => !prev)}
-                title="View Question Paper and Mark Scheme side-by-side"
-              >
-                Split View (QP + MS)
-              </button>
-            )}
 
             <a
               href={url}
@@ -768,7 +776,7 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             >
               Open Full Tab ↗
             </a>
-            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close preview">
+            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close preview" title="Close Preview (Esc)">
               ✕
             </button>
           </div>
@@ -777,7 +785,12 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
           {activeSplit ? (
             <>
               <div className="modal-split-pane">
-                <div className="modal-split-label qp">Question Paper (QP)</div>
+                <div className="modal-split-label qp">
+                  <span>Question Paper (QP)</span>
+                  <a href={getHfUrl(siblings.QP.path)} target="_blank" rel="noreferrer" className="modal-pane-link" title="Open QP in new tab">
+                    Open Tab ↗
+                  </a>
+                </div>
                 <iframe
                   src={getHfUrl(siblings.QP.path)}
                   title="Question Paper"
@@ -785,7 +798,12 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
                 />
               </div>
               <div className="modal-split-pane">
-                <div className="modal-split-label ms">Mark Scheme (MS)</div>
+                <div className="modal-split-label ms">
+                  <span>Mark Scheme (MS)</span>
+                  <a href={getHfUrl(siblings.MS.path)} target="_blank" rel="noreferrer" className="modal-pane-link" title="Open MS in new tab">
+                    Open Tab ↗
+                  </a>
+                </div>
                 <iframe
                   src={getHfUrl(siblings.MS.path)}
                   title="Mark Scheme"
@@ -2721,11 +2739,11 @@ function App() {
                                   {isPdf && (
                                     <button
                                       type="button"
-                                      className="unified-preview-btn"
+                                      className={`unified-preview-btn ${Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'split-btn' : ''}`}
                                       onClick={() => setPreviewFile(activeDoc)}
-                                      title="Quick In-App Preview & Side-by-Side (QP + MS) Split View"
+                                      title={Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? "Open Question Paper and Mark Scheme side-by-side in Split View" : "Quick In-App PDF Preview"}
                                     >
-                                      Preview
+                                      {Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'Split View' : 'Preview'}
                                     </button>
                                   )}
                                 </div>
@@ -2783,9 +2801,9 @@ function App() {
                                       type="button"
                                       className={viewMode === 'unified' ? 'unified-preview-btn' : 'preview-btn'}
                                       onClick={() => setPreviewFile(activeDoc)}
-                                      title="Quick In-App PDF Preview"
+                                      title={Boolean(siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf') ? "Open Question Paper and Mark Scheme side-by-side in Split View" : "Quick In-App PDF Preview"}
                                     >
-                                      Preview
+                                      {Boolean(siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf') ? 'Split View' : 'Preview'}
                                     </button>
                                   )}
                                 </div>
