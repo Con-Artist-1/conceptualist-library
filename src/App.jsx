@@ -9,6 +9,17 @@ const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
+    version: 'v3.3',
+    date: BUILD_TIMESTAMP,
+    title: 'Instant In-Modal Switching for QP, MS, and Split View',
+    summary: 'Resolved an issue where clicking the Question Paper or Mark Scheme buttons inside the reader modal could reload the view back into split mode, enabling seamless instant toggles between single and dual document views.',
+    changes: [
+      'Seamless view toggling: Switching between Split View, Question Paper [QP], Mark Scheme [MS], and Examiner Report [ER] now happens instantly inside the modal without reloading or resetting.',
+      'Active tab clarity: The active view button is clearly highlighted with McMaster burgundy so you always know which document or view mode is currently focused.',
+      'Clean single-document view: Selecting Question Paper or Mark Scheme expands that document to full width while updating the title, subtitle, and full-tab download link accordingly.'
+    ]
+  },
+  {
     version: 'v3.2',
     date: BUILD_TIMESTAMP,
     title: 'Default Side-by-Side Split View & Immersive Fullscreen Reader',
@@ -697,17 +708,16 @@ const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggl
 });
 
 // ─── In-App Quick PDF Preview Modal (with Default Fullscreen Split View) ────
-const PreviewModal = ({ file, onClose, onSwitchFile }) => {
-  const siblings = {
+const PreviewModal = ({ file, onClose }) => {
+  const siblings = useMemo(() => ({
     ...(file?.siblings || {}),
     ...(file?.docs || {})
-  };
-  const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
-  const [splitMode, setSplitMode] = useState(() => canSplit);
+  }), [file]);
 
-  useEffect(() => {
-    if (canSplit) setSplitMode(true);
-  }, [file, canSplit]);
+  const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
+
+  // activeView can be 'split', 'QP', 'MS', 'ER'
+  const [activeView, setActiveView] = useState(() => (canSplit ? 'split' : (file?.docType || 'QP')));
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -718,29 +728,45 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
   }, [onClose]);
 
   if (!file) return null;
-  const url = getHfUrl(file.path);
-  const activeSplit = splitMode && canSplit;
-  const title = activeSplit ? `${getUnifiedSittingTitle(file)} — Split View (QP + MS)` : getDisplayTitle(file);
+
+  const isSplit = activeView === 'split' && canSplit;
+
+  // Resolve current active single document when not in split mode
+  const currentDoc = useMemo(() => {
+    if (activeView === 'QP' && siblings.QP) return siblings.QP;
+    if (activeView === 'MS' && siblings.MS) return siblings.MS;
+    if (activeView === 'ER' && siblings.ER) return siblings.ER;
+    return siblings[activeView] || file.primaryFile || file;
+  }, [activeView, siblings, file]);
+
+  const singleUrl = getHfUrl(currentDoc.path);
+  const singleTitle = getDisplayTitle(currentDoc);
+
+  const modalTitle = isSplit
+    ? `${getUnifiedSittingTitle(file)} — Split View (QP + MS)`
+    : singleTitle;
+
+  const modalSubtitle = isSplit
+    ? `Left: ${siblings.QP?.name || ''} • Right: ${siblings.MS?.name || ''}`
+    : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
+
+  const openTabUrl = isSplit ? getHfUrl(siblings.QP?.path) : singleUrl;
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
-      <div className={`modal-container ${activeSplit ? 'modal-split-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={modalTitle}>
+      <div className={`modal-container ${isSplit ? 'modal-split-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-group">
-            <span className="modal-title">{title}</span>
-            <span className="modal-subtitle">
-              {activeSplit
-                ? `Left: ${siblings.QP.name} • Right: ${siblings.MS.name}`
-                : `${file.path} ${file.size ? `(${formatBytes(file.size)})` : ''}`}
-            </span>
+            <span className="modal-title">{modalTitle}</span>
+            <span className="modal-subtitle">{modalSubtitle}</span>
           </div>
 
           <div className="modal-actions">
             {canSplit && (
               <button
                 type="button"
-                className={`modal-sibling-btn split ${activeSplit ? 'active' : ''}`}
-                onClick={() => setSplitMode(true)}
+                className={`modal-sibling-btn split ${isSplit ? 'active' : ''}`}
+                onClick={() => setActiveView('split')}
                 title="View Question Paper and Mark Scheme side-by-side (Default)"
               >
                 Split View (QP + MS)
@@ -751,16 +777,13 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             {['QP', 'MS', 'ER'].map((type) => {
               const sib = siblings[type];
               if (!sib || !sib.ext || sib.ext !== 'pdf') return null;
-              const isCurrent = !activeSplit && file.path === sib.path;
+              const isCurrent = !isSplit && (activeView === type || currentDoc.path === sib.path);
               return (
                 <button
                   key={type}
                   type="button"
                   className={`modal-sibling-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
-                  onClick={() => {
-                    setSplitMode(false);
-                    if (file.path !== sib.path) onSwitchFile(sib);
-                  }}
+                  onClick={() => setActiveView(type)}
                   title={`Focus on ${DOC_TYPE_INFO[type]?.fullLabel || type} only`}
                 >
                   {type === 'QP' ? 'Question Paper [QP]' : type === 'MS' ? 'Mark Scheme [MS]' : 'Examiner Report [ER]'}
@@ -769,10 +792,11 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             })}
 
             <a
-              href={url}
+              href={openTabUrl}
               target="_blank"
               rel="noreferrer"
               className="modal-action-link"
+              title="Open document in new browser tab"
             >
               Open Full Tab ↗
             </a>
@@ -781,8 +805,8 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             </button>
           </div>
         </div>
-        <div className={`modal-body ${activeSplit ? 'split-grid' : ''}`}>
-          {activeSplit ? (
+        <div className={`modal-body ${isSplit ? 'split-grid' : ''}`}>
+          {isSplit ? (
             <>
               <div className="modal-split-pane">
                 <div className="modal-split-label qp">
@@ -813,8 +837,9 @@ const PreviewModal = ({ file, onClose, onSwitchFile }) => {
             </>
           ) : (
             <iframe
-              src={url}
-              title={title}
+              key={currentDoc.path}
+              src={singleUrl}
+              title={singleTitle}
               className="modal-iframe"
             />
           )}
@@ -2740,7 +2765,7 @@ function App() {
                                     <button
                                       type="button"
                                       className={`unified-preview-btn ${Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'split-btn' : ''}`}
-                                      onClick={() => setPreviewFile(activeDoc)}
+                                      onClick={() => setPreviewFile(file)}
                                       title={Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? "Open Question Paper and Mark Scheme side-by-side in Split View" : "Quick In-App PDF Preview"}
                                     >
                                       {Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf') ? 'Split View' : 'Preview'}
@@ -2885,9 +2910,9 @@ function App() {
       {/* In-App PDF Preview Modal */}
       {previewFile && (
         <PreviewModal
+          key={previewFile.id || previewFile.path}
           file={previewFile}
           onClose={() => setPreviewFile(null)}
-          onSwitchFile={(newFile) => setPreviewFile(newFile)}
         />
       )}
 
