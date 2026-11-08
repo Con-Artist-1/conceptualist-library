@@ -4,10 +4,23 @@ import './index.css';
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-08T02:00:00.000Z';
-const APP_VERSION = 'v3.2';
+const APP_VERSION = 'v3.4';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v3.4',
+    date: BUILD_TIMESTAMP,
+    title: 'Mobile Reader Refinement & Content-First UX',
+    summary: 'Optimized mobile viewing across all pages: pinned in-modal close controls, full-height single-page reader mode on phones, decluttered exam sitting cards, and streamlined wizard navigation.',
+    changes: [
+      'Fixed mobile reader header: Pinned the close button and tab controls to the top of the modal on small screens, preventing the 200px+ horizontal overflow that trapped mobile users.',
+      'Full-height mobile reader: Automatically opens examination papers in full-height single view on mobile devices for readable PDFs, with 1-tap switching between QP, MS, and Split View.',
+      'Decluttered sitting cards: Removed redundant stacked text in mobile cards, displaying clean examination titles, variant badges, and thumb-friendly action buttons.',
+      'Streamlined interactive wizard: Automatically collapses the welcome hero on mobile when drilling down into units and years, keeping relevant options immediately in view.',
+      'Persistent subpage navigation: Added clear top-level return navigation to the About and Changelog pages on mobile while preserving the distraction-free search layout.'
+    ]
+  },
   {
     version: 'v3.3',
     date: BUILD_TIMESTAMP,
@@ -715,9 +728,12 @@ const PreviewModal = ({ file, onClose }) => {
   }), [file]);
 
   const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
-  // activeView can be 'split', 'QP', 'MS', 'ER'
-  const [activeView, setActiveView] = useState(() => (canSplit ? 'split' : (file?.docType || 'QP')));
+  // On mobile portrait, default to single QP view for maximum readable document height; on desktop, default to split view
+  const [activeView, setActiveView] = useState(() => (
+    isMobile ? (file?.docType || (siblings.QP ? 'QP' : 'split')) : (canSplit ? 'split' : (file?.docType || 'QP'))
+  ));
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -756,23 +772,35 @@ const PreviewModal = ({ file, onClose }) => {
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={modalTitle}>
       <div className={`modal-container ${isSplit ? 'modal-split-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title-group">
-            <span className="modal-title">{modalTitle}</span>
-            <span className="modal-subtitle">{modalSubtitle}</span>
-          </div>
+          <div className="modal-header-top">
+            <div className="modal-title-group">
+              <span className="modal-title" title={modalTitle}>{modalTitle}</span>
+              <span className="modal-subtitle">{modalSubtitle}</span>
+            </div>
 
-          <div className="modal-actions">
-            {canSplit && (
+            <div className="modal-header-controls">
+              <a
+                href={openTabUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="modal-action-link"
+                title="Open document in new browser tab"
+              >
+                Open Tab ↗
+              </a>
               <button
                 type="button"
-                className={`modal-sibling-btn split ${isSplit ? 'active' : ''}`}
-                onClick={() => setActiveView('split')}
-                title="View Question Paper and Mark Scheme side-by-side (Default)"
+                className="modal-close-btn"
+                onClick={onClose}
+                aria-label="Close preview"
+                title="Close Preview (Esc)"
               >
-                Split View (QP + MS)
+                ✕
               </button>
-            )}
+            </div>
+          </div>
 
+          <div className="modal-actions" role="tablist" aria-label="Document view tabs">
             {/* Instant Sibling Switcher inside Preview Modal */}
             {['QP', 'MS', 'ER'].map((type) => {
               const sib = siblings[type];
@@ -786,23 +814,25 @@ const PreviewModal = ({ file, onClose }) => {
                   onClick={() => setActiveView(type)}
                   title={`Focus on ${DOC_TYPE_INFO[type]?.fullLabel || type} only`}
                 >
-                  {type === 'QP' ? 'Question Paper [QP]' : type === 'MS' ? 'Mark Scheme [MS]' : 'Examiner Report [ER]'}
+                  <span className="modal-btn-desktop-text">
+                    {type === 'QP' ? 'Question Paper [QP]' : type === 'MS' ? 'Mark Scheme [MS]' : 'Examiner Report [ER]'}
+                  </span>
+                  <span className="modal-btn-mobile-text">{type}</span>
                 </button>
               );
             })}
 
-            <a
-              href={openTabUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="modal-action-link"
-              title="Open document in new browser tab"
-            >
-              Open Full Tab ↗
-            </a>
-            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close preview" title="Close Preview (Esc)">
-              ✕
-            </button>
+            {canSplit && (
+              <button
+                type="button"
+                className={`modal-sibling-btn split ${isSplit ? 'active' : ''}`}
+                onClick={() => setActiveView('split')}
+                title="View Question Paper and Mark Scheme side-by-side"
+              >
+                <span className="modal-btn-desktop-text">Split View (QP + MS)</span>
+                <span className="modal-btn-mobile-text">Split</span>
+              </button>
+            )}
           </div>
         </div>
         <div className={`modal-body ${isSplit ? 'split-grid' : ''}`}>
@@ -1218,7 +1248,7 @@ const WelcomePage = ({ data, onSubjectSelect, onViewAll, onCurriculumSelect, onS
 
   return (
     <div className="welcome-container">
-      <div className="welcome-hero">
+      <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
         <div className="welcome-hero-top">
           <div>
             <h1>Past Exam Papers & Course Resources</h1>
@@ -2301,7 +2331,7 @@ function App() {
     <div className="app-container">
       {/* Header */}
       <header className="header-top">
-        <div className={`header-top-row ${!showWelcome ? 'mobile-hidden' : ''}`}>
+        <div className={`header-top-row ${!showWelcome && currentTab === 'library' ? 'mobile-hidden' : ''}`}>
           <div
             className="brand-section"
             onClick={() => { setCurrentTab('library'); clearFilters(); }}
@@ -2324,10 +2354,10 @@ function App() {
             </div>
             <button
               type="button"
-              className={`header-nav-btn ${currentTab === 'about' ? 'active' : ''}`}
-              onClick={() => setCurrentTab(currentTab === 'about' ? 'library' : 'about')}
+              className={`header-nav-btn ${currentTab !== 'library' ? 'active' : ''}`}
+              onClick={() => setCurrentTab(currentTab !== 'library' ? 'library' : 'about')}
             >
-              {currentTab === 'about' ? '← Library' : 'About'}
+              {currentTab !== 'library' ? '← Library' : 'About'}
             </button>
           </div>
         </div>
@@ -2357,7 +2387,7 @@ function App() {
                 id="search-input"
                 type="text"
                 className="search-input"
-                placeholder="Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."
+                placeholder={typeof window !== 'undefined' && window.innerWidth <= 768 ? "Search subject, unit, or code (e.g. WMA11)..." : "Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search by course code, subject, unit or year"
@@ -2569,6 +2599,14 @@ function App() {
                   Reset All
                 </button>
               )}
+
+              <button
+                type="button"
+                className="filter-apply-btn mobile-only"
+                onClick={() => setShowMobileFilters(false)}
+              >
+                Done &amp; View Results ({allMatchedFiles.length.toLocaleString()})
+              </button>
             </div>
           </div>
         </div>
@@ -2709,7 +2747,7 @@ function App() {
                                       className="unified-doc-btn qp"
                                       title={`Open Question Paper — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
                                     >
-                                      <span>Question Paper</span>
+                                      <span className="desktop-btn-label">Question Paper </span>
                                       <span className="btn-code">[QP]</span>
                                     </a>
                                   )}
@@ -2721,7 +2759,7 @@ function App() {
                                       className="unified-doc-btn ms"
                                       title={`Open Mark Scheme — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
                                     >
-                                      <span>Mark Scheme</span>
+                                      <span className="desktop-btn-label">Mark Scheme </span>
                                       <span className="btn-code">[MS]</span>
                                     </a>
                                   )}
@@ -2733,7 +2771,7 @@ function App() {
                                       className="unified-doc-btn er"
                                       title={`Open Examiner Report — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
                                     >
-                                      <span>Examiner Report</span>
+                                      <span className="desktop-btn-label">Examiner Report </span>
                                       <span className="btn-code">[ER]</span>
                                     </a>
                                   )}

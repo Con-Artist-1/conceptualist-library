@@ -160,3 +160,4 @@ server.listen(HTTP_PORT, async () => {
   server.close();
   process.exit(success ? 0 : 1);
 });
+
