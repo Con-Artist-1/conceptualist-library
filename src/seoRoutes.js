@@ -129,7 +129,6 @@ export const DEFAULT_UNIT_LABELS = {
       'Statistics 3 (S3)'
     ],
     'Physics': [
-      'Practical Physics I (WPH13)',
       'Unit 1: Mechanics & Materials (WPH11)',
       'Unit 2: Waves & Electricity (WPH12)',
       'Unit 3: Practical Physics I (WPH13)',

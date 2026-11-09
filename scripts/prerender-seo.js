@@ -220,6 +220,13 @@ function buildStaticSemanticBody(route, seo, meta) {
     </main>`;
 }
 
+function setOrInsertTag(html, tagRegex, newTag) {
+  if (tagRegex.test(html)) {
+    return html.replace(tagRegex, newTag);
+  }
+  return html.replace(/<\/head>/i, `  ${newTag}\n  </head>`);
+}
+
 function injectSeoIntoHtml(templateHtml, route, meta) {
   const seo = getSeoMetadata({ ...route.state, meta });
   const jsonLd = buildJsonLd({ ...route.state, seo, meta });
@@ -228,44 +235,56 @@ function injectSeoIntoHtml(templateHtml, route, meta) {
   let html = templateHtml;
 
   // Replace <title>
-  html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(seo.title)}</title>`);
+  html = setOrInsertTag(
+    html,
+    /<title>[\s\S]*?<\/title>/i,
+    `<title>${escapeHtml(seo.title)}</title>`
+  );
 
   // Replace meta description
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="description" content="${escapeHtml(seo.description)}" />`
   );
 
   // Replace meta keywords
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+name="keywords"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="keywords" content="${escapeHtml(seo.keywords)}" />`
   );
 
-  // Replace canonical
-  html = html.replace(
+  // Replace or inject canonical
+  html = setOrInsertTag(
+    html,
     /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
     `<link rel="canonical" href="${escapeHtml(seo.canonicalUrl)}" />`
   );
 
   // Replace OpenGraph & Twitter tags
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i,
     `<meta property="og:title" content="${escapeHtml(seo.title)}" />`
   );
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i,
     `<meta property="og:description" content="${escapeHtml(seo.description)}" />`
   );
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i,
     `<meta property="og:url" content="${escapeHtml(seo.canonicalUrl)}" />`
   );
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:title" content="${escapeHtml(seo.title)}" />`
   );
-  html = html.replace(
+  html = setOrInsertTag(
+    html,
     /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:description" content="${escapeHtml(seo.description)}" />`
   );

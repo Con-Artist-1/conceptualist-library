@@ -14,16 +14,13 @@ function loadPdfJs() {
 }
 
 // Single Page Canvas Renderer Component with IntersectionObserver virtualization
-const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isVisible, isMobile, onPageRendered }) => {
+const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isVisible, isNear, isMobile, onPageRendered }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const [aspectRatio, setAspectRatio] = useState(1.414); // Standard A4 ratio initial estimate
   const [rendered, setRendered] = useState(false);
-  const hasEverBeenVisibleRef = useRef(false);
 
-  if (isVisible) {
-    hasEverBeenVisibleRef.current = true;
-  }
+  const shouldMountCanvas = isVisible || isNear;
 
   // Pre-fetch viewport dimensions to lock aspect ratio early (prevent layout jumps)
   useEffect(() => {
@@ -41,9 +38,20 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
     };
   }, [pdfDoc, pageNum]);
 
-  // Render page when it becomes visible
+  // Release GPU texture memory when page scrolls far out of active viewport buffer
   useEffect(() => {
-    if (!isVisible || !pdfDoc) return;
+    if (!shouldMountCanvas && canvasRef.current) {
+      try {
+        canvasRef.current.width = 1;
+        canvasRef.current.height = 1;
+      } catch {}
+      setRendered(false);
+    }
+  }, [shouldMountCanvas]);
+
+  // Render page when it becomes visible or near
+  useEffect(() => {
+    if (!shouldMountCanvas || !pdfDoc) return;
 
     let active = true;
     let renderTask = null;
@@ -119,7 +127,7 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
         try { renderTaskRef.current.cancel(); } catch {}
       }
     };
-  }, [pdfDoc, pageNum, scale, containerWidth, isVisible, onPageRendered, isMobile]);
+  }, [pdfDoc, pageNum, scale, containerWidth, shouldMountCanvas, onPageRendered, isMobile]);
 
   const safeWidth = Math.max(containerWidth - 28, 260);
   let targetWidth;
@@ -148,7 +156,7 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
       }}
     >
       <div className="pdf-page-number-indicator">Page {pageNum}</div>
-      {isVisible || hasEverBeenVisibleRef.current ? (
+      {shouldMountCanvas ? (
         <canvas ref={canvasRef} className="pdf-canvas" />
       ) : (
         <div className="pdf-skeleton-page" style={{ height: `${Math.floor(estimatedHeight)}px` }}>
@@ -187,6 +195,7 @@ export const PdfViewerPane = ({
   const isProgrammaticScrollRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
   const pendingZoomAnchorRef = useRef(null);
+  const pageInputRef = useRef(null);
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -274,17 +283,25 @@ export const PdfViewerPane = ({
     return () => el.removeEventListener('wheel', handleWheel);
   }, [recordZoomAnchor]);
 
-  // Fetch and parse document with PDF.js
+  // Fetch and parse document with PDF.js (with strict worker and document destruction on unmount)
   const loadDocument = useCallback(() => {
     if (!url) return;
     let active = true;
+    let loadingTask = null;
+    let loadedDoc = null;
+
     setLoading(true);
     setLoadError(null);
-    setPdfDoc(null);
+    setPdfDoc((prev) => {
+      if (prev) {
+        try { prev.destroy(); } catch {}
+      }
+      return null;
+    });
 
     loadPdfJs().then((pdfjsLib) => {
       if (!active) return;
-      const loadingTask = pdfjsLib.getDocument({
+      loadingTask = pdfjsLib.getDocument({
         url,
         cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
         cMapPacked: true,
@@ -294,7 +311,11 @@ export const PdfViewerPane = ({
       });
 
       loadingTask.promise.then((doc) => {
-        if (!active) return;
+        if (!active) {
+          try { doc.destroy(); } catch {}
+          return;
+        }
+        loadedDoc = doc;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setLoading(false);
@@ -313,14 +334,23 @@ export const PdfViewerPane = ({
 
     return () => {
       active = false;
+      if (loadingTask) {
+        try { loadingTask.destroy(); } catch {}
+      }
+      if (loadedDoc) {
+        try { loadedDoc.destroy(); } catch {}
+      }
     };
   }, [url]);
 
   useEffect(() => {
-    loadDocument();
+    const cleanup = loadDocument();
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, [loadDocument]);
 
-  // Setup IntersectionObserver for smooth progressive page rendering ONLY (no page indicator flapping)
+  // Setup IntersectionObserver for smooth progressive page rendering with bounded canvas memory
   useEffect(() => {
     if (!scrollAreaRef.current || !pdfDoc || numPages === 0) return;
 
@@ -337,6 +367,8 @@ export const PdfViewerPane = ({
             // Preload neighbors for instant smooth scrolling
             if (pageNum + 1 <= numPages) next.add(pageNum + 1);
             if (pageNum - 1 >= 1) next.add(pageNum - 1);
+          } else {
+            next.delete(pageNum);
           }
         });
         return next;
@@ -374,7 +406,9 @@ export const PdfViewerPane = ({
           if (currentPageRef.current !== 1) {
             currentPageRef.current = 1;
             setCurrentPage(1);
-            setInputPage('1');
+            if (document.activeElement !== pageInputRef.current) {
+              setInputPage('1');
+            }
           }
           return;
         }
@@ -384,7 +418,9 @@ export const PdfViewerPane = ({
           if (currentPageRef.current !== numPages) {
             currentPageRef.current = numPages;
             setCurrentPage(numPages);
-            setInputPage(String(numPages));
+            if (document.activeElement !== pageInputRef.current) {
+              setInputPage(String(numPages));
+            }
           }
           return;
         }
@@ -400,7 +436,9 @@ export const PdfViewerPane = ({
             if (pageNum && pageNum !== currentPageRef.current) {
               currentPageRef.current = pageNum;
               setCurrentPage(pageNum);
-              setInputPage(String(pageNum));
+              if (document.activeElement !== pageInputRef.current) {
+                setInputPage(String(pageNum));
+              }
             }
             break;
           }
@@ -450,21 +488,21 @@ export const PdfViewerPane = ({
   };
 
   // Zoom handlers (zoom centered to the middle of the screen)
-  const handleZoomIn = () => {
+  const handleZoomIn = useCallback(() => {
     recordZoomAnchor();
     setScale((prev) => {
       if (prev === 'fit-width' || prev === 'fit-page') return 1.25;
       return Math.min(Number((prev + 0.2).toFixed(2)), 3.5);
     });
-  };
+  }, [recordZoomAnchor]);
 
-  const handleZoomOut = () => {
+  const handleZoomOut = useCallback(() => {
     recordZoomAnchor();
     setScale((prev) => {
       if (prev === 'fit-width' || prev === 'fit-page') return 0.85;
       return Math.max(Number((prev - 0.2).toFixed(2)), 0.4);
     });
-  };
+  }, [recordZoomAnchor]);
 
   const handleFitWidth = () => {
     recordZoomAnchor();
@@ -482,6 +520,37 @@ export const PdfViewerPane = ({
     if (scale === 'fit-page') return 'Page';
     return `${Math.round(scale * 100)}%`;
   }, [scale]);
+
+  // Keyboard navigation shortcuts when viewer is mounted
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        scrollToPage(currentPageRef.current - 1);
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        scrollToPage(currentPageRef.current + 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        scrollToPage(1);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        scrollToPage(numPages || 1);
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        handleZoomIn();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        handleZoomOut();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [numPages, scrollToPage, handleZoomIn, handleZoomOut]);
 
   // Page Array
   const pagesList = useMemo(() => {
@@ -513,6 +582,7 @@ export const PdfViewerPane = ({
           </button>
           <span className="pdf-page-indicator">
             <input
+              ref={pageInputRef}
               type="text"
               className="pdf-page-input"
               value={inputPage}
@@ -632,6 +702,7 @@ export const PdfViewerPane = ({
                 scale={scale}
                 containerWidth={containerWidth}
                 isVisible={visiblePages.has(pageNum)}
+                isNear={Math.abs(pageNum - currentPage) <= 2}
                 isMobile={isMobile}
               />
             ))}

@@ -10,6 +10,19 @@
     <meta name="description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
     <meta name="keywords" content="Conceptualist, Conceptualist Systems, Edexcel, IAL, IGCSE, past papers, mark scheme, question paper, examiner report, A-Level" />
     <title>Conceptualist Systems | Library Repository</title>
+    <link rel="canonical" href="https://www.conceptualist.uk/" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="theme-color" content="#F2F1ED" id="meta-theme-color" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Conceptualist Systems" />
+    <meta property="og:title" content="Conceptualist Systems | Library Repository" />
+    <meta property="og:description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
+    <meta property="og:url" content="https://www.conceptualist.uk/" />
+    <meta property="og:image" content="https://www.conceptualist.uk/favicon.svg" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Conceptualist Systems | Library Repository" />
+    <meta name="twitter:description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
+    <meta name="twitter:image" content="https://www.conceptualist.uk/favicon.svg" />
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
     <!-- Preload Critical Local Self-Hosted Fonts (Zero Latency & Zero FOUT) -->
@@ -24,8 +37,12 @@
           // Default to 'light' mode unless explicitly saved as 'dark'
           if (t === 'dark') {
             document.documentElement.setAttribute('data-theme', 'dark');
+            var metaTc = document.getElementById('meta-theme-color');
+            if (metaTc) metaTc.setAttribute('content', '#000000');
           } else {
             document.documentElement.setAttribute('data-theme', 'light');
+            var metaTc = document.getElementById('meta-theme-color');
+            if (metaTc) metaTc.setAttribute('content', '#F2F1ED');
           }
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light');

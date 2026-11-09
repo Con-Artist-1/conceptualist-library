@@ -12,13 +12,29 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v4.3';
+const APP_VERSION = 'v4.4';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v4.3',
+    version: 'v4.4',
     date: BUILD_TIMESTAMP,
+    title: 'Engine Memory Virtualization, SEO Canonical Fix & Filter Optimization',
+    summary: 'Resolved SEO canonical and Open Graph metadata injection across 296 pre-rendered routes, implemented bounded canvas memory release and keyboard navigation in WebPDF, locked modal background scroll, and optimized paper filtering to a single pass.',
+    changes: [
+      'Pre-rendered SEO & Open Graph fix: Ensured all 296 pre-rendered HTML routes and the homepage reliably inject canonical URLs and Open Graph/Twitter sharing cards.',
+      'WebPDF memory virtualization: Implemented sliding-window canvas memory release and explicit PDF.js worker destruction on unmount, preventing GPU memory exhaustion on mobile browsers.',
+      'Document keyboard navigation: Added Arrow Left/Right, PageUp/PageDown, Home/End, and Zoom +/- shortcuts when browsing past papers in the reader.',
+      'Page input reliability: Decoupled scroll-driven page indicators from the page input box while typing, preventing active user inputs from being overwritten.',
+      'Zero background scroll bleed: Locked body overflow when the reader modal is open to eliminate background page jumping on touch devices.',
+      'Single-pass filter optimization: Consolidated 5 sequential filter steps into a single combined predicate loop, slashing memory allocations during search.',
+      'Offline local development: Connected Vite library-files middleware in dev mode so local testing streams papers directly from disk with 0ms latency.',
+      'Cleaned starter assets: Pruned unused template CSS and image assets, keeping search-app/src strictly minimal and unbloated.'
+    ]
+  },
+  {
+    version: 'v4.3',
+    date: '2026-11-09T18:00:00.000Z',
     title: 'Anti-FOUC Architecture & Codebase Cleanup',
     summary: 'Eliminated page reload flicker with critical inline styles and noscript SEO shells, fixed React hook ordering, and pruned redundant legacy scripts.',
     changes: [
@@ -468,6 +484,10 @@ function formatSubjectDisplay(subj) {
 }
 
 function getHfUrl(filePath) {
+  if (!filePath) return '';
+  if (import.meta.env.DEV) {
+    return `/library-files/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
+  }
   return `https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
 }
 
@@ -1149,6 +1169,15 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
   useEffect(() => {
     mobileRatioRef.current = mobileSplitRatio;
   }, [mobileSplitRatio]);
+
+  // Lock background body scroll while modal is active to prevent scroll bleed-through
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -3234,56 +3263,68 @@ function App() {
     const isSpecificFolder = Boolean(selectedPath && selectedPath !== '' && selectedPath !== data.tree?.path);
     const useUnified = viewMode === 'unified';
 
-    let files = useUnified
+    const sourceFiles = useUnified
       ? data.unifiedFiles
       : (isSpecificFolder ? data.flatFiles : data.dedupedFiles);
 
-    if (isSpecificFolder) {
-      const prefix = selectedPath.endsWith('/') ? selectedPath : `${selectedPath}/`;
-      if (useUnified) {
-        files = files.filter(f =>
-          f.path === selectedPath ||
-          f.path.startsWith(prefix) ||
-          (f.paths && f.paths.some(p => p === selectedPath || p.startsWith(prefix)))
-        );
-      } else {
-        files = files.filter(f => f.path === selectedPath || f.path.startsWith(prefix));
-      }
-    }
+    const folderPrefix = isSpecificFolder
+      ? (selectedPath.endsWith('/') ? selectedPath : `${selectedPath}/`)
+      : null;
 
-    if (filterCurriculum) {
-      files = files.filter(f => f.curriculum === filterCurriculum);
-    }
+    const hasFolder = Boolean(folderPrefix);
+    const hasCurriculum = Boolean(filterCurriculum);
+    const hasSubject = Boolean(filterSubject);
+    const hasUnit = Boolean(filterUnit);
+    const hasYear = Boolean(filterYear);
+    const hasDocType = Boolean(filterDocType);
 
-    if (filterSubject) {
-      files = files.filter(f => f.subject === filterSubject);
-    }
+    let files;
+    if (!hasFolder && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasDocType) {
+      files = sourceFiles;
+    } else {
+      const filtered = [];
+      const len = sourceFiles.length;
+      for (let i = 0; i < len; i++) {
+        const f = sourceFiles[i];
 
-    if (filterUnit) {
-      files = files.filter(f => f.cleanUnitLabel === filterUnit);
-    }
-
-    if (filterYear) {
-      files = files.filter(f => String(f.year) === String(filterYear));
-    }
-
-    if (filterDocType) {
-      if (filterDocType === 'Book') {
-        files = files.filter(f => f.category === 'Books' || f.category === 'IAL Books' || f.category === 'IGCSE Books');
-      } else if (filterDocType === 'Extra') {
-        if (useUnified) {
-          files = files.filter(f =>
-            f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL ||
-            f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL'
-          );
-        } else {
-          files = files.filter(f => f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL');
+        if (hasFolder) {
+          if (useUnified) {
+            const inFolder = f.path === selectedPath || f.path.startsWith(folderPrefix) ||
+              (f.paths && f.paths.some(p => p === selectedPath || p.startsWith(folderPrefix)));
+            if (!inFolder) continue;
+          } else {
+            if (f.path !== selectedPath && !f.path.startsWith(folderPrefix)) continue;
+          }
         }
-      } else if (useUnified) {
-        files = files.filter(f => Boolean(f.docs?.[filterDocType] || f.docType === filterDocType));
-      } else {
-        files = files.filter(f => f.docType === filterDocType);
+
+        if (hasCurriculum && f.curriculum !== filterCurriculum) continue;
+        if (hasSubject && f.subject !== filterSubject) continue;
+        if (hasUnit && f.cleanUnitLabel !== filterUnit) continue;
+        if (hasYear && String(f.year) !== String(filterYear)) continue;
+
+        if (hasDocType) {
+          if (filterDocType === 'Book') {
+            if (f.category !== 'Books' && f.category !== 'IAL Books' && f.category !== 'IGCSE Books') continue;
+          } else if (filterDocType === 'Extra') {
+            if (useUnified) {
+              const hasExtra = Boolean(
+                f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL ||
+                f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL'
+              );
+              if (!hasExtra) continue;
+            } else {
+              if (f.docType !== 'DF' && f.docType !== 'AUD' && f.docType !== 'SC' && f.docType !== 'SAM' && f.docType !== 'SOL') continue;
+            }
+          } else if (useUnified) {
+            if (!f.docs?.[filterDocType] && f.docType !== filterDocType) continue;
+          } else {
+            if (f.docType !== filterDocType) continue;
+          }
+        }
+
+        filtered.push(f);
       }
+      files = filtered;
     }
 
     const termGroups = parseSearchQuery(deferredSearchQuery);
