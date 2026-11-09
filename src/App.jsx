@@ -12,10 +12,22 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v4.8';
+const APP_VERSION = 'v4.9';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v4.9',
+    date: BUILD_TIMESTAMP,
+    title: 'Brand Header Navigation Restoration & URL Sub-Route Home Synchronization',
+    summary: 'Resolved header brand logo navigation issue to ensure clicking the logo reliably returns to the root homepage ("/") from any deep sub-route, clearing active filters and resetting path hydration without re-triggering unit re-resolution.',
+    changes: [
+      'Reliable root navigation: Converted brand logo header into a semantic, accessible anchor link that clears curriculum, subject, and unit filters, resets preview modals and search queries, and transitions directly to root ("/") using window.history.pushState.',
+      'Cold-visit hydration loop fix: Guarded unit slug re-resolution effect with an initial-mount ref so clearing unit filters never re-parses stale route segments from window.location.pathname.',
+      'Breadcrumb & footer synchronization: Updated breadcrumb "← Library Home" and footer "Library Home" links to use the unified navigateToHome handler for seamless single-page transitions.',
+      'Focus & interaction polish: Replaced harsh default rectangular focus rings with subtle collegiate gold focus-visible outlines on the header brand section.'
+    ]
+  },
   {
     version: 'v4.8',
     date: BUILD_TIMESTAMP,
@@ -2712,8 +2724,11 @@ function App() {
   }, [data.meta, data.unifiedFiles, data.flatFiles]);
 
   // Re-resolve unit slug from URL once wizard metadata finishes hydrating on cold visits
+  const initialUnitHydratedRef = useRef(false);
   useEffect(() => {
+    if (initialUnitHydratedRef.current) return;
     if (!data.meta?.wizard) return;
+    initialUnitHydratedRef.current = true;
     const segments = (window.location.pathname || '/').split('/').filter(Boolean);
     if (segments.length >= 3 && !filterUnit) {
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
@@ -2724,7 +2739,8 @@ function App() {
         setForceShowTable(true);
       }
     }
-  }, [data.meta, filterUnit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.meta]);
 
   // Resolve ?paper= deep link once catalog finishes loading
   useEffect(() => {
@@ -3261,6 +3277,38 @@ function App() {
     setSortBy('newest');
     setForceShowTable(false);
     setSelectedPath(data.tree?.path || '');
+    if (typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '')) {
+      window.history.pushState(null, '', '/');
+    }
+  }, [data.tree]);
+
+  const navigateToHome = useCallback((e) => {
+    if (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) {
+        return;
+      }
+      if (e.preventDefault) {
+        e.preventDefault();
+      }
+    }
+    setCurrentTab('library');
+    setPreviewFile(null);
+    setPendingPaperParam('');
+    setFilterCurriculum('');
+    setFilterDocType(null);
+    setFilterSubject('');
+    setFilterUnit('');
+    setFilterYear('');
+    setSearchQuery('');
+    setSortBy('newest');
+    setForceShowTable(false);
+    setSelectedPath(data.tree?.path || '');
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname !== '/' || window.location.search !== '') {
+        window.history.pushState(null, '', '/');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, [data.tree]);
 
   const handleViewAll = useCallback(() => {
@@ -3540,9 +3588,9 @@ function App() {
   const renderBreadcrumbs = (classNameAdd = '') => (
     <div className={`breadcrumb-container ${classNameAdd}`}>
       <div className="breadcrumb-trail">
-        <span className="breadcrumb-link home" onClick={clearFilters}>
+        <a href="/" className="breadcrumb-link home" onClick={navigateToHome}>
           ← Library Home
-        </span>
+        </a>
         {filterCurriculum && (
           <>
             <span className="breadcrumb-separator">/</span>
@@ -3635,12 +3683,11 @@ function App() {
       {/* Header */}
       <header className="header-top">
         <div className={`header-top-row ${!showWelcome && currentTab === 'library' ? 'mobile-hidden' : ''}`}>
-          <div
+          <a
+            href="/"
             className="brand-section"
-            onClick={() => { setCurrentTab('library'); clearFilters(); }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setCurrentTab('library'); clearFilters(); } }}
+            onClick={navigateToHome}
+            aria-label="Conceptualist Systems - Library Home"
           >
             <div className="brand-logo-text">
               Conceptualist <span className="brand-logo-accent">Systems</span>
@@ -3649,7 +3696,7 @@ function App() {
               <span className="title">EDEXCEL LIBRARY</span>
               <span>Past Exam Papers & Resources</span>
             </div>
-          </div>
+          </a>
 
           <div className="header-right-group">
             <div className="header-coverage-badge">
@@ -4358,7 +4405,7 @@ function App() {
           <a
             href="/"
             className="footer-link"
-            onClick={(e) => { e.preventDefault(); setCurrentTab('library'); clearFilters(); }}
+            onClick={navigateToHome}
           >
             Library Home
           </a>
