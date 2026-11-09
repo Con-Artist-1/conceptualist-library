@@ -12,10 +12,22 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v4.4';
+const APP_VERSION = 'v4.5';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v4.5',
+    date: BUILD_TIMESTAMP,
+    title: 'Zerui Chen Warm Rust & Terminal Themes + Pure OLED Dark Mode',
+    summary: 'Adopted zeruic.me warm Rust aesthetic for White/Light mode and tactile Terminal styling for Dark mode, while preserving dedicated 100% true black OLED dark mode as a selectable 3rd option.',
+    changes: [
+      'Zerui Chen Light Mode ("Rust"): Transformed light mode to zeruic.me warm palette with terracotta rust header (#a4552f), brass antique accents (#b98b3e), deep espresso ink (#413c33), and parchment background (#ddd5c5).',
+      'Zerui Chen Dark Mode ("Terminal"): Introduced warm tactical dark theme inspired by zeruic.me Terminal style (#1f211c ground, #272a24 card surface, #cfc9b2 linen text, #b98b3e brass accents).',
+      'Preserved Pure OLED Mode: Kept 100% pitch black (#000000) true OLED dark mode as a dedicated third theme option with high-contrast borders and full diagram color preservation.',
+      'Three-Way Theme Cycler: Seamless cycle through White (Light) -> Dark (Terminal) -> OLED -> White in both main navigation and PDF reader modal with geometric SVG icons and zero reload flicker.'
+    ]
+  },
   {
     version: 'v4.4',
     date: BUILD_TIMESTAMP,
@@ -1393,23 +1405,34 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
                 {engineMode === 'custom' ? 'WebPDF' : 'Built-IN'}
               </button>
 
-              {/* Dark / Light Mode Toggle Button */}
+              {/* Theme Toggle Button (White / Dark / OLED) */}
               {onToggleTheme && (
                 <button
                   type="button"
                   className="modal-btn modal-theme-toggle-btn"
                   onClick={onToggleTheme}
-                  title={theme === 'dark' ? 'Switch to Academic Light Mode' : 'Switch to Pure OLED Dark Mode'}
+                  title={
+                    theme === 'light'
+                      ? 'Current: White (Rust) - Click for Dark Mode'
+                      : theme === 'dark'
+                      ? 'Current: Dark (Terminal) - Click for Pure OLED Mode'
+                      : 'Current: Pure OLED - Click for White Mode'
+                  }
                 >
-                  {theme === 'dark' ? (
+                  {theme === 'light' ? (
                     <>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                      <span className="btn-desktop-text">Light</span>
+                      <span className="btn-desktop-text">White</span>
                     </>
-                  ) : (
+                  ) : theme === 'dark' ? (
                     <>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                       <span className="btn-desktop-text">Dark</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9"/><path d="M12 3v18A9 9 0 0 0 12 3z" fill="currentColor"/></svg>
+                      <span className="btn-desktop-text">OLED</span>
                     </>
                   )}
                 </button>
@@ -2521,13 +2544,13 @@ function App() {
   const [pendingPaperParam, setPendingPaperParam] = useState(initialRoute.paperParam || '');
   const [viewMode, setViewMode] = useState('unified'); // 'unified' | 'separate'
 
-  // Theme Management (Default: Light Mode; Persistent across Sessions & Cookies)
+  // Theme Management (Default: Light Mode; Persistent across Sessions & Cookies; Supports 'light' | 'dark' | 'oled')
   const [theme, setTheme] = useState(() => {
     try {
       const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )cs_theme=([^;]*)/) : null;
       const cookieTheme = match ? decodeURIComponent(match[1]) : null;
       const saved = cookieTheme || (typeof localStorage !== 'undefined' ? localStorage.getItem('cs_theme') : null);
-      if (saved === 'dark' || saved === 'light') return saved;
+      if (saved === 'dark' || saved === 'light' || saved === 'oled') return saved;
     } catch {}
     return 'light'; // Light Mode is strictly default
   });
@@ -2537,11 +2560,19 @@ function App() {
       document.documentElement.setAttribute('data-theme', theme);
       localStorage.setItem('cs_theme', theme);
       document.cookie = `cs_theme=${theme}; max-age=31536000; path=/; SameSite=Lax`;
+      const metaTheme = document.getElementById('meta-theme-color');
+      if (metaTheme) {
+        metaTheme.setAttribute('content', theme === 'oled' ? '#000000' : (theme === 'dark' ? '#1f211c' : '#ddd5c5'));
+      }
     } catch {}
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setTheme(prev => {
+      if (prev === 'light') return 'dark';
+      if (prev === 'dark') return 'oled';
+      return 'light';
+    });
   }, []);
 
   // Filters initialized directly from URL route
@@ -3592,18 +3623,29 @@ function App() {
               type="button"
               className="header-theme-btn"
               onClick={toggleTheme}
-              title={theme === 'dark' ? 'Switch to Academic Light Mode' : 'Switch to Pure OLED Dark Mode'}
-              aria-label="Toggle Dark Mode"
+              title={
+                theme === 'light'
+                  ? 'Current: White (Rust) - Click for Dark Mode'
+                  : theme === 'dark'
+                  ? 'Current: Dark (Terminal) - Click for Pure OLED Mode'
+                  : 'Current: Pure OLED - Click for White Mode'
+              }
+              aria-label="Toggle Theme"
             >
-              {theme === 'dark' ? (
+              {theme === 'light' ? (
                 <>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span>Light</span>
+                  <span>White</span>
                 </>
-              ) : (
+              ) : theme === 'dark' ? (
                 <>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                   <span>Dark</span>
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9"/><path d="M12 3v18A9 9 0 0 0 12 3z" fill="currentColor"/></svg>
+                  <span>OLED</span>
                 </>
               )}
             </button>

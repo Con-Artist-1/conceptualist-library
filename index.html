@@ -12,7 +12,7 @@
     <title>Conceptualist Systems | Library Repository</title>
     <link rel="canonical" href="https://www.conceptualist.uk/" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <meta name="theme-color" content="#F2F1ED" id="meta-theme-color" />
+    <meta name="theme-color" content="#ddd5c5" id="meta-theme-color" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Conceptualist Systems" />
     <meta property="og:title" content="Conceptualist Systems | Library Repository" />
@@ -34,15 +34,19 @@
           var cookieTheme = match ? decodeURIComponent(match[1]) : null;
           var localTheme = localStorage.getItem('cs_theme');
           var t = cookieTheme || localTheme;
-          // Default to 'light' mode unless explicitly saved as 'dark'
-          if (t === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
+          // Theme support: 'light' (Zerui Chen Rust/White), 'dark' (Zerui Chen Terminal), 'oled' (Pure Black)
+          if (t === 'oled') {
+            document.documentElement.setAttribute('data-theme', 'oled');
             var metaTc = document.getElementById('meta-theme-color');
             if (metaTc) metaTc.setAttribute('content', '#000000');
+          } else if (t === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            var metaTc = document.getElementById('meta-theme-color');
+            if (metaTc) metaTc.setAttribute('content', '#1f211c');
           } else {
             document.documentElement.setAttribute('data-theme', 'light');
             var metaTc = document.getElementById('meta-theme-color');
-            if (metaTc) metaTc.setAttribute('content', '#F2F1ED');
+            if (metaTc) metaTc.setAttribute('content', '#ddd5c5');
           }
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light');
@@ -57,15 +61,24 @@
     <!-- Critical Anti-FOUC Baseline Theme & Surface Styles -->
     <style id="critical-anti-fouc">
       :root, [data-theme='light'] {
-        --bg-page: #F2F1ED;
-        --bg-surface: #FFFFFF;
-        --text-primary: #1A1D20;
-        --mcmaster-maroon: #6F1D2B;
-        --mcmaster-gold: #C9A45C;
-        background-color: #F2F1ED;
-        color: #1A1D20;
+        --bg-page: #ddd5c5;
+        --bg-surface: #e8e2d4;
+        --text-primary: #413c33;
+        --mcmaster-maroon: #a4552f;
+        --mcmaster-gold: #b98b3e;
+        background-color: #ddd5c5;
+        color: #413c33;
       }
       [data-theme='dark'] {
+        --bg-page: #1f211c;
+        --bg-surface: #272a24;
+        --text-primary: #cfc9b2;
+        --mcmaster-maroon: #b98b3e;
+        --mcmaster-gold: #b98b3e;
+        background-color: #1f211c;
+        color: #cfc9b2;
+      }
+      [data-theme='oled'] {
         --bg-page: #000000;
         --bg-surface: #000000;
         --text-primary: #FFFFFF;
