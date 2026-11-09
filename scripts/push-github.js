@@ -126,16 +126,20 @@ async function main() {
   console.log(`=== Pushing to GitHub (${REPO}) ===`);
 
   const files = collectRepoFiles(APP_DIR);
-  const aiReadmePath = path.join(LIBRARY_ROOT, 'AI_INSTRUCTIONS_README.md');
-  if (fs.existsSync(aiReadmePath)) {
-    const buf = fs.readFileSync(aiReadmePath);
-    files.push({
-      full: aiReadmePath,
-      rel: 'AI_INSTRUCTIONS_README.md',
-      buf,
-      gitSha: computeGitBlobSha(buf),
-      size: buf.length
-    });
+  const candidateNames = ['AI_INSTRUCTIONS_LIBRARY.md', 'AI_INSTRUCTIONS_README.md'];
+  for (const name of candidateNames) {
+    const aiReadmePath = path.join(LIBRARY_ROOT, name);
+    if (fs.existsSync(aiReadmePath)) {
+      const buf = fs.readFileSync(aiReadmePath);
+      files.push({
+        full: aiReadmePath,
+        rel: name,
+        buf,
+        gitSha: computeGitBlobSha(buf),
+        size: buf.length
+      });
+      break;
+    }
   }
 
   console.log(`Collected ${files.length} clean repository files (${(files.reduce((s, f) => s + f.size, 0) / 1024).toFixed(1)} KB total).`);
