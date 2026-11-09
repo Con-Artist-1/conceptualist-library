@@ -6,13 +6,13 @@ Welcome! If you are an AI assistant tasked with working on this directory (`e:\T
 
 ## 1. Directory Structure
 
-The library is a curated **100% Pearson Edexcel** collection containing **13,309 files** (`13,238` past papers/resources + `71` textbooks) covering **January 2003 – January 2026**.
+The library is a curated **100% Pearson Edexcel** collection containing **13,940 files** covering **January 2003 – June 2026**.
 
 **Main Root Folders:**
-1. **`Past Papers\IAL`**: Contains Pearson Edexcel International A-Level (IAL) and legacy GCE papers across 19 subjects (`9,701` files).
-2. **`Past Papers\IGCSE`**: Contains Pearson Edexcel International GCSE papers across 18 subjects (`3,537` files).
-3. **`IAL Books`**: Contains official Edexcel IAL student textbooks, lab books, and solution banks sorted by subject (`60` files across 9 subjects).
-4. **`IGCSE Books`**: Contains official Edexcel IGCSE (9–1) student textbooks sorted by subject (`11` files across 10 subjects).
+1. **`Past Papers\IAL`**: Contains Pearson Edexcel International A-Level (IAL) and legacy GCE papers across 19 subjects.
+2. **`Past Papers\IGCSE`**: Contains Pearson Edexcel International GCSE papers across 18 subjects.
+3. **`IAL Books`**: Contains official Edexcel IAL student textbooks, lab books, and solution banks sorted by subject.
+4. **`IGCSE Books`**: Contains official Edexcel IGCSE (9–1) student textbooks sorted by subject.
 
 **Typical Hierarchy:**
 - `Past Papers \ IAL \ <Subject> \ <Unit or Year> \ <Session> \ <File.pdf>`
@@ -35,24 +35,42 @@ The naming conventions depend on the source batch:
 
 ## 3. Web Application & Indexing
 
-The front-end web application (React 19 + Vite) located at `e:\The Library\search-app` uses a two-stage static index (`public/meta.json` for `0ms` initial tree/subject render and `public/index.json` for full client-side search).
+The front-end web application (React 19 + Vite) located at `e:\The Library\search-app` uses a two-stage static index:
+- `public/meta.json`: High-speed compact index for `0ms` initial tree/subject hierarchy render.
+- `public/index.json`: Full client-side searchable past paper index.
 
-**Rebuilding the Index:**
-Whenever you add, move, or delete files in the library, you **MUST** regenerate `index.json` and `meta.json` by running the Node.js indexer:
-```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\generate-index.js"
-```
+**Core Production Scripts (`search-app/scripts/`):**
+The scripts directory contains strictly 7 essential utilities. Do not leave temporary or scratch scripts behind.
 
-**Building the Application:**
-```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\build.js"
-```
-
-**Deploying to Production (Vercel):**
-After updating the code or index, deploy to production (`https://www.conceptualist.uk`) using the standalone Vercel deployment script (which reads `VERCEL_TOKEN` from `search-app/.env`):
-```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\deploy-vercel.js"
-```
+1. **Rebuild Metadata & Search Index:**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\generate-index.js"
+   ```
+2. **Vite Application Build:**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\build.js"
+   ```
+3. **SEO Sitemap & Route Pre-rendering (with Anti-FOUC noscript wrapper):**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\prerender-seo.js"
+   ```
+4. **Push Web App to GitHub (`Con-Artist-1/conceptualist-library`):**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\push-github.js" "<commit message>"
+   ```
+5. **Deploy to Vercel Production (`https://www.conceptualist.uk`):**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\deploy-vercel.js"
+   ```
+   *(Note: Production Vercel is connected directly to the GitHub repo; pushing to `main` also triggers automated deployment).*
+6. **Sync Library Files to Hugging Face (`Diavlon/mcmaster-docs-library`):**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\sync-hf.js"
+   ```
+7. **Upload Live Index to Hugging Face:**
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\upload-live-index-hf.js"
+   ```
 
 ---
 
@@ -73,7 +91,7 @@ The application features an in-house high-performance PDF reading engine (`searc
 
 ---
 
-## 5. Pure OLED Dark Mode & Session Theme Architecture
+## 5. Pure OLED Dark Mode & Anti-FOUC Architecture
 
 The platform supports both **Academic Light Mode** (default) and **Pure OLED Dark Mode** (`#000000` true black):
 
@@ -81,7 +99,11 @@ The platform supports both **Academic Light Mode** (default) and **Pure OLED Dar
 - **1-Year Cookie & LocalStorage Dual Persistence:**
   - Theme choices are written to both `localStorage.setItem('cs_theme', theme)` and a 1-year browser cookie:
     `document.cookie = 'cs_theme=' + theme + '; max-age=31536000; path=/; SameSite=Lax'`
-  - A synchronous `<head>` script in `index.html` inspects the cookie and `localStorage` before the first paint to eliminate any flash of unstyled content (FOUC).
+- **Anti-FOUC Critical Inline CSS (`<style id="critical-anti-fouc">`):**
+  - An inline style block immediately in `<head>` sets `:root` and `[data-theme='dark']` baseline variables, immediately locks `html`, `body`, and `#root` background colors (`#F2F1ED` in light mode, `#000000` in dark mode), and hides any raw SSR shells (`.seo-prerender-shell { display: none !important; }`).
+  - This eliminates raw HTML reload flashes and dark-mode white screen flashes.
+- **Noscript SEO Wrapper:**
+  - Fallback SEO pre-rendered content is strictly placed inside `<noscript>` in `dist/` HTML pages. Browsers with JavaScript skip it entirely during hydration, while search engine crawlers index every paper route.
 - **Hue-Preserving PDF Canvas Inversion (`shivaprsd/doqment` Model):**
   - Applied filter:
     ```css
@@ -100,26 +122,10 @@ The platform supports both **Academic Light Mode** (default) and **Pure OLED Dar
 
 ---
 
-## 6. Hugging Face Dataset Sync & GitHub Push
+## 6. Encrypted Token Vault & Environment Management
 
-The library acts as the master source for the Hugging Face dataset `Diavlon/mcmaster-docs-library`.
-When files are updated, push changes via:
-```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\sync-hf.js"
-```
-
-To push the web application and scripts to GitHub (`Con-Artist-1/conceptualist-library`):
-```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\push-github.js"
-```
-
-### Encrypted Token Vault (Password Required from User)
-All deployment credentials (`VERCEL_TOKEN`, `HF_TOKEN`, `GITHUB_TOKEN`, and `GITHUB_REPO`) are encrypted below using **AES-256-GCM** (PBKDF2-SHA256, 100,000 iterations).
-If `e:\The Library\search-app\.env` is ever missing or needs to be restored, **ask the user for the vault password** and run:
-```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\unlock-tokens.js" "<USER_PASSWORD>"
-```
-Encrypted Vault Payload (`salt.iv.authTag.ciphertext`):
+All deployment credentials (`VERCEL_TOKEN`, `HF_TOKEN`, `GITHUB_TOKEN`, and `GITHUB_REPO`) are stored in `e:\The Library\search-app\.env`.
+Encrypted Vault Payload (`salt.iv.authTag.ciphertext`) using **AES-256-GCM** (PBKDF2-SHA256, 100,000 iterations):
 ```text
 M0rVF6hL8kSBZKddZZFsVw==.6U6izizH0zJXshHE.B0u2YJezMhxxSX+/Ba1IPA==.swY7bDh/CD67V5IOng2VkA4w4FsFfdO+rAFDkiiMIKihGXTC47sf9jlr1AonTYHYU3UDGYnEhZu05JkzbC92IK/q/VfMmP8iSU2Za3T4Gdk25v7vgbgJEOHtdLjyKu1Ox5SZUegQ1StaN/mAbgNDGe1h7Mis8+WT95hBXxZBdy6Ifrxhjju3Vfv7MVRlLlv0c4N9eBNa0eQgj8rH4U8CGji1BLeSoLWB4cPUHOJWest/KnTH0Dayv0CnEHm1/RjTBsa9LuN/n0/h3rcpaFriVStPDNIHbuHfwg8CX+BZE8sXFDmkB4YCd3Iul9hdMMhQoRByyAx9muyslDIrNo2y/TaLdAOfHRAnfLN+5XVOCyoMWgH98PQSnjmJl0BqR+7LyAT38g==
 ```
@@ -130,10 +136,14 @@ M0rVF6hL8kSBZKddZZFsVw==.6U6izizH0zJXshHE.B0u2YJezMhxxSX+/Ba1IPA==.swY7bDh/CD67V
 
 1. **Do not break folder structures**. Stick to `Past Papers\IAL`, `Past Papers\IGCSE`, `IAL Books`, and `IGCSE Books`.
 2. **Clean file names**. Ensure all newly downloaded files are stripped of junk suffixes before moving them into the main library.
-3. **No Scripts at Root**. Keep scripts (`.js`, `.py`, `.bat`) inside `e:\The Library\search-app\scripts\`.
+3. **No Scripts at Root or Junk Scripts in search-app/scripts/**. Keep only the 7 core production scripts. Clean up any temporary or test scripts immediately after use.
 4. **Use Forward Slashes (`/`) in JSON**. Windows backslashes (`\`) break during Vite's static file copying and URL resolution.
-5. **Node Invocations**: On this Windows machine, invoke Node via `$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" <script.js>`.
+5. **Node Invocations**: On this Windows machine, invoke Node via:
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" <script.js>
+   ```
 6. **Brave Headless Testing**: Always test UI changes against Brave Headless via CDP before shipping to production.
-7. **Production Discipline**: After verifying builds locally, always run `deploy-vercel.js` and `push-github.js` to keep production and source control in sync.
+7. **Version & Changelog Discipline**: Whenever shipping updates, increment `APP_VERSION` and add a clean, unbloated entry to `CHANGELOG_HISTORY` in `search-app/src/App.jsx`.
+8. **Production Discipline**: After verifying builds locally, run `push-github.js` to trigger Vercel deployment and keep source control in sync.
 
-Enjoy working with this curated 13,309-document Edexcel repository!
+Enjoy working with this curated 13,940-document Edexcel repository!

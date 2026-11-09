@@ -11,14 +11,27 @@ import {
 const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
-const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-08T02:00:00.000Z';
-const APP_VERSION = 'v4.2';
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
+const APP_VERSION = 'v4.3';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v4.2',
+    version: 'v4.3',
     date: BUILD_TIMESTAMP,
+    title: 'Anti-FOUC Architecture & Codebase Cleanup',
+    summary: 'Eliminated page reload flicker with critical inline styles and noscript SEO shells, fixed React hook ordering, and pruned redundant legacy scripts.',
+    changes: [
+      'Zero reload flicker: Injected critical inline theme CSS directly in document head so pages never flash raw HTML on refresh.',
+      'Noscript SEO shell: Wrapped pre-rendered route content in noscript tags so browsers render directly without temporary unstyled text while retaining full Google indexing.',
+      'Dark-mode refresh fix: Guaranteed instant #000000 background paint before first render, eliminating white flashes.',
+      'React hook reliability: Corrected conditional useMemo order in the reader modal to ensure stable render behavior.',
+      'Clean repository: Purged legacy one-off helper scripts and consolidated the script suite to 7 core Node utilities.'
+    ]
+  },
+  {
+    version: 'v4.2',
+    date: '2026-11-09T12:00:00.000Z',
     title: 'UI Polish, History Cards & Restored Team Navigation',
     summary: 'Streamlined the PDF reader header, refined the recently viewed paper history cards, restored the full team on the About page, and added canonical footer navigation.',
     changes: [
