@@ -7,31 +7,30 @@
     <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <meta name="description" content="Conceptualist Systems: Browse 24,000+ Pearson Edexcel IAL (A-Level) & IGCSE past papers, mark schemes, examiner reports, and textbooks on-site. Organised by subject, unit, and year." />
-    <meta name="keywords" content="Conceptualist, Conceptualist Systems, Edexcel, Pearson Edexcel, IAL, IGCSE, past papers, mark scheme, question paper, examiner report, A-Level, split screen past papers" />
-    <title>Conceptualist Systems | Edexcel IAL &amp; IGCSE Past Papers, Mark Schemes &amp; Textbooks</title>
-    <link rel="canonical" href="https://www.conceptualist.uk/" />
+    <meta name="description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
+    <meta name="keywords" content="Conceptualist, Conceptualist Systems, Edexcel, IAL, IGCSE, past papers, mark scheme, question paper, examiner report, A-Level" />
+    <title>Conceptualist Systems | Library Repository</title>
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
-    <!-- OpenGraph & Social Metadata -->
-    <meta property="og:site_name" content="Conceptualist Systems" />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Conceptualist Systems | Edexcel IAL &amp; IGCSE Past Papers, Mark Schemes &amp; Textbooks" />
-    <meta property="og:description" content="Browse 24,000+ Pearson Edexcel IAL (A-Level) &amp; IGCSE past papers, mark schemes, examiner reports, and textbooks on-site with side-by-side Split View." />
-    <meta property="og:url" content="https://www.conceptualist.uk/" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Conceptualist Systems | Edexcel IAL &amp; IGCSE Past Papers, Mark Schemes &amp; Textbooks" />
-    <meta name="twitter:description" content="Browse 24,000+ Pearson Edexcel IAL (A-Level) &amp; IGCSE past papers, mark schemes, examiner reports, and textbooks on-site." />
-
-    <!-- Non-blocking font preconnect & swap -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Roboto:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'" />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Roboto:wght@400;500;700;900&display=swap" />
-    </noscript>
+    <!-- Preload Critical Local Self-Hosted Fonts (Zero Latency & Zero FOUT) -->
+    <link rel="preload" href="/fonts/roboto-latin.woff2" as="font" type="font/woff2" crossorigin />
     <script>
+      (function() {
+        try {
+          var match = document.cookie.match(/(?:^|; )cs_theme=([^;]*)/);
+          var cookieTheme = match ? decodeURIComponent(match[1]) : null;
+          var localTheme = localStorage.getItem('cs_theme');
+          var t = cookieTheme || localTheme;
+          // Default to 'light' mode unless explicitly saved as 'dark'
+          if (t === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
       window.addEventListener('vite:preloadError', function () {
         try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
         window.location.href = '/?reset=' + Date.now();

@@ -20,6 +20,8 @@ const serveLibraryFiles = () => {
         
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
           const ext = path.extname(fullPath).toLowerCase();
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Accept-Ranges', 'bytes');
           if (ext === '.pdf') {
             res.setHeader('Content-Type', 'application/pdf');
           }
@@ -38,4 +40,16 @@ export default defineConfig({
     __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   plugins: [react(), serveLibraryFiles()],
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+        }
+      }
+    }
+  }
 })
