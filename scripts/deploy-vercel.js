@@ -31,14 +31,24 @@ if (!TOKEN) {
 const PROJECT_ID = 'prj_aoqCf7hkChGqzoRb3WGb9cf2KAgp';
 const TEAM_ID = 'team_34CBzFBsKwAwot7TK9eTAPj8';
 
-const EXCLUDE = new Set(['node_modules', 'dist', '.vercel', '.git', '.env', '.env.local', 'pi-deploy', 'pi-deploy.zip', 'scripts']);
+const EXCLUDE = new Set(['node_modules', 'dist', '.vercel', '.git', '.env', '.env.local', 'pi-deploy', 'pi-deploy.zip']);
 
 function collectAppFiles(dir, baseDir = APP_DIR) {
   let list = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (dir === baseDir && EXCLUDE.has(entry.name)) continue;
+    if (dir === baseDir && EXCLUDE.has(entry.name) && entry.name !== 'scripts') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (entry.name === 'scripts') {
+        const prerender = path.join(full, 'prerender-seo.js');
+        if (fs.existsSync(prerender)) {
+          const rel = 'scripts/prerender-seo.js';
+          const buf = fs.readFileSync(prerender);
+          const sha = crypto.createHash('sha1').update(buf).digest('hex');
+          list.push({ full: prerender, rel, buf, sha, size: buf.length });
+        }
+        continue;
+      }
       list = list.concat(collectAppFiles(full, baseDir));
     } else {
       const rel = path.relative(baseDir, full).replace(/\\/g, '/');
