@@ -12,10 +12,22 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v5.0';
+const APP_VERSION = 'v5.1';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.1',
+    date: BUILD_TIMESTAMP,
+    title: 'Uniform Card Grid Architecture & Ultra-Subtle Table Contrast Refinement',
+    summary: 'Streamlined subject cards to uniform surfaces to eliminate false grid hierarchy, refined resource table zebra striping to an ultra-subtle warm tint (#FAF8F6), unified inner metadata pills with solid white backgrounds, and softened divider borders (#EEEAE6).',
+    changes: [
+      'Uniform subject card grid: Dropped card alternation to restore equal visual weight across all columns, maintaining crisp white cards (#FFFFFF) and consistent borders with authoritative McMaster Crimson and collegiate blue left accent bars.',
+      'Refined resource table zebra tint: Lightened even table rows to an ultra-subtle warm tint (#FAF8F6 in Light, #1A1D23 in Dark, #08090B in OLED) to guide horizontal scanning without heavy visual weight.',
+      'Unified inner metadata pills: Elevated folder path subtext, file count tags, and view counter badges to solid white backgrounds (#FFFFFF) with crisp hairline borders (#E2DDD5), completely eliminating muddy nested beige-on-beige contrast.',
+      'Softened table divider lines: Lightened horizontal divider lines to a delicate #EEEAE6 (#1E2127 in Dark, #141414 in OLED), eliminating double-framing and busy layout borders.'
+    ]
+  },
   {
     version: 'v5.0',
     date: BUILD_TIMESTAMP,
