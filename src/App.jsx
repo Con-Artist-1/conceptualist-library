@@ -12,10 +12,22 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v4.9';
+const APP_VERSION = 'v5.0';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.0',
+    date: BUILD_TIMESTAMP,
+    title: 'Alternating Row & Card Contrast Patterns Across All Themes',
+    summary: 'Introduced rhythmically alternating contrast patterns (zebra striping and 2D checkerboard weaving) across table rows, subject category cards, wizard unit buttons, and recent history cards in White, Dark, and OLED modes for effortless visual scanning.',
+    changes: [
+      'Table row zebra striping: Implemented rhythmic odd/even row contrast across examination sitting tables in White (#FFFFFF / #F8F7F4), Academic Dark (#16181D / #1E2229), and Pure OLED (#000000 / #0F1115) with smooth interactive hover feedback.',
+      'Subject card checkerboard pattern: Configured alternating tonal shading for subject cards and button tabs with a 2D checkerboard pattern on desktop and responsive alternation on mobile/tablet viewports.',
+      'Interactive unit & history buttons: Propagated alternating card styles to wizard unit selectors and recently viewed paper cards across all themes.',
+      'Mobile card parity: Preserved alternating card separation and responsive borders on mobile touch viewports.'
+    ]
+  },
   {
     version: 'v4.9',
     date: BUILD_TIMESTAMP,

@@ -913,6 +913,11 @@ a.breadcrumb-link:hover {
   gap: 10px;
 }
 
+.wizard-option-btn:nth-child(even) {
+  background: #F8F7F4;
+  border-color: #CCC7BC;
+}
+
 .wizard-option-btn:hover {
   border-color: var(--mcmaster-maroon);
   background: var(--badge-qp-bg);
@@ -1386,7 +1391,12 @@ a.breadcrumb-link:hover {
   border-radius: var(--radius-sm);
   padding: 14px 18px;
   cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s, background-color 0.12s;
+}
+
+.subject-card:nth-child(even) {
+  background: #F8F7F4;
+  border-color: #CCC7BC;
 }
 
 .subject-card.igcse {
@@ -1396,11 +1406,30 @@ a.breadcrumb-link:hover {
 .subject-card:hover {
   border-color: var(--mcmaster-maroon);
   background: #FAF9F6;
+  box-shadow: 0 4px 12px rgba(111, 29, 43, 0.08);
+  transform: translateY(-2px);
 }
 
 .subject-card.igcse:hover {
   border-color: var(--igcse-blue);
   background: #F7F9FB;
+  box-shadow: 0 4px 12px rgba(30, 78, 140, 0.08);
+  transform: translateY(-2px);
+}
+
+/* 4-column 2D checkerboard pattern on wide desktop */
+@media (min-width: 1280px) {
+  .subject-grid .subject-card:nth-child(even) {
+    background: var(--bg-surface);
+    border-color: var(--border-medium);
+  }
+  .subject-grid .subject-card:nth-child(8n+2),
+  .subject-grid .subject-card:nth-child(8n+4),
+  .subject-grid .subject-card:nth-child(8n+5),
+  .subject-grid .subject-card:nth-child(8n+7) {
+    background: #F8F7F4;
+    border-color: #CCC7BC;
+  }
 }
 
 .subject-card-top {
@@ -1479,8 +1508,16 @@ a.breadcrumb-link:hover {
   text-overflow: ellipsis;
 }
 
-.file-table tr:hover td {
-  background-color: rgba(122, 0, 60, 0.025);
+.file-table tbody tr:nth-child(odd) td {
+  background-color: #FFFFFF;
+}
+
+.file-table tbody tr:nth-child(even) td {
+  background-color: #F8F7F4;
+}
+
+.file-table tbody tr:hover td {
+  background-color: #EFECE4 !important;
 }
 
 /* Matching Document Type Link Colors */
@@ -3220,10 +3257,16 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .subject-card {
-  background: #1B1E23 !important;
-  border: 1px solid #282C34 !important;
+  background: #16181D !important;
+  border: 1px solid #262A32 !important;
   border-left: 4px solid #8C1D2F !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s, background-color 0.12s !important;
+}
+
+[data-theme='dark'] .subject-card:nth-child(even) {
+  background: #1E2229 !important;
+  border-color: #323844 !important;
 }
 
 [data-theme='dark'] .subject-card.igcse {
@@ -3231,13 +3274,29 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .subject-card:hover {
-  background: #22262E !important;
+  background: #272C35 !important;
   border-color: #8C1D2F !important;
   transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
 }
 
 [data-theme='dark'] .subject-card.igcse:hover {
   border-color: #4A7BB0 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+}
+
+@media (min-width: 1280px) {
+  [data-theme='dark'] .subject-grid .subject-card:nth-child(even) {
+    background: #16181D !important;
+    border-color: #262A32 !important;
+  }
+  [data-theme='dark'] .subject-grid .subject-card:nth-child(8n+2),
+  [data-theme='dark'] .subject-grid .subject-card:nth-child(8n+4),
+  [data-theme='dark'] .subject-grid .subject-card:nth-child(8n+5),
+  [data-theme='dark'] .subject-grid .subject-card:nth-child(8n+7) {
+    background: #1E2229 !important;
+    border-color: #323844 !important;
+  }
 }
 
 [data-theme='dark'] .subject-card-title {
@@ -3296,10 +3355,15 @@ html[data-theme='dark'] body {
   color: #F0F2F5 !important;
 }
 
+[data-theme='dark'] .wizard-option-btn:nth-child(even) {
+  background: #1E2229 !important;
+  border-color: #343A46 !important;
+}
+
 [data-theme='dark'] .wizard-option-btn:hover {
-  background: #22262E !important;
+  background: #272C35 !important;
   border-color: #8C1D2F !important;
-  color: #ffffff !important;
+  color: #FFFFFF !important;
 }
 
 [data-theme='dark'] .wizard-option-btn.primary {
@@ -3348,39 +3412,49 @@ html[data-theme='dark'] body {
   border: 1px solid #282C34 !important;
 }
 
+[data-theme='dark'] .file-table,
 [data-theme='dark'] .results-table,
 [data-theme='dark'] .data-table {
-  background-color: #1B1E23 !important;
+  background-color: #16181D !important;
   color: #F0F2F5 !important;
 }
 
+[data-theme='dark'] .file-table th,
 [data-theme='dark'] .results-table th,
 [data-theme='dark'] .data-table thead th {
-  background-color: #15171C !important;
+  background-color: #121417 !important;
   border-bottom: 2px solid #282C34 !important;
   border-right: 1px solid #252830 !important;
   color: #8892A0 !important;
   font-weight: 800 !important;
 }
 
+[data-theme='dark'] .file-table td,
 [data-theme='dark'] .results-table td,
 [data-theme='dark'] .data-table td {
   border-bottom: 1px solid #252830 !important;
-  border-right: 1px solid #20242C !important;
   color: #F0F2F5 !important;
-  background-color: #1B1E23 !important;
 }
 
+[data-theme='dark'] .file-table tbody tr:nth-child(odd) td,
+[data-theme='dark'] .results-table tr:nth-child(odd) td,
+[data-theme='dark'] .data-table tbody tr:nth-child(odd) td {
+  background-color: #16181D !important;
+}
+
+[data-theme='dark'] .file-table tbody tr:nth-child(even) td,
 [data-theme='dark'] .results-table tr:nth-child(even) td,
 [data-theme='dark'] .data-table tbody tr:nth-child(even) td {
-  background-color: #17191E !important;
+  background-color: #1E2229 !important;
 }
 
+[data-theme='dark'] .file-table tbody tr:hover td,
 [data-theme='dark'] .results-table tr:hover td,
 [data-theme='dark'] .data-table tbody tr:hover td {
-  background-color: #242831 !important;
+  background-color: #272C35 !important;
 }
 
+[data-theme='dark'] .file-table tr.selected td,
 [data-theme='dark'] .results-table tr.selected td {
   background-color: #2A171D !important;
 }
@@ -4639,25 +4713,46 @@ html[data-theme='oled'] body {
 }
 
 [data-theme='oled'] .subject-card {
-  background: #0D0D0D !important;
-  border: 1px solid #222222 !important;
+  background: #000000 !important;
+  border: 1px solid #1C1C1C !important;
   border-left: 4px solid #FF5370 !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s, background-color 0.12s !important;
 }
 
-[data-theme='oled'] .subject-card:hover {
-  background: #171717 !important;
-  border-color: #FF5370 !important;
-  transform: translateY(-1px);
+[data-theme='oled'] .subject-card:nth-child(even) {
+  background: #0E1014 !important;
+  border-color: #262626 !important;
 }
 
 [data-theme='oled'] .subject-card.igcse {
   border-left-color: #388BFD !important;
 }
 
+[data-theme='oled'] .subject-card:hover {
+  background: #1A1D24 !important;
+  border-color: #FF5370 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(255, 83, 112, 0.15) !important;
+}
+
 [data-theme='oled'] .subject-card.igcse:hover {
-  background: #171717 !important;
   border-color: #388BFD !important;
+  box-shadow: 0 4px 14px rgba(56, 139, 253, 0.15) !important;
+}
+
+@media (min-width: 1280px) {
+  [data-theme='oled'] .subject-grid .subject-card:nth-child(even) {
+    background: #000000 !important;
+    border-color: #1C1C1C !important;
+  }
+  [data-theme='oled'] .subject-grid .subject-card:nth-child(8n+2),
+  [data-theme='oled'] .subject-grid .subject-card:nth-child(8n+4),
+  [data-theme='oled'] .subject-grid .subject-card:nth-child(8n+5),
+  [data-theme='oled'] .subject-grid .subject-card:nth-child(8n+7) {
+    background: #0E1014 !important;
+    border-color: #262626 !important;
+  }
 }
 
 [data-theme='oled'] .subject-card-title {
@@ -4705,8 +4800,13 @@ html[data-theme='oled'] body {
   font-weight: 700 !important;
 }
 
+[data-theme='oled'] .wizard-option-btn:nth-child(even) {
+  background: #0E1014 !important;
+  border-color: #262626 !important;
+}
+
 [data-theme='oled'] .wizard-option-btn:hover {
-  background: #181818 !important;
+  background: #1A1D24 !important;
   border-color: #FF5370 !important;
   color: #FFFFFF !important;
 }
@@ -4754,11 +4854,13 @@ html[data-theme='oled'] body {
   border: 1px solid #202020 !important;
 }
 
+[data-theme='oled'] .file-table,
 [data-theme='oled'] .results-table {
   background-color: #000000 !important;
   color: #FFFFFF !important;
 }
 
+[data-theme='oled'] .file-table th,
 [data-theme='oled'] .results-table th {
   background-color: #0A0A0A !important;
   color: #CBD5E1 !important;
@@ -4767,16 +4869,28 @@ html[data-theme='oled'] body {
   font-weight: 800 !important;
 }
 
+[data-theme='oled'] .file-table td,
 [data-theme='oled'] .results-table td {
   border-bottom: 1px solid #1A1A1A !important;
-  border-right: 1px solid #141414 !important;
+  color: #F0F2F5 !important;
+}
+
+[data-theme='oled'] .file-table tbody tr:nth-child(odd) td,
+[data-theme='oled'] .results-table tr:nth-child(odd) td {
   background-color: #000000 !important;
 }
 
-[data-theme='oled'] .results-table tr:hover td {
-  background-color: #0D0D0D !important;
+[data-theme='oled'] .file-table tbody tr:nth-child(even) td,
+[data-theme='oled'] .results-table tr:nth-child(even) td {
+  background-color: #0F1115 !important;
 }
 
+[data-theme='oled'] .file-table tbody tr:hover td,
+[data-theme='oled'] .results-table tr:hover td {
+  background-color: #1A1D24 !important;
+}
+
+[data-theme='oled'] .file-table tr.selected td,
 [data-theme='oled'] .results-table tr.selected td {
   background-color: #111A24 !important;
 }
@@ -5868,9 +5982,35 @@ html[data-theme='oled'] body {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
 
+  .file-table tr:nth-child(even) {
+    background: #F8F7F4;
+    border-color: #CCC7BC;
+  }
+
+  [data-theme='dark'] .file-table tr {
+    background: #16181D !important;
+    border-color: #262A32 !important;
+  }
+
+  [data-theme='dark'] .file-table tr:nth-child(even) {
+    background: #1E2229 !important;
+    border-color: #323844 !important;
+  }
+
+  [data-theme='oled'] .file-table tr {
+    background: #000000 !important;
+    border-color: #1C1C1C !important;
+  }
+
+  [data-theme='oled'] .file-table tr:nth-child(even) {
+    background: #0F1115 !important;
+    border-color: #262626 !important;
+  }
+
   .file-table td {
     padding: 2px 0;
     border-bottom: none;
+    background: transparent !important;
   }
 
   .file-table td:last-child {
