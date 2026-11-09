@@ -1667,21 +1667,21 @@ a:hover {
 }
 
 .sibling-pill.qp {
-  background: #0969DA;
+  background: #2B303A;
   color: #FFFFFF !important;
-  border-color: #0550AE;
+  border-color: #1E232B;
 }
 
 .sibling-pill.ms {
-  background: #1A7F37;
+  background: #8C651E;
   color: #FFFFFF !important;
-  border-color: #116329;
+  border-color: #735216;
 }
 
 .sibling-pill.er {
-  background: #B45309;
+  background: #4A3525;
   color: #FFFFFF !important;
-  border-color: #92400E;
+  border-color: #38271A;
 }
 
 .preview-btn {
@@ -1795,39 +1795,39 @@ a:hover {
 }
 
 .unified-doc-btn.qp {
-  background: #0969DA;
+  background: #2B303A;
   color: #FFFFFF !important;
-  border-color: #0550AE;
+  border-color: #1E232B;
 }
 
 .unified-doc-btn.qp:hover {
-  background: #0858B8;
+  background: #1E232B;
   color: #FFFFFF !important;
-  border-color: #044289;
+  border-color: #0F1318;
 }
 
 .unified-doc-btn.ms {
-  background: #1A7F37;
+  background: #8C651E;
   color: #FFFFFF !important;
-  border-color: #116329;
+  border-color: #735216;
 }
 
 .unified-doc-btn.ms:hover {
-  background: #146C2E;
+  background: #735216;
   color: #FFFFFF !important;
-  border-color: #0E5221;
+  border-color: #5C4110;
 }
 
 .unified-doc-btn.er {
-  background: #B45309;
+  background: #4A3525;
   color: #FFFFFF !important;
-  border-color: #92400E;
+  border-color: #38271A;
 }
 
 .unified-doc-btn.er:hover {
-  background: #92400E;
+  background: #38271A;
   color: #FFFFFF !important;
-  border-color: #78350F;
+  border-color: #261A11;
 }
 
 .unified-doc-btn.book {
@@ -2113,8 +2113,8 @@ a:hover {
 }
 
 .modal-view-btn.qp.active {
-  background: #1E3A5F;
-  border-color: #1E3A5F;
+  background: #2B303A;
+  border-color: #1E232B;
   color: #FFFFFF;
 }
 
@@ -2125,14 +2125,14 @@ a:hover {
 }
 
 .modal-view-btn.ms:hover {
-  background: #DEE8E2;
-  border-color: #97B2A3;
-  color: #102B20;
+  background: #F3EBDD;
+  border-color: #D6C29E;
+  color: #5C4110;
 }
 
 .modal-view-btn.ms.active {
-  background: #1B4332;
-  border-color: #1B4332;
+  background: #8C651E;
+  border-color: #735216;
   color: #FFFFFF;
 }
 
@@ -3420,58 +3420,56 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .sibling-pill.qp {
-  background: #153E65 !important;
-  color: #FFFFFF !important;
-  border-color: #1E4E78 !important;
+  background: #252932 !important;
+  border-color: #383F4C !important;
+  color: #F0F2F5 !important;
 }
 
 [data-theme='dark'] .sibling-pill.ms {
-  background: #145A32 !important;
+  background: #A88226 !important;
+  border-color: #C29832 !important;
   color: #FFFFFF !important;
-  border-color: #196C3E !important;
 }
 
 [data-theme='dark'] .sibling-pill.er {
-  background: #7D3C00 !important;
+  background: #3D2E24 !important;
+  border-color: #5A4537 !important;
   color: #FFFFFF !important;
-  border-color: #994A00 !important;
 }
 
 /* Unified Action Buttons */
 [data-theme='dark'] .unified-doc-btn.qp {
-  background: #153E65 !important;
-  color: #FFFFFF !important;
-  border-color: #1E4E78 !important;
+  background: #252932 !important;
+  border-color: #383F4C !important;
+  color: #F0F2F5 !important;
 }
 
 [data-theme='dark'] .unified-doc-btn.qp:hover {
-  background: #1C5285 !important;
+  background: #2E3440 !important;
+  border-color: #4A5466 !important;
   color: #FFFFFF !important;
-  border-color: #2D6EA8 !important;
 }
 
 [data-theme='dark'] .unified-doc-btn.ms {
-  background: #145A32 !important;
+  background: #A88226 !important;
+  border-color: #C29832 !important;
   color: #FFFFFF !important;
-  border-color: #196C3E !important;
 }
 
 [data-theme='dark'] .unified-doc-btn.ms:hover {
-  background: #196F3D !important;
+  background: #BF962E !important;
+  border-color: #D4AF37 !important;
   color: #FFFFFF !important;
-  border-color: #219653 !important;
 }
 
 [data-theme='dark'] .unified-doc-btn.er {
-  background: #7D3C00 !important;
+  background: #3D2E24 !important;
+  border-color: #5A4537 !important;
   color: #FFFFFF !important;
-  border-color: #994A00 !important;
 }
 
 [data-theme='dark'] .unified-doc-btn.er:hover {
-  background: #994A00 !important;
-  color: #FFFFFF !important;
-  border-color: #BA5B00 !important;
+  background: #4D3A2E !important;
 }
 
 [data-theme='dark'] .unified-doc-btn.book {
@@ -3600,21 +3598,21 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .history-doc-btn.qp {
-  background: #0F2640 !important;
-  border-color: #1E4E78 !important;
-  color: #79B8FF !important;
+  background: #252932 !important;
+  border-color: #383F4C !important;
+  color: #F0F2F5 !important;
 }
 
 [data-theme='dark'] .history-doc-btn.ms {
-  background: #0D2E1C !important;
-  border-color: #196C3E !important;
-  color: #7EE787 !important;
+  background: #A88226 !important;
+  border-color: #C29832 !important;
+  color: #FFFFFF !important;
 }
 
 [data-theme='dark'] .history-doc-btn.er {
-  background: #2E2008 !important;
-  border-color: #6E4E10 !important;
-  color: #FFD33D !important;
+  background: #3D2E24 !important;
+  border-color: #5A4537 !important;
+  color: #FFFFFF !important;
 }
 
 [data-theme='dark'] .history-doc-btn.split {
@@ -3911,8 +3909,8 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .modal-btn.qp-btn.active {
-  background: #153E65 !important;
-  border-color: #58A6FF !important;
+  background: #252932 !important;
+  border-color: #383F4C !important;
   color: #FFFFFF !important;
 }
 
@@ -3924,8 +3922,8 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .modal-btn.ms-btn.active {
-  background: #145A32 !important;
-  border-color: #3FB950 !important;
+  background: #A88226 !important;
+  border-color: #C29832 !important;
   color: #FFFFFF !important;
 }
 
@@ -4801,57 +4799,55 @@ html[data-theme='oled'] body {
 }
 
 [data-theme='oled'] .sibling-pill.qp {
-  background: #144A75 !important;
+  background: #181818 !important;
+  border-color: #333333 !important;
   color: #FFFFFF !important;
-  border-color: #23649E !important;
 }
 
 [data-theme='oled'] .sibling-pill.ms {
-  background: #145A32 !important;
+  background: #8C6D20 !important;
+  border-color: #A68228 !important;
   color: #FFFFFF !important;
-  border-color: #1E824C !important;
 }
 
 [data-theme='oled'] .sibling-pill.er {
-  background: #7D3C00 !important;
+  background: #33251B !important;
+  border-color: #4D3728 !important;
   color: #FFFFFF !important;
-  border-color: #A34E00 !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.qp {
-  background: #144A75 !important;
+  background: #181818 !important;
+  border-color: #333333 !important;
   color: #FFFFFF !important;
-  border-color: #23649E !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.qp:hover {
-  background: #1B5E94 !important;
+  background: #252525 !important;
+  border-color: #555555 !important;
   color: #FFFFFF !important;
-  border-color: #3182CE !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.ms {
-  background: #145A32 !important;
+  background: #8C6D20 !important;
+  border-color: #A68228 !important;
   color: #FFFFFF !important;
-  border-color: #1E824C !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.ms:hover {
-  background: #196F3D !important;
+  background: #A68228 !important;
+  border-color: #C29832 !important;
   color: #FFFFFF !important;
-  border-color: #27AE60 !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.er {
-  background: #7D3C00 !important;
+  background: #33251B !important;
+  border-color: #4D3728 !important;
   color: #FFFFFF !important;
-  border-color: #A34E00 !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.er:hover {
-  background: #994A00 !important;
-  color: #FFFFFF !important;
-  border-color: #CC6600 !important;
+  background: #4D3728 !important;
 }
 
 [data-theme='oled'] .unified-doc-btn.book {
@@ -6841,20 +6837,20 @@ html[data-theme='oled'] body {
 }
 
 [data-theme='oled'] .history-doc-btn.qp {
-  background: #1A365D !important;
-  border-color: #2B6CB0 !important;
+  background: #181818 !important;
+  border-color: #333333 !important;
   color: #FFFFFF !important;
 }
 
 [data-theme='oled'] .history-doc-btn.ms {
-  background: #1C4532 !important;
-  border-color: #2F855A !important;
+  background: #8C6D20 !important;
+  border-color: #A68228 !important;
   color: #FFFFFF !important;
 }
 
 [data-theme='oled'] .history-doc-btn.er {
-  background: #5A3515 !important;
-  border-color: #975A16 !important;
+  background: #33251B !important;
+  border-color: #4D3728 !important;
   color: #FFFFFF !important;
 }
 

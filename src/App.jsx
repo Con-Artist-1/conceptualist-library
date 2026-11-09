@@ -12,10 +12,22 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v4.7';
+const APP_VERSION = 'v4.8';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v4.8',
+    date: BUILD_TIMESTAMP,
+    title: 'Refined Document Action Colors & Desktop Button Label Optimization',
+    summary: 'Streamlined desktop action buttons to "Question Paper" and "Mark Scheme" (reserving concise "QP" and "MS" exclusively for mobile viewports) and replaced disjointed blue and green with refined brand-coherent Academic Slate Charcoal and Antique Collegiate Gold.',
+    changes: [
+      'Desktop label cleanup: Removed redundant "(QP)", "(MS)", and "(ER)" parenthetical acronyms from desktop button text across all table rows, displaying clean "Question Paper", "Mark Scheme", and "Examiner Report".',
+      'Preserved mobile compactness: Maintained concise "QP", "MS", and "ER" labels on small mobile touch viewports to prevent line-wrapping.',
+      'Color theory harmony: Replaced disjointed blue and green fills with Deep Academic Slate Charcoal (#2B303A) for Question Papers and Antique Collegiate Gold (#8C651E / #A88226) for Mark Schemes, achieving seamless triad harmony with McMaster Crimson (#6F1D2B / #8C1D2F).',
+      'Universal button consistency: Propagated the refined charcoal and gold color scheme across table rows, recently viewed history cards, sibling pills, and reader modal controls across Light, Dark, and OLED themes.'
+    ]
+  },
   {
     version: 'v4.7',
     date: BUILD_TIMESTAMP,
@@ -2167,7 +2179,7 @@ const WelcomePage = ({
                           e.stopPropagation();
                           onOpenPaper(item, 'QP');
                         }}
-                        title="Open Question Paper (QP)"
+                        title="Open Question Paper"
                       >
                         QP
                       </a>
@@ -2181,7 +2193,7 @@ const WelcomePage = ({
                           e.stopPropagation();
                           onOpenPaper(item, 'MS');
                         }}
-                        title="Open Mark Scheme (MS)"
+                        title="Open Mark Scheme"
                       >
                         MS
                       </a>
@@ -2195,7 +2207,7 @@ const WelcomePage = ({
                           e.stopPropagation();
                           onOpenPaper(item, 'ER');
                         }}
-                        title="Open Examiner Report (ER)"
+                        title="Open Examiner Report"
                       >
                         ER
                       </a>
@@ -4095,9 +4107,9 @@ function App() {
                                         openOnSiteReader(file, 'QP');
                                       }}
                                       className="unified-doc-btn qp"
-                                      title={`Open Question Paper on-site — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
+                                      title={`Open Question Paper — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
                                     >
-                                      <span className="btn-desktop-text">Question Paper (QP)</span>
+                                      <span className="btn-desktop-text">Question Paper</span>
                                       <span className="btn-mobile-text">QP</span>
                                     </a>
                                   )}
@@ -4109,9 +4121,9 @@ function App() {
                                         openOnSiteReader(file, 'MS');
                                       }}
                                       className="unified-doc-btn ms"
-                                      title={`Open Mark Scheme on-site — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
+                                      title={`Open Mark Scheme — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
                                     >
-                                      <span className="btn-desktop-text">Mark Scheme (MS)</span>
+                                      <span className="btn-desktop-text">Mark Scheme</span>
                                       <span className="btn-mobile-text">MS</span>
                                     </a>
                                   )}
@@ -4123,9 +4135,9 @@ function App() {
                                         openOnSiteReader(file, 'ER');
                                       }}
                                       className="unified-doc-btn er"
-                                      title={`Open Examiner Report on-site — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
+                                      title={`Open Examiner Report — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
                                     >
-                                      <span className="btn-desktop-text">Examiner Report (ER)</span>
+                                      <span className="btn-desktop-text">Examiner Report</span>
                                       <span className="btn-mobile-text">ER</span>
                                     </a>
                                   )}
