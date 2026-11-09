@@ -12,10 +12,22 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v4.5';
+const APP_VERSION = 'v4.6';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v4.6',
+    date: BUILD_TIMESTAMP,
+    title: 'Ivy League Academic Color Theory Redesign & Heritage Branding Restoration',
+    summary: 'Harmonized color theory across both Light and Dark themes, restoring authentic McMaster Heritage Crimson (#6F1D2B / #8C1D2F), refined collegiate gold (#C9A45C / #D4AF37), and Oxford navy accents while preserving 100% Pure OLED dark mode.',
+    changes: [
+      'Academic Light Mode ("Light"): Restored luminous warm alabaster canvas (#F4F3EF), crisp pure white surfaces (#FFFFFF), authoritative McMaster Crimson header (#6F1D2B), antique collegiate gold (#C9A45C), and deep charcoal ink typography (#1A1D20).',
+      'Academic Dark Mode ("Dark"): Redesigned dark mode to an authentic deep slate charcoal ground (#121417) and elevated slate card surfaces (#1B1E23) with vivid McMaster Crimson (#8C1D2F) and collegiate gold accents, completely eliminating murky olive-green casts.',
+      'High-Contrast Action Badges: Maintained bold identity badges for Question Papers (Oxford Navy), Mark Schemes (Ivy Green), and Examiner Reports (Warm Amber) with AAA readability.',
+      'Anti-FOUC & Pure OLED Preserved: Kept true pitch black (#000000) OLED dark mode intact with zero reload flickers across all pre-rendered routes.'
+    ]
+  },
   {
     version: 'v4.5',
     date: BUILD_TIMESTAMP,
@@ -1405,7 +1417,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
                 {engineMode === 'custom' ? 'WebPDF' : 'Built-IN'}
               </button>
 
-              {/* Theme Toggle Button (White / Dark / OLED) */}
+              {/* Theme Toggle Button (Light / Dark / OLED) */}
               {onToggleTheme && (
                 <button
                   type="button"
@@ -1413,16 +1425,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
                   onClick={onToggleTheme}
                   title={
                     theme === 'light'
-                      ? 'Current: White (Rust) - Click for Dark Mode'
+                      ? 'Current: Academic Light - Click for Dark Mode'
                       : theme === 'dark'
-                      ? 'Current: Dark (Terminal) - Click for Pure OLED Mode'
-                      : 'Current: Pure OLED - Click for White Mode'
+                      ? 'Current: Academic Dark - Click for Pure OLED Mode'
+                      : 'Current: Pure OLED - Click for Light Mode'
                   }
                 >
                   {theme === 'light' ? (
                     <>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                      <span className="btn-desktop-text">White</span>
+                      <span className="btn-desktop-text">Light</span>
                     </>
                   ) : theme === 'dark' ? (
                     <>
@@ -2562,7 +2574,7 @@ function App() {
       document.cookie = `cs_theme=${theme}; max-age=31536000; path=/; SameSite=Lax`;
       const metaTheme = document.getElementById('meta-theme-color');
       if (metaTheme) {
-        metaTheme.setAttribute('content', theme === 'oled' ? '#000000' : (theme === 'dark' ? '#1f211c' : '#ddd5c5'));
+        metaTheme.setAttribute('content', theme === 'oled' ? '#000000' : (theme === 'dark' ? '#121417' : '#6F1D2B'));
       }
     } catch {}
   }, [theme]);
@@ -3625,17 +3637,17 @@ function App() {
               onClick={toggleTheme}
               title={
                 theme === 'light'
-                  ? 'Current: White (Rust) - Click for Dark Mode'
+                  ? 'Current: Academic Light - Click for Dark Mode'
                   : theme === 'dark'
-                  ? 'Current: Dark (Terminal) - Click for Pure OLED Mode'
-                  : 'Current: Pure OLED - Click for White Mode'
+                  ? 'Current: Academic Dark - Click for Pure OLED Mode'
+                  : 'Current: Pure OLED - Click for Light Mode'
               }
               aria-label="Toggle Theme"
             >
               {theme === 'light' ? (
                 <>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span>White</span>
+                  <span>Light</span>
                 </>
               ) : theme === 'dark' ? (
                 <>
