@@ -178,6 +178,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Base utility: Mobile-only elements are strictly hidden on desktop */
+.mobile-only {
+  display: none !important;
+}
+
+.filter-apply-btn {
+  display: none !important;
+}
+
 #root {
   max-width: 100vw;
   overflow-x: hidden;
@@ -255,6 +264,10 @@ a:hover {
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s;
   font-family: var(--font-family);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .header-nav-btn:hover,
@@ -4721,10 +4734,10 @@ html[data-theme='dark'] body {
 }
 
 .paper-views-counter.modal {
-  background: #141923;
-  border-color: #2D3748;
-  color: #E2E8F0;
-  padding: 4px 10px;
+  background: var(--bg-surface);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  padding: 3px 8px;
 }
 
 .paper-views-counter.card {
@@ -4740,7 +4753,7 @@ html[data-theme='dark'] body {
 }
 
 .paper-views-counter.modal .paper-views-icon {
-  color: #A0AEC0;
+  color: var(--mcmaster-maroon);
 }
 
 .paper-views-meta {
@@ -4761,8 +4774,8 @@ html[data-theme='dark'] body {
 }
 
 .paper-views-counter.modal .paper-views-num {
-  color: #F7FAFC;
-  font-size: 12.5px;
+  color: var(--text-primary);
+  font-size: 12px;
 }
 
 .paper-views-label {
@@ -4774,7 +4787,7 @@ html[data-theme='dark'] body {
 }
 
 .paper-views-counter.modal .paper-views-label {
-  color: #718096;
+  color: var(--text-muted);
 }
 
 /* ============================================================
@@ -4916,18 +4929,6 @@ html[data-theme='dark'] body {
 }
 
 .history-card-hint {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 2px;
-  transition: opacity 0.15s ease;
-}
-
-.history-card:hover .history-card-hint,
-.history-card:focus-within .history-card-hint {
   display: none;
 }
 
@@ -4936,21 +4937,9 @@ html[data-theme='dark'] body {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  opacity: 0;
-  max-height: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transform: translateY(3px);
-  transition: opacity 0.16s ease, max-height 0.18s ease, transform 0.16s ease;
-}
-
-.history-card:hover .history-card-actions,
-.history-card:focus-within .history-card-actions {
   opacity: 1;
-  max-height: 90px;
   pointer-events: auto;
-  transform: translateY(0);
-  margin-top: 8px;
+  margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--border-light);
 }
@@ -4959,7 +4948,7 @@ html[data-theme='dark'] body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 10px;
+  padding: 5px 12px;
   border-radius: 4px;
   font-size: 11.5px;
   font-weight: 800;
@@ -4972,31 +4961,32 @@ html[data-theme='dark'] body {
 }
 
 .history-doc-btn:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
+  transform: translateY(-1px);
 }
 
 .history-doc-btn.qp {
-  background: var(--badge-qp-bg);
+  background: #1F3A52;
   color: #FFFFFF !important;
-  border-color: var(--badge-qp-border);
+  border-color: #152738;
 }
 
 .history-doc-btn.ms {
-  background: var(--badge-ms-bg);
+  background: #1B4D3E;
   color: #FFFFFF !important;
-  border-color: var(--badge-ms-border);
+  border-color: #123329;
 }
 
 .history-doc-btn.er {
-  background: var(--badge-er-bg);
+  background: #5C3D1E;
   color: #FFFFFF !important;
-  border-color: var(--badge-er-border);
+  border-color: #3F2913;
 }
 
 .history-doc-btn.split {
   background: var(--mcmaster-maroon);
   color: #FFFFFF !important;
-  border-color: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon-hover);
   margin-left: auto;
 }
 
@@ -5294,6 +5284,30 @@ html[data-theme='dark'] body {
 
 [data-theme='dark'] .history-card-actions {
   border-top-color: #1F1F1F !important;
+}
+
+[data-theme='dark'] .history-doc-btn.qp {
+  background: #1A365D !important;
+  border-color: #2B6CB0 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .history-doc-btn.ms {
+  background: #1C4532 !important;
+  border-color: #2F855A !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .history-doc-btn.er {
+  background: #5A3515 !important;
+  border-color: #975A16 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .history-doc-btn.split {
+  background: #8C2435 !important;
+  border-color: #A32D40 !important;
+  color: #FFFFFF !important;
 }
 
 [data-theme='dark'] .skeleton-shimmer {

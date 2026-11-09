@@ -17,10 +17,24 @@ const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-08T02:00:00.000Z';
-const APP_VERSION = 'v4.1';
+const APP_VERSION = 'v4.2';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v4.2',
+    date: BUILD_TIMESTAMP,
+    title: 'Streamlined PDF Header, Polished History Cards, Restored Team & Navigation',
+    summary: 'Refined the WebPDF modal header into a sleek single row, strictly isolated mobile filter buttons, enhanced Recently Viewed paper cards with always-visible high-contrast action triggers, restored all 5 core team members to the About page, restored complete canonical footer links, and replaced raw text arrows with crisp SVG navigation chevrons.',
+    changes: [
+      'Streamlined PDF Reader Header: Eliminated duplicate file subtitle rows and redundant title suffixes in split mode; styled the in-modal view counter to integrate harmoniously in both Light and Pure OLED Dark modes.',
+      'Desktop Filter Cleanup: Strictly hidden the mobile filter drawer button ("Done & View Results") on desktop screens, keeping desktop filter controls uncluttered.',
+      'High-Contrast History Action Buttons: Made Question Paper (QP), Mark Scheme (MS), Examiner Report (ER), and View buttons permanently visible on history cards with solid, high-contrast backgrounds (#1F3A52, #1B4D3E, #6F1D2B) and bold pure white typography.',
+      'Full Team Restored on About Page: Reinstated all 5 team members (Diavlon, Naz, Jemison Flaren, Gemin Arghen, Claudis Oppen) with accurate titles and responsive grid presentation.',
+      'Expanded Canonical Footer Navigation: Restored direct navigation links for Library Home, Edexcel IAL, Edexcel IGCSE, Textbooks, Changelog, About Us & Team, and Contact Us.',
+      'Crisp SVG Return Chevrons: Replaced awkward unicode arrows with pixel-perfect SVG navigation chevrons on the header Library button and return-to-library actions.'
+    ]
+  },
   {
     version: 'v4.1',
     date: BUILD_TIMESTAMP,
@@ -1267,11 +1281,11 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
   const singleTitle = getDisplayTitle(currentDoc);
 
   const modalTitle = isSplit
-    ? `${getUnifiedSittingTitle(file)} — Split View`
+    ? getUnifiedSittingTitle(file)
     : singleTitle;
 
   const modalSubtitle = isSplit
-    ? `${siblings.QP?.name || 'QP'} • ${siblings.MS?.name || 'MS'}`
+    ? ''
     : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
 
   const openTabUrl = isSplit ? getHfUrl(siblings.QP?.path) : singleUrl;
@@ -1319,22 +1333,12 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
                   ✕
                 </button>
               </div>
-              <div className="modal-subtitle" title={modalSubtitle}>
-                {isSplit ? (
-                  <>
-                    <span className="modal-doc-pill qp">QP</span>
-                    <span className="modal-doc-name">{siblings.QP?.name || 'Question Paper'}</span>
-                    <span className="modal-doc-sep">•</span>
-                    <span className="modal-doc-pill ms">MS</span>
-                    <span className="modal-doc-name">{siblings.MS?.name || 'Mark Scheme'}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="modal-doc-name">{currentDoc.name || currentDoc.path}</span>
-                    {currentDoc.size ? <span className="modal-doc-size">({formatBytes(currentDoc.size)})</span> : null}
-                  </>
-                )}
-              </div>
+              {!isSplit && (
+                <div className="modal-subtitle" title={modalSubtitle}>
+                  <span className="modal-doc-name">{currentDoc.name || currentDoc.path}</span>
+                  {currentDoc.size ? <span className="modal-doc-size">({formatBytes(currentDoc.size)})</span> : null}
+                </div>
+              )}
             </div>
 
             {/* Right side: Consolidated buttons with strict pixel uniformity */}
@@ -1801,8 +1805,14 @@ const ChangelogPage = ({ onGoHome }) => {
         </div>
 
         <div style={{ marginTop: '28px' }}>
-          <button className="search-button" onClick={onGoHome}>
-            ← Return to Library Repository
+          <button
+            type="button"
+            className="search-button return-to-library-btn"
+            onClick={onGoHome}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <span>Return to Library Repository</span>
           </button>
         </div>
       </div>
@@ -1828,11 +1838,23 @@ const AboutPage = ({ onGoHome }) => {
           <div className="team-grid">
             <div className="team-card">
               <div className="team-name">Diavlon</div>
-              <div className="team-role">Founder & Lead Architect</div>
+              <div className="team-role">Founder &amp; Lead Architect</div>
             </div>
             <div className="team-card">
               <div className="team-name">Naz</div>
-              <div className="team-role">Co-Founder & Systems Lead</div>
+              <div className="team-role">Co-Founder &amp; Systems Lead</div>
+            </div>
+            <div className="team-card">
+              <div className="team-name">Jemison Flaren</div>
+              <div className="team-role">Systems Architect</div>
+            </div>
+            <div className="team-card">
+              <div className="team-name">Gemin Arghen</div>
+              <div className="team-role">Infrastructure Engineer</div>
+            </div>
+            <div className="team-card">
+              <div className="team-name">Claudis Oppen</div>
+              <div className="team-role">Research &amp; Intelligence Lead</div>
             </div>
           </div>
         </div>
@@ -1857,8 +1879,14 @@ const AboutPage = ({ onGoHome }) => {
         </div>
 
         <div style={{ marginTop: '28px' }}>
-          <button className="search-button" onClick={onGoHome}>
-            ← Return to Library Repository
+          <button
+            type="button"
+            className="search-button return-to-library-btn"
+            onClick={onGoHome}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <span>Return to Library Repository</span>
           </button>
         </div>
       </div>
@@ -2076,10 +2104,6 @@ const WelcomePage = ({
                       )}
                     </div>
                     <div className="history-card-title">{title}</div>
-                    <div className="history-card-hint">
-                      <span className="desktop-hover-prompt">Click for Question Paper (QP) • Hover for MS / ER</span>
-                      <span className="mobile-tap-prompt">Tap below to open QP, MS, or View</span>
-                    </div>
                   </a>
 
                   <div className="history-card-actions" aria-label={`Quick links for ${title}`}>
@@ -3572,7 +3596,14 @@ function App() {
               className={`header-nav-btn ${currentTab !== 'library' ? 'active' : ''}`}
               onClick={() => setCurrentTab(currentTab !== 'library' ? 'library' : 'about')}
             >
-              {currentTab !== 'library' ? '← Library' : 'About'}
+              {currentTab !== 'library' ? (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="15 18 9 12 15 6"/></svg>
+                  <span>Library</span>
+                </>
+              ) : (
+                'About'
+              )}
             </button>
           </div>
         </div>
@@ -3815,13 +3846,15 @@ function App() {
                 </button>
               )}
 
-              <button
-                type="button"
-                className="filter-apply-btn mobile-only"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                Done &amp; View Results ({allMatchedFiles.length.toLocaleString()})
-              </button>
+              {showMobileFilters && (
+                <button
+                  type="button"
+                  className="filter-apply-btn mobile-only"
+                  onClick={() => setShowMobileFilters(false)}
+                >
+                  Done &amp; View Results ({allMatchedFiles.length.toLocaleString()})
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -4228,17 +4261,71 @@ function App() {
           </div>
         </div>
         <div className="footer-links">
-          <span className="footer-link" onClick={() => { setCurrentTab('library'); clearFilters(); }}>
+          <a
+            href="/"
+            className="footer-link"
+            onClick={(e) => { e.preventDefault(); setCurrentTab('library'); clearFilters(); }}
+          >
             Library Home
-          </span>
+          </a>
           <span className="footer-sep">•</span>
-          <span className="footer-link" onClick={() => setCurrentTab('changelog')}>
+          <a
+            href="/ial"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters();
+              setFilterCurriculum('Edexcel IAL');
+              setForceShowTable(true);
+            }}
+          >
+            Edexcel IAL
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/igcse"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters();
+              setFilterCurriculum('Edexcel IGCSE');
+              setForceShowTable(true);
+            }}
+          >
+            Edexcel IGCSE
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/textbooks"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters();
+              setFilterDocType('Book');
+              setForceShowTable(true);
+            }}
+          >
+            Textbooks
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/changelog"
+            className="footer-link"
+            onClick={(e) => { e.preventDefault(); setCurrentTab('changelog'); }}
+          >
             Changelog
-          </span>
+          </a>
           <span className="footer-sep">•</span>
-          <span className="footer-link" onClick={() => setCurrentTab('about')}>
-            About Us & Team
-          </span>
+          <a
+            href="/about"
+            className="footer-link"
+            onClick={(e) => { e.preventDefault(); setCurrentTab('about'); }}
+          >
+            About Us &amp; Team
+          </a>
           <span className="footer-sep">•</span>
           <a href="mailto:diavlon.pxa@gmail.com" className="footer-link">
             Contact Us
