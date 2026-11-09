@@ -88,7 +88,7 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
 
       // Cancel any ongoing rendering task for this canvas before starting a new one
       if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel(); } catch (e) {}
+        try { renderTaskRef.current.cancel(); } catch {}
       }
 
       renderTask = page.render({
@@ -116,10 +116,10 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
     return () => {
       active = false;
       if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel(); } catch (e) {}
+        try { renderTaskRef.current.cancel(); } catch {}
       }
     };
-  }, [pdfDoc, pageNum, scale, containerWidth, isVisible, onPageRendered]);
+  }, [pdfDoc, pageNum, scale, containerWidth, isVisible, onPageRendered, isMobile]);
 
   const safeWidth = Math.max(containerWidth - 28, 260);
   let targetWidth;
@@ -306,6 +306,7 @@ export const PdfViewerPane = ({
       });
     }).catch((err) => {
       if (!active) return;
+      console.warn('[WebPDF] Failed to initialize PDF.js engine:', err);
       setLoadError('Failed to load WebPDF engine');
       setLoading(false);
     });
@@ -553,8 +554,8 @@ export const PdfViewerPane = ({
           <button
             type="button"
             className={`pdf-tool-btn text-btn ${scale === 'fit-width' ? 'active' : ''}`}
-            onClick={handleFitWidth}
-            title="Fit to Width"
+            onClick={scale === 'fit-width' ? handleFitPage : handleFitWidth}
+            title={scale === 'fit-width' ? 'Fit to Page' : 'Fit to Width'}
           >
             {zoomDisplay}
           </button>

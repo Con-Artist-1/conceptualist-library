@@ -274,10 +274,12 @@ function injectSeoIntoHtml(templateHtml, route, meta) {
   const jsonLdScript = `  <script id="seo-json-ld" type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n  </head>`;
   html = html.replace(/<\/head>/i, jsonLdScript);
 
-  // Inject crawlable semantic HTML inside <div id="root">...</div>
+  // Inject crawlable semantic HTML inside <div id="root">...</div> wrapped in <noscript>
+  // This guarantees search engine crawlers receive all structured content and links,
+  // while preventing any raw unstyled HTML flicker or bullet-point flash for human users during hydration.
   html = html.replace(
     /<div id="root"><\/div>/i,
-    `<div id="root">${staticBody}</div>`
+    `<div id="root"><noscript>${staticBody}</noscript></div>`
   );
 
   return html;

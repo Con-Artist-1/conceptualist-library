@@ -2,15 +2,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef } from 'react';
 import './index.css';
 import {
-  SITE_URL,
-  DEFAULT_UNIT_LABELS,
   buildRoutePath,
   parseRouteFromLocation,
   getSeoMetadata,
-  buildJsonLd,
-  getCurriculumSlug,
-  getSubjectSlug,
-  getUnitSlug
+  buildJsonLd
 } from './seoRoutes.js';
 
 const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
@@ -1231,17 +1226,18 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
     }
   }, []);
 
-  if (!file) return null;
-
-  const isSplit = activeView === 'split' && canSplit;
-
   // Resolve current active single document when not in split mode
   const currentDoc = useMemo(() => {
+    if (!file) return {};
     if (activeView === 'QP' && siblings.QP) return siblings.QP;
     if (activeView === 'MS' && siblings.MS) return siblings.MS;
     if (activeView === 'ER' && siblings.ER) return siblings.ER;
     return siblings[activeView] || file.primaryFile || file;
   }, [activeView, siblings, file]);
+
+  if (!file) return null;
+
+  const isSplit = activeView === 'split' && canSplit;
 
   const singleUrl = getHfUrl(currentDoc.path);
   const singleTitle = getDisplayTitle(currentDoc);
@@ -4114,7 +4110,7 @@ function App() {
                                         openOnSiteReader(activeDoc, activeDoc.docType || 'QP');
                                       }}
                                       className={viewMode === 'unified' ? 'unified-preview-btn' : 'preview-btn'}
-                                      title={Boolean(siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf') ? "Open Question Paper and Mark Scheme in PDF Reader" : "Quick In-App PDF Preview"}
+                                      title={siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf' ? "Open Question Paper and Mark Scheme in PDF Reader" : "Quick In-App PDF Preview"}
                                     >
                                       View
                                     </a>

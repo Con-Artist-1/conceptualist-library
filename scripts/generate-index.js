@@ -828,18 +828,6 @@ const coverageRangeStr = minDate && maxDate
   ? `${minDate.label} – ${maxDate.label}`
   : 'January 2003 – January 2026';
 
-function getDirectoryOnlyTree(node) {
-  if (!node) return null;
-  const dirChildren = (node.children || [])
-    .filter(c => c.children)
-    .map(getDirectoryOnlyTree);
-  return {
-    name: node.name,
-    path: node.path,
-    children: dirChildren
-  };
-}
-
 function isYearOrSessionDir(name) {
   if (/^\d{4}$/.test(name)) return true;
   if (/^\d{4}[-_\s]+[A-Za-z]+$/i.test(name)) return true;
