@@ -2,13 +2,20 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 
 // Shared singleton promise to lazy-load PDF.js only when the viewer is first opened
 let pdfjsPromise = null;
+const dynamicImportModule = new Function('url', 'return import(url)');
 function loadPdfJs() {
   if (!pdfjsPromise) {
-    pdfjsPromise = import(/* @vite-ignore */ '/pdfjs/pdf.min.mjs').then((mod) => {
-      // Point worker to absolute URL on the current host
-      mod.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
-      return mod;
-    });
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    pdfjsPromise = dynamicImportModule(`${base}/pdfjs/pdf.min.mjs`)
+      .then((mod) => {
+        // Point worker to absolute URL on the current host
+        mod.GlobalWorkerOptions.workerSrc = `${base}/pdfjs/pdf.worker.min.mjs`;
+        return mod;
+      })
+      .catch((err) => {
+        pdfjsPromise = null;
+        throw err;
+      });
   }
   return pdfjsPromise;
 }

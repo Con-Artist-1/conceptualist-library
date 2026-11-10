@@ -3,16 +3,20 @@ import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import viewsApiHandler from './api/views.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const LIBRARY_ROOT = path.resolve(__dirname, '..')
 
-// Custom plugin to serve files from The Library root during local dev
+// Custom plugin to serve files from The Library root and handle /api/views during local dev
 const serveLibraryFiles = () => {
   return {
     name: 'serve-library-files',
     configureServer(server) {
+      server.middlewares.use('/api/views', (req, res) => {
+        viewsApiHandler(req, res)
+      })
       server.middlewares.use('/library-files', (req, res, next) => {
         const decodedPath = decodeURIComponent(req.url || '');
         const relativePath = decodedPath.startsWith('/') ? decodedPath.slice(1) : decodedPath;

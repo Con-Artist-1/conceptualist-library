@@ -7,8 +7,7 @@ import {
   getSeoMetadata,
   buildJsonLd
 } from './seoRoutes.js';
-
-const PdfViewerPane = React.lazy(() => import('./PdfViewerPane.jsx'));
+import PdfViewerPane from './PdfViewerPane.jsx';
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
@@ -569,9 +568,6 @@ function formatSubjectDisplay(subj) {
 
 function getHfUrl(filePath) {
   if (!filePath) return '';
-  if (import.meta.env.DEV) {
-    return `/library-files/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
-  }
   return `https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
 }
 
@@ -917,7 +913,7 @@ const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggl
   );
 });
 
-const VIEWS_STORAGE_KEY = 'cs_paper_views_v1';
+const VIEWS_STORAGE_KEY = 'cs_paper_views_db_v2';
 const HISTORY_STORAGE_KEY = 'cs_recent_papers_v1';
 const MAX_HISTORY_ITEMS = 8;
 
@@ -939,41 +935,12 @@ function isQuestionPaperEligibleForViews(file) {
   return file.docType === 'QP' || Boolean(file.docs?.QP);
 }
 
-// Fast O(1) deterministic baseline view count seeded by paper key, subject demand, and exam recency
-function getBasePaperViews(file) {
-  if (!file) return 0;
-  const key = getPaperViewKey(file);
-  if (!key) return 142;
-  let hash = 2166136261;
-  for (let i = 0; i < key.length; i++) {
-    hash ^= key.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  const u = hash >>> 0;
-  const subj = (file.subject || '').toLowerCase();
-  const isHighTraffic =
-    subj === 'math' ||
-    subj === 'mathematics' ||
-    subj === 'mathematics a' ||
-    subj === 'physics' ||
-    subj === 'chemistry' ||
-    subj === 'biology' ||
-    subj === 'economics' ||
-    subj === 'business' ||
-    subj === 'accounting';
-  const yr = Number(file.year) || 2022;
-  const isPeakYear = yr >= 2021 && yr <= 2025;
-  const minViews = isHighTraffic ? (isPeakYear ? 225 : 135) : (isPeakYear ? 118 : 72);
-  const range = isHighTraffic ? (isPeakYear ? 620 : 340) : (isPeakYear ? 280 : 165);
-  return minViews + (u % range);
-}
-
 function getPaperTotalViews(file, viewsMap) {
   if (!file) return 0;
-  const base = getBasePaperViews(file);
   const key = getPaperViewKey(file);
-  const extra = (key && viewsMap && viewsMap[key]) ? Number(viewsMap[key]) : 0;
-  return base + extra;
+  if (!key || !viewsMap) return 0;
+  const count = Number(viewsMap[key]);
+  return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
 // Build a 0ms placeholder object from ?paper= URL parameter while index.json resolves in the background
@@ -1089,13 +1056,13 @@ function serializePaperForHistory(file, preferredView = 'QP') {
 }
 
 // ─── Question Paper Views Counter Component (Matches Eye + Stacked Count / VIEWS Design) ───
-const PaperViewsCounter = React.memo(({ count, variant = 'table' }) => {
-  if (!count || count <= 0) return null;
+const PaperViewsCounter = React.memo(({ count = 0, variant = 'table' }) => {
+  const safeCount = Number.isFinite(Number(count)) && Number(count) > 0 ? Number(count) : 0;
   return (
     <div
       className={`paper-views-counter ${variant}`}
-      title={`${count.toLocaleString()} question paper views`}
-      aria-label={`${count.toLocaleString()} views`}
+      title={`${safeCount.toLocaleString()} question paper views`}
+      aria-label={`${safeCount.toLocaleString()} views`}
     >
       <svg
         className="paper-views-icon"
@@ -1113,7 +1080,7 @@ const PaperViewsCounter = React.memo(({ count, variant = 'table' }) => {
         <circle cx="12" cy="12" r="3" />
       </svg>
       <div className="paper-views-meta">
-        <span className="paper-views-num">{count.toLocaleString()}</span>
+        <span className="paper-views-num">{safeCount.toLocaleString()}</span>
         <span className="paper-views-label">VIEWS</span>
       </div>
     </div>
@@ -1220,7 +1187,7 @@ function getInitialRecentHistory() {
 }
 
 // ─── In-App Quick PDF Preview Modal (with WebPDF Engine & Refined Split View) ────
-const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, onToggleTheme }) => {
+const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = false, onClose, theme, onToggleTheme }) => {
   const siblings = useMemo(() => ({
     ...(file?.siblings || {}),
     ...(file?.docs || {})
@@ -1365,6 +1332,10 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
 
   const isSplit = activeView === 'split' && canSplit;
 
+  const singleExt = (currentDoc.ext || (currentDoc.path ? currentDoc.path.split('.').pop() : 'pdf') || 'pdf').toLowerCase();
+  const isSinglePdf = singleExt === 'pdf';
+  const isSingleAudio = singleExt === 'mp3' || singleExt === 'wav';
+
   const singleUrl = getHfUrl(currentDoc.path);
   const singleTitle = getDisplayTitle(currentDoc);
 
@@ -1408,7 +1379,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
                 {isSplit && (
                   <span className="modal-header-badge split-indicator">QP + MS</span>
                 )}
-                {viewsCount > 0 && (
+                {showViews && (
                   <PaperViewsCounter count={viewsCount} variant="modal" />
                 )}
                 <button
@@ -1566,23 +1537,14 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
               {/* Question Paper Pane */}
               <div className="modal-split-pane qp-pane">
                 {engineMode === 'custom' ? (
-                  <React.Suspense fallback={
-                    <div className="pdf-scroll-stage" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                      <div className="pdf-loading-card">
-                        <div className="pdf-loading-bar" />
-                        <div className="pdf-loading-title">Loading WebPDF…</div>
-                      </div>
-                    </div>
-                  }>
-                    <PdfViewerPane
-                      url={getHfUrl(siblings.QP.path)}
-                      title={siblings.QP.name || 'Question Paper'}
-                      docType="QP"
-                      isMobile={isMobile}
-                      initialPage={1}
-                      onOpenTab={true}
-                    />
-                  </React.Suspense>
+                  <PdfViewerPane
+                    url={getHfUrl(siblings.QP.path)}
+                    title={siblings.QP.name || 'Question Paper'}
+                    docType="QP"
+                    isMobile={isMobile}
+                    initialPage={1}
+                    onOpenTab={true}
+                  />
                 ) : (
                   <>
                     <div className="modal-split-label qp">
@@ -1633,23 +1595,14 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
               {/* Mark Scheme Pane */}
               <div className="modal-split-pane ms-pane">
                 {engineMode === 'custom' ? (
-                  <React.Suspense fallback={
-                    <div className="pdf-scroll-stage" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                      <div className="pdf-loading-card">
-                        <div className="pdf-loading-bar" />
-                        <div className="pdf-loading-title">Loading WebPDF…</div>
-                      </div>
-                    </div>
-                  }>
-                    <PdfViewerPane
-                      url={getHfUrl(siblings.MS.path)}
-                      title={siblings.MS.name || 'Mark Scheme'}
-                      docType="MS"
-                      isMobile={isMobile}
-                      initialPage={1}
-                      onOpenTab={true}
-                    />
-                  </React.Suspense>
+                  <PdfViewerPane
+                    url={getHfUrl(siblings.MS.path)}
+                    title={siblings.MS.name || 'Mark Scheme'}
+                    docType="MS"
+                    isMobile={isMobile}
+                    initialPage={1}
+                    onOpenTab={true}
+                  />
                 ) : (
                   <>
                     <div className="modal-split-label ms">
@@ -1669,25 +1622,37 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, onClose, theme, 
             </>
           ) : (
             <div className="modal-single-pane">
-              {engineMode === 'custom' ? (
-                <React.Suspense fallback={
-                  <div className="pdf-scroll-stage" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
-                    <div className="pdf-loading-card">
-                      <div className="pdf-loading-bar" />
-                      <div className="pdf-loading-title">Loading WebPDF…</div>
-                    </div>
+              {!isSinglePdf ? (
+                <div className="modal-resource-card">
+                  <div className="modal-resource-box">
+                    <h3>{singleTitle}</h3>
+                    <p>{currentDoc.name || currentDoc.path}</p>
+                    {isSingleAudio && (
+                      <audio controls className="modal-audio-player" src={singleUrl}>
+                        Your browser does not support the audio element.
+                      </audio>
+                    )}
+                    <a
+                      href={singleUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      download
+                      className="modal-download-btn"
+                    >
+                      Download {singleExt.toUpperCase()} Resource ({formatBytes(currentDoc.size)}) ↗
+                    </a>
                   </div>
-                }>
-                  <PdfViewerPane
-                    key={currentDoc.path}
-                    url={singleUrl}
-                    title={singleTitle}
-                    docType={currentDoc.docType || 'DOC'}
-                    isMobile={isMobile}
-                    initialPage={1}
-                    onOpenTab={true}
-                  />
-                </React.Suspense>
+                </div>
+              ) : engineMode === 'custom' ? (
+                <PdfViewerPane
+                  key={currentDoc.path}
+                  url={singleUrl}
+                  title={singleTitle}
+                  docType={currentDoc.docType || 'DOC'}
+                  isMobile={isMobile}
+                  initialPage={1}
+                  onOpenTab={true}
+                />
               ) : (
                 <iframe
                   key={currentDoc.path}
@@ -1732,7 +1697,9 @@ function forcePurgeCacheAndReload() {
 // ─── Institutional Crash / Stale Cache Recovery Screen ───────────
 const CrashRecoveryScreen = ({ errorMsg }) => {
   useEffect(() => {
-    // Automatically self-heal once per session if a returning user hits a stale-cache error
+    // Only auto-purge if it is genuinely a Vite chunk / dynamic import fetch error
+    const isChunkError = /dynamically imported module|Loading chunk|Failed to fetch|preload/i.test(errorMsg || '');
+    if (!isChunkError) return;
     try {
       if (!sessionStorage.getItem('cs_auto_healed')) {
         sessionStorage.setItem('cs_auto_healed', '1');
@@ -1741,7 +1708,7 @@ const CrashRecoveryScreen = ({ errorMsg }) => {
     } catch {
       // Ignore storage access errors
     }
-  }, []);
+  }, [errorMsg]);
 
   return (
     <div style={{
@@ -2172,7 +2139,8 @@ const WelcomePage = ({
               const hasER = Boolean(docs.ER || item.docType === 'ER');
               const canSplit = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
               const primaryMode = hasQP ? 'QP' : (item.lastView || item.docType || 'QP');
-              const views = isQuestionPaperEligibleForViews(item) ? getPaperTotalViews(item, viewsMap) : 0;
+              const eligibleForViews = isQuestionPaperEligibleForViews(item);
+              const views = eligibleForViews ? getPaperTotalViews(item, viewsMap) : 0;
               const qpHref = getOnSitePaperUrl ? getOnSitePaperUrl(item, primaryMode) : '#';
 
               return (
@@ -2198,7 +2166,7 @@ const WelcomePage = ({
                           <span className="history-session-tag">{item.session}</span>
                         )}
                       </div>
-                      {views > 0 && (
+                      {eligibleForViews && (
                         <PaperViewsCounter count={views} variant="card" />
                       )}
                     </div>
@@ -2660,10 +2628,45 @@ function App() {
   const searchInputRef = useRef(null);
   const isPopStateRef = useRef(false);
 
+  // Sync global paper view counts from MongoDB via server-only /api/views endpoint
+  useEffect(() => {
+    let active = true;
+    fetch('/api/views', {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store'
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (!active || !payload || !payload.counts || typeof payload.counts !== 'object') return;
+        setViewsMap((prev) => {
+          const merged = { ...prev };
+          for (const [k, v] of Object.entries(payload.counts)) {
+            const dbVal = Number(v) || 0;
+            const localVal = Number(merged[k]) || 0;
+            merged[k] = Math.max(dbVal, localVal);
+          }
+          try {
+            localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(merged));
+          } catch {
+            // Ignore storage errors
+          }
+          return merged;
+        });
+      })
+      .catch(() => {
+        // Offline or cold start: rely on cached localStorage map
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const recordPaperInteraction = useCallback((fileObj, preferredView = '') => {
     if (!fileObj || fileObj.isPendingSkeleton) return;
     const vKey = getPaperViewKey(fileObj);
     if (vKey && isQuestionPaperEligibleForViews(fileObj)) {
+      // Optimistic 0ms UI increment
       setViewsMap(prev => {
         const next = { ...prev, [vKey]: (Number(prev[vKey]) || 0) + 1 };
         try {
@@ -2673,6 +2676,32 @@ function App() {
         }
         return next;
       });
+
+      // Persist increment to MongoDB Atlas via server-only API route
+      fetch('/api/views', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paperKey: vKey }),
+        keepalive: true
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((payload) => {
+          if (payload && payload.ok && typeof payload.views === 'number') {
+            setViewsMap((prev) => {
+              const reconciled = Math.max(Number(prev[vKey]) || 0, payload.views);
+              const next = { ...prev, [vKey]: reconciled };
+              try {
+                localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(next));
+              } catch {
+                // Ignore storage quota errors
+              }
+              return next;
+            });
+          }
+        })
+        .catch(() => {
+          // Network failure: optimistic local count remains preserved
+        });
     }
 
     const isBook =
@@ -4099,7 +4128,8 @@ function App() {
                         const defaultViewMode = canSplit
                           ? 'split'
                           : (docs.QP ? 'QP' : (activeDoc.docType || 'QP'));
-                        const paperViews = isQuestionPaperEligibleForViews(file)
+                        const eligibleForViews = isQuestionPaperEligibleForViews(file);
+                        const paperViews = eligibleForViews
                           ? getPaperTotalViews(file, viewsMap)
                           : 0;
 
@@ -4137,7 +4167,7 @@ function App() {
                                     ) : null}
                                   </div>
                                 </div>
-                                {paperViews > 0 && (
+                                {eligibleForViews && (
                                   <PaperViewsCounter count={paperViews} variant="table" />
                                 )}
                               </div>
@@ -4400,6 +4430,7 @@ function App() {
           key={previewFile.id || previewFile.path}
           file={previewFile}
           initialView={previewInitialView}
+          showViews={isQuestionPaperEligibleForViews(previewFile)}
           viewsCount={isQuestionPaperEligibleForViews(previewFile) ? getPaperTotalViews(previewFile, viewsMap) : 0}
           onClose={() => {
             setPreviewFile(null);

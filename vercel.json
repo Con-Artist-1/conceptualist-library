@@ -1,8 +1,35 @@
 {
   "rewrites": [
-    { "source": "/((?!assets/|fonts/|pdfjs/|.*\\.(?:css|js|json|svg|png|jpg|ico|xml|txt|mjs|woff|woff2)).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|assets/|fonts/|pdfjs/|.*\\.(?:css|js|json|svg|png|jpg|ico|xml|txt|mjs|woff|woff2)).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/ial/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/igcse/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(ial|igcse|textbooks|about|changelog)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/fonts/(.*)",
       "headers": [

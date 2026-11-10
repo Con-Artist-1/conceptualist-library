@@ -16,7 +16,9 @@ dist-ssr
 # Environment Secrets
 .env
 .env.*
+*.env
 !.env.example
+atlas_cred.env
 
 # Deployment & Temporary Artifacts
 .vercel
