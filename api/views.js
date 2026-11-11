@@ -1,23 +1,88 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { MongoClient } from 'mongodb';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 const DB_NAME_DEFAULT = 'conceptualist_library';
 const COLLECTION_NAME = 'paper_views';
 const PAPER_KEY_MAX_LEN = 220;
 const PAPER_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&]+$/;
 
-// Per-IP sliding window rate limiter to prevent view-count spam or scraping
+// Strict 30-second cooldown before the same user can add another view to the same paper
+const PAPER_VIEW_COOLDOWN_MS = 30 * 1000; // 30 seconds
+
+// Global per-IP burst rate limiter against automated scraping/flooding
 const RATE_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_POSTS_PER_WINDOW = 45;
-const ipRateMap = new Map();
+const ipRateMap = globalThis.__csIpRateMap || (globalThis.__csIpRateMap = new Map());
+
+// Server-side 30-second per-user per-paper cooldown tracker
+const paperCooldownMap = globalThis.__csPaperCooldownMap || (globalThis.__csPaperCooldownMap = new Map());
+
+// Server-side persistent fallback store (used if MongoDB Atlas IP whitelist blocks connection, and synced to MongoDB once reachable)
+const LOCAL_STORE_DIR = path.join(PROJECT_ROOT, '.data');
+const LOCAL_STORE_FILE = path.join(LOCAL_STORE_DIR, 'paper_views.json');
+let memoryViewsStore = globalThis.__csMemoryViewsStore || null;
+let hasSyncedFallbackToMongo = false;
+let lastMongoFailAt = 0;
+let hasLoggedAtlasWarning = false;
+const MONGO_RETRY_BACKOFF_MS = 15 * 1000;
+
+function loadLocalServerStore() {
+  if (memoryViewsStore) return memoryViewsStore;
+  try {
+    if (fs.existsSync(LOCAL_STORE_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(LOCAL_STORE_FILE, 'utf-8'));
+      if (parsed && typeof parsed.counts === 'object') {
+        memoryViewsStore = {
+          counts: { ...parsed.counts },
+          dirtyKeys: new Set(Array.isArray(parsed.dirtyKeys) ? parsed.dirtyKeys : Object.keys(parsed.counts))
+        };
+        globalThis.__csMemoryViewsStore = memoryViewsStore;
+        return memoryViewsStore;
+      }
+    }
+  } catch {
+    // Ignore local filesystem read errors (e.g. read-only serverless container)
+  }
+  memoryViewsStore = { counts: Object.create(null), dirtyKeys: new Set() };
+  globalThis.__csMemoryViewsStore = memoryViewsStore;
+  return memoryViewsStore;
+}
+
+function saveLocalServerStore(store) {
+  try {
+    if (!fs.existsSync(LOCAL_STORE_DIR)) {
+      fs.mkdirSync(LOCAL_STORE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(
+      LOCAL_STORE_FILE,
+      JSON.stringify(
+        {
+          counts: store.counts,
+          dirtyKeys: Array.from(store.dirtyKeys),
+          updatedAt: new Date().toISOString()
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
+  } catch {
+    // Ignore read-only filesystem errors on serverless platforms
+  }
+}
 
 function checkRateLimit(ip) {
   const now = Date.now();
   const entry = ipRateMap.get(ip);
   if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
     ipRateMap.set(ip, { windowStart: now, count: 1 });
-    // Prune stale entries occasionally so memory stays bounded
     if (ipRateMap.size > 2000) {
       for (const [k, v] of ipRateMap.entries()) {
         if (now - v.windowStart > RATE_WINDOW_MS) ipRateMap.delete(k);
@@ -30,6 +95,39 @@ function checkRateLimit(ip) {
   }
   entry.count += 1;
   return true;
+}
+
+function hashIdentifier(raw) {
+  return crypto.createHash('sha256').update(String(raw || 'anon')).digest('hex').slice(0, 20);
+}
+
+function getCooldownRemainingMs(ipHash, vidHash, paperKey, now = Date.now()) {
+  // Prune expired entries occasionally
+  if (paperCooldownMap.size > 5000) {
+    for (const [k, ts] of paperCooldownMap.entries()) {
+      if (now - ts >= PAPER_VIEW_COOLDOWN_MS) paperCooldownMap.delete(k);
+    }
+  }
+  const ipKey = `ip:${ipHash}|${paperKey}`;
+  const lastIpTs = paperCooldownMap.get(ipKey) || 0;
+  if (now - lastIpTs < PAPER_VIEW_COOLDOWN_MS) {
+    return PAPER_VIEW_COOLDOWN_MS - (now - lastIpTs);
+  }
+  if (vidHash) {
+    const vidKey = `vid:${vidHash}|${paperKey}`;
+    const lastVidTs = paperCooldownMap.get(vidKey) || 0;
+    if (now - lastVidTs < PAPER_VIEW_COOLDOWN_MS) {
+      return PAPER_VIEW_COOLDOWN_MS - (now - lastVidTs);
+    }
+  }
+  return 0;
+}
+
+function recordCooldownTimestamp(ipHash, vidHash, paperKey, now = Date.now()) {
+  paperCooldownMap.set(`ip:${ipHash}|${paperKey}`, now);
+  if (vidHash) {
+    paperCooldownMap.set(`vid:${vidHash}|${paperKey}`, now);
+  }
 }
 
 function parseEnvFile(filePath) {
@@ -59,8 +157,11 @@ function resolveMongoConfig() {
 
   if (!uri || !uri.includes('.mongodb.net')) {
     const envCandidates = [
+      path.join(PROJECT_ROOT, 'atlas_cred.env'),
       path.resolve(process.cwd(), 'atlas_cred.env'),
+      path.join(PROJECT_ROOT, '.env.local'),
       path.resolve(process.cwd(), '.env.local'),
+      path.join(PROJECT_ROOT, '.env'),
       path.resolve(process.cwd(), '.env')
     ];
     for (const candidate of envCandidates) {
@@ -94,30 +195,81 @@ async function getViewsCollection() {
     throw new Error('MongoDB connection credentials are not configured on the server.');
   }
 
+  const now = Date.now();
+  if (!cachedClientPromise && now - lastMongoFailAt < MONGO_RETRY_BACKOFF_MS) {
+    throw new Error('MongoDB connection in retry backoff window.');
+  }
+
   if (!cachedClientPromise) {
     const client = new MongoClient(uri, {
       maxPoolSize: 10,
       minPoolSize: 0,
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000
+      serverSelectionTimeoutMS: 6000,
+      connectTimeoutMS: 6000
     });
     cachedClientPromise = client.connect().catch((err) => {
       cachedClientPromise = null;
       globalThis.__csMongoClientPromise = null;
+      lastMongoFailAt = Date.now();
+      if (!hasLoggedAtlasWarning) {
+        hasLoggedAtlasWarning = true;
+        console.warn(
+          '[api/views] MongoDB Atlas connection failed:',
+          err?.message || err,
+          '\n-> Ensure your current IP / 0.0.0.0/0 is whitelisted in MongoDB Atlas (Security -> Network Access). Using persistent server store until Atlas is reachable.'
+        );
+      }
       throw err;
     });
     globalThis.__csMongoClientPromise = cachedClientPromise;
   }
 
   const client = await cachedClientPromise;
-  return client.db(dbName).collection(COLLECTION_NAME);
+  const col = client.db(dbName).collection(COLLECTION_NAME);
+
+  // Sync any locally buffered server views into MongoDB Atlas once connected
+  if (!hasSyncedFallbackToMongo) {
+    hasSyncedFallbackToMongo = true;
+    const store = loadLocalServerStore();
+    if (store.dirtyKeys.size > 0) {
+      const nowIso = new Date().toISOString();
+      const ops = [];
+      for (const k of store.dirtyKeys) {
+        const count = Number(store.counts[k]) || 0;
+        if (count > 0 && isValidPaperKey(k)) {
+          ops.push({
+            updateOne: {
+              filter: { _id: k },
+              update: {
+                $max: { views: count },
+                $set: { updatedAt: nowIso },
+                $setOnInsert: { createdAt: nowIso }
+              },
+              upsert: true
+            }
+          });
+        }
+      }
+      if (ops.length > 0) {
+        col.bulkWrite(ops, { ordered: false })
+          .then(() => {
+            store.dirtyKeys.clear();
+            saveLocalServerStore(store);
+          })
+          .catch(() => {
+            hasSyncedFallbackToMongo = false;
+          });
+      }
+    }
+  }
+
+  return col;
 }
 
 function isValidPaperKey(key) {
   if (typeof key !== 'string') return false;
   const trimmed = key.trim();
   if (trimmed.length < 3 || trimmed.length > PAPER_KEY_MAX_LEN) return false;
-  // Block any NoSQL operator characters ($ or { or })
   if (trimmed.includes('$') || trimmed.includes('{') || trimmed.includes('}')) return false;
   return PAPER_KEY_REGEX.test(trimmed);
 }
@@ -125,7 +277,7 @@ function isValidPaperKey(key) {
 function isAllowedOrigin(req) {
   const origin = req.headers['origin'] || '';
   const referer = req.headers['referer'] || '';
-  if (!origin && !referer) return true; // Same-origin GET or server-side fetch
+  if (!origin && !referer) return true;
   const allowedHosts = [
     'localhost',
     '127.0.0.1',
@@ -145,7 +297,6 @@ function isAllowedOrigin(req) {
 }
 
 export default async function handler(req, res) {
-  // Strict security headers on API responses
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -157,6 +308,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    const store = loadLocalServerStore();
     try {
       const col = await getViewsCollection();
       const cursor = col.find(
@@ -168,19 +320,22 @@ export default async function handler(req, res) {
       );
       const docs = await cursor.toArray();
       const counts = Object.create(null);
+      for (const [k, v] of Object.entries(store.counts)) {
+        if (typeof v === 'number' && v > 0) counts[k] = v;
+      }
       for (const doc of docs) {
         if (typeof doc._id === 'string' && typeof doc.views === 'number') {
-          counts[doc._id] = doc.views;
+          counts[doc._id] = Math.max(doc.views, counts[doc._id] || 0);
+          store.counts[doc._id] = counts[doc._id];
         }
       }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ ok: true, counts }));
+      return res.end(JSON.stringify({ ok: true, source: 'mongodb', counts }));
     } catch {
-      // Never leak internal database details or credentials in error responses
-      res.statusCode = 503;
+      res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ ok: false, counts: {} }));
+      return res.end(JSON.stringify({ ok: true, source: 'server-store', counts: store.counts }));
     }
   }
 
@@ -196,6 +351,8 @@ export default async function handler(req, res) {
       return res.end(JSON.stringify({ ok: false, error: 'Too many requests' }));
     }
 
+    let paperKey = '';
+    let viewerId = '';
     try {
       let body = req.body;
       if (!body || typeof body === 'string') {
@@ -213,20 +370,103 @@ export default async function handler(req, res) {
         body = raw ? JSON.parse(raw) : {};
       }
 
-      const paperKey = typeof body?.paperKey === 'string' ? body.paperKey.trim() : '';
-      if (!isValidPaperKey(paperKey)) {
-        res.statusCode = 400;
+      paperKey = typeof body?.paperKey === 'string' ? body.paperKey.trim() : '';
+      viewerId = typeof body?.viewerId === 'string' ? body.viewerId.trim().slice(0, 64) : '';
+    } catch {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify({ ok: false, error: 'Malformed JSON body' }));
+    }
+
+    if (!isValidPaperKey(paperKey)) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify({ ok: false, error: 'Invalid paperKey' }));
+    }
+
+    const now = Date.now();
+    const ipHash = hashIdentifier(clientIp);
+    const vidHash = viewerId ? hashIdentifier(viewerId) : '';
+    const store = loadLocalServerStore();
+
+    // 1. Check in-memory 30-second cooldown for this user + paper
+    const memRemainingMs = getCooldownRemainingMs(ipHash, vidHash, paperKey, now);
+    if (memRemainingMs > 0) {
+      let currentViews = Number(store.counts[paperKey]) || 0;
+      try {
+        const col = await getViewsCollection();
+        const existing = await col.findOne({ _id: paperKey }, { projection: { _id: 1, views: 1 } });
+        if (typeof existing?.views === 'number') {
+          currentViews = Math.max(currentViews, existing.views);
+          store.counts[paperKey] = currentViews;
+        }
+      } catch {
+        // Fallback to server store count
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          paperKey,
+          views: currentViews,
+          incremented: false,
+          cooldownRemainingMs: memRemainingMs
+        })
+      );
+    }
+
+    // 2. Check MongoDB (including distributed 30s cooldown across serverless instances) and atomically increment
+    try {
+      const col = await getViewsCollection();
+      const existing = await col.findOne(
+        { _id: paperKey },
+        { projection: { _id: 1, views: 1, cooldowns: 1 } }
+      );
+
+      const dbCooldowns = existing?.cooldowns && typeof existing.cooldowns === 'object' ? existing.cooldowns : {};
+      const lastDbIpTs = Number(dbCooldowns[ipHash]) || 0;
+      const lastDbVidTs = vidHash ? Number(dbCooldowns[vidHash]) || 0 : 0;
+      const lastDbTs = Math.max(lastDbIpTs, lastDbVidTs);
+
+      if (lastDbTs > 0 && now - lastDbTs < PAPER_VIEW_COOLDOWN_MS) {
+        recordCooldownTimestamp(ipHash, vidHash, paperKey, lastDbTs);
+        const currentViews = typeof existing?.views === 'number' ? existing.views : (Number(store.counts[paperKey]) || 0);
+        store.counts[paperKey] = currentViews;
+        res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
-        return res.end(JSON.stringify({ ok: false, error: 'Invalid paperKey' }));
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            paperKey,
+            views: currentViews,
+            incremented: false,
+            cooldownRemainingMs: PAPER_VIEW_COOLDOWN_MS - (now - lastDbTs)
+          })
+        );
       }
 
-      const col = await getViewsCollection();
-      const nowIso = new Date().toISOString();
+      // Prune expired cooldown entries (>30s old) so the document stays compact
+      const activeCooldowns = {};
+      for (const [k, ts] of Object.entries(dbCooldowns)) {
+        if (typeof ts === 'number' && now - ts < PAPER_VIEW_COOLDOWN_MS) {
+          activeCooldowns[k] = ts;
+        }
+      }
+      activeCooldowns[ipHash] = now;
+      if (vidHash) activeCooldowns[vidHash] = now;
+
+      recordCooldownTimestamp(ipHash, vidHash, paperKey, now);
+
+      const nowIso = new Date(now).toISOString();
       const updateResult = await col.findOneAndUpdate(
         { _id: paperKey },
         {
           $inc: { views: 1 },
-          $set: { updatedAt: nowIso },
+          $set: {
+            updatedAt: nowIso,
+            cooldowns: activeCooldowns
+          },
           $setOnInsert: { createdAt: nowIso }
         },
         {
@@ -238,14 +478,41 @@ export default async function handler(req, res) {
 
       const updatedDoc = updateResult?.value !== undefined ? updateResult.value : updateResult;
       const newViews = typeof updatedDoc?.views === 'number' ? updatedDoc.views : 1;
+      store.counts[paperKey] = newViews;
+      saveLocalServerStore(store);
 
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ ok: true, paperKey, views: newViews }));
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          source: 'mongodb',
+          paperKey,
+          views: newViews,
+          incremented: true,
+          cooldownRemainingMs: PAPER_VIEW_COOLDOWN_MS
+        })
+      );
     } catch {
-      res.statusCode = 503;
+      // MongoDB temporarily unreachable (e.g. IP not yet whitelisted in Atlas): record in server store and queue for sync
+      recordCooldownTimestamp(ipHash, vidHash, paperKey, now);
+      const nextViews = (Number(store.counts[paperKey]) || 0) + 1;
+      store.counts[paperKey] = nextViews;
+      store.dirtyKeys.add(paperKey);
+      saveLocalServerStore(store);
+
+      res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ ok: false }));
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          source: 'server-store',
+          paperKey,
+          views: nextViews,
+          incremented: true,
+          cooldownRemainingMs: PAPER_VIEW_COOLDOWN_MS
+        })
+      );
     }
   }
 
@@ -254,4 +521,3 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   return res.end(JSON.stringify({ error: 'Method Not Allowed' }));
 }
-

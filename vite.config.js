@@ -34,6 +34,11 @@ const serveLibraryFiles = () => {
           next();
         }
       })
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use('/api/views', (req, res) => {
+        viewsApiHandler(req, res)
+      })
     }
   }
 }

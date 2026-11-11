@@ -913,9 +913,85 @@ const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggl
   );
 });
 
-const VIEWS_STORAGE_KEY = 'cs_paper_views_db_v2';
 const HISTORY_STORAGE_KEY = 'cs_recent_papers_v1';
+const VIEW_COOLDOWN_STORAGE_KEY = 'cs_paper_view_cooldown_v1';
+const VIEWER_ID_STORAGE_KEY = 'cs_viewer_id_v1';
+const ACTIVE_MODAL_PAPER_SESSION_KEY = 'cs_active_modal_paper_v1';
+const PAPER_VIEW_COOLDOWN_MS = 30 * 1000; // Strict 30-second cooldown per paper per user
 const MAX_HISTORY_ITEMS = 8;
+const inMemoryCooldownMap = new Map();
+
+function getOrCreateViewerId() {
+  try {
+    let vid = localStorage.getItem(VIEWER_ID_STORAGE_KEY);
+    if (!vid || typeof vid !== 'string' || vid.length < 8) {
+      vid =
+        (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
+      localStorage.setItem(VIEWER_ID_STORAGE_KEY, vid);
+    }
+    return vid;
+  } catch {
+    return 'anon-session';
+  }
+}
+
+function isBrowserReloadNavigation() {
+  try {
+    if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
+      const navEntries = performance.getEntriesByType('navigation');
+      if (Array.isArray(navEntries) && navEntries.length > 0 && navEntries[0].type === 'reload') {
+        return true;
+      }
+    }
+    if (typeof performance !== 'undefined' && performance.navigation && performance.navigation.type === 1) {
+      return true;
+    }
+  } catch {
+    // Ignore performance API errors
+  }
+  return false;
+}
+
+function canCountPaperViewNow(paperKey, { isPageReload = false } = {}) {
+  if (!paperKey || isPageReload) return false;
+  const now = Date.now();
+  const memLast = inMemoryCooldownMap.get(paperKey) || 0;
+  if (now - memLast < PAPER_VIEW_COOLDOWN_MS) {
+    return false;
+  }
+
+  let stored = {};
+  try {
+    const raw = localStorage.getItem(VIEW_COOLDOWN_STORAGE_KEY);
+    stored = raw ? JSON.parse(raw) : {};
+    if (!stored || typeof stored !== 'object') stored = {};
+  } catch {
+    stored = {};
+  }
+
+  const storageLast = Number(stored[paperKey]) || 0;
+  if (now - storageLast < PAPER_VIEW_COOLDOWN_MS) {
+    inMemoryCooldownMap.set(paperKey, storageLast);
+    return false;
+  }
+
+  // Record timestamp and prune expired entries
+  inMemoryCooldownMap.set(paperKey, now);
+  const nextStored = { [paperKey]: now };
+  for (const [k, ts] of Object.entries(stored)) {
+    if (k !== paperKey && now - Number(ts) < PAPER_VIEW_COOLDOWN_MS) {
+      nextStored[k] = Number(ts);
+    }
+  }
+  try {
+    localStorage.setItem(VIEW_COOLDOWN_STORAGE_KEY, JSON.stringify(nextStored));
+  } catch {
+    // Ignore storage quota errors
+  }
+  return true;
+}
 
 // Canonical key so Unified Sitting, Individual QP, Modal, and History Card share the exact same view counter
 function getPaperViewKey(file) {
@@ -1166,15 +1242,6 @@ const TableSkeletonLoader = ({ rows = 8, viewMode = 'unified' }) => (
     </table>
   </div>
 );
-
-function getInitialViewsMap() {
-  try {
-    const raw = localStorage.getItem(VIEWS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
 
 function getInitialRecentHistory() {
   try {
@@ -2552,7 +2619,7 @@ function App() {
       : {}
   ), [initialCache]);
 
-  const [viewsMap, setViewsMap] = useState(() => getInitialViewsMap());
+  const [viewsMap, setViewsMap] = useState({});
   const [recentHistory, setRecentHistory] = useState(() => getInitialRecentHistory());
 
   const [data, setData] = useState(() => ({
@@ -2628,8 +2695,15 @@ function App() {
   const searchInputRef = useRef(null);
   const isPopStateRef = useRef(false);
 
-  // Sync global paper view counts from MongoDB via server-only /api/views endpoint
+  // Sync global paper view counts strictly from server database via /api/views
   useEffect(() => {
+    try {
+      localStorage.removeItem('cs_paper_views_v1');
+      localStorage.removeItem('cs_paper_views_db_v2');
+    } catch {
+      // Ignore storage errors
+    }
+
     let active = true;
     fetch('/api/views', {
       method: 'GET',
@@ -2639,69 +2713,55 @@ function App() {
       .then((res) => (res.ok ? res.json() : null))
       .then((payload) => {
         if (!active || !payload || !payload.counts || typeof payload.counts !== 'object') return;
-        setViewsMap((prev) => {
-          const merged = { ...prev };
-          for (const [k, v] of Object.entries(payload.counts)) {
-            const dbVal = Number(v) || 0;
-            const localVal = Number(merged[k]) || 0;
-            merged[k] = Math.max(dbVal, localVal);
-          }
-          try {
-            localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(merged));
-          } catch {
-            // Ignore storage errors
-          }
-          return merged;
-        });
+        const nextCounts = {};
+        for (const [k, v] of Object.entries(payload.counts)) {
+          const dbVal = Number(v) || 0;
+          if (dbVal > 0) nextCounts[k] = dbVal;
+        }
+        setViewsMap(nextCounts);
       })
       .catch(() => {
-        // Offline or cold start: rely on cached localStorage map
+        // Server unreachable
       });
     return () => {
       active = false;
     };
   }, []);
 
-  const recordPaperInteraction = useCallback((fileObj, preferredView = '') => {
+  const recordPaperInteraction = useCallback((fileObj, preferredView = '', options = {}) => {
     if (!fileObj || fileObj.isPendingSkeleton) return;
     const vKey = getPaperViewKey(fileObj);
-    if (vKey && isQuestionPaperEligibleForViews(fileObj)) {
-      // Optimistic 0ms UI increment
-      setViewsMap(prev => {
-        const next = { ...prev, [vKey]: (Number(prev[vKey]) || 0) + 1 };
-        try {
-          localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // Ignore storage quota errors
-        }
-        return next;
-      });
+    if (vKey) {
+      try {
+        sessionStorage.setItem(ACTIVE_MODAL_PAPER_SESSION_KEY, vKey);
+      } catch {
+        // Ignore sessionStorage errors
+      }
+    }
 
-      // Persist increment to MongoDB Atlas via server-only API route
-      fetch('/api/views', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paperKey: vKey }),
-        keepalive: true
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((payload) => {
-          if (payload && payload.ok && typeof payload.views === 'number') {
-            setViewsMap((prev) => {
-              const reconciled = Math.max(Number(prev[vKey]) || 0, payload.views);
-              const next = { ...prev, [vKey]: reconciled };
-              try {
-                localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(next));
-              } catch {
-                // Ignore storage quota errors
-              }
-              return next;
-            });
-          }
+    if (vKey && isQuestionPaperEligibleForViews(fileObj)) {
+      const allowedToCount = canCountPaperViewNow(vKey, options);
+      if (allowedToCount) {
+        const viewerId = getOrCreateViewerId();
+        fetch('/api/views', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paperKey: vKey, viewerId }),
+          keepalive: true
         })
-        .catch(() => {
-          // Network failure: optimistic local count remains preserved
-        });
+          .then((res) => (res.ok ? res.json() : null))
+          .then((payload) => {
+            if (payload && payload.ok && typeof payload.views === 'number') {
+              setViewsMap((prev) => ({
+                ...prev,
+                [vKey]: Math.max(Number(prev[vKey]) || 0, payload.views)
+              }));
+            }
+          })
+          .catch(() => {
+            // Do not fake increment if database request fails
+          });
+      }
     }
 
     const isBook =
@@ -2795,7 +2855,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.meta]);
 
-  // Resolve ?paper= deep link once catalog finishes loading
+  // Resolve ?paper= deep link once catalog finishes loading (skip view increment on browser refresh)
   useEffect(() => {
     if (!pendingPaperParam) return;
     if (data.unifiedFiles.length === 0 && data.flatFiles.length === 0) return;
@@ -2804,7 +2864,15 @@ function App() {
       data.flatFiles.find(f => f.path === pendingPaperParam);
     if (found) {
       setPreviewFile(found);
-      recordPaperInteraction(found, previewInitialView || 'QP');
+      const resolvedKey = getPaperViewKey(found);
+      let alreadyOpenInSession = false;
+      try {
+        alreadyOpenInSession = sessionStorage.getItem(ACTIVE_MODAL_PAPER_SESSION_KEY) === resolvedKey;
+      } catch {
+        alreadyOpenInSession = false;
+      }
+      const isPageReload = isBrowserReloadNavigation() || alreadyOpenInSession;
+      recordPaperInteraction(found, previewInitialView || 'QP', { isPageReload });
     }
     setPendingPaperParam('');
   }, [pendingPaperParam, data.unifiedFiles, data.flatFiles, previewInitialView, recordPaperInteraction]);
@@ -3347,6 +3415,11 @@ function App() {
     setCurrentTab('library');
     setPreviewFile(null);
     setPendingPaperParam('');
+    try {
+      sessionStorage.removeItem(ACTIVE_MODAL_PAPER_SESSION_KEY);
+    } catch {
+      // Ignore sessionStorage errors
+    }
     setFilterCurriculum('');
     setFilterDocType(null);
     setFilterSubject('');
@@ -4435,6 +4508,11 @@ function App() {
           onClose={() => {
             setPreviewFile(null);
             setPendingPaperParam('');
+            try {
+              sessionStorage.removeItem(ACTIVE_MODAL_PAPER_SESSION_KEY);
+            } catch {
+              // Ignore sessionStorage errors
+            }
           }}
           theme={theme}
           onToggleTheme={toggleTheme}

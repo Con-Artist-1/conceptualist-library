@@ -22,6 +22,7 @@ atlas_cred.env
 
 # Deployment & Temporary Artifacts
 .vercel
+.data
 pi-deploy
 pi-deploy.zip
 
