@@ -31,15 +31,32 @@ if (!TOKEN) {
 const PROJECT_ID = 'prj_aoqCf7hkChGqzoRb3WGb9cf2KAgp';
 const TEAM_ID = 'team_34CBzFBsKwAwot7TK9eTAPj8';
 
-const EXCLUDE = new Set(['node_modules', 'dist', '.vercel', '.git', '.env', '.env.local', 'pi-deploy', 'pi-deploy.zip']);
+const EXCLUDE = new Set([
+  'node_modules',
+  'dist',
+  '.vercel',
+  '.git',
+  '.data',
+  'logs',
+  'pi-deploy',
+  'pi-deploy.zip',
+  '.DS_Store',
+  'Thumbs.db'
+]);
+
+function isExcludedName(name) {
+  if (EXCLUDE.has(name)) return true;
+  if (name === '.env' || name.startsWith('.env.') || name.endsWith('.env')) return true;
+  return false;
+}
 
 function collectAppFiles(dir, baseDir = APP_DIR) {
   let list = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (dir === baseDir && EXCLUDE.has(entry.name) && entry.name !== 'scripts') continue;
+    if (isExcludedName(entry.name) && !(dir === baseDir && entry.name === 'scripts')) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'scripts') {
+      if (dir === baseDir && entry.name === 'scripts') {
         const prerender = path.join(full, 'prerender-seo.js');
         if (fs.existsSync(prerender)) {
           const rel = 'scripts/prerender-seo.js';

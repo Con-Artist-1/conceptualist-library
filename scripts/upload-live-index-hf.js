@@ -24,6 +24,10 @@ function loadEnv() {
 loadEnv();
 
 const TOKEN = process.argv[2] || process.env.HF_TOKEN;
+if (!TOKEN) {
+  console.error('Missing HF_TOKEN. Set it in search-app/.env or pass as CLI arg.');
+  process.exit(1);
+}
 const REPO_ID = 'Diavlon/mcmaster-docs-library';
 const INDEX_FILE = path.join(APP_DIR, 'public', 'index.json');
 
@@ -80,7 +84,7 @@ async function main() {
     JSON.stringify({
       key: 'header',
       value: {
-        summary: 'Update live_index.json with complete subject tree and resilient edge caching (v3.1)'
+        summary: 'Update live_index.json with deduplicated library index and compact tree'
       }
     }),
     JSON.stringify({

@@ -32,6 +32,13 @@ let hasSyncedFallbackToMongo = false;
 let lastMongoFailAt = 0;
 let hasLoggedAtlasWarning = false;
 const MONGO_RETRY_BACKOFF_MS = 15 * 1000;
+const GET_CACHE_TTL_MS = 15 * 1000;
+let cachedGetResult = globalThis.__csViewsGetCache || null;
+
+function invalidateGetCache() {
+  cachedGetResult = null;
+  globalThis.__csViewsGetCache = null;
+}
 
 function loadLocalServerStore() {
   if (memoryViewsStore) return memoryViewsStore;
@@ -274,10 +281,10 @@ function isValidPaperKey(key) {
   return PAPER_KEY_REGEX.test(trimmed);
 }
 
-function isAllowedOrigin(req) {
+function isAllowedOrigin(req, requireHeader = false) {
   const origin = req.headers['origin'] || '';
   const referer = req.headers['referer'] || '';
-  if (!origin && !referer) return true;
+  if (!origin && !referer) return !requireHeader;
   const allowedHosts = [
     'localhost',
     '127.0.0.1',
@@ -299,15 +306,25 @@ function isAllowedOrigin(req) {
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
 
-  if (!isAllowedOrigin(req)) {
+  const isPost = req.method === 'POST';
+  const requirePostOrigin = isPost && Boolean(process.env.VERCEL);
+  if (!isAllowedOrigin(req, requirePostOrigin)) {
     res.statusCode = 403;
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify({ error: 'Forbidden origin' }));
   }
 
   if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=15, stale-while-revalidate=30');
+    const now = Date.now();
+    if (cachedGetResult && cachedGetResult.expiresAt > now) {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(cachedGetResult.json);
+    }
+
     const store = loadLocalServerStore();
     try {
       const col = await getViewsCollection();
@@ -329,15 +346,20 @@ export default async function handler(req, res) {
           store.counts[doc._id] = counts[doc._id];
         }
       }
+      const json = JSON.stringify({ ok: true, source: 'mongodb', counts });
+      cachedGetResult = { expiresAt: now + GET_CACHE_TTL_MS, json };
+      globalThis.__csViewsGetCache = cachedGetResult;
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ ok: true, source: 'mongodb', counts }));
+      return res.end(json);
     } catch {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify({ ok: true, source: 'server-store', counts: store.counts }));
     }
   }
+
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
 
   if (req.method === 'POST') {
     const clientIp =
@@ -446,35 +468,104 @@ export default async function handler(req, res) {
         );
       }
 
-      // Prune expired cooldown entries (>30s old) so the document stays compact
-      const activeCooldowns = {};
+      const cutoff = now - PAPER_VIEW_COOLDOWN_MS;
+      const setPayload = {
+        updatedAt: new Date(now).toISOString(),
+        [`cooldowns.${ipHash}`]: now
+      };
+      if (vidHash) setPayload[`cooldowns.${vidHash}`] = now;
+
+      // Selectively unset expired cooldown keys without clobbering concurrent active users
+      const unsetPayload = {};
       for (const [k, ts] of Object.entries(dbCooldowns)) {
-        if (typeof ts === 'number' && now - ts < PAPER_VIEW_COOLDOWN_MS) {
-          activeCooldowns[k] = ts;
+        if (k !== ipHash && k !== vidHash && (typeof ts !== 'number' || now - ts >= PAPER_VIEW_COOLDOWN_MS)) {
+          unsetPayload[`cooldowns.${k}`] = '';
         }
       }
-      activeCooldowns[ipHash] = now;
-      if (vidHash) activeCooldowns[vidHash] = now;
+
+      const updateOps = {
+        $inc: { views: 1 },
+        $set: setPayload,
+        $setOnInsert: { createdAt: setPayload.updatedAt }
+      };
+      if (Object.keys(unsetPayload).length > 0) {
+        updateOps.$unset = unsetPayload;
+      }
+
+      let updateResult = null;
+      if (existing) {
+        const atomicAndGuards = [
+          {
+            $or: [
+              { [`cooldowns.${ipHash}`]: { $exists: false } },
+              { [`cooldowns.${ipHash}`]: { $lt: cutoff } }
+            ]
+          }
+        ];
+        if (vidHash) {
+          atomicAndGuards.push({
+            $or: [
+              { [`cooldowns.${vidHash}`]: { $exists: false } },
+              { [`cooldowns.${vidHash}`]: { $lt: cutoff } }
+            ]
+          });
+        }
+        updateResult = await col.findOneAndUpdate(
+          { _id: paperKey, $and: atomicAndGuards },
+          updateOps,
+          { upsert: false, returnDocument: 'after', projection: { _id: 1, views: 1 } }
+        );
+        const matched = updateResult?.value !== undefined ? updateResult.value : updateResult;
+        if (!matched) {
+          // Concurrent request won the cooldown race cleanly
+          recordCooldownTimestamp(ipHash, vidHash, paperKey, now);
+          const fresh = await col.findOne({ _id: paperKey }, { projection: { _id: 1, views: 1 } });
+          const views = typeof fresh?.views === 'number' ? fresh.views : (Number(existing.views) || 1);
+          store.counts[paperKey] = views;
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(
+            JSON.stringify({
+              ok: true,
+              paperKey,
+              views,
+              incremented: false,
+              cooldownRemainingMs: PAPER_VIEW_COOLDOWN_MS
+            })
+          );
+        }
+      } else {
+        try {
+          updateResult = await col.findOneAndUpdate(
+            { _id: paperKey },
+            updateOps,
+            { upsert: true, returnDocument: 'after', projection: { _id: 1, views: 1 } }
+          );
+        } catch (err) {
+          // Handle simultaneous first-time upsert race safely
+          if (err?.code === 11000) {
+            recordCooldownTimestamp(ipHash, vidHash, paperKey, now);
+            const fresh = await col.findOne({ _id: paperKey }, { projection: { _id: 1, views: 1 } });
+            const views = typeof fresh?.views === 'number' ? fresh.views : 1;
+            store.counts[paperKey] = views;
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(
+              JSON.stringify({
+                ok: true,
+                paperKey,
+                views,
+                incremented: false,
+                cooldownRemainingMs: PAPER_VIEW_COOLDOWN_MS
+              })
+            );
+          }
+          throw err;
+        }
+      }
 
       recordCooldownTimestamp(ipHash, vidHash, paperKey, now);
-
-      const nowIso = new Date(now).toISOString();
-      const updateResult = await col.findOneAndUpdate(
-        { _id: paperKey },
-        {
-          $inc: { views: 1 },
-          $set: {
-            updatedAt: nowIso,
-            cooldowns: activeCooldowns
-          },
-          $setOnInsert: { createdAt: nowIso }
-        },
-        {
-          upsert: true,
-          returnDocument: 'after',
-          projection: { _id: 1, views: 1 }
-        }
-      );
+      invalidateGetCache();
 
       const updatedDoc = updateResult?.value !== undefined ? updateResult.value : updateResult;
       const newViews = typeof updatedDoc?.views === 'number' ? updatedDoc.views : 1;
@@ -496,6 +587,7 @@ export default async function handler(req, res) {
     } catch {
       // MongoDB temporarily unreachable (e.g. IP not yet whitelisted in Atlas): record in server store and queue for sync
       recordCooldownTimestamp(ipHash, vidHash, paperKey, now);
+      invalidateGetCache();
       const nextViews = (Number(store.counts[paperKey]) || 0) + 1;
       store.counts[paperKey] = nextViews;
       store.dirtyKeys.add(paperKey);

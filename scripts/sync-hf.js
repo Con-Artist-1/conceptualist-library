@@ -253,7 +253,7 @@ async function main() {
   }
 
   if (missingOrChanged.length === 0) {
-    console.log('\nAll 13,309 files are already 100% in sync on Hugging Face!');
+    console.log(`\nAll ${localFiles.length.toLocaleString()} files are already 100% in sync on Hugging Face!`);
     return;
   }
 

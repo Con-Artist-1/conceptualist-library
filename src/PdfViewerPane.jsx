@@ -2,11 +2,14 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 
 // Shared singleton promise to lazy-load PDF.js only when the viewer is first opened
 let pdfjsPromise = null;
-const dynamicImportModule = new Function('url', 'return import(url)');
+const mountedPaneIds = new Set();
+let activePaneId = null;
+let nextPaneSeq = 1;
+
 function loadPdfJs() {
   if (!pdfjsPromise) {
     const base = typeof window !== 'undefined' ? window.location.origin : '';
-    pdfjsPromise = dynamicImportModule(`${base}/pdfjs/pdf.min.mjs`)
+    pdfjsPromise = import(/* @vite-ignore */ `${base}/pdfjs/pdf.min.mjs`)
       .then((mod) => {
         // Point worker to absolute URL on the current host
         mod.GlobalWorkerOptions.workerSrc = `${base}/pdfjs/pdf.worker.min.mjs`;
@@ -20,30 +23,33 @@ function loadPdfJs() {
   return pdfjsPromise;
 }
 
+function computePageTargetWidth(containerWidth, scale, isMobile) {
+  const safeWidth = Math.max(containerWidth - (isMobile ? 12 : 28), 220);
+  if (scale === 'fit-width') return safeWidth;
+  if (scale === 'fit-page') return Math.min(safeWidth, 640);
+  if (typeof scale === 'number') return Math.max(safeWidth * scale, 220);
+  return safeWidth;
+}
+
 // Single Page Canvas Renderer Component with IntersectionObserver virtualization
-const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isVisible, isNear, isMobile, onPageRendered }) => {
+const VirtualPdfPage = React.memo(({
+  pdfDoc,
+  pageNum,
+  scale,
+  containerWidth,
+  isVisible,
+  isNear,
+  isMobile,
+  defaultAspectRatio,
+  onPageRendered
+}) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
-  const [aspectRatio, setAspectRatio] = useState(1.414); // Standard A4 ratio initial estimate
+  const [aspectRatio, setAspectRatio] = useState(null);
   const [rendered, setRendered] = useState(false);
 
   const shouldMountCanvas = isVisible || isNear;
-
-  // Pre-fetch viewport dimensions to lock aspect ratio early (prevent layout jumps)
-  useEffect(() => {
-    let active = true;
-    if (!pdfDoc) return;
-    pdfDoc.getPage(pageNum).then((page) => {
-      if (!active) return;
-      const vp = page.getViewport({ scale: 1 });
-      if (vp && vp.width > 0) {
-        setAspectRatio(vp.height / vp.width);
-      }
-    }).catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [pdfDoc, pageNum]);
+  const effectiveAspectRatio = aspectRatio || defaultAspectRatio || 1.414;
 
   // Release GPU texture memory when page scrolls far out of active viewport buffer
   useEffect(() => {
@@ -51,62 +57,53 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
       try {
         canvasRef.current.width = 1;
         canvasRef.current.height = 1;
-      } catch {}
+      } catch {
+        // Ignore detached canvas errors
+      }
       setRendered(false);
     }
   }, [shouldMountCanvas]);
 
-  // Render page when it becomes visible or near
+  // Render page only when visible or in the immediate buffer window
   useEffect(() => {
     if (!shouldMountCanvas || !pdfDoc) return;
 
     let active = true;
-    let renderTask = null;
 
     pdfDoc.getPage(pageNum).then((page) => {
       if (!active || !canvasRef.current) return;
+
+      const unscaledViewport = page.getViewport({ scale: 1 });
+      if (unscaledViewport && unscaledViewport.width > 0) {
+        const ratio = unscaledViewport.height / unscaledViewport.width;
+        setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
+      }
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const safeWidth = Math.max(containerWidth - (isMobile ? 12 : 28), 220);
-
-      // Calculate width based on scale or fit mode
-      let targetWidth;
-      if (scale === 'fit-width') {
-        targetWidth = safeWidth;
-      } else if (scale === 'fit-page') {
-        targetWidth = Math.min(safeWidth, 640);
-      } else if (typeof scale === 'number') {
-        targetWidth = Math.max(safeWidth * scale, 240);
-      } else {
-        targetWidth = safeWidth;
-      }
-
-      const unscaledViewport = page.getViewport({ scale: 1 });
+      const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
       const computedScale = targetWidth / unscaledViewport.width;
       const viewport = page.getViewport({ scale: computedScale });
 
-      // High-DPI scaling for Retina, 4K, and modern mobile screens
-      const dpr = Math.min(window.devicePixelRatio || 1, 2.5); // Cap at 2.5x to preserve GPU memory
+      // High-DPI scaling capped at 2.5x to preserve GPU memory
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
       canvas.width = Math.floor(viewport.width * dpr);
       canvas.height = Math.floor(viewport.height * dpr);
       canvas.style.width = `${Math.floor(viewport.width)}px`;
       canvas.style.height = `${Math.floor(viewport.height)}px`;
 
-      // Fill pure white paper background
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
 
-      // Cancel any ongoing rendering task for this canvas before starting a new one
       if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel(); } catch {}
+        try { renderTaskRef.current.cancel(); } catch { /* noop */ }
       }
 
-      renderTask = page.render({
+      const renderTask = page.render({
         canvasContext: ctx,
         viewport,
         transform,
@@ -131,24 +128,13 @@ const VirtualPdfPage = React.memo(({ pdfDoc, pageNum, scale, containerWidth, isV
     return () => {
       active = false;
       if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel(); } catch {}
+        try { renderTaskRef.current.cancel(); } catch { /* noop */ }
       }
     };
   }, [pdfDoc, pageNum, scale, containerWidth, shouldMountCanvas, onPageRendered, isMobile]);
 
-  const safeWidth = Math.max(containerWidth - 28, 260);
-  let targetWidth;
-  if (scale === 'fit-width') {
-    targetWidth = safeWidth;
-  } else if (scale === 'fit-page') {
-    targetWidth = Math.min(safeWidth, 640);
-  } else if (typeof scale === 'number') {
-    targetWidth = Math.max(safeWidth * scale, 240);
-  } else {
-    targetWidth = safeWidth;
-  }
-
-  const estimatedHeight = targetWidth * aspectRatio;
+  const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
+  const estimatedHeight = targetWidth * effectiveAspectRatio;
 
   return (
     <div
@@ -182,8 +168,13 @@ export const PdfViewerPane = ({
   initialPage = 1,
   onOpenTab
 }) => {
+  const paneIdRef = useRef(null);
+  if (paneIdRef.current === null) {
+    paneIdRef.current = nextPaneSeq++;
+  }
   const [pdfDoc, setPdfDoc] = useState(null);
   const [numPages, setNumPages] = useState(0);
+  const [defaultAspectRatio, setDefaultAspectRatio] = useState(1.414);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [inputPage, setInputPage] = useState(String(initialPage));
   const [scale, setScale] = useState('fit-width'); // 'fit-width' | 'fit-page' | number
@@ -193,6 +184,18 @@ export const PdfViewerPane = ({
     typeof window !== 'undefined' ? (isMobile ? Math.min(window.innerWidth, 390) : 640) : 640
   ));
   const [visiblePages, setVisiblePages] = useState(new Set([1, 2]));
+
+  useEffect(() => {
+    const id = paneIdRef.current;
+    mountedPaneIds.add(id);
+    activePaneId = id;
+    return () => {
+      mountedPaneIds.delete(id);
+      if (activePaneId === id) {
+        activePaneId = mountedPaneIds.size > 0 ? Array.from(mountedPaneIds)[mountedPaneIds.size - 1] : null;
+      }
+    };
+  }, []);
 
   const containerRef = useRef(null);
   const scrollAreaRef = useRef(null);
@@ -325,7 +328,19 @@ export const PdfViewerPane = ({
         loadedDoc = doc;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
+        setCurrentPage(1);
+        setInputPage('1');
+        setVisiblePages(new Set([1, 2]));
         setLoading(false);
+
+        // Fetch only page 1 dimensions to calibrate unvisited page skeleton heights
+        doc.getPage(1).then((p1) => {
+          if (!active) return;
+          const vp = p1.getViewport({ scale: 1 });
+          if (vp && vp.width > 0) {
+            setDefaultAspectRatio(vp.height / vp.width);
+          }
+        }).catch(() => {});
       }).catch((err) => {
         if (!active) return;
         console.error('[WebPDF] Load error for URL', url, err);
@@ -528,9 +543,11 @@ export const PdfViewerPane = ({
     return `${Math.round(scale * 100)}%`;
   }, [scale]);
 
-  // Keyboard navigation shortcuts when viewer is mounted
+  // Keyboard navigation shortcuts scoped to the focused/active pane (safe in Split View)
   useEffect(() => {
+    const paneId = paneIdRef.current;
     const handleKeyDown = (e) => {
+      if (mountedPaneIds.size > 1 && activePaneId !== paneId) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -564,8 +581,18 @@ export const PdfViewerPane = ({
     return Array.from({ length: numPages }, (_, i) => i + 1);
   }, [numPages]);
 
+  const markPaneActive = () => {
+    activePaneId = paneIdRef.current;
+  };
+
   return (
-    <div ref={containerRef} className={`custom-pdf-pane ${isMobile ? 'mobile-mode' : ''}`}>
+    <div
+      ref={containerRef}
+      className={`custom-pdf-pane ${isMobile ? 'mobile-mode' : ''}`}
+      onMouseEnter={markPaneActive}
+      onPointerDown={markPaneActive}
+      onFocus={markPaneActive}
+    >
       {/* Pane Toolbar */}
       <div className="pdf-pane-toolbar">
         <div className="pdf-pane-badge-group">
@@ -711,6 +738,7 @@ export const PdfViewerPane = ({
                 isVisible={visiblePages.has(pageNum)}
                 isNear={Math.abs(pageNum - currentPage) <= 2}
                 isMobile={isMobile}
+                defaultAspectRatio={defaultAspectRatio}
               />
             ))}
           </div>

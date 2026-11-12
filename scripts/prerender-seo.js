@@ -168,7 +168,17 @@ function buildStaticSemanticBody(route, seo, meta) {
   const { filterCurriculum = '', filterSubject = '', filterUnit = '', currentTab = 'library' } = route.state;
   const links = [];
 
-  if (filterSubject && filterCurriculum) {
+  if (filterSubject && filterCurriculum && filterUnit) {
+    const currSlug = getCurriculumSlug(filterCurriculum);
+    const subjSlug = getSubjectSlug(filterSubject);
+    const unitSlug = getUnitSlug(filterUnit);
+    const years = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units?.[filterUnit]?.years || [];
+    for (const yr of years.slice(0, 12)) {
+      links.push(
+        `<li><a href="/${currSlug}/${subjSlug}/${unitSlug}?year=${yr}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${filterUnit} (${yr})`)}</a></li>`
+      );
+    }
+  } else if (filterSubject && filterCurriculum) {
     const currSlug = getCurriculumSlug(filterCurriculum);
     const subjSlug = getSubjectSlug(filterSubject);
     const unitsObj = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units || {};
@@ -246,6 +256,13 @@ function injectSeoIntoHtml(templateHtml, route, meta) {
     html,
     /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="description" content="${escapeHtml(seo.description)}" />`
+  );
+
+  // Replace or set meta robots
+  html = setOrInsertTag(
+    html,
+    /<meta\s+name="robots"\s+content="[^"]*"\s*\/?>/i,
+    `<meta name="robots" content="${escapeHtml(seo.robots || 'index, follow')}" />`
   );
 
   // Replace meta keywords

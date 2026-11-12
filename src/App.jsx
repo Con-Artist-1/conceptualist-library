@@ -1,5 +1,5 @@
 /* global __APP_BUILD_TIME__ */
-import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef, lazy, Suspense } from 'react';
 import './index.css';
 import {
   buildRoutePath,
@@ -7,17 +7,50 @@ import {
   getSeoMetadata,
   buildJsonLd
 } from './seoRoutes.js';
-import PdfViewerPane from './PdfViewerPane.jsx';
+import { extractVariant, getCleanUnitLabel } from './unitParser.js';
+
+const PdfViewerPane = lazy(() => import('./PdfViewerPane.jsx'));
+
+function useIsMobile(breakpointPx = 768) {
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= breakpointPx : false
+  ));
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(`(max-width: ${breakpointPx}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', update);
+      return () => mq.removeEventListener('change', update);
+    }
+    mq.addListener(update);
+    return () => mq.removeListener(update);
+  }, [breakpointPx]);
+  return isMobile;
+}
 
 const PAGE_SIZE = 80;
-const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-09T18:00:00.000Z';
-const APP_VERSION = 'v5.1';
+const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
+const APP_VERSION = 'v5.2';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v5.1',
+    version: 'v5.2',
     date: BUILD_TIMESTAMP,
+    title: 'Index Consolidation, WebPDF Streaming & Accessibility Architecture Overhaul',
+    summary: 'Eliminated index duplication, merged Physics WPH07 into WPH13, fixed filename parser regexes, tightened SEO titles and metadata across 170+ routes, restored code-split WebPDF lazy loading, scoped Split View keyboard controls, and hardened mobile modal geometry and API concurrency.',
+    changes: [
+      'Shared unit parser & smaller index: Consolidated unit normalization into a shared module, fixed snake_case date, CamelCase audio, and Unit1A History parsing, merged WPH07 into Unit 3 (WPH13), and deduplicated index.json at build time with compact tree inflation (slashing payload sizes by 17–58%).',
+      'WebPDF range & mobile optimization: Removed upfront multi-page getPage() burst fan-out on long textbooks, fixed mobile canvas gutter width alignment, scoped Split View keyboard shortcuts to the focused pane, and restored Suspense lazy-loading of the reader bundle.',
+      'SEO & routing accuracy: Tightened titles and descriptions under SERP truncation limits across all curriculum, subject, and unit pages, added 404 route recovery and noindex handling for filtered search permutations, and rendered semantic archive H1 headings.',
+      'Accessibility & mobile polish: Added 100dvh flex modal sizing, enlarged mobile touch targets, keyboard-operable split divider separators, focus-visible rings on filter selects, reduced-motion support, and atomic MongoDB view cooldown updates.'
+    ]
+  },
+  {
+    version: 'v5.1',
+    date: '2026-11-11T14:00:00.000Z',
     title: 'Uniform Card Grid Architecture & Ultra-Subtle Table Contrast Refinement',
     summary: 'Streamlined subject cards to uniform surfaces to eliminate false grid hierarchy, refined resource table zebra striping to an ultra-subtle warm tint (#FAF8F6), unified inner metadata pills with solid white backgrounds, and softened divider borders (#EEEAE6).',
     changes: [
@@ -29,7 +62,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v5.0',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-11T08:00:00.000Z',
     title: 'Alternating Row & Card Contrast Patterns Across All Themes',
     summary: 'Introduced rhythmically alternating contrast patterns (zebra striping and 2D checkerboard weaving) across table rows, subject category cards, wizard unit buttons, and recent history cards in White, Dark, and OLED modes for effortless visual scanning.',
     changes: [
@@ -41,7 +74,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v4.9',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-10T22:00:00.000Z',
     title: 'Brand Header Navigation Restoration & URL Sub-Route Home Synchronization',
     summary: 'Resolved header brand logo navigation issue to ensure clicking the logo reliably returns to the root homepage ("/") from any deep sub-route, clearing active filters and resetting path hydration without re-triggering unit re-resolution.',
     changes: [
@@ -53,7 +86,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v4.8',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-10T18:00:00.000Z',
     title: 'Refined Document Action Colors & Desktop Button Label Optimization',
     summary: 'Streamlined desktop action buttons to "Question Paper" and "Mark Scheme" (reserving concise "QP" and "MS" exclusively for mobile viewports) and replaced disjointed blue and green with refined brand-coherent Academic Slate Charcoal and Antique Collegiate Gold.',
     changes: [
@@ -65,7 +98,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v4.7',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-10T15:00:00.000Z',
     title: 'Exhaustive Dark Mode Coverage Across Changelog, About, Tables & Modals',
     summary: 'Resolved all remaining dark mode UI contrast issues: eliminated white background bleeds on changelog cards, ensured 100% theme parity with OLED across all 293 UI elements, and harmonized typography and borders.',
     changes: [
@@ -77,7 +110,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v4.6',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-10T12:00:00.000Z',
     title: 'Ivy League Academic Color Theory Redesign & Heritage Branding Restoration',
     summary: 'Harmonized color theory across both Light and Dark themes, restoring authentic McMaster Heritage Crimson (#6F1D2B / #8C1D2F), refined collegiate gold (#C9A45C / #D4AF37), and Oxford navy accents while preserving 100% Pure OLED dark mode.',
     changes: [
@@ -89,7 +122,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v4.5',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-10T09:00:00.000Z',
     title: 'Zerui Chen Warm Rust & Terminal Themes + Pure OLED Dark Mode',
     summary: 'Adopted zeruic.me warm Rust aesthetic for White/Light mode and tactile Terminal styling for Dark mode, while preserving dedicated 100% true black OLED dark mode as a selectable 3rd option.',
     changes: [
@@ -101,7 +134,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v4.4',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-09T21:00:00.000Z',
     title: 'Engine Memory Virtualization, SEO Canonical Fix & Filter Optimization',
     summary: 'Resolved SEO canonical and Open Graph metadata injection across 296 pre-rendered routes, implemented bounded canvas memory release and keyboard navigation in WebPDF, locked modal background scroll, and optimized paper filtering to a single pass.',
     changes: [
@@ -449,7 +482,16 @@ const SEARCH_VOCAB = [
   'wch11', 'wch12', 'wch13', 'wch14', 'wch15', 'wch16',
   'wph11', 'wph12', 'wph13', 'wph14', 'wph15', 'wph16',
   'wac11', 'wac12', 'wec11', 'wec12', 'wec13', 'wec14',
-  'wbs11', 'wbs12', 'wbs13', 'wbs14'
+  'wbs11', 'wbs12', 'wbs13', 'wbs14',
+  'wps01', 'wps02', 'wps03', 'wps04', 'whi01', 'whi02', 'whi03', 'whi04',
+  'wge01', 'wge02', 'wge03', 'wge04', 'wit11', 'wit12', 'wit13', 'wit14',
+  'wen01', 'wen02', 'wen03', 'wen04', 'wet01', 'wet02', 'wet03', 'wet04',
+  'waa01', 'waa02', 'wfr01', 'wfr02', 'wfr03', 'wfr04',
+  'wgn01', 'wgn02', 'wgn03', 'wgn04', 'wgk01', 'wgk02',
+  'wsp01', 'wsp02', 'wsp03', 'wsp04', 'yla1', 'yla2',
+  '4ma1', '4mb1', '4pm1', '4ph1', '4ch1', '4bi1', '4hb1', '4ec1', '4bs1',
+  '4ac1', '4cm1', '4cp0', '4it1', '4ea1', '4eb1', '4et1', '4ge1', '4ba0',
+  '4wbi1', '4wch1', '4wph1'
 ];
 
 // Fast bounded Damerau-Levenshtein distance (supports insertions, deletions, substitutions, and adjacent transpositions)
@@ -585,188 +627,6 @@ function inflateCompactTree(compactNode, parentPath = '', isRoot = true) {
     return { name, path: nodePath, children };
   }
   return compactNode;
-}
-
-// Determine curriculum from path & category
-function getCurriculum(file) {
-  const p = file.path || '';
-  const cat = file.category || '';
-  const spec = file.spec || '';
-
-  if (spec === 'IGCSE' || p.includes('IGCSE') || cat === 'IGCSE Books') {
-    return 'Edexcel IGCSE';
-  }
-  return 'Edexcel IAL';
-}
-
-// Extract variant tag (e.g. R, A, F, H, Mod, OptA, Opt2, v2, ER1..10) so distinct variants are clearly labeled & never merged
-function extractVariant(file) {
-  const p = file.path || '';
-  const n = (file.name || '').replace(/\.[^.]+$/, '');
-  const isMod = /modular|(?:^|[^a-z0-9])4w[a-z]{1,2}[1-3]/i.test(p);
-
-  // IAL History route options (Unit1A..Unit4D)
-  if (file.subject === 'History') {
-    const mHist = n.match(/(?:Unit[-_\s]*[1-4]|WHI0[1-4][-_\s]*1)([A-D])\b/i);
-    if (mHist) return `Opt${mHist[1].toUpperCase()}`;
-  }
-
-  // IGCSE Computer Science Paper 2 programming language options (P2A, P2B, P2C)
-  if (file.subject === 'Computer Science') {
-    const mCs = p.match(/(?:^|[^A-Z0-9])P2([A-C])(?:[^A-Z0-9]|$)/i);
-    if (mCs) return `P2${mCs[1].toUpperCase()}`;
-  }
-
-  // IGCSE Mathematics A Foundation / Higher (+ Regional / Modular)
-  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*[12]F[-_\s]*R?|Foundation)(?:[^A-Z0-9]|$)/i.test(p);
-  const isH = /(?:^|[^A-Z0-9])(?:[12]H[-_]?R?|Paper[-_\s]*[12]H[-_\s]*R?|4WM[12]H|Higher)(?:[^A-Z0-9]|$)/i.test(p);
-  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*[1-4][FH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-3][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][BCPFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)(?:[^A-Z0-9]|$)/i.test(p);
-
-  if (isMod) {
-    if (isF && isR) return 'F-R-Mod';
-    if (isH && isR) return 'H-R-Mod';
-    if (isF) return 'F-Mod';
-    if (isH) return 'H-Mod';
-    if (isR) return 'R-Mod';
-    return 'Mod';
-  }
-
-  if (isF && isR) return 'F-R';
-  if (isH && isR) return 'H-R';
-  if (isF) return 'F';
-  if (isH) return 'H';
-  if (isR) return 'R';
-
-  if (/(?:^|[^A-Z0-9])(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)(?:[^A-Z0-9]|$)/i.test(p)) return 'A';
-  const mOpt = n.match(/_([2-9]|\d{2})$/);
-  if (mOpt) return `Opt${mOpt[1]}`;
-  const mVer = n.match(/\((v\d+|\d+)\)/i);
-  if (mVer) return mVer[1].toLowerCase();
-  const mEr = n.match(/^ER\s+(\d+)$/i);
-  if (mEr && (file.spec === 'IGCSE' || file.curriculum === 'Edexcel IGCSE')) return `ER${mEr[1]}`;
-  return '';
-}
-
-// Clean canonical unit label resolver
-function getCleanUnitLabel(file) {
-  if (file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') return null;
-
-  const code = (file.unitCode || '').toUpperCase();
-  const name = (file.unitName || '').toUpperCase();
-  const rawPath = (file.path || '').toUpperCase();
-  const subj = (file.subject || '').toUpperCase();
-  const curr = file.curriculum || getCurriculum(file);
-
-  if (curr === 'Edexcel IGCSE') {
-    if (code === 'P1' || name === 'PAPER 1') return 'Paper 1 (P1)';
-    if (code === 'P2' || name === 'PAPER 2') return 'Paper 2 (P2)';
-    if (code === 'P3' || name === 'PAPER 3') return 'Paper 3 (P3)';
-    return file.unitName || null;
-  }
-
-  if (subj === 'MATH' || subj === 'MATHEMATICS') {
-    if (code === 'WMA11' || name.includes('PURE MATHEMATICS 1') || /\b(?:P1|P1A|P1R)\b/.test(name) || rawPath.includes('WMA11'))
-      return 'Pure Mathematics 1 (P1)';
-    if (code === 'WMA12' || name.includes('PURE MATHEMATICS 2') || /\b(?:P2|P2A|P2R)\b/.test(name) || rawPath.includes('WMA12'))
-      return 'Pure Mathematics 2 (P2)';
-    if (code === 'WMA13' || name.includes('PURE MATHEMATICS 3') || /\b(?:P3|P3A)\b/.test(name) || rawPath.includes('WMA13'))
-      return 'Pure Mathematics 3 (P3)';
-    if (code === 'WMA14' || name.includes('PURE MATHEMATICS 4') || /\b(?:P4|P4A)\b/.test(name) || rawPath.includes('WMA14'))
-      return 'Pure Mathematics 4 (P4)';
-    if (code === 'WMA01' || name.includes('CORE MATHEMATICS 12') || /\bC12\b/.test(name) || rawPath.includes('WMA01'))
-      return 'Core Mathematics 12 (C12)';
-    if (code === 'WMA02' || name.includes('CORE MATHEMATICS 34') || /\bC34\b/.test(name) || rawPath.includes('WMA02'))
-      return 'Core Mathematics 34 (C34)';
-    if (code === 'C1' || name.includes('CORE MATHEMATICS 1 (C1)'))
-      return 'Core Mathematics 1 (C1)';
-    if (code === 'C2' || name.includes('CORE MATHEMATICS 2 (C2)'))
-      return 'Core Mathematics 2 (C2)';
-    if (code === 'C3' || name.includes('CORE MATHEMATICS 3 (C3)'))
-      return 'Core Mathematics 3 (C3)';
-    if (code === 'C4' || name.includes('CORE MATHEMATICS 4 (C4)'))
-      return 'Core Mathematics 4 (C4)';
-
-    if (code === 'WFM01' || name.includes('FURTHER PURE 1') || /\b(?:FP1|FP1A)\b/.test(name) || rawPath.includes('WFM01'))
-      return 'Further Pure 1 (FP1)';
-    if (code === 'WFM02' || name.includes('FURTHER PURE 2') || /\b(?:FP2|FP2A)\b/.test(name) || rawPath.includes('WFM02'))
-      return 'Further Pure 2 (FP2)';
-    if (code === 'WFM03' || name.includes('FURTHER PURE 3') || /\b(?:FP3|FP3A)\b/.test(name) || rawPath.includes('WFM03'))
-      return 'Further Pure 3 (FP3)';
-
-    if (code === 'WME01' || name.includes('MECHANICS 1') || /\b(?:M1|M1A)\b/.test(name) || rawPath.includes('WME01'))
-      return 'Mechanics 1 (M1)';
-    if (code === 'WME02' || name.includes('MECHANICS 2') || /\b(?:M2|M2A)\b/.test(name) || rawPath.includes('WME02'))
-      return 'Mechanics 2 (M2)';
-    if (code === 'WME03' || name.includes('MECHANICS 3') || /\b(?:M3|M3A)\b/.test(name) || rawPath.includes('WME03'))
-      return 'Mechanics 3 (M3)';
-
-    if (code === 'WST01' || name.includes('STATISTICS 1') || /\b(?:S1|S1A)\b/.test(name) || rawPath.includes('WST01'))
-      return 'Statistics 1 (S1)';
-    if (code === 'WST02' || name.includes('STATISTICS 2') || /\b(?:S2|S2A)\b/.test(name) || rawPath.includes('WST02'))
-      return 'Statistics 2 (S2)';
-    if (code === 'WST03' || name.includes('STATISTICS 3') || /\b(?:S3|S3A)\b/.test(name) || rawPath.includes('WST03'))
-      return 'Statistics 3 (S3)';
-
-    if (code === 'WDM11' || code === 'WDM01' || name.includes('DECISION') || /\b(?:D1|D1A)\b/.test(name) || rawPath.includes('WDM11') || rawPath.includes('WDM01'))
-      return 'Decision Mathematics 1 (D1)';
-  }
-
-  if (subj.includes('CHEM')) {
-    if (code === 'WCH11' || name.includes('UNIT 1') || rawPath.includes('WCH11')) return 'Unit 1: Structure & Bonding (WCH11)';
-    if (code === 'WCH12' || name.includes('UNIT 2') || rawPath.includes('WCH12')) return 'Unit 2: Energetics & Organics (WCH12)';
-    if (code === 'WCH13' || name.includes('UNIT 3') || rawPath.includes('WCH13')) return 'Unit 3: Practical Chemistry I (WCH13)';
-    if (code === 'WCH14' || name.includes('UNIT 4') || rawPath.includes('WCH14')) return 'Unit 4: Rates & Organic Chemistry (WCH14)';
-    if (code === 'WCH15' || name.includes('UNIT 5') || rawPath.includes('WCH15')) return 'Unit 5: Transition Metals (WCH15)';
-    if (code === 'WCH16' || name.includes('UNIT 6') || rawPath.includes('WCH16')) return 'Unit 6: Practical Chemistry II (WCH16)';
-  }
-
-  if (subj.includes('PHYS')) {
-    if (code === 'WPH11' || name.includes('UNIT 1') || rawPath.includes('WPH11')) return 'Unit 1: Mechanics & Materials (WPH11)';
-    if (code === 'WPH12' || name.includes('UNIT 2') || rawPath.includes('WPH12')) return 'Unit 2: Waves & Electricity (WPH12)';
-    if (code === 'WPH13' || name.includes('UNIT 3') || rawPath.includes('WPH13')) return 'Unit 3: Practical Physics I (WPH13)';
-    if (code === 'WPH14' || name.includes('UNIT 4') || rawPath.includes('WPH14')) return 'Unit 4: Further Mechanics & Fields (WPH14)';
-    if (code === 'WPH15' || name.includes('UNIT 5') || rawPath.includes('WPH15')) return 'Unit 5: Thermodynamics & Oscillations (WPH15)';
-    if (code === 'WPH16' || name.includes('UNIT 6') || rawPath.includes('WPH16')) return 'Unit 6: Practical Physics II (WPH16)';
-    if (code === 'WPH07') return 'Practical Physics I (WPH13)';
-  }
-
-  if (subj === 'BIOLOGY') {
-    if (code === 'WBI11' || code === '6BI01' || name.includes('UNIT 1') || rawPath.includes('WBI11')) return 'Unit 1: Lifestyle, Transport & Health (WBI11)';
-    if (code === 'WBI12' || code === '6BI02' || name.includes('UNIT 2') || rawPath.includes('WBI12')) return 'Unit 2: Cells, Development & Biodiversity (WBI12)';
-    if (code === 'WBI13' || code === '6BI03' || name.includes('UNIT 3') || rawPath.includes('WBI13')) return 'Unit 3: Practical Biology I (WBI13)';
-    if (code === 'WBI14' || code === '6BI04' || name.includes('UNIT 4') || rawPath.includes('WBI14')) return 'Unit 4: Energy, Environment & Immunity (WBI14)';
-    if (code === 'WBI15' || code === '6BI05' || name.includes('UNIT 5') || rawPath.includes('WBI15')) return 'Unit 5: Respiration & Muscles (WBI15)';
-    if (code === 'WBI16' || code === '6BI06' || name.includes('UNIT 6') || rawPath.includes('WBI16')) return 'Unit 6: Practical Biology II (WBI16)';
-  }
-
-  if (subj.includes('ACCOUNTING')) {
-    if (code === 'WAC11' || name.includes('UNIT 1') || rawPath.includes('WAC11')) return 'Unit 1: The Accounting System & Costing (WAC11)';
-    if (code === 'WAC12' || name.includes('UNIT 2') || rawPath.includes('WAC12')) return 'Unit 2: Corporate & Management Accounting (WAC12)';
-  }
-
-  if (subj.includes('ECONOMICS')) {
-    if (code === 'WEC11' || name.includes('UNIT 1') || rawPath.includes('WEC11')) return 'Unit 1: Markets in Action (WEC11)';
-    if (code === 'WEC12' || name.includes('UNIT 2') || rawPath.includes('WEC12')) return 'Unit 2: Macroeconomic Performance (WEC12)';
-    if (code === 'WEC13' || name.includes('UNIT 3') || rawPath.includes('WEC13')) return 'Unit 3: Business Behaviour (WEC13)';
-    if (code === 'WEC14' || name.includes('UNIT 4') || rawPath.includes('WEC14')) return 'Unit 4: A Global Perspective (WEC14)';
-  }
-
-  if (subj.includes('BUSINESS')) {
-    if (code === 'WBS11' || name.includes('UNIT 1') || rawPath.includes('WBS11')) return 'Unit 1: Marketing & People (WBS11)';
-    if (code === 'WBS12' || name.includes('UNIT 2') || rawPath.includes('WBS12')) return 'Unit 2: Managing Business Activities (WBS12)';
-    if (code === 'WBS13' || name.includes('UNIT 3') || rawPath.includes('WBS13')) return 'Unit 3: Business Decisions & Strategy (WBS13)';
-    if (code === 'WBS14' || name.includes('UNIT 4') || rawPath.includes('WBS14')) return 'Unit 4: Global Business (WBS14)';
-  }
-
-  if (
-    file.unitName &&
-    !file.unitName.includes('.pdf') &&
-    !file.unitName.includes('_177')
-  ) {
-    return file.unitName;
-  }
-
-  return null;
 }
 
 // Strip redundant subject prefix from unitName (e.g. "Accounting Unit 1 (WAC11)" -> "Unit 1 (WAC11)")
@@ -1261,7 +1121,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   }), [file]);
 
   const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const isMobile = useIsMobile();
 
   // On mobile portrait, default to single QP view for maximum readable document height; on desktop, default to split view
   const [activeView, setActiveView] = useState(() => {
@@ -1386,6 +1246,40 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     }
   }, []);
 
+  const handleDesktopResizerKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      if (e.key === 'Home' || e.key === 'End') {
+        handleResetSplit();
+        return;
+      }
+      const delta = e.key === 'ArrowLeft' ? -5 : 5;
+      setDesktopSplitRatio((prev) => {
+        const next = Math.max(15, Math.min(85, Math.round(prev + delta)));
+        desktopRatioRef.current = next;
+        if (modalBodyRef.current) modalBodyRef.current.style.setProperty('--desktop-split-pct', `${next}%`);
+        return next;
+      });
+    }
+  }, [handleResetSplit]);
+
+  const handleMobileResizerKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      if (e.key === 'Home' || e.key === 'End') {
+        handleResetSplit();
+        return;
+      }
+      const delta = e.key === 'ArrowUp' ? -5 : 5;
+      setMobileSplitRatio((prev) => {
+        const next = Math.max(18, Math.min(82, Math.round(prev + delta)));
+        mobileRatioRef.current = next;
+        if (modalBodyRef.current) modalBodyRef.current.style.setProperty('--mobile-split-pct', `${next}%`);
+        return next;
+      });
+    }
+  }, [handleResetSplit]);
+
   // Resolve current active single document when not in split mode
   const currentDoc = useMemo(() => {
     if (!file) return {};
@@ -1426,7 +1320,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             onClick={() => setHeaderVisible(true)}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setHeaderVisible(true); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHeaderVisible(true); } }}
             title="Click to restore header (or press H)"
           >
             <span className="unhide-bar-content">▼ Show Header Controls (Press H)</span>
@@ -1471,21 +1365,33 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             <div className="modal-header-controls-bar">
               {/* Document View Switchers */}
               <div className="modal-view-tabs" role="tablist" aria-label="Document views">
-                {['QP', 'MS', 'ER'].map((type) => {
+                {['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM'].map((type) => {
                   const sib = siblings[type];
-                  if (!sib || !sib.ext || sib.ext !== 'pdf') return null;
+                  if (!sib) return null;
                   const isCurrent = !isSplit && (activeView === type || currentDoc.path === sib.path);
-                  const fullLabel = type === 'QP' ? 'Question Paper' : type === 'MS' ? 'Mark Scheme' : 'Examiner Report';
+                  const labelMap = {
+                    QP: ['Question Paper', 'QP'],
+                    MS: ['Mark Scheme', 'MS'],
+                    ER: ['Examiner Report', 'ER'],
+                    SC: ['Scientific Article', 'SC'],
+                    AUD: ['Audio Track', 'Audio'],
+                    DF: ['Data / Formulae', 'Data'],
+                    SOL: ['Worked Solution', 'SOL'],
+                    SAM: ['Sample Paper', 'SAM']
+                  };
+                  const [fullLabel, shortLabel] = labelMap[type] || [type, type];
                   return (
                     <button
                       key={type}
                       type="button"
+                      role="tab"
+                      aria-selected={isCurrent}
                       className={`modal-btn modal-view-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
                       onClick={() => setActiveView(type)}
                       title={`View ${fullLabel}`}
                     >
                       <span className="btn-desktop-text">{fullLabel}</span>
-                      <span className="btn-mobile-text">{type}</span>
+                      <span className="btn-mobile-text">{shortLabel}</span>
                     </button>
                   );
                 })}
@@ -1493,6 +1399,8 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 {canSplit && (
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={isSplit}
                     className={`modal-btn modal-view-btn split ${isSplit ? 'active' : ''}`}
                     onClick={() => setActiveView('split')}
                     title="View Question Paper and Mark Scheme side-by-side"
@@ -1604,14 +1512,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
               {/* Question Paper Pane */}
               <div className="modal-split-pane qp-pane">
                 {engineMode === 'custom' ? (
-                  <PdfViewerPane
-                    url={getHfUrl(siblings.QP.path)}
-                    title={siblings.QP.name || 'Question Paper'}
-                    docType="QP"
-                    isMobile={isMobile}
-                    initialPage={1}
-                    onOpenTab={true}
-                  />
+                  <Suspense fallback={<PdfPaneSkeleton title="Loading Question Paper..." subtitle="Initializing WebPDF Reader" />}>
+                    <PdfViewerPane
+                      url={getHfUrl(siblings.QP.path)}
+                      title={siblings.QP.name || 'Question Paper'}
+                      docType="QP"
+                      isMobile={isMobile}
+                      initialPage={1}
+                      onOpenTab={true}
+                    />
+                  </Suspense>
                 ) : (
                   <>
                     <div className="modal-split-label qp">
@@ -1636,9 +1546,15 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                   onMouseDown={handleDesktopDragStart}
                   onTouchStart={handleDesktopDragStart}
                   onDoubleClick={handleResetSplit}
-                  title="Drag to resize panes (Double-click to reset 50/50)"
+                  onKeyDown={handleDesktopResizerKeyDown}
+                  tabIndex={0}
+                  title="Drag or use Left/Right Arrow keys to resize panes (Double-click or Home to reset 50/50)"
                   role="separator"
+                  aria-label="Resize Question Paper and Mark Scheme panes"
                   aria-orientation="vertical"
+                  aria-valuenow={Math.round(desktopSplitRatio)}
+                  aria-valuemin={15}
+                  aria-valuemax={85}
                 >
                   <div className="resizer-handle-grip" />
                 </div>
@@ -1651,9 +1567,15 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                   onTouchStart={handleMobileDragStart}
                   onMouseDown={handleMobileDragStart}
                   onDoubleClick={handleResetSplit}
-                  title="Drag to resize top/bottom split (Double-tap to reset 50/50)"
+                  onKeyDown={handleMobileResizerKeyDown}
+                  tabIndex={0}
+                  title="Drag or use Up/Down Arrow keys to resize split (Double-tap or Home to reset 50/50)"
                   role="separator"
+                  aria-label="Resize top and bottom panes"
                   aria-orientation="horizontal"
+                  aria-valuenow={Math.round(mobileSplitRatio)}
+                  aria-valuemin={18}
+                  aria-valuemax={82}
                 >
                   <div className="mobile-resizer-grip" />
                 </div>
@@ -1662,14 +1584,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
               {/* Mark Scheme Pane */}
               <div className="modal-split-pane ms-pane">
                 {engineMode === 'custom' ? (
-                  <PdfViewerPane
-                    url={getHfUrl(siblings.MS.path)}
-                    title={siblings.MS.name || 'Mark Scheme'}
-                    docType="MS"
-                    isMobile={isMobile}
-                    initialPage={1}
-                    onOpenTab={true}
-                  />
+                  <Suspense fallback={<PdfPaneSkeleton title="Loading Mark Scheme..." subtitle="Initializing WebPDF Reader" />}>
+                    <PdfViewerPane
+                      url={getHfUrl(siblings.MS.path)}
+                      title={siblings.MS.name || 'Mark Scheme'}
+                      docType="MS"
+                      isMobile={isMobile}
+                      initialPage={1}
+                      onOpenTab={true}
+                    />
+                  </Suspense>
                 ) : (
                   <>
                     <div className="modal-split-label ms">
@@ -1711,15 +1635,17 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                   </div>
                 </div>
               ) : engineMode === 'custom' ? (
-                <PdfViewerPane
-                  key={currentDoc.path}
-                  url={singleUrl}
-                  title={singleTitle}
-                  docType={currentDoc.docType || 'DOC'}
-                  isMobile={isMobile}
-                  initialPage={1}
-                  onOpenTab={true}
-                />
+                <Suspense fallback={<PdfPaneSkeleton title={`Loading ${singleTitle}...`} subtitle="Initializing WebPDF Reader" />}>
+                  <PdfViewerPane
+                    key={currentDoc.path}
+                    url={singleUrl}
+                    title={singleTitle}
+                    docType={currentDoc.docType || 'DOC'}
+                    isMobile={isMobile}
+                    initialPage={1}
+                    onOpenTab={true}
+                  />
+                </Suspense>
               ) : (
                 <iframe
                   key={currentDoc.path}
@@ -1736,10 +1662,19 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   );
 };
 
-// Global utility to purge all browser caches, storage, and service workers and force a clean reload
+  // Global utility to purge all cached index/chunk entries while preserving theme, study history & viewer ID
 function forcePurgeCacheAndReload() {
   try {
+    const preserveKeys = ['cs_theme', 'cs_recent_papers_v1', 'cs_viewer_id_v1'];
+    const preserved = {};
+    preserveKeys.forEach((k) => {
+      const val = localStorage.getItem(k);
+      if (val !== null) preserved[k] = val;
+    });
     localStorage.clear();
+    Object.entries(preserved).forEach(([k, val]) => {
+      localStorage.setItem(k, val);
+    });
     sessionStorage.clear();
     sessionStorage.setItem('cs_auto_healed', '1');
   } catch {
@@ -2153,8 +2088,8 @@ const WelcomePage = ({
           </div>
           <div className="hero-stats-row">
             <div className="hero-stat-pill">
-              <strong>{(data.meta?.totalFiles || 13309).toLocaleString()}</strong>
-              <span>Total Files</span>
+              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 10146).toLocaleString()}</strong>
+              <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
             </div>
             <div className="hero-stat-pill">
               <strong>{ialSubjects.length + igcseSubjects.length}</strong>
@@ -2310,6 +2245,7 @@ const WelcomePage = ({
         <div className="interactive-wizard-card">
           <div className="wizard-breadcrumb">
             <button
+              type="button"
               className="wizard-back-btn"
               onClick={() => { if (selectedUnit) setSelectedUnit(null); else setSelectedSubject(null); }}
             >
@@ -2405,7 +2341,7 @@ const WelcomePage = ({
                   onClick={() => handleSubjectClick(subject, 'Edexcel IAL')}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubjectClick(subject, 'Edexcel IAL'); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IAL'); } }}
                 >
                   <div className="subject-card-top">
                     <div className="subject-card-title">{formatSubjectDisplay(subject)}</div>
@@ -2435,7 +2371,7 @@ const WelcomePage = ({
                   onClick={() => handleSubjectClick(subject, 'Edexcel IGCSE')}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubjectClick(subject, 'Edexcel IGCSE'); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IGCSE'); } }}
                 >
                   <div className="subject-card-top">
                     <div className="subject-card-title">{subject}</div>
@@ -2500,7 +2436,7 @@ const DEFAULT_TREE = {
             { name: 'History', path: 'Past Papers/IAL/History', children: [] },
             { name: 'Information Technology', path: 'Past Papers/IAL/Information Technology', children: [] },
             { name: 'Law', path: 'Past Papers/IAL/Law', children: [] },
-            { name: 'Mathematics', path: 'Past Papers/IAL/Mathematics', children: [] },
+            { name: 'Math', path: 'Past Papers/IAL/Math', children: [] },
             { name: 'Physics', path: 'Past Papers/IAL/Physics', children: [] },
             { name: 'Psychology', path: 'Past Papers/IAL/Psychology', children: [] },
             { name: 'Spanish', path: 'Past Papers/IAL/Spanish', children: [] }
@@ -2511,7 +2447,6 @@ const DEFAULT_TREE = {
           path: 'Past Papers/IGCSE',
           children: [
             { name: 'Accounting', path: 'Past Papers/IGCSE/Accounting', children: [] },
-            { name: 'Arabic', path: 'Past Papers/IGCSE/Arabic', children: [] },
             { name: 'Bangla', path: 'Past Papers/IGCSE/Bangla', children: [] },
             { name: 'Biology', path: 'Past Papers/IGCSE/Biology', children: [] },
             { name: 'Business', path: 'Past Papers/IGCSE/Business', children: [] },
@@ -2522,18 +2457,13 @@ const DEFAULT_TREE = {
             { name: 'English Language A', path: 'Past Papers/IGCSE/English Language A', children: [] },
             { name: 'English Language B', path: 'Past Papers/IGCSE/English Language B', children: [] },
             { name: 'English Literature', path: 'Past Papers/IGCSE/English Literature', children: [] },
-            { name: 'French', path: 'Past Papers/IGCSE/French', children: [] },
             { name: 'Further Pure Mathematics', path: 'Past Papers/IGCSE/Further Pure Mathematics', children: [] },
             { name: 'Geography', path: 'Past Papers/IGCSE/Geography', children: [] },
-            { name: 'German', path: 'Past Papers/IGCSE/German', children: [] },
-            { name: 'Greek', path: 'Past Papers/IGCSE/Greek', children: [] },
-            { name: 'History', path: 'Past Papers/IGCSE/History', children: [] },
             { name: 'Human Biology', path: 'Past Papers/IGCSE/Human Biology', children: [] },
             { name: 'Information Technology', path: 'Past Papers/IGCSE/Information Technology', children: [] },
             { name: 'Mathematics A', path: 'Past Papers/IGCSE/Mathematics A', children: [] },
             { name: 'Mathematics B', path: 'Past Papers/IGCSE/Mathematics B', children: [] },
-            { name: 'Physics', path: 'Past Papers/IGCSE/Physics', children: [] },
-            { name: 'Spanish', path: 'Past Papers/IGCSE/Spanish', children: [] }
+            { name: 'Physics', path: 'Past Papers/IGCSE/Physics', children: [] }
           ]
         }
       ]
@@ -2573,23 +2503,25 @@ const DEFAULT_TREE = {
 };
 
 const DEFAULT_META = {
-  totalFiles: 13940,
+  totalFiles: 13939,
+  uniqueFiles: 10146,
   subjects: [
     'Accounting', 'Arabic', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
-    'Computer Science', 'Economics', 'English Language', 'English Literature', 'French',
-    'Geography', 'German', 'Greek', 'History', 'Human Biology', 'Information Technology',
-    'Law', 'Mathematics', 'Physics', 'Psychology', 'Spanish'
+    'Computer Science', 'Economics', 'English Language', 'English Language A', 'English Language B',
+    'English Literature', 'French', 'Further Pure Mathematics', 'Geography', 'German', 'Greek',
+    'History', 'Human Biology', 'Information Technology', 'Law', 'Math',
+    'Mathematics A', 'Mathematics B', 'Physics', 'Psychology', 'Spanish'
   ],
   ialSubjects: [
     'Accounting', 'Arabic', 'Biology', 'Business', 'Chemistry', 'Economics',
     'English Language', 'English Literature', 'French', 'Geography', 'German', 'Greek',
-    'History', 'Information Technology', 'Law', 'Mathematics', 'Physics', 'Psychology', 'Spanish'
+    'History', 'Information Technology', 'Law', 'Math', 'Physics', 'Psychology', 'Spanish'
   ],
   igcseSubjects: [
-    'Accounting', 'Arabic', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
-    'Computer Science', 'Economics', 'English Language A', 'English Language B', 'English Literature',
-    'French', 'Geography', 'German', 'Greek', 'History', 'Human Biology', 'Information Technology',
-    'Mathematics A', 'Mathematics B', 'Physics', 'Spanish'
+    'Accounting', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
+    'Computer Science', 'Economics', 'English Language A', 'English Language B',
+    'English Literature', 'Further Pure Mathematics', 'Geography', 'Human Biology',
+    'Information Technology', 'Mathematics A', 'Mathematics B', 'Physics'
   ],
   coverage: 'January 2003 – June 2026'
 };
@@ -2612,6 +2544,7 @@ function getInitialCachedMeta() {
 
 // ─── Main Application ────────────────────────────────────────────
 function App() {
+  const isMobile = useIsMobile();
   const initialCache = useMemo(() => getInitialCachedMeta(), []);
   const initialRoute = useMemo(() => (
     typeof window !== 'undefined'
@@ -2619,6 +2552,7 @@ function App() {
       : {}
   ), [initialCache]);
 
+  const [isNotFound, setIsNotFound] = useState(Boolean(initialRoute.notFound));
   const [viewsMap, setViewsMap] = useState({});
   const [recentHistory, setRecentHistory] = useState(() => getInitialRecentHistory());
 
@@ -2808,6 +2742,7 @@ function App() {
       isPopStateRef.current = true;
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
       setCurrentTab(parsed.currentTab || 'library');
+      setIsNotFound(Boolean(parsed.notFound));
       setFilterCurriculum(parsed.filterCurriculum || '');
       setFilterSubject(parsed.filterSubject || '');
       setFilterUnit(parsed.filterUnit || '');
@@ -2836,15 +2771,16 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [data.meta, data.unifiedFiles, data.flatFiles]);
 
-  // Re-resolve unit slug from URL once wizard metadata finishes hydrating on cold visits
+  // Re-resolve unit slug and route validity once wizard metadata finishes hydrating on cold visits
   const initialUnitHydratedRef = useRef(false);
   useEffect(() => {
     if (initialUnitHydratedRef.current) return;
     if (!data.meta?.wizard) return;
     initialUnitHydratedRef.current = true;
     const segments = (window.location.pathname || '/').split('/').filter(Boolean);
-    if (segments.length >= 3 && !filterUnit) {
+    if (segments.length >= 1) {
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
+      setIsNotFound(Boolean(parsed.notFound));
       if (parsed.filterUnit) {
         setFilterCurriculum(parsed.filterCurriculum);
         setFilterSubject(parsed.filterSubject);
@@ -2854,6 +2790,13 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.meta]);
+
+  // Scroll to top when switching top-level views (Library / About / Changelog)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [currentTab]);
 
   // Resolve ?paper= deep link once catalog finishes loading (skip view increment on browser refresh)
   useEffect(() => {
@@ -2885,8 +2828,23 @@ function App() {
     filterUnit,
     filterYear,
     filterDocType,
+    searchQuery: deferredSearchQuery,
+    paperParam: previewFile ? (previewFile.id || previewFile.path) : pendingPaperParam,
+    notFound: currentTab === 'library' && isNotFound,
     meta: data.meta
-  }), [currentTab, filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, data.meta]);
+  }), [
+    currentTab,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterYear,
+    filterDocType,
+    deferredSearchQuery,
+    previewFile,
+    pendingPaperParam,
+    isNotFound,
+    data.meta
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2894,8 +2852,9 @@ function App() {
     // Wait for wizard metadata before overwriting a 3-segment unit URL on a cold cache visit
     const pathSegments = (window.location.pathname || '/').split('/').filter(Boolean);
     const waitingForUnitHydration = pathSegments.length >= 3 && !filterUnit && !data.meta?.wizard;
+    const activeNotFound = currentTab === 'library' && isNotFound;
 
-    if (!waitingForUnitHydration) {
+    if (!waitingForUnitHydration && !activeNotFound) {
       const nextUrl = buildRoutePath({
         currentTab,
         filterCurriculum,
@@ -2922,7 +2881,7 @@ function App() {
       }
     }
 
-    // Update document title, meta description, canonical URL, OpenGraph, and JSON-LD schema
+    // Update document title, meta description, canonical URL, robots, OpenGraph, and JSON-LD schema
     const pageTitle = previewFile
       ? `${getUnifiedSittingTitle(previewFile)} — Past Paper & Mark Scheme | Conceptualist Systems`
       : seoMeta.title;
@@ -2940,6 +2899,7 @@ function App() {
 
     setMetaTag('meta[name="description"]', 'name', 'description', seoMeta.description);
     setMetaTag('meta[name="keywords"]', 'name', 'keywords', seoMeta.keywords);
+    setMetaTag('meta[name="robots"]', 'name', 'robots', seoMeta.robots || 'index, follow');
     setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
     setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
     setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
@@ -2971,6 +2931,7 @@ function App() {
     ldScript.textContent = JSON.stringify(jsonLdObj);
   }, [
     currentTab,
+    isNotFound,
     filterCurriculum,
     filterSubject,
     filterUnit,
@@ -3040,7 +3001,7 @@ function App() {
       'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index.json'
     ];
 
-    const INDEX_CACHE_URL = `https://cs-cache.local/index_${APP_VERSION}_${BUILD_TIMESTAMP}.json`;
+    const INDEX_CACHE_URL = `https://cs-cache.local/index_${APP_VERSION}.json`;
 
     const getCachedIndex = async () => {
       if (typeof caches === 'undefined') return null;
@@ -3054,19 +3015,17 @@ function App() {
       return null;
     };
 
-    const saveCachedIndex = async (jsonObj) => {
-      if (typeof caches === 'undefined') return;
+    const saveCachedIndex = async (response) => {
+      if (typeof caches === 'undefined' || !response) return;
       try {
         const cache = await caches.open('cs_index_cache');
         const keys = await cache.keys();
         for (const req of keys) {
-          if (!req.url.includes(BUILD_TIMESTAMP)) {
+          if (req.url !== INDEX_CACHE_URL) {
             await cache.delete(req);
           }
         }
-        await cache.put(INDEX_CACHE_URL, new Response(JSON.stringify(jsonObj), {
-          headers: { 'Content-Type': 'application/json' }
-        }));
+        await cache.put(INDEX_CACHE_URL, response);
       } catch {
         // Ignore cache errors
       }
@@ -3145,7 +3104,7 @@ function App() {
               flatFiles[i] = fileObj;
             }
 
-        // Deduplicate byte-for-byte duplicate files across batches & link QP/MS/ER siblings
+        // Link QP/MS/ER/extras siblings across each canonical exam sitting (deduplicating only legacy un-deduped indexes)
         const scoreFile = (f) => {
           let s = 0;
           if (f.path.includes('(')) s += 10;
@@ -3153,28 +3112,45 @@ function App() {
           return s;
         };
 
-        const dedupMap = new Map();
+        const hasPreDeduped = Boolean(
+          json.meta?.uniqueFiles &&
+          Array.isArray(flatFiles) &&
+          flatFiles.length === json.meta.uniqueFiles
+        );
+        const SIBLING_TYPES = new Set(['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM']);
+        const preferSiblingCandidate = (existing, candidate) => {
+          if (!existing) return true;
+          const exPdf = existing.ext === 'pdf' ? 1 : 0;
+          const caPdf = candidate.ext === 'pdf' ? 1 : 0;
+          if (caPdf !== exPdf) return caPdf > exPdf;
+          return scoreFile(candidate) > scoreFile(existing);
+        };
+
+        const dedupMap = hasPreDeduped ? null : new Map();
         const siblingGroups = new Map();
 
         for (let i = 0; i < flatFiles.length; i++) {
           const f = flatFiles[i];
           const isCanonicalPaper = f.category === 'Past Papers' && f.unitCode && f.session && f.docType;
-          const dedupKey = isCanonicalPaper
-            ? `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}|${f.docType}|${f.ext}|${f.size}`
-            : f.path;
 
-          if (!dedupMap.has(dedupKey) || scoreFile(f) > scoreFile(dedupMap.get(dedupKey))) {
-            dedupMap.set(dedupKey, f);
+          if (dedupMap) {
+            const dedupKey = isCanonicalPaper
+              ? `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}|${f.docType}|${f.ext}|${f.size}`
+              : f.path;
+            const prev = dedupMap.get(dedupKey);
+            if (!prev || scoreFile(f) > scoreFile(prev)) {
+              dedupMap.set(dedupKey, f);
+            }
           }
 
-          if (isCanonicalPaper && f.ext === 'pdf' && (f.docType === 'QP' || f.docType === 'MS' || f.docType === 'ER')) {
+          if (isCanonicalPaper && SIBLING_TYPES.has(f.docType)) {
             const sibKey = `${f.spec}|${f.subject}|${f.unitCode}|${f.variant}|${f.session}`;
             let grp = siblingGroups.get(sibKey);
             if (!grp) {
               grp = {};
               siblingGroups.set(sibKey, grp);
             }
-            if (!grp[f.docType] || scoreFile(f) > scoreFile(grp[f.docType])) {
+            if (preferSiblingCandidate(grp[f.docType], f)) {
               grp[f.docType] = f;
             }
           }
@@ -3189,7 +3165,7 @@ function App() {
           }
         }
 
-        const dedupedFiles = Array.from(dedupMap.values());
+        const dedupedFiles = dedupMap ? Array.from(dedupMap.values()) : flatFiles;
 
         // Build Unified Exam Sitting entries so each exam sitting (QP + MS + ER + extras) is a single row
         const sittingMap = new Map();
@@ -3211,7 +3187,7 @@ function App() {
               isUnifiedSitting: false,
               docs: f.docType ? { [f.docType]: f } : {},
               docTypes: f.docType ? [f.docType] : [],
-              paths: [f.path],
+              paths: Array.isArray(f.altPaths) && f.altPaths.length > 0 ? [f.path, ...f.altPaths] : [f.path],
               fileCount: 1,
               totalSize: f.size || 0
             });
@@ -3248,6 +3224,9 @@ function App() {
             group.docs[f.docType] = f;
           }
           group.paths.push(f.path);
+          if (Array.isArray(f.altPaths) && f.altPaths.length > 0) {
+            group.paths.push(...f.altPaths);
+          }
           group.searchChunks.push(f.searchTerms);
           group.totalSize += (f.size || 0);
         }
@@ -3286,14 +3265,18 @@ function App() {
           }, 0);
     };
 
-    const loadFullIndex = async () => {
+    const loadFullIndex = async (freshMeta = null) => {
       setFilesLoading(true);
       setLoadError(null);
 
-      // Check Cache API first (0ms load on repeat visits)
+      // Check Cache API first and verify against fresh meta.json before hydrating in 0ms
       try {
         const cached = await getCachedIndex();
-        if (cached) {
+        const isCacheValid = cached && (
+          !freshMeta ||
+          (cached.meta?.generatedAt === freshMeta.generatedAt && cached.meta?.uniqueFiles === freshMeta.uniqueFiles)
+        );
+        if (isCacheValid) {
           applyHydratedIndex(cached);
           return;
         }
@@ -3303,9 +3286,10 @@ function App() {
 
       // Stage 2: Background load full index.json using resilient multi-tier fallback
       resilientFetch(candidateIndexUrls, {}, 50000)
-        .then(res => res.json())
-        .then(json => {
-          saveCachedIndex(json);
+        .then(async (res) => {
+          const resClone = res.clone();
+          const json = await res.json();
+          saveCachedIndex(resClone);
           applyHydratedIndex(json);
         })
         .catch(err => {
@@ -3316,40 +3300,35 @@ function App() {
         });
     };
 
-    if (initialCache?.tree && initialCache?.meta?.wizard) {
-      // Tree and wizard are already hydrated from localStorage; background fetch full index
-      setTimeout(loadFullIndex, 0);
-    } else {
-      // Stage 1: Fetch tiny pruned meta.json first (~3.5 KB Brotli) to hydrate wizard and category tree
-      resilientFetch(['/meta.json', `/meta.json?v=${buildQuery}`], {}, 25000)
-        .then(res => res.json())
-        .then(json => {
-          const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
-          if (tree) {
-            metaLoadedTree = true;
-            setData(prev => ({
-              ...prev,
-              tree: tree || prev.tree,
-              meta: json.meta || prev.meta
-            }));
-            setLoading(false);
-            setExpandedPaths(prev => new Set([...prev, '', tree.path]));
-          }
-          try {
-            localStorage.setItem(META_CACHE_KEY, JSON.stringify({
-              compactTree: json.compactTree,
-              meta: json.meta
-            }));
-          } catch {
-            // Ignore quota errors
-          }
-          setTimeout(loadFullIndex, 0);
-        })
-        .catch(err => {
-          console.warn('Meta fetch error, proceeding to full index:', err);
-          loadFullIndex();
-        });
-    }
+    // Always validate against /meta.json (also consumes <link rel="preload" href="/meta.json">)
+    resilientFetch(['/meta.json', `/meta.json?v=${buildQuery}`], {}, 25000)
+      .then(res => res.json())
+      .then(json => {
+        const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
+        if (tree) {
+          metaLoadedTree = true;
+          setData(prev => ({
+            ...prev,
+            tree: tree || prev.tree,
+            meta: json.meta || prev.meta
+          }));
+          setLoading(false);
+          setExpandedPaths(prev => new Set([...prev, '', tree.path]));
+        }
+        try {
+          localStorage.setItem(META_CACHE_KEY, JSON.stringify({
+            compactTree: json.compactTree,
+            meta: json.meta
+          }));
+        } catch {
+          // Ignore quota errors
+        }
+        setTimeout(() => loadFullIndex(json.meta || null), 0);
+      })
+      .catch(err => {
+        console.warn('Meta fetch error, proceeding to cached or remote full index:', err);
+        loadFullIndex(null);
+      });
   }, [initialCache, retryCount]);
 
   // Reset pagination when filters/search change
@@ -3368,6 +3347,7 @@ function App() {
 
   const handleSubjectSelect = useCallback((subject, curriculum = '') => {
     setCurrentTab('library');
+    setIsNotFound(false);
     if (curriculum) setFilterCurriculum(curriculum);
     setFilterSubject(subject);
     setFilterUnit('');
@@ -3379,6 +3359,7 @@ function App() {
 
   const handleSelectFinalFilter = useCallback(({ subject, curriculum, unit, year }) => {
     setCurrentTab('library');
+    setIsNotFound(false);
     if (curriculum) setFilterCurriculum(curriculum);
     if (subject) setFilterSubject(subject);
     setFilterUnit(unit || '');
@@ -3388,7 +3369,8 @@ function App() {
     setSelectedPath(data.tree?.path || '');
   }, [data.tree]);
 
-  const clearFilters = useCallback(() => {
+  const clearFilters = useCallback(({ pushUrl = true } = {}) => {
+    setIsNotFound(false);
     setFilterCurriculum('');
     setFilterDocType(null);
     setFilterSubject('');
@@ -3398,7 +3380,7 @@ function App() {
     setSortBy('newest');
     setForceShowTable(false);
     setSelectedPath(data.tree?.path || '');
-    if (typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '')) {
+    if (pushUrl && typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '')) {
       window.history.pushState(null, '', '/');
     }
   }, [data.tree]);
@@ -3413,6 +3395,7 @@ function App() {
       }
     }
     setCurrentTab('library');
+    setIsNotFound(false);
     setPreviewFile(null);
     setPendingPaperParam('');
     try {
@@ -3439,6 +3422,7 @@ function App() {
 
   const handleViewAll = useCallback(() => {
     setCurrentTab('library');
+    setIsNotFound(false);
     setSortBy('newest');
     setForceShowTable(true);
   }, []);
@@ -3534,7 +3518,9 @@ function App() {
               (f.paths && f.paths.some(p => p === selectedPath || p.startsWith(folderPrefix)));
             if (!inFolder) continue;
           } else {
-            if (f.path !== selectedPath && !f.path.startsWith(folderPrefix)) continue;
+            const inFolder = f.path === selectedPath || f.path.startsWith(folderPrefix) ||
+              (f.altPaths && f.altPaths.some(p => p === selectedPath || p.startsWith(folderPrefix)));
+            if (!inFolder) continue;
           }
         }
 
@@ -3720,47 +3706,48 @@ function App() {
         {filterCurriculum && (
           <>
             <span className="breadcrumb-separator">/</span>
-            <span className="breadcrumb-link" onClick={() => setFilterCurriculum('')} title="Click to remove curriculum filter">
+            <button type="button" className="breadcrumb-link" onClick={() => setFilterCurriculum('')} title="Click to remove curriculum filter">
               {filterCurriculum} ×
-            </span>
+            </button>
           </>
         )}
         {filterSubject && (
           <>
             <span className="breadcrumb-separator">/</span>
-            <span className="breadcrumb-link" onClick={() => { setFilterSubject(''); setFilterUnit(''); }} title="Click to remove subject filter">
+            <button type="button" className="breadcrumb-link" onClick={() => { setFilterSubject(''); setFilterUnit(''); }} title="Click to remove subject filter">
               {formatSubjectDisplay(filterSubject)} ×
-            </span>
+            </button>
           </>
         )}
         {filterUnit && (
           <>
             <span className="breadcrumb-separator">/</span>
-            <span className="breadcrumb-link" onClick={() => setFilterUnit('')} title="Click to remove unit filter">
+            <button type="button" className="breadcrumb-link" onClick={() => setFilterUnit('')} title="Click to remove unit filter">
               {filterUnit} ×
-            </span>
+            </button>
           </>
         )}
         {filterYear && (
           <>
             <span className="breadcrumb-separator">/</span>
-            <span className="breadcrumb-link" onClick={() => setFilterYear('')} title="Click to remove year filter">
+            <button type="button" className="breadcrumb-link" onClick={() => setFilterYear('')} title="Click to remove year filter">
               {filterYear} ×
-            </span>
+            </button>
           </>
         )}
         {filterDocType && (
           <>
             <span className="breadcrumb-separator">/</span>
-            <span className="breadcrumb-link" onClick={() => setFilterDocType(null)} title="Click to remove document type filter">
+            <button type="button" className="breadcrumb-link" onClick={() => setFilterDocType(null)} title="Click to remove document type filter">
               {DOC_TYPE_INFO[filterDocType]?.fullLabel || filterDocType} ×
-            </span>
+            </button>
           </>
         )}
         {breadcrumbParts.map((part, i) => (
           <React.Fragment key={i}>
             <span className="breadcrumb-separator">/</span>
-            <span
+            <button
+              type="button"
               className="breadcrumb-link"
               onClick={() => {
                 const pathSlice = breadcrumbParts.slice(0, i + 1).join('/');
@@ -3769,15 +3756,15 @@ function App() {
               }}
             >
               {part}
-            </span>
+            </button>
           </React.Fragment>
         ))}
         {searchQuery && (
           <>
             <span className="breadcrumb-separator">/</span>
-            <span className="breadcrumb-link" onClick={() => setSearchQuery('')} title="Clear search query">
+            <button type="button" className="breadcrumb-link" onClick={() => setSearchQuery('')} title="Clear search query">
               Search: &ldquo;{searchQuery}&rdquo; ×
-            </span>
+            </button>
           </>
         )}
       </div>
@@ -3808,7 +3795,7 @@ function App() {
     <div className="app-container">
       {/* Header */}
       <header className="header-top">
-        <div className={`header-top-row ${!showWelcome && currentTab === 'library' ? 'mobile-hidden' : ''}`}>
+        <div className={`header-top-row ${!showWelcome && !isNotFound && currentTab === 'library' ? 'mobile-hidden' : ''}`}>
           <a
             href="/"
             className="brand-section"
@@ -3858,10 +3845,15 @@ function App() {
                 </>
               )}
             </button>
-            <button
-              type="button"
+            <a
+              href={currentTab !== 'library' ? '/' : '/about'}
               className={`header-nav-btn ${currentTab !== 'library' ? 'active' : ''}`}
-              onClick={() => setCurrentTab(currentTab !== 'library' ? 'library' : 'about')}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                e.preventDefault();
+                setIsNotFound(false);
+                setCurrentTab(currentTab !== 'library' ? 'library' : 'about');
+              }}
             >
               {currentTab !== 'library' ? (
                 <>
@@ -3871,12 +3863,12 @@ function App() {
               ) : (
                 'About'
               )}
-            </button>
+            </a>
           </div>
         </div>
 
         {/* Integrated Mobile Header Breadcrumb Strip */}
-        {currentTab === 'library' && !showWelcome && (
+        {isMobile && currentTab === 'library' && !showWelcome && !isNotFound && (
           <div className="mobile-header-breadcrumb">
             {renderBreadcrumbs('mobile-header-breadcrumb-content')}
           </div>
@@ -3900,9 +3892,9 @@ function App() {
                 id="search-input"
                 type="text"
                 className="search-input"
-                placeholder={typeof window !== 'undefined' && window.innerWidth <= 768 ? "Search unit, code, or year..." : "Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."}
+                placeholder={isMobile ? "Search unit, code, or year..." : "Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setIsNotFound(false); setSearchQuery(e.target.value); }}
                 aria-label="Search by course code, subject, unit or year"
               />
               {searchQuery ? (
@@ -3941,7 +3933,7 @@ function App() {
                 <button
                   type="button"
                   className={`filter-btn ${filterCurriculum === '' ? 'active' : ''}`}
-                  onClick={() => setFilterCurriculum('')}
+                  onClick={() => { setIsNotFound(false); setFilterCurriculum(''); }}
                 >
                   All
                 </button>
@@ -3949,6 +3941,7 @@ function App() {
                   type="button"
                   className={`filter-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
                   onClick={() => {
+                    setIsNotFound(false);
                     setFilterCurriculum(filterCurriculum === 'Edexcel IAL' ? '' : 'Edexcel IAL');
                     setForceShowTable(true);
                   }}
@@ -3959,6 +3952,7 @@ function App() {
                   type="button"
                   className={`filter-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
                   onClick={() => {
+                    setIsNotFound(false);
                     setFilterCurriculum(filterCurriculum === 'Edexcel IGCSE' ? '' : 'Edexcel IGCSE');
                     setForceShowTable(true);
                   }}
@@ -3972,42 +3966,42 @@ function App() {
                 <button
                   type="button"
                   className={`filter-btn ${filterDocType === null ? 'active' : ''}`}
-                  onClick={() => setFilterDocType(null)}
+                  onClick={() => { setIsNotFound(false); setFilterDocType(null); }}
                 >
                   All Types
                 </button>
                 <button
                   type="button"
                   className={`filter-btn ${filterDocType === 'QP' ? 'active' : ''}`}
-                  onClick={() => { setFilterDocType(filterDocType === 'QP' ? null : 'QP'); setForceShowTable(true); }}
+                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'QP' ? null : 'QP'); setForceShowTable(true); }}
                 >
                   Question Papers
                 </button>
                 <button
                   type="button"
                   className={`filter-btn ${filterDocType === 'MS' ? 'active' : ''}`}
-                  onClick={() => { setFilterDocType(filterDocType === 'MS' ? null : 'MS'); setForceShowTable(true); }}
+                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'MS' ? null : 'MS'); setForceShowTable(true); }}
                 >
                   Mark Schemes
                 </button>
                 <button
                   type="button"
                   className={`filter-btn ${filterDocType === 'ER' ? 'active' : ''}`}
-                  onClick={() => { setFilterDocType(filterDocType === 'ER' ? null : 'ER'); setForceShowTable(true); }}
+                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'ER' ? null : 'ER'); setForceShowTable(true); }}
                 >
                   Examiner Reports
                 </button>
                 <button
                   type="button"
                   className={`filter-btn ${filterDocType === 'Book' ? 'active' : ''}`}
-                  onClick={() => { setFilterDocType(filterDocType === 'Book' ? null : 'Book'); setForceShowTable(true); }}
+                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Book' ? null : 'Book'); setForceShowTable(true); }}
                 >
                   Textbooks
                 </button>
                 <button
                   type="button"
                   className={`filter-btn ${filterDocType === 'Extra' ? 'active' : ''}`}
-                  onClick={() => { setFilterDocType(filterDocType === 'Extra' ? null : 'Extra'); setForceShowTable(true); }}
+                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Extra' ? null : 'Extra'); setForceShowTable(true); }}
                 >
                   Audio / Data / SAMs
                 </button>
@@ -4023,6 +4017,7 @@ function App() {
                 className="filter-select"
                 value={filterSubject}
                 onChange={(e) => {
+                  setIsNotFound(false);
                   setFilterSubject(e.target.value);
                   setFilterUnit('');
                   if (e.target.value) setForceShowTable(true);
@@ -4043,6 +4038,7 @@ function App() {
                     className="filter-select"
                     value={filterUnit}
                     onChange={(e) => {
+                      setIsNotFound(false);
                       setFilterUnit(e.target.value);
                       setForceShowTable(true);
                     }}
@@ -4062,6 +4058,7 @@ function App() {
                 className="filter-select"
                 value={filterYear}
                 onChange={(e) => {
+                  setIsNotFound(false);
                   setFilterYear(e.target.value);
                   if (e.target.value) setForceShowTable(true);
                 }}
@@ -4136,7 +4133,7 @@ function App() {
             <TreeNode
               node={data.tree}
               currentPath={selectedPath}
-              onSelect={(p) => { setSelectedPath(p); setForceShowTable(p !== data.tree?.path); }}
+              onSelect={(p) => { setIsNotFound(false); setSelectedPath(p); setForceShowTable(p !== data.tree?.path); }}
               expandedPaths={expandedPaths}
               toggleExpand={toggleExpand}
             />
@@ -4146,9 +4143,56 @@ function App() {
         {/* Main Content Area */}
         <main className="content-area">
           {currentTab === 'about' ? (
-            <AboutPage onGoHome={() => setCurrentTab('library')} />
+            <AboutPage onGoHome={() => { setIsNotFound(false); setCurrentTab('library'); }} />
           ) : currentTab === 'changelog' ? (
-            <ChangelogPage onGoHome={() => setCurrentTab('library')} />
+            <ChangelogPage onGoHome={() => { setIsNotFound(false); setCurrentTab('library'); }} />
+          ) : isNotFound ? (
+            <div className="not-found-card" role="region" aria-label="Page not found">
+              <span className="not-found-badge">404 • Route Not Found</span>
+              <h1>{seoMeta.h1}</h1>
+              <p>{seoMeta.subtitle}</p>
+              <div className="not-found-actions">
+                <a href="/" className="search-button" onClick={navigateToHome}>
+                  Return to Library Home
+                </a>
+                <a
+                  href="/ial"
+                  className="filter-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearFilters({ pushUrl: false });
+                    setFilterCurriculum('Edexcel IAL');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Edexcel IAL
+                </a>
+                <a
+                  href="/igcse"
+                  className="filter-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearFilters({ pushUrl: false });
+                    setFilterCurriculum('Edexcel IGCSE');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Edexcel IGCSE
+                </a>
+                <a
+                  href="/textbooks"
+                  className="filter-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearFilters({ pushUrl: false });
+                    setFilterDocType('Book');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Textbooks
+                </a>
+              </div>
+            </div>
           ) : showWelcome ? (
             <WelcomePage
               data={data}
@@ -4159,13 +4203,21 @@ function App() {
               getOnSitePaperUrl={getOnSitePaperUrl}
               onSubjectSelect={handleSubjectSelect}
               onViewAll={handleViewAll}
-              onCurriculumSelect={(c) => { setFilterCurriculum(c); setForceShowTable(true); }}
+              onCurriculumSelect={(c) => { setIsNotFound(false); setFilterCurriculum(c); setForceShowTable(true); }}
               onSelectFinalFilter={handleSelectFinalFilter}
             />
           ) : (
             <>
               {/* Desktop Breadcrumb Bar */}
-              {renderBreadcrumbs('desktop-breadcrumb')}
+              {!isMobile && renderBreadcrumbs('desktop-breadcrumb')}
+
+              {/* Semantic Route Heading */}
+              <div className="archive-title-header">
+                <h1 className="archive-page-h1">{seoMeta.h1}</h1>
+                {seoMeta.subtitle && (
+                  <p className="archive-page-subtitle">{seoMeta.subtitle}</p>
+                )}
+              </div>
 
               {/* Document List / Data Table */}
               {filesLoading && visibleFiles.length === 0 ? (
@@ -4525,10 +4577,10 @@ function App() {
           <div>© 2026 <strong>Conceptualist Systems</strong> — All Rights Reserved</div>
           <div
             className="footer-update-micro"
-            onClick={() => setCurrentTab('changelog')}
+            onClick={() => { setIsNotFound(false); setCurrentTab('changelog'); }}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCurrentTab('changelog'); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsNotFound(false); setCurrentTab('changelog'); } }}
             title="Click to view full site changelog & version history"
           >
             Last updated {formatUpdateTimestamp(BUILD_TIMESTAMP)} ({CHANGELOG_HISTORY[0].version}): {CHANGELOG_HISTORY[0].summary}
@@ -4549,7 +4601,7 @@ function App() {
             onClick={(e) => {
               e.preventDefault();
               setCurrentTab('library');
-              clearFilters();
+              clearFilters({ pushUrl: false });
               setFilterCurriculum('Edexcel IAL');
               setForceShowTable(true);
             }}
@@ -4563,7 +4615,7 @@ function App() {
             onClick={(e) => {
               e.preventDefault();
               setCurrentTab('library');
-              clearFilters();
+              clearFilters({ pushUrl: false });
               setFilterCurriculum('Edexcel IGCSE');
               setForceShowTable(true);
             }}
@@ -4577,7 +4629,7 @@ function App() {
             onClick={(e) => {
               e.preventDefault();
               setCurrentTab('library');
-              clearFilters();
+              clearFilters({ pushUrl: false });
               setFilterDocType('Book');
               setForceShowTable(true);
             }}
@@ -4588,7 +4640,7 @@ function App() {
           <a
             href="/changelog"
             className="footer-link"
-            onClick={(e) => { e.preventDefault(); setCurrentTab('changelog'); }}
+            onClick={(e) => { e.preventDefault(); setIsNotFound(false); setCurrentTab('changelog'); }}
           >
             Changelog
           </a>
@@ -4596,7 +4648,7 @@ function App() {
           <a
             href="/about"
             className="footer-link"
-            onClick={(e) => { e.preventDefault(); setCurrentTab('about'); }}
+            onClick={(e) => { e.preventDefault(); setIsNotFound(false); setCurrentTab('about'); }}
           >
             About Us &amp; Team
           </a>

@@ -2,31 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index, follow" />
     <meta name="description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
     <meta name="keywords" content="Conceptualist, Conceptualist Systems, Edexcel, IAL, IGCSE, past papers, mark scheme, question paper, examiner report, A-Level" />
-    <title>Conceptualist Systems | Library Repository</title>
+    <title>Conceptualist Systems | Edexcel IAL &amp; IGCSE Past Papers</title>
     <link rel="canonical" href="https://www.conceptualist.uk/" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="theme-color" content="#6F1D2B" id="meta-theme-color" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Conceptualist Systems" />
-    <meta property="og:title" content="Conceptualist Systems | Library Repository" />
+    <meta property="og:title" content="Conceptualist Systems | Edexcel IAL &amp; IGCSE Past Papers" />
     <meta property="og:description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
     <meta property="og:url" content="https://www.conceptualist.uk/" />
     <meta property="og:image" content="https://www.conceptualist.uk/favicon.svg" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Conceptualist Systems | Library Repository" />
+    <meta name="twitter:title" content="Conceptualist Systems | Edexcel IAL &amp; IGCSE Past Papers" />
     <meta name="twitter:description" content="Conceptualist Systems: Browse thousands of Edexcel past papers, mark schemes, examiner reports, and textbooks. Organised by subject, unit, and year." />
     <meta name="twitter:image" content="https://www.conceptualist.uk/favicon.svg" />
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
-    <!-- Preload Critical Local Self-Hosted Fonts (Zero Latency & Zero FOUT) -->
+    <!-- Preconnect & Critical Preloads -->
+    <link rel="preconnect" href="https://huggingface.co" crossorigin />
     <link rel="preload" href="/fonts/roboto-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/meta.json" as="fetch" crossorigin />
     <script>
       (function() {
         try {
@@ -53,8 +53,11 @@
         }
       })();
       window.addEventListener('vite:preloadError', function () {
-        try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
-        window.location.href = '/?reset=' + Date.now();
+        try {
+          if (sessionStorage.getItem('cs_chunk_reload')) return;
+          sessionStorage.setItem('cs_chunk_reload', '1');
+        } catch (e) {}
+        window.location.reload();
       });
     </script>
 

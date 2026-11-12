@@ -383,6 +383,93 @@ export function buildRoutePath({
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
+const MATH_CODE_PRIORITY = [
+  'WMA11', 'WMA12', 'WMA13', 'WMA14',
+  'WFM01', 'WFM02', 'WFM03',
+  'WME01', 'WME02', 'WME03',
+  'WST01', 'WST02', 'WST03',
+  'WDM11', 'WMA01', 'WMA02',
+  '6663', '6664', '6665', '6666'
+];
+
+function getUniqueOrderedUnitCodes(unitNames) {
+  const unique = [...new Set(unitNames.map(getUnitCodeFromLabel).filter(Boolean))];
+  return unique.sort((a, b) => {
+    const ia = MATH_CODE_PRIORITY.indexOf(a);
+    const ib = MATH_CODE_PRIORITY.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+
+function formatCodeRangeForTitle(codes, isMath = false) {
+  if (!codes || codes.length === 0) return '';
+  if (isMath && codes.includes('WMA11') && codes.includes('WMA14')) {
+    return 'WMA11–WMA14';
+  }
+  if (codes.length >= 2) {
+    const first = codes[0];
+    const last = codes[codes.length - 1];
+    const m1 = /^([A-Z]+)(\d+)$/.exec(first);
+    const m2 = /^([A-Z]+)(\d+)$/.exec(last);
+    if (m1 && m2 && m1[1] === m2[1] && parseInt(m2[2], 10) - parseInt(m1[2], 10) === codes.length - 1) {
+      return `${first}–${last}`;
+    }
+  }
+  return codes.slice(0, 3).join(', ');
+}
+
+function cleanUnitForContext(subjDisplay, filterUnit) {
+  let clean = String(filterUnit || '').trim();
+  const sLower = subjDisplay.toLowerCase();
+  if (clean.toLowerCase().startsWith(`${sLower} `)) {
+    clean = clean.slice(subjDisplay.length).trim();
+  } else if (sLower === 'information technology' && clean.toUpperCase().startsWith('IT ')) {
+    clean = clean.slice(3).trim();
+  }
+  return clean;
+}
+
+function compactUnitTitleLabel(label) {
+  // Collapse "Unit 5: Thermodynamics & Oscillations (WPH15)" -> "Unit 5 (WPH15)" when needed to stay <= 65 chars
+  const m = /^(Unit\s+\d+):\s+.+?(\s*\([A-Z0-9]+\))$/i.exec(label);
+  if (m) return `${m[1]}${m[2]}`;
+  return String(label || '')
+    .replace(/\b(Decision|Pure|Core|Further Pure)\s+Mathematics\b/gi, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function getCurriculumUniqueCount(meta, curr) {
+  const subjectsMap = meta?.wizard?.[curr];
+  if (subjectsMap && Object.keys(subjectsMap).length > 0) {
+    return Object.values(subjectsMap).reduce((sum, entry) => sum + (entry?.totalFiles || 0), 0);
+  }
+  return curr === 'Edexcel IGCSE' ? 3040 : 7106;
+}
+
+function getArchiveCounts(meta) {
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 10146;
+  const totalFiles = meta?.totalFiles || 13939;
+  return { uniqueFiles, totalFiles };
+}
+
+function pickTitleVariant(candidates, maxLen = 65) {
+  for (const c of candidates) {
+    if (c.length <= maxLen) return c;
+  }
+  return candidates[candidates.length - 1];
+}
+
+function fitDescription(str, maxLen = 160) {
+  if (str.length <= maxLen) return str;
+  const trimmed = str.slice(0, maxLen - 1);
+  const lastSpace = trimmed.lastIndexOf(' ');
+  return `${(lastSpace > 100 ? trimmed.slice(0, lastSpace) : trimmed).replace(/[.,;:\s-]+$/, '')}.`;
+}
+
 export function parseRouteFromLocation(pathname = '/', search = '', meta = null) {
   const cleanPath = (pathname || '/').replace(/\/+$/, '') || '/';
   const params = new URLSearchParams(search || '');
@@ -397,7 +484,8 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null)
     searchQuery: params.get('q') || '',
     paperParam: params.get('paper') || '',
     viewParam: params.get('view') || '',
-    forceShowTable: false
+    forceShowTable: false,
+    notFound: false
   };
 
   if (cleanPath === '/about') {
@@ -415,31 +503,48 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null)
   }
 
   const segments = cleanPath.split('/').filter(Boolean);
-  if (segments.length >= 1) {
-    const first = segments[0].toLowerCase();
-    if (first === 'ial' || first === 'edexcel-ial') {
-      result.filterCurriculum = 'Edexcel IAL';
-      result.forceShowTable = true;
-    } else if (first === 'igcse' || first === 'edexcel-igcse') {
-      result.filterCurriculum = 'Edexcel IGCSE';
+  if (segments.length === 0) {
+    if (result.filterYear || result.filterDocType || result.searchQuery || result.paperParam) {
       result.forceShowTable = true;
     }
+    return result;
   }
 
-  if (result.filterCurriculum && segments.length >= 2) {
+  const first = segments[0].toLowerCase();
+  if (first === 'ial' || first === 'edexcel-ial') {
+    result.filterCurriculum = 'Edexcel IAL';
+    result.forceShowTable = true;
+  } else if (first === 'igcse' || first === 'edexcel-igcse') {
+    result.filterCurriculum = 'Edexcel IGCSE';
+    result.forceShowTable = true;
+  } else {
+    result.notFound = true;
+    return result;
+  }
+
+  if (segments.length >= 2) {
     const subj = resolveSubjectFromSlug(segments[1], result.filterCurriculum, meta);
-    if (subj) {
-      result.filterSubject = subj;
-      result.forceShowTable = true;
+    if (!subj) {
+      result.notFound = true;
+      return result;
     }
+    result.filterSubject = subj;
+    result.forceShowTable = true;
   }
 
-  if (result.filterCurriculum && result.filterSubject && segments.length >= 3) {
+  if (segments.length >= 3) {
     const unit = resolveUnitFromSlug(segments[2], result.filterCurriculum, result.filterSubject, meta);
-    if (unit) {
-      result.filterUnit = unit;
-      result.forceShowTable = true;
+    if (!unit) {
+      result.notFound = true;
+      return result;
     }
+    result.filterUnit = unit;
+    result.forceShowTable = true;
+  }
+
+  if (segments.length > 3) {
+    result.notFound = true;
+    return result;
   }
 
   if (result.filterYear || result.filterDocType || result.searchQuery || result.paperParam) {
@@ -456,8 +561,31 @@ export function getSeoMetadata({
   filterUnit = '',
   filterYear = '',
   filterDocType = null,
+  searchQuery = '',
+  paperParam = '',
+  notFound = false,
   meta = null
 }) {
+  const { uniqueFiles, totalFiles } = getArchiveCounts(meta);
+  const hasFacetedQuery = Boolean(
+    filterYear ||
+    searchQuery ||
+    paperParam ||
+    (filterDocType && !(filterDocType === 'Book' && !filterCurriculum && !filterSubject && !filterUnit))
+  );
+
+  if (notFound) {
+    return {
+      title: 'Page Not Found | Conceptualist Systems',
+      description: 'The requested Edexcel past paper or resource route could not be found. Browse all IAL & IGCSE subjects from our archive home.',
+      keywords: 'Conceptualist Systems, Edexcel IAL past papers, Edexcel IGCSE past papers',
+      canonicalUrl: `${SITE_URL}/`,
+      robots: 'noindex, nofollow',
+      h1: 'Archive Route Not Found',
+      subtitle: 'Return to the Edexcel IAL & IGCSE archive directory to select a subject, unit, or textbook.'
+    };
+  }
+
   const canonicalPath = buildRoutePath({
     currentTab,
     filterCurriculum,
@@ -467,24 +595,27 @@ export function getSeoMetadata({
     filterDocType: filterDocType === 'Book' && !filterCurriculum && !filterSubject ? 'Book' : null
   });
   const canonicalUrl = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`;
+  const robots = hasFacetedQuery ? 'noindex, follow' : 'index, follow';
 
   if (currentTab === 'about') {
     return {
-      title: 'About Conceptualist Systems | Edexcel IAL & IGCSE Past Papers Library',
-      description: 'Learn about Conceptualist Systems, an independent academic resource platform indexing 13,940+ Pearson Edexcel IAL and IGCSE past papers, mark schemes, examiner reports, and textbooks.',
+      title: 'About Conceptualist Systems | Edexcel IAL & IGCSE Archive',
+      description: fitDescription(`Learn about Conceptualist Systems, indexing ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE papers, mark schemes, reports & books (${totalFiles.toLocaleString()} archived files).`),
       keywords: 'Conceptualist Systems, Edexcel past papers, IAL past papers, IGCSE past papers, academic repository, Diavlon, Naz',
       canonicalUrl,
+      robots: 'index, follow',
       h1: 'About Conceptualist Systems',
-      subtitle: 'Open, high-speed access to 13,940+ Pearson Edexcel International A-Level and IGCSE examination resources.'
+      subtitle: `Open, high-speed access to ${uniqueFiles.toLocaleString()}+ unique Pearson Edexcel IAL and IGCSE resources (${totalFiles.toLocaleString()} total archived files).`
     };
   }
 
   if (currentTab === 'changelog') {
     return {
-      title: 'Site Changelog & Archive Updates | Conceptualist Systems',
-      description: 'Live update history, new 2025–2026 Edexcel past paper additions, side-by-side Split View reader improvements, and performance updates on Conceptualist Systems.',
+      title: 'Site Changelog & Updates | Conceptualist Systems',
+      description: fitDescription('Live update history: new 2025–2026 Edexcel past papers, Split View WebPDF optimizations, search improvements, and archive updates.'),
       keywords: 'Conceptualist Systems changelog, Edexcel 2026 past papers, 2025 past papers, split view reader',
       canonicalUrl,
+      robots: 'index, follow',
       h1: 'Site Changelog & Update History',
       subtitle: 'Complete log of speed optimizations, new examination series, and reader features.'
     };
@@ -492,10 +623,11 @@ export function getSeoMetadata({
 
   if (filterDocType === 'Book' && !filterCurriculum && !filterSubject) {
     return {
-      title: 'Pearson Edexcel IAL & IGCSE Textbooks & Solution Banks PDF | Conceptualist Systems',
-      description: 'Browse and read 71 official Pearson Edexcel International A-Level (IAL) and IGCSE (9–1) student textbooks, lab books, and worked solution banks online.',
+      title: 'Edexcel IAL & IGCSE Textbooks & Solutions PDF | Conceptualist',
+      description: fitDescription('Read 71 official Pearson Edexcel IAL and IGCSE (9–1) student textbooks, lab books, and worked solution banks free online in WebPDF reader.'),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
+      robots,
       h1: 'Pearson Edexcel IAL & IGCSE Textbooks & Solution Banks',
       subtitle: 'Official course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Economics, and Humanities.'
     };
@@ -503,37 +635,51 @@ export function getSeoMetadata({
 
   const subjDisplay = formatSubjectName(filterSubject);
   const currShort = filterCurriculum === 'Edexcel IGCSE' ? 'Edexcel IGCSE' : filterCurriculum === 'Edexcel IAL' ? 'Edexcel IAL' : 'Pearson Edexcel';
-  const currFull = filterCurriculum === 'Edexcel IGCSE'
-    ? 'Pearson Edexcel International GCSE (IGCSE 9–1)'
-    : 'Pearson Edexcel International A-Level (IAL)';
 
   // Unit-level SEO metadata
   if (filterSubject && filterUnit) {
     const unitCode = getUnitCodeFromLabel(filterUnit);
     const igcseCode = filterCurriculum === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
-    const codeBadge = unitCode ? `${unitCode}` : igcseCode;
+    const unitClean = cleanUnitForContext(subjDisplay, filterUnit);
+    const unitWithCode = unitCode && !unitClean.includes(unitCode) ? `${unitClean} (${unitCode})` : unitClean;
+    const compactClean = compactUnitTitleLabel(unitClean);
+    const unitShort = unitCode && !compactClean.includes(unitCode)
+      ? `${compactClean} (${unitCode})`
+      : compactClean;
+
     const unitObj = meta?.wizard?.[filterCurriculum || 'Edexcel IAL']?.[filterSubject]?.units?.[filterUnit];
     const docCount = unitObj?.count || 60;
     const years = unitObj?.years || [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019];
     const minYr = years[years.length - 1] || 2014;
     const maxYr = years[0] || 2026;
-    const yrSuffix = filterYear ? ` (${filterYear})` : ` (${minYr}–${maxYr})`;
+    const yrSpan = `${minYr}–${maxYr}`;
+    const igcseTitleCode = igcseCode ? ` (${igcseCode.split(' / ')[0]})` : '';
 
-    const title = unitCode && !filterUnit.includes(unitCode)
-      ? `${currShort} ${subjDisplay} ${filterUnit} (${unitCode}) Past Papers & Mark Schemes${yrSuffix} | Conceptualist`
-      : `${currShort} ${subjDisplay} — ${filterUnit} Past Papers & Mark Schemes${yrSuffix} | Conceptualist`;
+    const title = pickTitleVariant([
+      `${currShort} ${subjDisplay} ${unitWithCode} Past Papers | Conceptualist`,
+      `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Papers | Conceptualist`,
+      `${currShort} ${subjDisplay} ${unitShort} | Conceptualist`,
+      `${currShort.replace('Edexcel ', '')} ${subjDisplay} ${unitShort} | Conceptualist`
+    ], 65);
 
-    const description = `View and practice ${docCount}+ ${currFull} ${subjDisplay} ${filterUnit}${codeBadge ? ` (${codeBadge})` : ''} Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) from ${minYr} to ${maxYr} side-by-side in Split View.`;
+    const codeNote = !unitWithCode.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
+    const shortCodeNote = !unitShort.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
+    const description = pickTitleVariant([
+      `Study ${docCount}+ ${currShort} ${subjDisplay} ${unitWithCode}${codeNote} Past Papers, Mark Schemes & Examiner Reports (${yrSpan}) in Split View.`,
+      `Study ${docCount}+ ${currShort} ${subjDisplay} ${unitWithCode}${codeNote} Past Papers, Mark Schemes & Examiner Reports (${yrSpan}).`,
+      `Study ${docCount}+ ${currShort} ${subjDisplay} ${unitShort}${shortCodeNote} Past Papers, Mark Schemes & Examiner Reports (${yrSpan}).`,
+      fitDescription(`Browse ${docCount}+ ${currShort} ${subjDisplay} ${unitShort} (${yrSpan}) Past Papers & Mark Schemes in Split View.`)
+    ], 158);
 
     const keywords = [
-      `${currShort} ${subjDisplay} ${filterUnit} past papers`,
+      `${currShort} ${subjDisplay} ${unitClean} past papers`,
       unitCode ? `${unitCode} past papers` : '',
       unitCode ? `${unitCode} mark scheme` : '',
       unitCode ? `${unitCode} question paper` : '',
       unitCode ? `${unitCode} Jan 2026` : '',
       unitCode ? `${unitCode} June 2025` : '',
-      igcseCode ? `${igcseCode} ${filterUnit} past papers` : '',
-      `${subjDisplay} ${filterUnit} mark scheme`,
+      igcseCode ? `${igcseCode} ${unitClean} past papers` : '',
+      `${subjDisplay} ${unitClean} mark scheme`,
       'Edexcel split view past papers'
     ].filter(Boolean).join(', ');
 
@@ -542,8 +688,9 @@ export function getSeoMetadata({
       description,
       keywords,
       canonicalUrl,
-      h1: `${currShort} ${subjDisplay} — ${filterUnit}${unitCode && !filterUnit.includes(unitCode) ? ` (${unitCode})` : ''} Past Papers`,
-      subtitle: `${docCount} verified Question Papers, Mark Schemes, and Examiner Reports covering ${minYr}–${maxYr}. Click any paper to study side-by-side in Split View.`
+      robots,
+      h1: `${currShort} ${subjDisplay} — ${unitWithCode} Past Papers (${yrSpan})`,
+      subtitle: `${docCount} verified Question Papers, Mark Schemes, and Examiner Reports covering ${yrSpan}. Click any sitting to study side-by-side in Split View.`
     };
   }
 
@@ -553,17 +700,37 @@ export function getSeoMetadata({
     const subjWizard = meta?.wizard?.[curr]?.[filterSubject];
     const docCount = subjWizard?.totalFiles || 150;
     const unitNames = Object.keys(subjWizard?.units || {});
-    const unitCodes = unitNames.map(getUnitCodeFromLabel).filter(Boolean);
+    const unitCodes = getUniqueOrderedUnitCodes(unitNames);
     const igcseCode = curr === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
     const cov = (curr === 'Edexcel IGCSE' ? meta?.igcseSubjectCoverage?.[filterSubject] : meta?.ialSubjectCoverage?.[filterSubject]) || '2014 – June 2026';
-    const codeStr = curr === 'Edexcel IGCSE' && igcseCode
+
+    const fullCodeStr = curr === 'Edexcel IGCSE' && igcseCode
       ? ` (${igcseCode})`
       : unitCodes.length > 0
         ? ` (${unitCodes.slice(0, 6).join(', ')})`
         : '';
 
-    const title = `${curr} ${subjDisplay}${codeStr} Past Papers, Mark Schemes & Books | Conceptualist Systems`;
-    const description = `Complete archive of ${docCount}+ ${currFull} ${subjDisplay}${codeStr} past exam papers, mark schemes, examiner reports, and textbooks (${cov}). Study QP and MS side-by-side on-site.`;
+    const shortCodeToken = curr === 'Edexcel IGCSE' && igcseCode
+      ? igcseCode.split(' / ')[0]
+      : formatCodeRangeForTitle(unitCodes, filterSubject === 'Math');
+    const shortCodeStr = shortCodeToken ? ` (${shortCodeToken})` : '';
+
+    const title = pickTitleVariant([
+      `${curr} ${subjDisplay}${shortCodeStr} Past Papers & MS | Conceptualist`,
+      `${curr} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
+      `${curr} ${subjDisplay} Past Papers & Mark Schemes | Conceptualist`,
+      `${curr.replace('Edexcel ', '')} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
+      `${curr.replace('Edexcel ', '')} ${subjDisplay}${shortCodeStr} Papers | Conceptualist`,
+      `${curr} ${subjDisplay} Past Papers | Conceptualist`
+    ], 65);
+
+    const description = pickTitleVariant([
+      `Browse ${docCount}+ ${curr} ${subjDisplay}${fullCodeStr} past exam papers, mark schemes, examiner reports & textbooks (${cov}) in Split View.`,
+      `Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} past exam papers, mark schemes, examiner reports & textbooks (${cov}) in Split View.`,
+      `Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} past papers, mark schemes & examiner reports (${cov}) in Split View.`,
+      fitDescription(`Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} past papers, mark schemes & textbooks (${cov}).`)
+    ], 158);
+
     const keywords = [
       `${curr} ${subjDisplay} past papers`,
       `${curr} ${subjDisplay} mark schemes`,
@@ -578,42 +745,50 @@ export function getSeoMetadata({
       description,
       keywords,
       canonicalUrl,
-      h1: `${curr} ${subjDisplay}${codeStr} Past Papers & Resources`,
-      subtitle: `Browse ${docCount} examination papers, mark schemes, examiner reports, and textbooks (${cov}) across ${unitNames.length || 'all'} course units.`
+      robots,
+      h1: `${curr} ${subjDisplay}${fullCodeStr} Past Papers & Resources`,
+      subtitle: `Browse ${docCount} unique examination papers, mark schemes, examiner reports, and textbooks (${cov}) across ${unitNames.length || 'all'} course units.`
     };
   }
 
   // Curriculum-level SEO metadata
   if (filterCurriculum === 'Edexcel IAL') {
+    const ialCount = getCurriculumUniqueCount(meta, 'Edexcel IAL');
+    const ialSubjCount = meta?.ialSubjects?.length || 19;
     return {
-      title: 'Edexcel IAL Past Papers, Mark Schemes & Textbooks (2003–2026) | Conceptualist Systems',
-      description: 'Browse 9,700+ Pearson Edexcel International A-Level (IAL) past papers, mark schemes, examiner reports, and textbooks across 19 subjects including Mathematics (WMA11–WMA14), Physics, Chemistry, Biology, Economics, and Business.',
+      title: 'Edexcel IAL Past Papers, Mark Schemes & Books | Conceptualist',
+      description: fitDescription(`Browse ${ialCount.toLocaleString()}+ Edexcel IAL past papers, mark schemes, examiner reports & books across ${ialSubjCount} subjects including Mathematics (WMA11–WMA14), Physics & Biology.`),
       keywords: 'Edexcel IAL past papers, International A Level past papers, Edexcel IAL mark schemes, WMA11, WCH11, WPH11, WBI11, WEC11, WBS11, Edexcel IAL textbooks',
       canonicalUrl,
+      robots,
       h1: 'Pearson Edexcel International A-Level (IAL) Past Papers & Textbooks',
-      subtitle: 'Complete archive across 19 IAL subjects (January 2003 – June 2026) with instant side-by-side Question Paper and Mark Scheme Split View.'
+      subtitle: `Complete archive across ${ialSubjCount} IAL subjects (${meta?.coverage || 'January 2003 – June 2026'}) with instant side-by-side Question Paper and Mark Scheme Split View.`
     };
   }
 
   if (filterCurriculum === 'Edexcel IGCSE') {
+    const igcseCount = getCurriculumUniqueCount(meta, 'Edexcel IGCSE');
+    const igcseSubjCount = meta?.igcseSubjects?.length || 18;
     return {
-      title: 'Edexcel IGCSE Past Papers, Mark Schemes & Textbooks (9–1) | Conceptualist Systems',
-      description: 'Browse 3,500+ Pearson Edexcel International GCSE (IGCSE 9–1 & Modular) past papers, mark schemes, examiner reports, and textbooks across 18+ subjects including Maths A (4MA1), Physics (4PH1), Chemistry (4CH1), and Biology (4BI1).',
+      title: 'Edexcel IGCSE Past Papers & Mark Schemes (9–1) | Conceptualist',
+      description: fitDescription(`Browse ${igcseCount.toLocaleString()}+ Edexcel IGCSE (9–1 & Modular) past papers, mark schemes, examiner reports & textbooks across ${igcseSubjCount} subjects (4MA1, 4PH1, 4CH1, 4BI1).`),
       keywords: 'Edexcel IGCSE past papers, International GCSE Edexcel past papers, 4MA1, 4PH1, 4CH1, 4BI1, Edexcel IGCSE Modular past papers, Regional 1R 2R past papers',
       canonicalUrl,
+      robots,
       h1: 'Pearson Edexcel International GCSE (IGCSE 9–1) Past Papers & Textbooks',
-      subtitle: 'Complete archive across 18+ IGCSE subjects including Foundation, Higher, Regional (R), and Modular series with instant Split View.'
+      subtitle: `Complete archive across ${igcseSubjCount} IGCSE subjects including Foundation, Higher, Regional (R), and Modular series with instant Split View.`
     };
   }
 
   // Default Homepage SEO metadata
   return {
-    title: 'Conceptualist Systems | Edexcel IAL & IGCSE Past Papers, Mark Schemes & Textbooks (2003–2026)',
-    description: 'Browse and study 13,940+ Pearson Edexcel International A-Level (IAL) and IGCSE (9–1) past papers, mark schemes, examiner reports, and textbooks (2003–2026) with instant side-by-side Split View.',
+    title: 'Conceptualist Systems | Edexcel IAL & IGCSE Past Papers',
+    description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.coverage || '2003–2026'}) side-by-side in Split View.`),
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Conceptualist Systems, WMA11, WCH11, WPH11, WBI11, 4MA1, mark schemes, examiner reports, Edexcel textbooks pdf',
     canonicalUrl: `${SITE_URL}/`,
+    robots,
     h1: 'Pearson Edexcel IAL & IGCSE Past Exam Papers & Textbooks',
-    subtitle: '13,940+ verified Question Papers, Mark Schemes, Examiner Reports, and Textbooks (January 2003 – June 2026).'
+    subtitle: `${uniqueFiles.toLocaleString()}+ unique Question Papers, Mark Schemes, Examiner Reports, and Textbooks across ${totalFiles.toLocaleString()} archived files (${meta?.coverage || 'January 2003 – June 2026'}).`
   };
 }
 
@@ -625,6 +800,7 @@ export function buildJsonLd({
   seo,
   meta = null
 }) {
+  const { uniqueFiles, totalFiles } = getArchiveCounts(meta);
   const breadcrumbs = [
     {
       '@type': 'ListItem',
@@ -678,7 +854,7 @@ export function buildJsonLd({
       url: `${SITE_URL}/`,
       name: 'Conceptualist Systems — Edexcel Past Papers & Textbooks Library',
       alternateName: ['Conceptualist Systems', 'Conceptualist Edexcel Library'],
-      description: 'High-speed academic repository of 13,940+ Pearson Edexcel IAL and IGCSE past exam papers, mark schemes, examiner reports, and textbooks.',
+      description: `High-speed academic repository indexing ${uniqueFiles.toLocaleString()}+ unique Pearson Edexcel IAL and IGCSE past exam papers, mark schemes, examiner reports, and textbooks (${totalFiles.toLocaleString()} archived files).`,
       potentialAction: {
         '@type': 'SearchAction',
         target: {
