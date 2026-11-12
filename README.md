@@ -8,7 +8,7 @@ A high-speed web application for searching, browsing, and viewing Pearson Edexce
 - **In-House WebPDF Reader & Split View:** Lazy-loaded canvas PDF reader powered by Mozilla PDF.js (`4.10.38`) featuring `IntersectionObserver` viewport virtualization, adaptive DPR scaling, animated download progress tracking, direct document download links, keyboard shortcuts, and synchronized side-by-side Split View (with adjustable desktop and mobile dividers).
 - **Three Academic Themes:** Instant, flicker-free cycling between **Academic Light**, **Academic Dark** (slate charcoal), and **Pure OLED** (`#000000`) with hue-preserving diagram/graph canvas inversion and dual persistence (`localStorage` + 1-year cookie).
 - **Dedicated Resource Viewers:** Automatically pairs Question Papers, Mark Schemes, and Examiner Reports per exam sitting, plays `AUD` language listening MP3s via themed audio cards, and serves `DF` practical `.zip` archives on `/data-files`.
-- **Canonical SEO & Route Sharding:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **40 compact JSON route shards**, **318 pre-rendered static HTML routes**, JSON-LD schema, Open Graph preview cards, and a **192-URL `sitemap.xml`**.
+- **Canonical SEO, Route Sharding & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **40 compact JSON route shards**, **318 pre-rendered static HTML routes**, JSON-LD schema, Open Graph preview cards, a **192-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
 - **View Tracking, History & Telemetry:** Serverless `/api/views` endpoint backed by MongoDB (with per-paper cooldown, rate limiting, and local JSON fallback), browser Recent History cards, and Vercel Web Analytics & Speed Insights.
 - **Mobile & Desktop Polish:** Responsive `100dvh` full-screen reader modals, `3 × 3` button navigation grid in the mobile footer, pixel-uniform headers, and `>= 16px` mobile inputs to prevent iOS Safari zoom.
 
@@ -85,10 +85,18 @@ After adding or organizing library documents in `Past Papers/`, `IAL Books/`, or
 npm run index
 ```
 
+### IndexNow & Environment Credentials
+
+Deployment tokens and `INDEXNOW_KEY` live locally in `.env` (see `.env.example` for template keys) and are stored encrypted inside the password-protected AES-256-GCM vault in `AI_INSTRUCTIONS_LIBRARY.md`. Production deploys via `scripts/deploy-vercel.js` automatically verify the static key file and submit `public/sitemap.xml` URLs to IndexNow, or you can trigger a standalone ping:
+
+```bash
+npm run indexnow
+```
+
 ## Project Structure
 
 - `api/`: Vercel serverless function (`views.js`) for paper popularity counters.
-- `public/`: Static assets, self-hosted WOFF2 fonts (`fonts/`), PDF.js runtime (`pdfjs/`), generated index/metadata (`meta.json`, `index.json`), Open Graph card (`og-card.png`), `robots.txt`, and `sitemap.xml`.
+- `public/`: Static assets, self-hosted WOFF2 fonts (`fonts/`), PDF.js runtime (`pdfjs/`), generated index/metadata (`meta.json`, `index.json`), Open Graph card (`og-card.png`), IndexNow verification `<INDEXNOW_KEY>.txt`, `robots.txt`, and `sitemap.xml`.
 - `scripts/`: Core automation utilities (`generate-index.js`, `build.js`, `prerender-seo.js`, `push-github.js`, `deploy-vercel.js`, `sync-hf.js`, `upload-live-index-hf.js`).
 - `src/`: Source code including `App.jsx`, lazy-loaded `PdfViewerPane.jsx`, `seoRoutes.js`, `unitParser.js`, `index.css`, and `main.jsx`.
 - `index.html`: Entry HTML with preloads and `<style id="critical-anti-fouc">` for flicker-free Light/Dark/OLED boot.

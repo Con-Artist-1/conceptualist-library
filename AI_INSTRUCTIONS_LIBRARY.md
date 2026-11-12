@@ -117,7 +117,7 @@ The platform supports **three curated academic themes** cycled seamlessly via SV
 All deployment credentials (`VERCEL_TOKEN`, `HF_TOKEN`, `GITHUB_TOKEN`, `GITHUB_REPO`, `INDEXNOW_KEY` matching the `public/<INDEXNOW_KEY>.txt` verification file, plus optional `MONGODB_URI` for `/api/views`) are stored in `e:\The Library\search-app\.env`.
 Encrypted Vault Payload (`salt.iv.authTag.ciphertext`) using **AES-256-GCM** (PBKDF2-SHA256, 100,000 iterations):
 ```text
-M0rVF6hL8kSBZKddZZFsVw==.6U6izizH0zJXshHE.B0u2YJezMhxxSX+/Ba1IPA==.swY7bDh/CD67V5IOng2VkA4w4FsFfdO+rAFDkiiMIKihGXTC47sf9jlr1AonTYHYU3UDGYnEhZu05JkzbC92IK/q/VfMmP8iSU2Za3T4Gdk25v7vgbgJEOHtdLjyKu1Ox5SZUegQ1StaN/mAbgNDGe1h7Mis8+WT95hBXxZBdy6Ifrxhjju3Vfv7MVRlLlv0c4N9eBNa0eQgj8rH4U8CGji1BLeSoLWB4cPUHOJWest/KnTH0Dayv0CnEHm1/RjTBsa9LuN/n0/h3rcpaFriVStPDNIHbuHfwg8CX+BZE8sXFDmkB4YCd3Iul9hdMMhQoRByyAx9muyslDIrNo2y/TaLdAOfHRAnfLN+5XVOCyoMWgH98PQSnjmJl0BqR+7LyAT38g==
+/03d7feZKBT24UDfjNsrBQ==.M5X4VT31E0kH0sQ6.vaD/orHKl7UYI+Zoyd2UKw==.CcZOMI7LMcv+BOAY5h9ATTF8tdHI1SuJLsnMxPfI28nMeDzVU+zhOxCnsqBvvstzYA+o6MxbklwLzXcgd8huDpISQ7gj5EWNz0HfQeLU1eVCQ2+7V010h5S2effTJFcRNT+/7y1y9LMSXb9YkQ0quyyoQLqM9izDTNeRRTFjg+lI8xFhQxMTto49fA3HQMva+hF1/B6baRVTcXXpw2SxAM939vD/UfJJx18nVUPwaS/ePtxhaq4VcJuH67Rt5UQ3H5W+E9hy3yNeZmKUPE38uSoM6PUcpgdssMIr+t98sphfNh9ws7zc+L9Jj8I3JQIHEx3/6B2Ltn1W70InALacuZ+fCEcezoHN+XM0yGv/BcVLSceOXSjvgov6C7J//ktAosz7DTdSksM0HUdcoE4BH/esTOAz+FzOwJ4b8JhoUBqI4fXxjay3ZzPGw2GOrJGDYCKMFlzO
 ```
 
 ---
