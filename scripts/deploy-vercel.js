@@ -23,13 +23,19 @@ function loadEnv() {
 }
 loadEnv();
 
-const TOKEN = process.argv[2] || process.env.VERCEL_TOKEN;
-if (!TOKEN) {
+const args = process.argv.slice(2);
+const INDEXNOW_ONLY = args.includes('--indexnow-only');
+const SKIP_INDEXNOW = args.includes('--skip-indexnow');
+const cliToken = args.find(arg => !arg.startsWith('--'));
+const TOKEN = cliToken || process.env.VERCEL_TOKEN;
+if (!INDEXNOW_ONLY && !TOKEN) {
   console.error('Missing VERCEL_TOKEN. Set it in search-app/.env or pass as CLI arg.');
   process.exit(1);
 }
 const PROJECT_ID = 'prj_aoqCf7hkChGqzoRb3WGb9cf2KAgp';
 const TEAM_ID = 'team_34CBzFBsKwAwot7TK9eTAPj8';
+const SITE_HOST = 'www.conceptualist.uk';
+const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
 
 const EXCLUDE = new Set([
   'node_modules',
@@ -77,7 +83,119 @@ function collectAppFiles(dir, baseDir = APP_DIR) {
   return list;
 }
 
+function decodeXmlEntities(str) {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function extractSitemapUrls() {
+  const sitemapPath = path.join(APP_DIR, 'public', 'sitemap.xml');
+  if (!fs.existsSync(sitemapPath)) {
+    throw new Error(`Sitemap not found at ${sitemapPath}`);
+  }
+  const xml = fs.readFileSync(sitemapPath, 'utf8');
+  const urls = [];
+  const seen = new Set();
+  const re = /<loc>([^<]+)<\/loc>/gi;
+  let match;
+  while ((match = re.exec(xml)) !== null) {
+    const url = decodeXmlEntities(match[1].trim());
+    if (url.startsWith(`https://${SITE_HOST}`) && !seen.has(url)) {
+      seen.add(url);
+      urls.push(url);
+    }
+  }
+  return urls;
+}
+
+async function verifyIndexNowKeyFile(key) {
+  const localKeyPath = path.join(APP_DIR, 'public', `${key}.txt`);
+  if (!fs.existsSync(localKeyPath)) {
+    throw new Error(`IndexNow key file missing at ${localKeyPath}`);
+  }
+  const localContent = fs.readFileSync(localKeyPath, 'utf8').trim();
+  if (localContent !== key) {
+    throw new Error(`Local IndexNow key file mismatch in ${localKeyPath}`);
+  }
+
+  const keyLocation = `https://${SITE_HOST}/${key}.txt`;
+  const maxAttempts = 4;
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(keyLocation, {
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      const body = (await res.text()).trim();
+      if (res.status === 200 && body === key) {
+        console.log(`[IndexNow] Verified live key file (${res.status} OK): ${keyLocation}`);
+        return keyLocation;
+      }
+      lastError = new Error(`Unexpected response from ${keyLocation}: HTTP ${res.status} (body length=${body.length})`);
+    } catch (err) {
+      lastError = err;
+    }
+    if (attempt < maxAttempts) {
+      console.log(`[IndexNow] Waiting for edge propagation (attempt ${attempt}/${maxAttempts})...`);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  throw lastError;
+}
+
+async function submitIndexNow() {
+  const key = (process.env.INDEXNOW_KEY || '').trim();
+  if (!key) {
+    if (INDEXNOW_ONLY) {
+      throw new Error('Missing INDEXNOW_KEY. Set it in search-app/.env or environment.');
+    }
+    console.log('[IndexNow] Skipping submission: INDEXNOW_KEY is not set.');
+    return;
+  }
+  if (!/^[a-z0-9-]{8,128}$/i.test(key)) {
+    throw new Error('Invalid INDEXNOW_KEY format (expected 8-128 [a-z0-9-] characters).');
+  }
+
+  console.log('\n=== IndexNow Verification & Submission ===');
+  const keyLocation = await verifyIndexNowKeyFile(key);
+  const urls = extractSitemapUrls();
+  if (urls.length === 0) {
+    throw new Error('No canonical URLs found in public/sitemap.xml');
+  }
+
+  const chunkSize = 10000;
+  for (let i = 0; i < urls.length; i += chunkSize) {
+    const chunk = urls.slice(i, i + chunkSize);
+    const res = await fetch(INDEXNOW_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        host: SITE_HOST,
+        key,
+        keyLocation,
+        urlList: chunk,
+      }),
+    });
+    const text = (await res.text()).trim();
+    if (res.status !== 200 && res.status !== 202) {
+      throw new Error(`IndexNow submission failed (HTTP ${res.status}): ${text || res.statusText}`);
+    }
+    console.log(
+      `[IndexNow] Submitted ${chunk.length} canonical URLs to ${INDEXNOW_ENDPOINT} -> HTTP ${res.status} ${res.statusText}${text ? ` (${text})` : ''}`
+    );
+  }
+}
+
 async function main() {
+  if (INDEXNOW_ONLY) {
+    await submitIndexNow();
+    return;
+  }
+
   console.log('=== Deploying search-app to Vercel Production ===');
   const files = collectAppFiles(APP_DIR);
   console.log(`Collected ${files.length} files to upload.`);
@@ -148,6 +266,11 @@ async function main() {
       console.log(`Live URLs:`);
       console.log(`  - https://www.conceptualist.uk`);
       console.log(`  - https://${statusObj.url}`);
+      if (!SKIP_INDEXNOW) {
+        await submitIndexNow();
+      } else {
+        console.log('[IndexNow] Skipped (--skip-indexnow).');
+      }
       return;
     }
     if (statusObj.readyState === 'ERROR' || statusObj.readyState === 'CANCELED') {

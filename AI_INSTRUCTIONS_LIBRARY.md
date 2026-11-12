@@ -60,11 +60,11 @@ The scripts directory contains strictly **7 essential utilities**. Do not leave 
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\push-github.js" "<commit message>"
    ```
-5. **Deploy to Vercel Production (`https://www.conceptualist.uk`):**
+5. **Deploy to Vercel Production (`https://www.conceptualist.uk`) & IndexNow Ping:**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\deploy-vercel.js"
    ```
-   *(Note: Production Vercel is connected directly to the GitHub repo; pushing to `main` also triggers automated deployment).*
+   *(Automatically verifies `https://www.conceptualist.uk/<INDEXNOW_KEY>.txt` once READY and submits all canonical `public/sitemap.xml` URLs to `api.indexnow.org`; supports `--indexnow-only` / `--skip-indexnow` and `npm run indexnow`. Pushing `main` on GitHub also triggers Vercel builds.)*
 6. **Sync Library Files to Hugging Face (`Diavlon/mcmaster-docs-library`):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\sync-hf.js"
@@ -114,7 +114,7 @@ The platform supports **three curated academic themes** cycled seamlessly via SV
 
 ## 6. Encrypted Token Vault & Environment Management
 
-All deployment credentials (`VERCEL_TOKEN`, `HF_TOKEN`, `GITHUB_TOKEN`, and `GITHUB_REPO`, plus optional `MONGODB_URI` for `/api/views`) are stored in `e:\The Library\search-app\.env`.
+All deployment credentials (`VERCEL_TOKEN`, `HF_TOKEN`, `GITHUB_TOKEN`, `GITHUB_REPO`, `INDEXNOW_KEY` matching the `public/<INDEXNOW_KEY>.txt` verification file, plus optional `MONGODB_URI` for `/api/views`) are stored in `e:\The Library\search-app\.env`.
 Encrypted Vault Payload (`salt.iv.authTag.ciphertext`) using **AES-256-GCM** (PBKDF2-SHA256, 100,000 iterations):
 ```text
 M0rVF6hL8kSBZKddZZFsVw==.6U6izizH0zJXshHE.B0u2YJezMhxxSX+/Ba1IPA==.swY7bDh/CD67V5IOng2VkA4w4FsFfdO+rAFDkiiMIKihGXTC47sf9jlr1AonTYHYU3UDGYnEhZu05JkzbC92IK/q/VfMmP8iSU2Za3T4Gdk25v7vgbgJEOHtdLjyKu1Ox5SZUegQ1StaN/mAbgNDGe1h7Mis8+WT95hBXxZBdy6Ifrxhjju3Vfv7MVRlLlv0c4N9eBNa0eQgj8rH4U8CGji1BLeSoLWB4cPUHOJWest/KnTH0Dayv0CnEHm1/RjTBsa9LuN/n0/h3rcpaFriVStPDNIHbuHfwg8CX+BZE8sXFDmkB4YCd3Iul9hdMMhQoRByyAx9muyslDIrNo2y/TaLdAOfHRAnfLN+5XVOCyoMWgH98PQSnjmJl0BqR+7LyAT38g==
