@@ -119,6 +119,18 @@ async function attachApiAndLibraryMiddlewares(server) {
     return sendJson(405, { error: 'Method not allowed' })
   })
 
+  server.middlewares.use('/_vercel', (req, res) => {
+    const cleanUrl = (req.url || '').split('?')[0]
+    if (cleanUrl.endsWith('.js')) {
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/javascript')
+      res.end('/* local vercel telemetry stub */')
+      return
+    }
+    res.statusCode = 204
+    res.end()
+  })
+
   const ALLOWED_LIBRARY_PREFIXES = ['Past Papers/', 'IAL Books/', 'IGCSE Books/']
 
   server.middlewares.use('/library-files', (req, res) => {

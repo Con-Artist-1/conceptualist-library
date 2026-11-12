@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.1.0",
     "mongodb": "^7.8.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

@@ -1,7 +1,7 @@
 {
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/((?!api/|assets/|fonts/|pdfjs/|.*\\.(?:css|js|json|svg|png|jpg|ico|xml|txt|mjs|woff|woff2)).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|_vercel/|assets/|fonts/|pdfjs/|shards/|.*\\.(?:css|js|json|svg|png|jpg|ico|xml|txt|mjs|woff|woff2)).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -23,11 +23,29 @@
       ]
     },
     {
-      "source": "/(ial|igcse|textbooks|about|changelog)",
+      "source": "/textbooks/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(ial|igcse|textbooks|data-files|audio|about|changelog)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/shards/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=86400, stale-while-revalidate=2592000"
         }
       ]
     },

@@ -5,7 +5,12 @@ import {
   buildRoutePath,
   parseRouteFromLocation,
   getSeoMetadata,
-  buildJsonLd
+  buildJsonLd,
+  getShardPathForRoute,
+  getLegacyEquivalentsForState,
+  inferCurriculumForSubject,
+  getCurriculumSlug,
+  getSubjectSlug
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 
@@ -32,10 +37,22 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.2';
+const APP_VERSION = 'v5.3';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.3',
+    date: BUILD_TIMESTAMP,
+    title: 'Instant Route Shards, Textbook & Resource Routes & Vercel Telemetry',
+    summary: 'Cut cold route load size by up to 96% with per-route JSON shards, launched canonical textbook, IT/CS data-file, and listening audio routes, enriched SSR HTML & OpenGraph previews, and enabled Vercel Web Analytics & Speed Insights.',
+    changes: [
+      'Route-sharded catalog streaming: Build generates 40 compact subject, textbook, data-file, and audio shards loaded in parallel with /meta.json on cold landings and seamlessly upgraded to the full index when searching globally.',
+      'Dedicated SEO resource routes: Added /textbooks/ial, /textbooks/igcse, 19 per-subject /textbooks/<curriculum>/<subject> pages, /data-files (34 IT & CS archives), and /audio (96 language listening MP3s) across sitemap and SSR pre-rendering.',
+      'Crawler & OpenGraph richness: Pre-rendered real exam sitting timelines, textbooks, legacy spec equivalents (WPH01–WPH07, C12/C34, 6PH01, 4WBI1/4WCH1/4WPH1), and 1200x630 og-card.png previews.',
+      'Production observability: Integrated Vercel Web Analytics and Speed Insights with zero impact on initial render performance.'
+    ]
+  },
   {
     version: 'v5.2',
     date: BUILD_TIMESTAMP,
@@ -387,6 +404,19 @@ const DOC_TYPE_INFO = {
   SAM: { label: 'SAM', fullLabel: 'Specimen / Syllabus', cls: 'sam' }
 };
 
+const SUBJECTS_WITH_BOOKS = {
+  'Edexcel IAL': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Information Technology', 'Math', 'Physics', 'Psychology']),
+  'Edexcel IGCSE': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Further Pure Mathematics', 'Human Biology', 'Information Technology', 'Mathematics A', 'Physics'])
+};
+
+const IAL_AUDIO_SUBJECTS = new Set(['French', 'German', 'Spanish']);
+
+function hasDataFilesForCourse(curriculum, subject) {
+  if (subject === 'Information Technology') return true;
+  if (subject === 'Computer Science' && curriculum !== 'Edexcel IAL') return true;
+  return false;
+}
+
 const QUERY_SYNONYMS = {
   'math': 'math mathematics maths',
   'maths': 'math mathematics maths',
@@ -424,6 +454,17 @@ const QUERY_SYNONYMS = {
   'book': 'book books textbook',
   'textbook': 'book books textbook',
   'textbooks': 'book books textbook',
+  'sol': 'sol solution solutions solutionbank textbook',
+  'solution': 'sol solution solutions solutionbank textbook',
+  'solutions': 'sol solution solutions solutionbank textbook',
+  'solutionbank': 'sol solution solutions solutionbank textbook',
+  'df': 'df data datafile datafiles zip',
+  'datafile': 'df data datafile datafiles zip',
+  'datafiles': 'df data datafile datafiles zip',
+  'aud': 'aud audio listening mp3',
+  'audio': 'aud audio listening mp3',
+  'listening': 'aud audio listening mp3',
+  'mp3': 'aud audio listening mp3',
   'u1': 'u1 unit 1 wma11 wbi11 wch11 wph11 wac11 wec11 wbs11 6bi01',
   'u2': 'u2 unit 2 wma12 wbi12 wch12 wph12 wac12 wec12 wbs12 6bi02',
   'u3': 'u3 unit 3 wma13 wbi13 wch13 wph13 wec13 wbs13 6bi03',
@@ -474,8 +515,14 @@ const SEARCH_VOCAB = [
   'human', 'information', 'technology', 'law', 'physics', 'psychology', 'spanish',
   'mechanics', 'statistics', 'decision', 'core', 'unit', 'paper', 'regional',
   'foundation', 'higher', 'question', 'mark', 'scheme', 'examiner', 'report',
-  'textbook', 'book', 'solutions', 'worked', 'specimen', 'listening', 'audio',
+  'textbook', 'book', 'solutions', 'solutionbank', 'worked', 'specimen', 'listening', 'audio', 'mp3',
+  'datafile', 'datafiles', 'modular', 'c12', 'c34',
   'january', 'june', 'october', 'november', 'summer', 'edexcel', 'igcse', 'ial',
+  'wph01', 'wph02', 'wph03', 'wph04', 'wph05', 'wph06', 'wph07',
+  '6ph01', '6ph02', '6ph03', '6ph04', '6ph05', '6ph06',
+  '6bi01', '6bi02', '6bi03', '6bi04', '6bi05', '6bi06',
+  '6ch01', '6ch02', '6ch03', '6ch04', '6ch05', '6ch06',
+  '4ma0', '4ph0', '4ch0', '4bi0',
   'wma11', 'wma12', 'wma13', 'wma14', 'wma01', 'wma02', 'wfm01', 'wfm02', 'wfm03',
   'wme01', 'wme02', 'wme03', 'wst01', 'wst02', 'wst03', 'wdm11', 'wdm01',
   'wbi11', 'wbi12', 'wbi13', 'wbi14', 'wbi15', 'wbi16',
@@ -2628,6 +2675,12 @@ function App() {
 
   const searchInputRef = useRef(null);
   const isPopStateRef = useRef(false);
+  const isFullIndexLoadedRef = useRef(false);
+  const isHydratedRef = useRef(false);
+  const hydratedShardPathRef = useRef(null);
+  const latestLoadedGenAtRef = useRef('');
+  const fullIndexPromiseRef = useRef(null);
+  const ensureFullIndexRef = useRef(null);
 
   // Sync global paper view counts strictly from server database via /api/views
   useEffect(() => {
@@ -2851,7 +2904,7 @@ function App() {
 
     // Wait for wizard metadata before overwriting a 3-segment unit URL on a cold cache visit
     const pathSegments = (window.location.pathname || '/').split('/').filter(Boolean);
-    const waitingForUnitHydration = pathSegments.length >= 3 && !filterUnit && !data.meta?.wizard;
+    const waitingForUnitHydration = pathSegments.length >= 3 && pathSegments[0] !== 'textbooks' && !filterUnit && !data.meta?.wizard;
     const activeNotFound = currentTab === 'library' && isNotFound;
 
     if (!waitingForUnitHydration && !activeNotFound) {
@@ -2925,6 +2978,7 @@ function App() {
       filterCurriculum,
       filterSubject,
       filterUnit,
+      filterDocType,
       seo: seoMeta,
       meta: data.meta
     });
@@ -2980,7 +3034,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const buildQuery = encodeURIComponent(BUILD_TIMESTAMP);
+    const initialShardRoute = getShardPathForRoute(initialRoute);
+
     // Clean up any older build caches in localStorage
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -2994,6 +3051,8 @@ function App() {
     }
 
     let metaLoadedTree = Boolean(initialCache?.tree);
+    let latestMeta = initialCache?.meta || null;
+    let shardFailed = false;
 
     const candidateIndexUrls = [
       '/index.json',
@@ -3031,8 +3090,9 @@ function App() {
       }
     };
 
-    const applyHydratedIndex = (json) => {
+    const applyHydratedIndex = (json, { isFull = true } = {}) => {
       setTimeout(() => {
+        if (cancelled || (!isFull && isFullIndexLoadedRef.current)) return;
         const tree = !metaLoadedTree
           ? (json.compactTree ? inflateCompactTree(json.compactTree) : json.tree)
           : null;
@@ -3096,7 +3156,21 @@ function App() {
                 (s.includes('June') ? 'may summer ' : s.includes('October') ? 'november nov ' : '') +
                 (fileObj.year || '') + ' ' +
                 dt + ' ' +
-                (dt === 'QP' ? 'question paper ' : dt === 'MS' ? 'mark scheme markscheme ' : dt === 'ER' ? 'examiner report ' : '') +
+                (dt === 'QP'
+                  ? 'question paper '
+                  : dt === 'MS'
+                  ? 'mark scheme markscheme '
+                  : dt === 'ER'
+                  ? 'examiner report '
+                  : dt === 'SOL'
+                  ? 'solution bank worked solutions '
+                  : dt === 'DF'
+                  ? 'data file datafiles practical zip '
+                  : dt === 'AUD'
+                  ? 'listening audio mp3 '
+                  : dt === 'Book'
+                  ? 'textbook student book '
+                  : '') +
                 fileObj.curriculum + ' ' +
                 (fileObj.category || '')
               ).toLowerCase();
@@ -3113,9 +3187,10 @@ function App() {
         };
 
         const hasPreDeduped = Boolean(
-          json.meta?.uniqueFiles &&
+          json.meta?.isShard ||
+          (json.meta?.uniqueFiles &&
           Array.isArray(flatFiles) &&
-          flatFiles.length === json.meta.uniqueFiles
+          flatFiles.length === json.meta.uniqueFiles)
         );
         const SIBLING_TYPES = new Set(['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM']);
         const preferSiblingCandidate = (existing, candidate) => {
@@ -3252,12 +3327,17 @@ function App() {
           delete item.searchChunks;
         }
 
+            if (cancelled || (!isFull && isFullIndexLoadedRef.current)) return;
+            isHydratedRef.current = true;
+            if (isFull) isFullIndexLoadedRef.current = true;
             setData(prev => ({
               tree: tree || prev.tree,
               flatFiles,
               dedupedFiles,
               unifiedFiles,
-              meta: json.meta || prev.meta || {}
+              meta: json.meta?.isShard
+                ? (prev.meta && prev.meta.wizard ? prev.meta : (latestMeta || prev.meta || {}))
+                : (json.meta || prev.meta || {})
             }));
             setLoading(false);
             setFilesLoading(false);
@@ -3265,45 +3345,113 @@ function App() {
           }, 0);
     };
 
-    const loadFullIndex = async (freshMeta = null) => {
-      setFilesLoading(true);
-      setLoadError(null);
-
-      // Check Cache API first and verify against fresh meta.json before hydrating in 0ms
-      try {
-        const cached = await getCachedIndex();
-        const isCacheValid = cached && (
-          !freshMeta ||
-          (cached.meta?.generatedAt === freshMeta.generatedAt && cached.meta?.uniqueFiles === freshMeta.uniqueFiles)
-        );
-        if (isCacheValid) {
-          applyHydratedIndex(cached);
-          return;
-        }
-      } catch {
-        // Fallback to network
+    const loadFullIndex = async (freshMeta = latestMeta, { showLoader = false } = {}) => {
+      if (cancelled) return;
+      if (
+        isFullIndexLoadedRef.current &&
+        (!freshMeta || latestLoadedGenAtRef.current === freshMeta.generatedAt)
+      ) {
+        return;
       }
+      if (fullIndexPromiseRef.current) return fullIndexPromiseRef.current;
 
-      // Stage 2: Background load full index.json using resilient multi-tier fallback
-      resilientFetch(candidateIndexUrls, {}, 50000)
-        .then(async (res) => {
+      const task = (async () => {
+        if (showLoader || !isHydratedRef.current) setFilesLoading(true);
+        setLoadError(null);
+
+        try {
+          const cached = await getCachedIndex();
+          const isCacheValid = cached && (
+            !freshMeta ||
+            (cached.meta?.generatedAt === freshMeta.generatedAt && cached.meta?.uniqueFiles === freshMeta.uniqueFiles)
+          );
+          if (isCacheValid && !cancelled) {
+            isFullIndexLoadedRef.current = true;
+            latestLoadedGenAtRef.current = cached.meta?.generatedAt || '';
+            hydratedShardPathRef.current = null;
+            applyHydratedIndex(cached, { isFull: true });
+            return;
+          }
+        } catch {
+          // Fallback to network
+        }
+
+        try {
+          const res = await resilientFetch(candidateIndexUrls, {}, 50000);
           const resClone = res.clone();
           const json = await res.json();
           saveCachedIndex(resClone);
-          applyHydratedIndex(json);
-        })
-        .catch(err => {
-          console.error('Failed to load index from all candidate sources:', err);
-          setLoading(false);
-          setFilesLoading(false);
-          setLoadError(err?.message || 'Connection delayed');
-        });
+          if (!cancelled) {
+            isFullIndexLoadedRef.current = true;
+            latestLoadedGenAtRef.current = json.meta?.generatedAt || '';
+            hydratedShardPathRef.current = null;
+            applyHydratedIndex(json, { isFull: true });
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error('Failed to load index from all candidate sources:', err);
+            setLoading(false);
+            setFilesLoading(false);
+            setLoadError(err?.message || 'Connection delayed');
+          }
+        } finally {
+          fullIndexPromiseRef.current = null;
+        }
+      })();
+
+      fullIndexPromiseRef.current = task;
+      return task;
     };
 
-    // Always validate against /meta.json (also consumes <link rel="preload" href="/meta.json">)
+    ensureFullIndexRef.current = (opts) => loadFullIndex(latestMeta, opts);
+
+    const hydrateInitialShard = async () => {
+      if (!initialShardRoute) return;
+      try {
+        const cached = await getCachedIndex();
+        const isCacheValid = cached && (
+          !latestMeta ||
+          (cached.meta?.generatedAt === latestMeta.generatedAt && cached.meta?.uniqueFiles === latestMeta.uniqueFiles)
+        );
+        if (isCacheValid && !cancelled) {
+          isFullIndexLoadedRef.current = true;
+          latestLoadedGenAtRef.current = cached.meta?.generatedAt || '';
+          hydratedShardPathRef.current = null;
+          applyHydratedIndex(cached, { isFull: true });
+          return;
+        }
+
+        const res = await fetch(initialShardRoute);
+        const contentType = res.headers.get('content-type') || '';
+        if (!res.ok || !contentType.includes('application/json')) {
+          throw new Error(`Shard unavailable (${res.status})`);
+        }
+        const shardJson = await res.json();
+        if (!Array.isArray(shardJson?.files)) {
+          throw new Error('Malformed shard payload');
+        }
+        if (!cancelled && !isFullIndexLoadedRef.current) {
+          hydratedShardPathRef.current = initialShardRoute;
+          applyHydratedIndex(shardJson, { isFull: false });
+        }
+      } catch {
+        shardFailed = true;
+        if (!cancelled) {
+          loadFullIndex(latestMeta);
+        }
+      }
+    };
+
+    if (initialShardRoute) {
+      hydrateInitialShard();
+    }
+
+    // Always validate against /meta.json in parallel with shard hydration
     resilientFetch(['/meta.json', `/meta.json?v=${buildQuery}`], {}, 25000)
       .then(res => res.json())
       .then(json => {
+        if (cancelled) return;
+        latestMeta = json.meta || null;
         const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
         if (tree) {
           metaLoadedTree = true;
@@ -3323,13 +3471,24 @@ function App() {
         } catch {
           // Ignore quota errors
         }
-        setTimeout(() => loadFullIndex(json.meta || null), 0);
+        const staleFullCache = isFullIndexLoadedRef.current && latestLoadedGenAtRef.current !== (json.meta?.generatedAt || '');
+        if (!initialShardRoute || shardFailed || staleFullCache) {
+          if (staleFullCache) isFullIndexLoadedRef.current = false;
+          setTimeout(() => loadFullIndex(json.meta || null), 0);
+        }
       })
       .catch(err => {
         console.warn('Meta fetch error, proceeding to cached or remote full index:', err);
-        loadFullIndex(null);
+        if (!initialShardRoute || shardFailed) {
+          loadFullIndex(null);
+        }
       });
-  }, [initialCache, retryCount]);
+
+    return () => {
+      cancelled = true;
+      fullIndexPromiseRef.current = null;
+    };
+  }, [initialCache, initialRoute, retryCount]);
 
   // Reset pagination when filters/search change
   useEffect(() => {
@@ -3683,6 +3842,208 @@ function App() {
     return data.meta?.coverage || 'January 2003 – January 2026';
   }, [filterSubject, filterCurriculum, data.meta]);
 
+  // Upgrade from a route shard to the full catalog index whenever global search or cross-route navigation requires it
+  useEffect(() => {
+    if (isFullIndexLoadedRef.current) return;
+    const activeShard = getShardPathForRoute({
+      currentTab,
+      filterCurriculum,
+      filterSubject,
+      filterDocType,
+      notFound: currentTab === 'library' && isNotFound
+    });
+    const switchedOutOfShard = Boolean(
+      hydratedShardPathRef.current &&
+      activeShard !== hydratedShardPathRef.current
+    );
+    const needsFull =
+      showWelcome ||
+      Boolean(deferredSearchQuery && deferredSearchQuery.trim()) ||
+      Boolean(selectedPath && selectedPath !== (data.tree?.path || '')) ||
+      switchedOutOfShard;
+    if (needsFull) {
+      ensureFullIndexRef.current?.({ showLoader: switchedOutOfShard && !showWelcome });
+    }
+  }, [
+    currentTab,
+    filterCurriculum,
+    filterSubject,
+    filterDocType,
+    isNotFound,
+    showWelcome,
+    deferredSearchQuery,
+    selectedPath,
+    data.tree
+  ]);
+
+  const archiveContextInfo = useMemo(() => {
+    if (currentTab !== 'library' || isNotFound || showWelcome) return null;
+    const effCurr = filterCurriculum || inferCurriculumForSubject(filterSubject, '');
+    const legacyInfo = getLegacyEquivalentsForState({
+      filterCurriculum: effCurr,
+      filterSubject,
+      filterUnit
+    });
+    const currSlug = effCurr ? getCurriculumSlug(effCurr) : '';
+    const subjSlug = filterSubject ? getSubjectSlug(filterSubject) : '';
+    const subjDisplay = filterSubject ? formatSubjectDisplay(filterSubject) : '';
+
+    const links = [];
+    if (filterSubject && currSlug && subjSlug) {
+      if (filterUnit) {
+        links.push({
+          href: `/${currSlug}/${subjSlug}`,
+          label: `All ${subjDisplay} Units & Papers`,
+          onClick: () => { setIsNotFound(false); setFilterUnit(''); setForceShowTable(true); }
+        });
+      }
+      const hasBooks = Boolean(SUBJECTS_WITH_BOOKS[effCurr]?.has(filterSubject));
+      if (hasBooks && filterDocType !== 'Book') {
+        const isMath = effCurr === 'Edexcel IAL' && filterSubject === 'Math';
+        links.push({
+          href: `/textbooks/${currSlug}/${subjSlug}`,
+          label: `${subjDisplay} Textbooks${isMath ? ' & Solution Banks' : ''}`,
+          onClick: () => {
+            setIsNotFound(false);
+            setFilterCurriculum(effCurr);
+            setFilterDocType('Book');
+            setFilterUnit('');
+            setFilterYear('');
+            setForceShowTable(true);
+          }
+        });
+      } else if (filterDocType === 'Book') {
+        links.push({
+          href: `/${currSlug}/${subjSlug}`,
+          label: `${subjDisplay} Past Papers & Mark Schemes`,
+          onClick: () => {
+            setIsNotFound(false);
+            setFilterDocType(null);
+            setForceShowTable(true);
+          }
+        });
+      }
+      if (hasDataFilesForCourse(effCurr, filterSubject) && filterDocType !== 'DF') {
+        links.push({
+          href: '/data-files',
+          label: 'IT & CS Data Files (.zip)',
+          onClick: () => {
+            clearFilters({ pushUrl: false });
+            setFilterDocType('DF');
+            setForceShowTable(true);
+          }
+        });
+      }
+      if (effCurr === 'Edexcel IAL' && IAL_AUDIO_SUBJECTS.has(filterSubject) && filterDocType !== 'AUD') {
+        links.push({
+          href: '/audio',
+          label: 'IAL Listening Audio (MP3)',
+          onClick: () => {
+            clearFilters({ pushUrl: false });
+            setFilterDocType('AUD');
+            setForceShowTable(true);
+          }
+        });
+      }
+    } else if (filterDocType === 'Book') {
+      if (filterCurriculum !== 'Edexcel IAL') {
+        links.push({
+          href: '/textbooks/ial',
+          label: 'Edexcel IAL Textbooks & Solution Banks',
+          onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IAL'); setFilterDocType('Book'); setForceShowTable(true); }
+        });
+      }
+      if (filterCurriculum !== 'Edexcel IGCSE') {
+        links.push({
+          href: '/textbooks/igcse',
+          label: 'Edexcel IGCSE (9-1) Textbooks',
+          onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IGCSE'); setFilterDocType('Book'); setForceShowTable(true); }
+        });
+      }
+    } else if (filterDocType === 'DF') {
+      links.push(
+        {
+          href: '/ial/information-technology',
+          label: 'IAL Information Technology',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Information Technology'); setForceShowTable(true); }
+        },
+        {
+          href: '/igcse/computer-science',
+          label: 'IGCSE Computer Science',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Computer Science'); setForceShowTable(true); }
+        },
+        {
+          href: '/igcse/information-technology',
+          label: 'IGCSE Information Technology',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Information Technology'); setForceShowTable(true); }
+        }
+      );
+    } else if (filterDocType === 'AUD') {
+      links.push(
+        {
+          href: '/ial/french',
+          label: 'IAL French Papers',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('French'); setForceShowTable(true); }
+        },
+        {
+          href: '/ial/german',
+          label: 'IAL German Papers',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('German'); setForceShowTable(true); }
+        },
+        {
+          href: '/ial/spanish',
+          label: 'IAL Spanish Papers',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Spanish'); setForceShowTable(true); }
+        }
+      );
+    } else if (filterCurriculum) {
+      links.push(
+        {
+          href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
+          label: `${filterCurriculum} Textbooks`,
+          onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
+        },
+        {
+          href: '/data-files',
+          label: 'IT & CS Data Files',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
+        }
+      );
+      if (filterCurriculum === 'Edexcel IAL') {
+        links.push({
+          href: '/audio',
+          label: 'Listening Audio Archive',
+          onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
+        });
+      }
+    }
+
+    let note = 'Every sitting pairs Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for instant on-site Split View inspection.';
+    if (filterDocType === 'Book') {
+      note = `Official Pearson Edexcel student books${filterCurriculum === 'Edexcel IAL' || filterSubject === 'Math' ? ' and worked Solution Banks' : ''} with range-streamed WebPDF viewing.`;
+    } else if (filterDocType === 'DF') {
+      note = 'Official Edexcel practical examination source archives (.zip) for IT and Computer Science coding, spreadsheet, database, and web tasks.';
+    } else if (filterDocType === 'AUD') {
+      note = 'Official Edexcel IAL Modern Languages listening examination audio tracks (MP3) with in-app playback alongside question papers.';
+    }
+
+    if (!legacyInfo && links.length === 0 && !filterCurriculum && !filterSubject) return null;
+
+    const heading = filterUnit
+      ? `${effCurr} ${subjDisplay} — ${filterUnit}`
+      : filterSubject
+        ? `${effCurr} ${subjDisplay} Specification & Resources`
+        : filterDocType === 'Book'
+          ? 'Edexcel Student Textbooks & Worked Solution Banks'
+          : filterDocType === 'DF'
+            ? 'Practical Examination Source Files (.zip)'
+            : filterDocType === 'AUD'
+              ? 'Modern Languages Listening Tracks (.mp3)'
+              : `${filterCurriculum || 'Edexcel Archive'} Resource Guide`;
+
+    return { heading, legacyInfo, note, links };
+  }, [currentTab, isNotFound, showWelcome, filterCurriculum, filterSubject, filterUnit, filterDocType, clearFilters]);
+
   if (loading) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#1A1D20', fontFamily: 'Roboto, sans-serif' }}>
@@ -3894,6 +4255,7 @@ function App() {
                 className="search-input"
                 placeholder={isMobile ? "Search unit, code, or year..." : "Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."}
                 value={searchQuery}
+                onFocus={() => ensureFullIndexRef.current?.()}
                 onChange={(e) => { setIsNotFound(false); setSearchQuery(e.target.value); }}
                 aria-label="Search by course code, subject, unit or year"
               />
@@ -4190,6 +4552,30 @@ function App() {
                   }}
                 >
                   Textbooks
+                </a>
+                <a
+                  href="/data-files"
+                  className="filter-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearFilters({ pushUrl: false });
+                    setFilterDocType('DF');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Data Files
+                </a>
+                <a
+                  href="/audio"
+                  className="filter-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    clearFilters({ pushUrl: false });
+                    setFilterDocType('AUD');
+                    setForceShowTable(true);
+                  }}
+                >
+                  Audio Archive
                 </a>
               </div>
             </div>
@@ -4544,6 +4930,37 @@ function App() {
                   )}
                 </div>
               )}
+
+              {archiveContextInfo && !(filesLoading && visibleFiles.length === 0) && (
+                <section className="archive-context-strip" aria-label="Archive specifications and related resources">
+                  <div className="archive-context-copy">
+                    <div className="archive-context-eyebrow">Specification &amp; Archive Reference</div>
+                    <h2 className="archive-context-heading">{archiveContextInfo.heading}</h2>
+                    {archiveContextInfo.legacyInfo && (
+                      <p className="archive-context-legacy">{archiveContextInfo.legacyInfo}</p>
+                    )}
+                    <p className="archive-context-note">{archiveContextInfo.note}</p>
+                  </div>
+                  {archiveContextInfo.links.length > 0 && (
+                    <nav className="archive-context-links" aria-label="Related course resources">
+                      {archiveContextInfo.links.map((item) => (
+                        <a
+                          key={item.href}
+                          href={item.href}
+                          className="archive-context-link"
+                          onClick={(e) => {
+                            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                            e.preventDefault();
+                            item.onClick();
+                          }}
+                        >
+                          {item.label} →
+                        </a>
+                      ))}
+                    </nav>
+                  )}
+                </section>
+              )}
             </>
           )}
         </main>
@@ -4635,6 +5052,34 @@ function App() {
             }}
           >
             Textbooks
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/data-files"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters({ pushUrl: false });
+              setFilterDocType('DF');
+              setForceShowTable(true);
+            }}
+          >
+            Data Files
+          </a>
+          <span className="footer-sep">•</span>
+          <a
+            href="/audio"
+            className="footer-link"
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentTab('library');
+              clearFilters({ pushUrl: false });
+              setFilterDocType('AUD');
+              setForceShowTable(true);
+            }}
+          >
+            Audio Archive
           </a>
           <span className="footer-sep">•</span>
           <a
