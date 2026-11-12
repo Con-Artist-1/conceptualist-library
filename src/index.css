@@ -314,17 +314,24 @@ a:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #FFFFFF;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 6px 14px;
+  height: 34px;
+  padding: 0 13px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
+  box-sizing: border-box;
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s;
   font-family: var(--font-family);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .header-nav-btn:hover,
@@ -338,17 +345,24 @@ a:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #FFFFFF;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 6px 12px;
+  height: 34px;
+  padding: 0 13px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
+  box-sizing: border-box;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  white-space: nowrap;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
   font-family: var(--font-family);
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .header-theme-btn:hover {
@@ -419,13 +433,18 @@ a.brand-section {
 .header-coverage-badge {
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 5px 12px;
+  height: 34px;
+  padding: 0 13px;
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: 13px;
+  line-height: 1;
+  box-sizing: border-box;
   color: #FFFFFF;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
@@ -438,6 +457,7 @@ a.brand-section {
 .header-coverage-badge strong {
   color: var(--mcmaster-gold);
   font-weight: 700;
+  line-height: 1;
 }
 
 /* ===================== MAIN SEARCH BANNER ===================== */
@@ -2527,6 +2547,85 @@ a.breadcrumb-link:hover {
   background: #FFFFFF;
 }
 
+.modal-resource-card {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: #EAE8E2;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.modal-resource-box {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-top: 4px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-md);
+  padding: 28px 24px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.modal-resource-box h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.modal-resource-box p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-family: 'Roboto Mono', monospace;
+  word-break: break-all;
+}
+
+.modal-audio-player {
+  width: 100%;
+  margin: 6px 0;
+  border-radius: var(--radius-sm);
+}
+
+.modal-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 18px;
+  margin-top: 4px;
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF !important;
+  border: 1px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none !important;
+  text-align: center;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  touch-action: manipulation;
+}
+
+.modal-download-btn:hover {
+  background: var(--mcmaster-maroon-hover);
+  border-color: var(--mcmaster-maroon-hover);
+  color: #FFFFFF !important;
+}
+
 /* ===================== CUSTOM HIGH-SPEED WEBPDF VIEWER (LIGHT MODE) ===================== */
 .custom-pdf-pane {
   display: flex;
@@ -4120,6 +4219,26 @@ html[data-theme='dark'] body {
   background: #121417 !important;
 }
 
+[data-theme='dark'] .modal-resource-card {
+  background: #121417 !important;
+}
+
+[data-theme='dark'] .modal-resource-box {
+  background: #1B1E23 !important;
+  border-color: #282C34 !important;
+  border-top-color: #8C1D2F !important;
+}
+
+[data-theme='dark'] .modal-download-btn {
+  background: #8C1D2F !important;
+  border-color: #A8253B !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .modal-download-btn:hover {
+  background: #A8253B !important;
+}
+
 [data-theme='dark'] .split-pane {
   background: #121417 !important;
 }
@@ -5402,6 +5521,26 @@ html[data-theme='oled'] body {
   background: #000000 !important;
 }
 
+[data-theme='oled'] .modal-resource-card {
+  background: #000000 !important;
+}
+
+[data-theme='oled'] .modal-resource-box {
+  background: #050505 !important;
+  border-color: #222222 !important;
+  border-top-color: #8C1D2F !important;
+}
+
+[data-theme='oled'] .modal-download-btn {
+  background: #8C1D2F !important;
+  border-color: #FF5370 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-download-btn:hover {
+  background: #A8253B !important;
+}
+
 [data-theme='oled'] .split-pane {
   background: #000000 !important;
 }
@@ -5665,15 +5804,13 @@ html[data-theme='oled'] body {
 
   .mobile-header-breadcrumb-content .breadcrumb-trail {
     display: flex !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    white-space: nowrap !important;
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    white-space: normal !important;
     color: rgba(255, 255, 255, 0.9);
     font-size: 11px;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     padding-bottom: 2px;
     width: 100% !important;
     max-width: 100% !important;
@@ -5690,10 +5827,20 @@ html[data-theme='oled'] body {
     background-color: rgba(0, 0, 0, 0.25);
     color: var(--mcmaster-gold);
     border: 1px solid rgba(253, 191, 87, 0.3);
-    padding: 3px 9px;
+    padding: 4px 10px;
+    min-height: 28px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.1;
+    display: inline-flex;
+    align-items: center;
     border-radius: 100px;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    box-sizing: border-box;
     text-decoration: none;
+    touch-action: manipulation;
   }
 
   .mobile-header-breadcrumb-content .breadcrumb-separator {
@@ -5719,6 +5866,9 @@ html[data-theme='oled'] body {
 
   .brand-section {
     min-width: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
     flex-shrink: 1;
     overflow: hidden;
   }
@@ -5747,16 +5897,20 @@ html[data-theme='oled'] body {
 
   .header-theme-btn {
     height: 32px;
-    padding: 0 9px;
-    font-size: 11.5px;
+    line-height: 1;
+    box-sizing: border-box;
+    padding: 0 10px;
+    font-size: 12px;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   .header-nav-btn {
     height: 32px;
+    line-height: 1;
+    box-sizing: border-box;
     padding: 0 10px;
-    font-size: 11.5px;
+    font-size: 12px;
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -5780,8 +5934,15 @@ html[data-theme='oled'] body {
 
   .search-input {
     width: 100%;
-    padding: 8px 34px 8px 34px;
-    font-size: 13px;
+    min-height: 42px;
+    padding: 8px 36px 8px 36px;
+    font-size: 16px;
+  }
+
+  .search-clear-btn {
+    width: 28px;
+    height: 28px;
+    right: 6px;
   }
 
   .search-shortcut-hint {
@@ -5790,8 +5951,9 @@ html[data-theme='oled'] body {
 
   .mobile-filter-toggle {
     display: flex !important;
-    width: 40px !important;
-    height: 38px !important;
+    width: 42px !important;
+    height: 42px !important;
+    touch-action: manipulation;
   }
 
   .mobile-filter-toggle.active {
@@ -5824,26 +5986,52 @@ html[data-theme='oled'] body {
   .filter-pills {
     flex-wrap: wrap;
     width: 100%;
+    gap: 6px;
   }
 
   .filter-btn {
     flex-shrink: 0;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: 12.5px;
+    touch-action: manipulation;
   }
 
   .filter-select {
     width: 100%;
     max-width: none;
+    min-height: 42px;
     padding: 8px 12px;
-    font-size: 13px;
+    font-size: 16px;
     margin-left: 0 !important;
+  }
+
+  .view-mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .view-mode-btn {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
   }
 
   .filter-reset-btn {
     margin-left: 0;
     align-self: flex-start;
     margin-top: 4px;
+    min-height: 36px;
+    padding: 7px 14px;
   }
 
   .content-area {
@@ -5879,7 +6067,14 @@ html[data-theme='oled'] body {
 
   .welcome-hero-actions button {
     width: 100%;
+    min-height: 40px;
+    padding: 10px 16px;
+    font-size: 13.5px;
     text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
   }
 
   .wizard-button-grid {
@@ -5888,6 +6083,15 @@ html[data-theme='oled'] body {
 
   .about-card {
     padding: 20px 16px;
+  }
+
+  .changelog-purge-btn {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .footer-bottom {
@@ -5905,6 +6109,28 @@ html[data-theme='oled'] body {
   .footer-update-micro {
     white-space: normal;
     text-align: center;
+  }
+
+  .footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 12px;
+    width: 100%;
+    max-width: 100%;
+    flex-shrink: 1;
+    box-sizing: border-box;
+  }
+
+  .footer-link {
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 4px 6px;
+  }
+
+  .footer-sep {
+    display: none;
   }
 
   .section-title {
@@ -5930,6 +6156,7 @@ html[data-theme='oled'] body {
 
   .filter-apply-btn {
     width: 100%;
+    min-height: 40px;
     margin-top: 10px;
     padding: 10px 14px;
     background: var(--mcmaster-maroon);
@@ -5942,10 +6169,36 @@ html[data-theme='oled'] body {
     text-align: center;
     box-shadow: var(--shadow-sm);
     transition: background 0.15s ease;
+    touch-action: manipulation;
   }
 
   .filter-apply-btn:hover {
     background: var(--mcmaster-maroon-hover);
+  }
+
+  .pagination-bar {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .pagination-info {
+    text-align: center;
+  }
+
+  .pagination-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .pagination-btn {
+    min-height: 38px;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
   }
 
   .file-table, .file-table tbody, .file-table tr, .file-table td {
@@ -5966,6 +6219,8 @@ html[data-theme='oled'] body {
     border-radius: 6px;
     background: #FFFFFF;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 135px;
   }
 
   .file-table tr:nth-child(even) {
@@ -6046,6 +6301,8 @@ html[data-theme='oled'] body {
     align-items: center;
     box-sizing: border-box;
     color: #FFFFFF !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .file-table .unified-doc-btn .btn-mobile-text {
@@ -6082,6 +6339,8 @@ html[data-theme='oled'] body {
     max-width: 100vw !important;
     height: 100vh !important;
     height: 100dvh !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
     border-radius: 0 !important;
     margin: 0 !important;
     transform: none !important;
@@ -6163,36 +6422,36 @@ html[data-theme='oled'] body {
 
   .modal-header-controls-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     width: 100%;
     max-width: 100%;
-    gap: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    gap: 5px;
     box-sizing: border-box;
-  }
-
-  .modal-header-controls-bar::-webkit-scrollbar {
-    display: none;
   }
 
   .modal-view-tabs {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 3px;
-    flex: 1;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .modal-btn {
-    height: 28px;
-    padding: 0 8px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 9px;
     font-size: 11px;
     border-radius: 4px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .modal-view-btn {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 44px;
     text-align: center;
     white-space: nowrap;
   }
@@ -6202,27 +6461,36 @@ html[data-theme='oled'] body {
   }
 
   .modal-engine-btn {
-    padding: 0 6px;
-    font-size: 10px;
-    height: 28px;
+    padding: 0 8px;
+    font-size: 11px;
+    height: 32px;
+  }
+
+  .modal-theme-toggle-btn {
+    height: 32px;
+    min-width: 34px;
+    padding: 0 8px;
+    flex-shrink: 0;
   }
 
   .modal-hide-header-btn {
-    padding: 0 6px;
-    font-size: 10px;
-    height: 28px;
+    padding: 0 9px;
+    font-size: 11px;
+    height: 32px;
+    flex-shrink: 0;
   }
 
   .modal-link-btn {
-    padding: 0 6px;
-    font-size: 10px;
-    height: 28px;
+    padding: 0 9px;
+    font-size: 11px;
+    height: 32px;
+    flex-shrink: 0;
   }
 
   .modal-close-btn {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
     font-size: 13px;
     font-weight: 900;
     border-radius: 4px;
@@ -6240,8 +6508,21 @@ html[data-theme='oled'] body {
   }
 
   .modal-docked-unhide-bar {
-    height: 30px;
-    font-size: 11px;
+    height: 34px;
+    font-size: 11.5px;
+    padding: 0 12px;
+  }
+
+  .modal-resource-box {
+    padding: 20px 16px;
+  }
+
+  .modal-download-btn {
+    width: 100%;
+  }
+
+  .pdf-skeleton-sheet {
+    padding: 18px 16px;
   }
 
   .modal-body.split-container {
@@ -6322,7 +6603,7 @@ html[data-theme='oled'] body {
   }
 
   .custom-pdf-pane.mobile-mode .pdf-pane-toolbar {
-    height: 38px;
+    height: 40px;
     padding: 0 8px;
     gap: 5px;
     background: #FFFFFF;
@@ -6351,12 +6632,14 @@ html[data-theme='oled'] body {
     background: #FFFFFF;
     border: 1px solid var(--border-medium);
     color: var(--text-primary);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .custom-pdf-pane.mobile-mode .pdf-page-input {
-    width: 36px;
-    height: 28px;
-    font-size: 12px;
+    width: 42px;
+    height: 32px;
+    font-size: 16px;
     background: #FFFFFF;
     border: 1px solid var(--border-medium);
     color: var(--text-primary);
@@ -7097,6 +7380,20 @@ html[data-theme='oled'] body {
   .file-title-top-flex {
     flex-wrap: wrap;
     gap: 6px;
+  }
+
+  .history-clear-btn {
+    min-height: 32px;
+    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .history-doc-btn {
+    min-height: 34px;
+    font-size: 12px;
+    touch-action: manipulation;
   }
 }
 

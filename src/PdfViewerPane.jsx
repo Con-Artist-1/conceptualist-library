@@ -87,8 +87,9 @@ const VirtualPdfPage = React.memo(({
       const computedScale = targetWidth / unscaledViewport.width;
       const viewport = page.getViewport({ scale: computedScale });
 
-      // High-DPI scaling capped at 2.5x to preserve GPU memory
-      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      // High-DPI scaling capped adaptively on zoomed mobile to preserve GPU memory
+      const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : 2.5;
+      const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       canvas.width = Math.floor(viewport.width * dpr);
       canvas.height = Math.floor(viewport.height * dpr);
       canvas.style.width = `${Math.floor(viewport.width)}px`;

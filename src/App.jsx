@@ -37,10 +37,21 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.3';
+const APP_VERSION = 'v5.4';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.4',
+    date: BUILD_TIMESTAMP,
+    title: 'Header Uniformity, Complete Mobile UI Audit & Touch Performance Overhaul',
+    summary: 'Aligned desktop and mobile header button dimensions pixel-for-pixel, fixed mobile footer link clipping and deep breadcrumb wrapping, styled in-modal audio/ZIP resource cards, prevented iOS Safari auto-zoom on all mobile inputs, and added mobile canvas/list memory optimizations.',
+    changes: [
+      'Desktop header pixel uniformity: Normalized height (34px), line-height, and border-box sizing across the date range badge, Light/Dark/OLED theme button, and About/Library navigation button.',
+      'Mobile footer & breadcrumbs: Wrapped global footer navigation cleanly without horizontal clipping, displayed full active breadcrumb filter pills on narrow viewports with concise mobile labels, and symmetrical full-width view toggles.',
+      'Resource modal & WebPDF mobile polish: Styled audio and ZIP archive cards across Light, Dark, and Pure OLED themes, added safe-area viewport inset support and adaptive zoomed canvas DPR capping, and eliminated iOS Safari focus zoom on search, filter, and page-number fields.'
+    ]
+  },
   {
     version: 'v5.3',
     date: BUILD_TIMESTAMP,
@@ -4021,7 +4032,8 @@ function App() {
     <div className={`breadcrumb-container ${classNameAdd}`}>
       <div className="breadcrumb-trail">
         <a href="/" className="breadcrumb-link home" onClick={navigateToHome}>
-          ← Library Home
+          <span className="btn-desktop-text">← Library Home</span>
+          <span className="btn-mobile-text">← Home</span>
         </a>
         {filterCurriculum && (
           <>
