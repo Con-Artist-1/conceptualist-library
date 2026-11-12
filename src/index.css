@@ -2292,6 +2292,7 @@ a.breadcrumb-link:hover {
   background: #F2F0EB;
   color: var(--text-secondary) !important;
   border-color: var(--border-medium);
+  gap: 5px;
 }
 
 .modal-link-btn:hover {
@@ -2826,12 +2827,13 @@ a.breadcrumb-link:hover {
   width: 45%;
   background: var(--mcmaster-maroon);
   border-radius: 2px;
-  animation: pdf-bar-slide 1.2s ease-in-out infinite alternate;
+  will-change: transform;
+  animation: pdf-bar-slide 1.15s ease-in-out infinite alternate;
 }
 
 @keyframes pdf-bar-slide {
-  0% { transform: translateX(-30%); width: 25%; }
-  100% { transform: translateX(250%); width: 50%; }
+  0% { transform: translateX(-25%); }
+  100% { transform: translateX(150%); }
 }
 
 .pdf-loading-title {
@@ -7386,9 +7388,9 @@ html[data-theme='oled'] body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *:not(.pdf-loading-bar-fill):not(.pdf-skeleton-spinner),
+  *:not(.pdf-loading-bar-fill):not(.pdf-skeleton-spinner)::before,
+  *:not(.pdf-loading-bar-fill):not(.pdf-skeleton-spinner)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

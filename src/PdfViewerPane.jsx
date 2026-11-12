@@ -166,8 +166,9 @@ export const PdfViewerPane = ({
   docType = 'QP',
   isMobile = false,
   initialPage = 1,
-  onOpenTab
+  onDownload = true
 }) => {
+  const downloadUrl = url ? (url.includes('?') ? `${url}&download=true` : `${url}?download=true`) : '';
   const paneIdRef = useRef(null);
   if (paneIdRef.current === null) {
     paneIdRef.current = nextPaneSeq++;
@@ -673,16 +674,20 @@ export const PdfViewerPane = ({
             +
           </button>
 
-          {onOpenTab && (
+          {onDownload && downloadUrl && (
             <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
+              href={downloadUrl}
+              download
+              rel="noopener noreferrer"
               className="pdf-tool-btn open-tab-btn"
-              title="Open raw PDF file in new browser tab"
-              aria-label="Open in new tab"
+              title="Download PDF"
+              aria-label="Download PDF"
             >
-              ↗
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
             </a>
           )}
         </div>
@@ -715,12 +720,12 @@ export const PdfViewerPane = ({
                 Retry
               </button>
               <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
+                href={downloadUrl || url}
+                download
+                rel="noopener noreferrer"
                 className="modal-action-link"
               >
-                Open Tab ↗
+                Download
               </a>
             </div>
           </div>

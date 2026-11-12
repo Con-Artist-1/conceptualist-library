@@ -660,6 +660,12 @@ function getHfUrl(filePath) {
   return `https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
 }
 
+function getDownloadUrl(filePath) {
+  const url = getHfUrl(filePath);
+  if (!url) return '';
+  return url.includes('?') ? `${url}&download=true` : `${url}?download=true`;
+}
+
 // Rehydrate compact [name, children] tree into { name, path, children } in ~1ms
 function inflateCompactTree(compactNode, parentPath = '', isRoot = true) {
   if (!compactNode) return null;
@@ -1177,7 +1183,6 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     return isMobile ? (file?.docType || (siblings.QP ? 'QP' : 'split')) : (canSplit ? 'split' : (file?.docType || 'QP'));
   });
 
-  const [engineMode, setEngineMode] = useState('custom'); // 'custom' (WebPDF) | 'native' (Built-IN)
   const [headerVisible, setHeaderVisible] = useState(true);
   const [desktopSplitRatio, setDesktopSplitRatio] = useState(50); // percentage for desktop split
   const [mobileSplitRatio, setMobileSplitRatio] = useState(50);   // percentage for mobile vertical split
@@ -1355,7 +1360,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     ? ''
     : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
 
-  const openTabUrl = isSplit ? getHfUrl(siblings.QP?.path) : singleUrl;
+  const downloadUrl = isSplit ? getDownloadUrl(siblings.QP?.path) : getDownloadUrl(currentDoc.path);
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={modalTitle}>
@@ -1460,16 +1465,6 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
 
               <div className="modal-control-separator" />
 
-              {/* WebPDF vs Built-IN Engine Switcher */}
-              <button
-                type="button"
-                className="modal-btn modal-engine-btn"
-                onClick={() => setEngineMode(engineMode === 'custom' ? 'native' : 'custom')}
-                title={engineMode === 'custom' ? 'Switch to built-in browser PDF embed' : 'Switch to WebPDF engine'}
-              >
-                {engineMode === 'custom' ? 'WebPDF' : 'Built-IN'}
-              </button>
-
               {/* Theme Toggle Button (Light / Dark / OLED) */}
               {onToggleTheme && (
                 <button
@@ -1514,16 +1509,20 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 <span className="btn-mobile-text">Hide</span>
               </button>
 
-              {/* Open raw PDF in browser tab */}
+              {/* Download PDF directly */}
               <a
-                href={openTabUrl}
-                target="_blank"
-                rel="noreferrer"
+                href={downloadUrl}
+                download
+                rel="noopener noreferrer"
                 className="modal-btn modal-link-btn"
-                title="Open document in new browser tab"
+                title="Download document"
               >
-                <span className="btn-desktop-text">Open Tab ↗</span>
-                <span className="btn-mobile-text">Tab ↗</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Download</span>
               </a>
 
               {/* Close Button */}
@@ -1558,32 +1557,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             <>
               {/* Question Paper Pane */}
               <div className="modal-split-pane qp-pane">
-                {engineMode === 'custom' ? (
-                  <Suspense fallback={<PdfPaneSkeleton title="Loading Question Paper..." subtitle="Initializing WebPDF Reader" />}>
-                    <PdfViewerPane
-                      url={getHfUrl(siblings.QP.path)}
-                      title={siblings.QP.name || 'Question Paper'}
-                      docType="QP"
-                      isMobile={isMobile}
-                      initialPage={1}
-                      onOpenTab={true}
-                    />
-                  </Suspense>
-                ) : (
-                  <>
-                    <div className="modal-split-label qp">
-                      <span>Question Paper</span>
-                      <a href={getHfUrl(siblings.QP.path)} target="_blank" rel="noreferrer" className="modal-pane-link" title="Open QP in new tab">
-                        Open Tab ↗
-                      </a>
-                    </div>
-                    <iframe
-                      src={getHfUrl(siblings.QP.path)}
-                      title="Question Paper"
-                      className="modal-iframe"
-                    />
-                  </>
-                )}
+                <Suspense fallback={<PdfPaneSkeleton title="Loading Question Paper..." subtitle="Initializing WebPDF Reader" />}>
+                  <PdfViewerPane
+                    url={getHfUrl(siblings.QP.path)}
+                    title={siblings.QP.name || 'Question Paper'}
+                    docType="QP"
+                    isMobile={isMobile}
+                    initialPage={1}
+                    onDownload={true}
+                  />
+                </Suspense>
               </div>
 
               {/* Desktop Horizontal Split Resizer */}
@@ -1630,32 +1613,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
 
               {/* Mark Scheme Pane */}
               <div className="modal-split-pane ms-pane">
-                {engineMode === 'custom' ? (
-                  <Suspense fallback={<PdfPaneSkeleton title="Loading Mark Scheme..." subtitle="Initializing WebPDF Reader" />}>
-                    <PdfViewerPane
-                      url={getHfUrl(siblings.MS.path)}
-                      title={siblings.MS.name || 'Mark Scheme'}
-                      docType="MS"
-                      isMobile={isMobile}
-                      initialPage={1}
-                      onOpenTab={true}
-                    />
-                  </Suspense>
-                ) : (
-                  <>
-                    <div className="modal-split-label ms">
-                      <span>Mark Scheme</span>
-                      <a href={getHfUrl(siblings.MS.path)} target="_blank" rel="noreferrer" className="modal-pane-link" title="Open MS in new tab">
-                        Open Tab ↗
-                      </a>
-                    </div>
-                    <iframe
-                      src={getHfUrl(siblings.MS.path)}
-                      title="Mark Scheme"
-                      className="modal-iframe"
-                    />
-                  </>
-                )}
+                <Suspense fallback={<PdfPaneSkeleton title="Loading Mark Scheme..." subtitle="Initializing WebPDF Reader" />}>
+                  <PdfViewerPane
+                    url={getHfUrl(siblings.MS.path)}
+                    title={siblings.MS.name || 'Mark Scheme'}
+                    docType="MS"
+                    isMobile={isMobile}
+                    initialPage={1}
+                    onDownload={true}
+                  />
+                </Suspense>
               </div>
             </>
           ) : (
@@ -1671,17 +1638,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                       </audio>
                     )}
                     <a
-                      href={singleUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                      href={downloadUrl}
+                      rel="noopener noreferrer"
                       download
                       className="modal-download-btn"
                     >
-                      Download {singleExt.toUpperCase()} Resource ({formatBytes(currentDoc.size)}) ↗
+                      Download {singleExt.toUpperCase()} Resource ({formatBytes(currentDoc.size)})
                     </a>
                   </div>
                 </div>
-              ) : engineMode === 'custom' ? (
+              ) : (
                 <Suspense fallback={<PdfPaneSkeleton title={`Loading ${singleTitle}...`} subtitle="Initializing WebPDF Reader" />}>
                   <PdfViewerPane
                     key={currentDoc.path}
@@ -1690,16 +1656,9 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     docType={currentDoc.docType || 'DOC'}
                     isMobile={isMobile}
                     initialPage={1}
-                    onOpenTab={true}
+                    onDownload={true}
                   />
                 </Suspense>
-              ) : (
-                <iframe
-                  key={currentDoc.path}
-                  src={singleUrl}
-                  title={singleTitle}
-                  className="modal-iframe"
-                />
               )}
             </div>
           )}
