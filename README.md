@@ -1,44 +1,44 @@
 # Conceptualist Systems — Past Papers & Textbooks Library
 
-A fast web application for searching, browsing, and viewing Pearson Edexcel past papers, mark schemes, examiner reports, and textbooks. The library covers International A-Level (IAL) and International GCSE (IGCSE) qualifications from 2003 through 2026.
+A high-speed web application for searching, browsing, and viewing Pearson Edexcel past papers, mark schemes, examiner reports, textbooks, IT/CS data files, and language listening audio. The curated repository spans **13,939 archived files** (**10,146 unique documents**) across **19 IAL subjects** and **18 IGCSE subjects** covering **January 2003 – June 2026**, live at `https://www.conceptualist.uk`.
 
 ## Features
 
-- Fast Search: Client-side search with typo tolerance and synonym matching across all indexed documents.
-- Filter and Browse: Filter papers by curriculum (IAL or IGCSE), subject, unit or paper code, and exam session.
-- In-Browser PDF Viewer: Read documents directly in the browser with single-document and side-by-side split view. Split view lets students compare question papers and mark schemes side by side with an adjustable divider.
-- OLED Dark Mode: Pure black dark theme with an inverted page filter that keeps graphs and diagrams legible.
-- Document Pairing: Automatically links question papers with their corresponding mark schemes and examiner reports for the same exam sitting.
-- Audio Support: In-browser audio playback for language listening examination tracks.
-- Recent History: Keeps track of recently opened papers in local browser storage for quick access.
-- Mobile and Desktop Support: Responsive layout designed for phones, tablets, and desktop screens.
+- **Fast Search & Single-Pass Filtering:** Client-side search with typo tolerance and legacy unit/specification matching (including C12/C34, WPH01–WPH07, 4WBI1/4WCH1/4WPH1, etc.), paired with single-pass filtering by curriculum (`IAL` or `IGCSE`), subject, unit/paper code, exam session, and document type.
+- **In-House WebPDF Reader & Split View:** Lazy-loaded canvas PDF reader powered by Mozilla PDF.js (`4.10.38`) featuring `IntersectionObserver` viewport virtualization, adaptive DPR scaling, animated download progress tracking, direct document download links, keyboard shortcuts, and synchronized side-by-side Split View (with adjustable desktop and mobile dividers).
+- **Three Academic Themes:** Instant, flicker-free cycling between **Academic Light**, **Academic Dark** (slate charcoal), and **Pure OLED** (`#000000`) with hue-preserving diagram/graph canvas inversion and dual persistence (`localStorage` + 1-year cookie).
+- **Dedicated Resource Viewers:** Automatically pairs Question Papers, Mark Schemes, and Examiner Reports per exam sitting, plays `AUD` language listening MP3s via themed audio cards, and serves `DF` practical `.zip` archives on `/data-files`.
+- **Canonical SEO & Route Sharding:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **40 compact JSON route shards**, **318 pre-rendered static HTML routes**, JSON-LD schema, Open Graph preview cards, and a **192-URL `sitemap.xml`**.
+- **View Tracking, History & Telemetry:** Serverless `/api/views` endpoint backed by MongoDB (with per-paper cooldown, rate limiting, and local JSON fallback), browser Recent History cards, and Vercel Web Analytics & Speed Insights.
+- **Mobile & Desktop Polish:** Responsive `100dvh` full-screen reader modals, `3 × 3` button navigation grid in the mobile footer, pixel-uniform headers, and `>= 16px` mobile inputs to prevent iOS Safari zoom.
 
 ## How It Works
 
-The application runs entirely on the client side after the initial page load. It uses a two-stage data loading process to keep loading times short:
+The frontend is designed for minimal cold-load payloads and zero runtime server bottlenecks:
 
-1. Initial Load: The browser first downloads a small metadata file (`public/meta.json`). This file contains the subject list, unit codes, and navigation tree, allowing the homepage and menus to display immediately.
-2. Background Search Index: While the user browses, the application loads the complete document index (`public/index.json`) in the background. Once loaded, users can search through thousands of documents instantly without sending search queries to a backend server.
-3. Document Viewing: PDFs are rendered on demand using a canvas-based PDF.js viewer. Pages are virtualized and only rendered when they enter the viewport, keeping memory usage low.
+1. **Instant Bootstrap (`public/meta.json`):** Loads the compact subject/unit catalog and navigation tree immediately for fast first paint.
+2. **Route-Sharded Loading (`dist/shards/*.json`):** Deep subject, textbook, audio, or data-file URLs fetch only their compact route shard (~4% of the full index size) in parallel with `meta.json`.
+3. **Full Catalog Upgrade (`public/index.json`):** Streams the tuple-encoded deduplicated search index seamlessly in the background (with Hugging Face `live_index.json` fallback) for instant global queries.
+4. **On-Demand PDF Virtualization:** PDF pages render lazily via WebPDF workers as they enter the scroll viewport and release offscreen textures to keep mobile and desktop memory bounded.
 
 ## Tech Stack
 
 - React 19
-- Vite
-- PDF.js
-- Plain CSS
+- Vite 8
+- Mozilla PDF.js (`4.10.38`)
+- Plain CSS (3-theme custom properties & responsive mobile grid/modal rules)
+- MongoDB Node Driver (`mongodb` for `/api/views`)
+- Vercel Web Analytics & Speed Insights
 - Oxlint
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (version 18 or newer)
+- Node.js (version 18 or newer; or Antigravity Electron Node runtime via `ELECTRON_RUN_AS_NODE=1` on Windows)
 - npm
 
 ### Installation
-
-Clone the repository and install dependencies:
 
 ```bash
 cd search-app
@@ -47,27 +47,31 @@ npm install
 
 ### Development
 
-Start the local development server:
+Start the local Vite dev server (includes `/api/views` JSON fallback and `/library-files/` disk byte-range streaming):
 
 ```bash
 npm run dev
 ```
 
-Open your browser and navigate to the local address displayed in the terminal (usually `http://localhost:5173`). In development mode, the local server can serve library files directly from your workspace.
+### Linting
+
+Verify code quality with Oxlint (`0` warnings/errors required):
+
+```bash
+npm run lint
+```
 
 ### Building for Production
 
-Compile the production bundle and generate static SEO routes:
+Compile the Vite bundle, generate `public/sitemap.xml` (`192` URLs), create `dist/shards/` (`40` route shards), and pre-render `318` static HTML pages into `dist/`:
 
 ```bash
 npm run build
 ```
 
-The output will be placed in the `dist` folder.
-
 ### Previewing the Build
 
-Preview the compiled production build locally:
+Preview the compiled production bundle locally:
 
 ```bash
 npm run preview
@@ -75,22 +79,31 @@ npm run preview
 
 ### Rebuilding the Index
 
-If you add new past papers or books to the collection, rebuild the metadata and search index files:
+After adding or organizing library documents in `Past Papers/`, `IAL Books/`, or `IGCSE Books/`, regenerate `public/meta.json`, `public/index.json`, root `live_index.json`, and SEO pre-renders:
 
 ```bash
 npm run index
 ```
 
-This runs the index generation script to update `public/meta.json` and `public/index.json`, followed by the static SEO pre-renderer.
-
 ## Project Structure
 
-- `public/`: Static files, fonts, and generated metadata (`meta.json` and `index.json`).
-- `scripts/`: Utilities for index generation (`generate-index.js`), app compilation (`build.js`), and SEO route pre-rendering (`prerender-seo.js`).
-- `src/`: React source code, including `App.jsx`, the custom PDF viewer (`PdfViewerPane.jsx`), and styling (`index.css`).
-- `index.html`: Main HTML entry point.
+- `api/`: Vercel serverless function (`views.js`) for paper popularity counters.
+- `public/`: Static assets, self-hosted WOFF2 fonts (`fonts/`), PDF.js runtime (`pdfjs/`), generated index/metadata (`meta.json`, `index.json`), Open Graph card (`og-card.png`), `robots.txt`, and `sitemap.xml`.
+- `scripts/`: Core automation utilities (`generate-index.js`, `build.js`, `prerender-seo.js`, `push-github.js`, `deploy-vercel.js`, `sync-hf.js`, `upload-live-index-hf.js`).
+- `src/`: Source code including `App.jsx`, lazy-loaded `PdfViewerPane.jsx`, `seoRoutes.js`, `unitParser.js`, `index.css`, and `main.jsx`.
+- `index.html`: Entry HTML with preloads and `<style id="critical-anti-fouc">` for flicker-free Light/Dark/OLED boot.
 - `package.json`: Project dependencies and npm scripts.
-- `vite.config.js`: Vite configuration and local development file server.
+- `vercel.json`: SPA rewrites, security/CSP headers, and route cache policies.
+- `vite.config.js`: Vite configuration and local disk streaming middleware.
+
+## Team
+
+- **Diavlon** — Founder & Lead Architect
+- **Naz** — Co-Founder & Systems Lead
+- **Jemison Flaren** — Systems Architect
+- **Gemin Arghen** — Infrastructure Engineer
+- **Claudis Oppen** — Research & Intelligence Lead
+- **Gemin Fauré Hidrojen** — Intern, Optimizer
 
 ## License
 

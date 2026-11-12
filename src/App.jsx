@@ -37,10 +37,20 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.5';
+const APP_VERSION = 'v5.6';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.6',
+    date: BUILD_TIMESTAMP,
+    title: 'Team Roster Update & Documentation Synchronization',
+    summary: 'Welcomed Gemin Fauré Hidrojen to the Conceptualist Systems team on the About page and brought README and AI developer guides up to date with the current v5 architecture.',
+    changes: [
+      'About Us & Team: Added Gemin Fauré Hidrojen (Intern, Optimizer) alongside the core 5-member Conceptualist Systems roster in the responsive 6-card grid.',
+      'Repository documentation sync: Updated AI_INSTRUCTIONS_APP.md, AI_INSTRUCTIONS_LIBRARY.md, and README.md with verified 13,939-file / 10,146-unique-record stats, 40 route shards, 318 pre-rendered static HTML routes, 3-theme Anti-FOUC specs, WebPDF v4.10.38 details, and MongoDB/Vercel telemetry configuration.'
+    ]
+  },
   {
     version: 'v5.5',
     date: BUILD_TIMESTAMP,
@@ -1950,6 +1960,10 @@ const AboutPage = ({ onGoHome }) => {
             <div className="team-card">
               <div className="team-name">Claudis Oppen</div>
               <div className="team-role">Research &amp; Intelligence Lead</div>
+            </div>
+            <div className="team-card">
+              <div className="team-name">Gemin Fauré Hidrojen</div>
+              <div className="team-role">Intern, Optimizer</div>
             </div>
           </div>
         </div>
