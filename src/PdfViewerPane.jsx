@@ -754,4 +754,4 @@ export const PdfViewerPane = ({
   );
 };
 
-export default PdfViewerPane;
+export default React.memo(PdfViewerPane);

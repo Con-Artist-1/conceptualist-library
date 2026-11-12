@@ -224,6 +224,20 @@ html {
   overflow-x: hidden;
 }
 
+/* Freeze hidden background app shell while full-screen PreviewModal covers viewport */
+html.modal-open .app-container > :not(.modal-backdrop) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Suppress cross-DOM CSS transitions during Light/Dark/OLED swaps so theme toggles finish in one frame */
+html.theme-switching *:not(.pdf-loading-bar-fill):not(.pdf-skeleton-spinner),
+html.theme-switching *:not(.pdf-loading-bar-fill):not(.pdf-skeleton-spinner)::before,
+html.theme-switching *:not(.pdf-loading-bar-fill):not(.pdf-skeleton-spinner)::after {
+  transition: none !important;
+  transition-duration: 0s !important;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--bg-page);
@@ -2861,6 +2875,7 @@ a.breadcrumb-link:hover {
   display: block;
   border-radius: 2px;
   background: #FFFFFF;
+  will-change: filter;
 }
 
 .pdf-skeleton-page {
@@ -6096,9 +6111,9 @@ html[data-theme='oled'] body {
 
   .footer-bottom {
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     text-align: center;
-    padding: 14px 16px;
+    padding: 16px 14px;
   }
 
   .footer-left-col {
@@ -6112,21 +6127,65 @@ html[data-theme='oled'] body {
   }
 
   .footer-links {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 4px 12px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
     width: 100%;
-    max-width: 100%;
+    max-width: 440px;
     flex-shrink: 1;
     box-sizing: border-box;
   }
 
   .footer-link {
-    white-space: nowrap;
     display: inline-flex;
     align-items: center;
-    min-height: 32px;
-    padding: 4px 6px;
+    justify-content: center;
+    width: 100%;
+    min-height: 36px;
+    padding: 6px;
+    background: #232529;
+    border: 1px solid rgba(212, 175, 55, 0.32);
+    border-radius: 6px;
+    font-size: clamp(10.5px, 2.85vw, 12px);
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+    text-decoration: none;
+    touch-action: manipulation;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .footer-link:hover,
+  .footer-link:active {
+    background: #2E3138;
+    border-color: var(--mcmaster-gold);
+    text-decoration: none;
+  }
+
+  [data-theme='dark'] .footer-link {
+    background: #1F232B;
+    border-color: #343A46;
+  }
+
+  [data-theme='dark'] .footer-link:hover,
+  [data-theme='dark'] .footer-link:active {
+    background: #282D37;
+    border-color: #D4AF37;
+  }
+
+  [data-theme='oled'] .footer-link {
+    background: #0D0D0D;
+    border-color: #2A2A2A;
+  }
+
+  [data-theme='oled'] .footer-link:hover,
+  [data-theme='oled'] .footer-link:active {
+    background: #181818;
+    border-color: #FFD33D;
   }
 
   .footer-sep {
