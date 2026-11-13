@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
+import { ensureLocalRedisRunning } from './scripts/local-redis.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -26,16 +27,18 @@ function readLocalViews() {
   try {
     if (!fs.existsSync(LOCAL_VIEWS_FILE)) return {}
     const parsed = JSON.parse(fs.readFileSync(LOCAL_VIEWS_FILE, 'utf8'))
+    if (parsed && typeof parsed.views === 'object') return parsed.views
+    if (parsed && typeof parsed.counts === 'object') return parsed.counts
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch {
     return {}
   }
 }
 
-function writeLocalViews(counts) {
+function writeLocalViews(views) {
   try {
     fs.mkdirSync(path.dirname(LOCAL_VIEWS_FILE), { recursive: true })
-    fs.writeFileSync(LOCAL_VIEWS_FILE, JSON.stringify(counts, null, 2))
+    fs.writeFileSync(LOCAL_VIEWS_FILE, JSON.stringify({ views, updatedAt: new Date().toISOString() }, null, 2))
   } catch {
     // Best-effort local persistence only
   }
@@ -44,6 +47,9 @@ function writeLocalViews(counts) {
 async function attachApiAndLibraryMiddlewares(server) {
   let cachedViewsHandler = null
   let viewsHandlerAttempted = false
+
+  // Ensure local Redis (127.0.0.1:6379) is running automatically during local dev/preview
+  void ensureLocalRedisRunning().catch(() => {})
 
   server.middlewares.use('/api/views', async (req, res) => {
     const sendJson = (statusCode, payload) => {
@@ -86,26 +92,26 @@ async function attachApiAndLibraryMiddlewares(server) {
       }
     }
 
-    if (cachedViewsHandler && process.env.MONGODB_URI) {
+    if (cachedViewsHandler) {
       try {
         await cachedViewsHandler(req, res)
         return
-      } catch {
-        // Fall through to local dev file store
+      } catch (err) {
+        console.warn('[vite /api/views] Handler error, using fallback:', err?.message || err)
       }
     }
 
-    const counts = readLocalViews()
+    const views = readLocalViews()
     if (req.method === 'GET') {
-      return sendJson(200, { ok: true, source: 'local-dev', counts })
+      return sendJson(200, { ok: true, source: 'local-dev', views })
     }
 
     if (req.method === 'POST') {
       const paperKey = typeof req.body?.paperKey === 'string' ? req.body.paperKey.trim().slice(0, 220) : ''
       if (!paperKey) return sendJson(400, { ok: false, error: 'Missing paperKey' })
-      const next = (counts[paperKey] || 0) + 1
-      counts[paperKey] = next
-      writeLocalViews(counts)
+      const next = (views[paperKey] || 0) + 1
+      views[paperKey] = next
+      writeLocalViews(views)
       return sendJson(200, {
         ok: true,
         source: 'local-dev',
