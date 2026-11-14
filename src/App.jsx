@@ -13,6 +13,20 @@ import {
   getSubjectSlug
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
+import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
+
+const normalizePaperTelemetryMode = (activeView, canSplit, fallbackDocType) => {
+  if (activeView === 'split' && canSplit) return 'split';
+  const rawType = String(
+    activeView && activeView !== 'split' ? activeView : fallbackDocType || 'QP'
+  )
+    .trim()
+    .toUpperCase();
+  if (rawType === 'QP') return 'qp';
+  if (rawType === 'MS') return 'ms';
+  if (rawType === 'ER') return 'er';
+  return 'other';
+};
 
 const PdfViewerPane = lazy(() => import('./PdfViewerPane.jsx'));
 
@@ -863,8 +877,6 @@ const VIEW_COOLDOWN_STORAGE_KEY = 'cs_paper_view_cooldown_v1';
 const VIEWER_ID_STORAGE_KEY = 'cs_viewer_id_v1';
 const ACTIVE_MODAL_PAPER_SESSION_KEY = 'cs_active_modal_paper_v1';
 const PAPER_VIEW_COOLDOWN_MS = 30 * 1000; // Strict 30-second cooldown per paper per user
-const DEFAULT_VIEWS_CACHE_TTL_MS = 60 * 60 * 1000; // ~1 hour Redis lifespan
-const DEGRADED_VIEWS_CACHE_TTL_MS = 30 * 1000;
 const MAX_HISTORY_ITEMS = 8;
 const inMemoryCooldownMap = new Map();
 
@@ -883,51 +895,33 @@ function sanitizeViewsMap(rawMap) {
 function readLocalViewsCache() {
   try {
     const raw = localStorage.getItem(VIEWS_CACHE_STORAGE_KEY);
-    if (!raw) return null;
+    if (raw === null) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.expiresAt !== 'number') {
-      return null;
-    }
-    const rawViews = parsed.views && typeof parsed.views === 'object' ? parsed.views : parsed.counts;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const rawViews = parsed.views && typeof parsed.views === 'object'
+      ? parsed.views
+      : (parsed.counts && typeof parsed.counts === 'object' ? parsed.counts : parsed);
     if (!rawViews || typeof rawViews !== 'object') return null;
-    return {
-      views: sanitizeViewsMap(rawViews),
-      cachedAt: Number(parsed.cachedAt) || 0,
-      expiresAt: parsed.expiresAt,
-      source: parsed.source || 'redis'
-    };
+    return sanitizeViewsMap(rawViews);
   } catch {
     return null;
   }
 }
 
-function writeLocalViewsCache(payload) {
-  const cleanViews = sanitizeViewsMap(
-    payload?.views && typeof payload.views === 'object' ? payload.views : payload?.counts
-  );
-  const now = Date.now();
-  let ttlMs = Number(payload?.ttlRemainingMs);
-  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
-    const serverExp = Number(payload?.expiresAt);
-    ttlMs = Number.isFinite(serverExp) && serverExp > now ? serverExp - now : DEFAULT_VIEWS_CACHE_TTL_MS;
-  }
-  if (payload?.source === 'server-store') {
-    ttlMs = Math.min(ttlMs, DEGRADED_VIEWS_CACHE_TTL_MS);
-  }
-  const expiresAt = now + ttlMs;
-  const record = {
-    views: cleanViews,
-    cachedAt: Number(payload?.cachedAt) || now,
-    expiresAt,
-    ttlRemainingMs: ttlMs,
-    source: payload?.source || 'redis'
-  };
+function writeLocalViewsCache(rawViewsObj) {
+  const cleanViews = sanitizeViewsMap(rawViewsObj);
   try {
-    localStorage.setItem(VIEWS_CACHE_STORAGE_KEY, JSON.stringify(record));
+    localStorage.setItem(
+      VIEWS_CACHE_STORAGE_KEY,
+      JSON.stringify({
+        views: cleanViews,
+        updatedAt: Date.now()
+      })
+    );
   } catch {
     // Ignore storage quota errors
   }
-  return record;
+  return cleanViews;
 }
 
 function updateSinglePaperInLocalViewsCache(paperKey, viewsCount) {
@@ -935,10 +929,9 @@ function updateSinglePaperInLocalViewsCache(paperKey, viewsCount) {
   const cleanCount = Number(viewsCount);
   if (!Number.isFinite(cleanCount) || cleanCount < 0) return;
   try {
-    const existing = readLocalViewsCache();
-    if (!existing) return;
-    existing.views[paperKey] = Math.floor(cleanCount);
-    localStorage.setItem(VIEWS_CACHE_STORAGE_KEY, JSON.stringify(existing));
+    const existingViews = readLocalViewsCache() || {};
+    existingViews[paperKey] = Math.max(Number(existingViews[paperKey]) || 0, Math.floor(cleanCount));
+    writeLocalViewsCache(existingViews);
   } catch {
     // Ignore storage quota errors
   }
@@ -1292,6 +1285,23 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     if (initialView && (siblings[initialView] || file?.docType === initialView)) return initialView;
     return isMobile ? (file?.docType || (siblings.QP ? 'QP' : 'split')) : (canSplit ? 'split' : (file?.docType || 'QP'));
   });
+
+  const telemetryPaperKey = file && !file.isPendingSkeleton ? getPaperViewKey(file) : '';
+  const telemetryMode = useMemo(() => {
+    if (!telemetryPaperKey) return '';
+    return normalizePaperTelemetryMode(activeView, canSplit, file?.docType);
+  }, [telemetryPaperKey, activeView, canSplit, file?.docType]);
+
+  useEffect(() => {
+    if (!telemetryPaperKey || !telemetryMode) {
+      setActivePaperTelemetry(null, null);
+      return undefined;
+    }
+    setActivePaperTelemetry(telemetryPaperKey, telemetryMode);
+    return () => {
+      setActivePaperTelemetry(null, null);
+    };
+  }, [telemetryPaperKey, telemetryMode]);
 
   const [headerVisible, setHeaderVisible] = useState(true);
   const [desktopSplitRatio, setDesktopSplitRatio] = useState(50); // percentage for desktop split
@@ -2347,9 +2357,10 @@ const WelcomePage = ({
                           e.stopPropagation();
                           onOpenPaper(item, 'split');
                         }}
-                        title="Open Question Paper and Mark Scheme in PDF Reader"
+                        title="Open Question Paper and Mark Scheme side by side in Split View"
                       >
-                        View
+                        <span className="btn-desktop-text">Split View</span>
+                        <span className="btn-mobile-text">Split</span>
                       </a>
                     )}
                   </div>
@@ -2673,7 +2684,7 @@ function App() {
   ), [initialCache]);
 
   const [isNotFound, setIsNotFound] = useState(Boolean(initialRoute.notFound));
-  const [viewsMap, setViewsMap] = useState(() => readLocalViewsCache()?.views || {});
+  const [viewsMap, setViewsMap] = useState(() => readLocalViewsCache() || {});
   const [recentHistory, setRecentHistory] = useState(() => getInitialRecentHistory());
 
   const [data, setData] = useState(() => ({
@@ -2801,22 +2812,7 @@ function App() {
   const latestLoadedGenAtRef = useRef('');
   const fullIndexPromiseRef = useRef(null);
   const ensureFullIndexRef = useRef(null);
-  const viewsRefreshTimerRef = useRef(null);
   const viewsInflightRef = useRef(null);
-
-  const scheduleNextViewsRefresh = useCallback((expiresAt, onExpire) => {
-    if (viewsRefreshTimerRef.current) {
-      clearTimeout(viewsRefreshTimerRef.current);
-      viewsRefreshTimerRef.current = null;
-    }
-    if (!Number.isFinite(expiresAt)) return;
-    // Wait until Redis's TTL expires (+300ms buffer) so client automatically refreshes outdated data
-    const delayMs = Math.min(Math.max(1000, expiresAt - Date.now() + 300), DEFAULT_VIEWS_CACHE_TTL_MS + 60000);
-    viewsRefreshTimerRef.current = setTimeout(() => {
-      viewsRefreshTimerRef.current = null;
-      onExpire();
-    }, delayMs);
-  }, []);
 
   const refreshViewsFromApi = useCallback(() => {
     if (viewsInflightRef.current) {
@@ -2832,11 +2828,8 @@ function App() {
         if (!payload || !payload.ok) return null;
         const mapObj = payload.views && typeof payload.views === 'object' ? payload.views : payload.counts;
         if (!mapObj || typeof mapObj !== 'object') return null;
-        const saved = writeLocalViewsCache(payload);
-        setViewsMap(saved.views);
-        scheduleNextViewsRefresh(saved.expiresAt, () => {
-          void refreshViewsFromApi();
-        });
+        const saved = writeLocalViewsCache(mapObj);
+        setViewsMap(saved);
         return saved;
       })
       .catch(() => null)
@@ -2845,9 +2838,9 @@ function App() {
       });
     viewsInflightRef.current = req;
     return req;
-  }, [scheduleNextViewsRefresh]);
+  }, []);
 
-  // Load instantly from browser localStorage; only call Redis API when missing or outdated (TTL expired)
+  // Load cached views directly from browser localStorage; only fetch once when empty, otherwise wait until user adds a view
   useEffect(() => {
     try {
       localStorage.removeItem('cs_paper_views_v1');
@@ -2856,39 +2849,14 @@ function App() {
       // Ignore storage errors
     }
 
-    const syncIfOutdated = () => {
-      const localCache = readLocalViewsCache();
-      if (!localCache || Date.now() >= localCache.expiresAt) {
-        void refreshViewsFromApi();
-      } else {
-        setViewsMap(localCache.views);
-        scheduleNextViewsRefresh(localCache.expiresAt, () => {
-          void refreshViewsFromApi();
-        });
-      }
-    };
+    if (readLocalViewsCache() === null) {
+      void refreshViewsFromApi();
+    }
+  }, [refreshViewsFromApi]);
 
-    syncIfOutdated();
-
-    const handleVisibilityOrFocus = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      const localCache = readLocalViewsCache();
-      if (!localCache || Date.now() >= localCache.expiresAt) {
-        void refreshViewsFromApi();
-      }
-    };
-
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    return () => {
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      if (viewsRefreshTimerRef.current) {
-        clearTimeout(viewsRefreshTimerRef.current);
-        viewsRefreshTimerRef.current = null;
-      }
-    };
-  }, [refreshViewsFromApi, scheduleNextViewsRefresh]);
+  useEffect(() => {
+    return initTelemetryTracker({ getViewerId: getOrCreateViewerId });
+  }, []);
 
   const recordPaperInteraction = useCallback((fileObj, preferredView = '', options = {}) => {
     if (!fileObj || fileObj.isPendingSkeleton) return;
@@ -2920,16 +2888,14 @@ function App() {
                 [vKey]: Math.max(Number(prev[vKey]) || 0, latestCount)
               }));
               updateSinglePaperInLocalViewsCache(vKey, latestCount);
+              if (payload.incremented) {
+                void refreshViewsFromApi();
+              }
             }
           })
           .catch(() => {
             // Do not fake increment if database request fails
           });
-      } else {
-        const localCache = readLocalViewsCache();
-        if (!localCache || Date.now() >= localCache.expiresAt) {
-          void refreshViewsFromApi();
-        }
       }
     }
 
@@ -4970,9 +4936,14 @@ function App() {
                                         openOnSiteReader(file, canSplit ? 'split' : 'QP');
                                       }}
                                       className={`unified-preview-btn ${canSplit ? 'split-btn' : ''}`}
-                                      title={canSplit ? "Open Question Paper and Mark Scheme in PDF Reader" : "Quick In-App PDF Preview"}
+                                      title={canSplit ? "Open Question Paper and Mark Scheme side by side in Split View" : "Quick In-App PDF Preview"}
                                     >
-                                      View
+                                      {canSplit ? (
+                                        <>
+                                          <span className="btn-desktop-text">Split View</span>
+                                          <span className="btn-mobile-text">Split</span>
+                                        </>
+                                      ) : 'View'}
                                     </a>
                                   )}
                                 </div>

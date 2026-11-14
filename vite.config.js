@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
-import { ensureLocalRedisRunning } from './scripts/local-redis.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -48,10 +47,7 @@ async function attachApiAndLibraryMiddlewares(server) {
   let cachedViewsHandler = null
   let viewsHandlerAttempted = false
 
-  // Ensure local Redis (127.0.0.1:6379) is running automatically during local dev/preview
-  void ensureLocalRedisRunning().catch(() => {})
-
-  server.middlewares.use('/api/views', async (req, res) => {
+  const loadAndRunApiHandler = async (fileName, state, req, res, logTag) => {
     const sendJson = (statusCode, payload) => {
       res.statusCode = statusCode
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -81,25 +77,69 @@ async function attachApiAndLibraryMiddlewares(server) {
       }
     }
 
-    if (!viewsHandlerAttempted) {
-      viewsHandlerAttempted = true
+    if (!state.attempted) {
+      state.attempted = true
       try {
-        const viewsModuleUrl = pathToFileURL(path.join(__dirname, 'api', 'views.js')).href
-        const mod = await import(/* @vite-ignore */ viewsModuleUrl)
-        cachedViewsHandler = mod.default
+        const moduleUrl = pathToFileURL(path.join(__dirname, 'api', fileName)).href
+        const mod = await import(/* @vite-ignore */ moduleUrl)
+        state.handler = mod.default
       } catch {
-        cachedViewsHandler = null
+        state.handler = null
       }
     }
 
-    if (cachedViewsHandler) {
+    if (state.handler) {
       try {
-        await cachedViewsHandler(req, res)
-        return
+        await state.handler(req, res)
+        return { handled: true, sendJson }
       } catch (err) {
-        console.warn('[vite /api/views] Handler error, using fallback:', err?.message || err)
+        console.warn(`[vite ${logTag}] Handler error, using fallback:`, err?.message || err)
       }
     }
+    return { handled: false, sendJson }
+  }
+
+  const telemetryHandlerState = { attempted: false, handler: null }
+  server.middlewares.use('/api/telemetry', async (req, res) => {
+    const { handled, sendJson } = await loadAndRunApiHandler(
+      'telemetry.js',
+      telemetryHandlerState,
+      req,
+      res,
+      '/api/telemetry'
+    )
+    if (handled) return
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST')
+      sendJson(405, { ok: false, error: 'Method not allowed' })
+      return
+    }
+    sendJson(202, { ok: true, localFallback: true })
+  })
+
+  server.middlewares.use('/api/views', async (req, res) => {
+    const viewsHandlerState = {
+      get attempted() {
+        return viewsHandlerAttempted
+      },
+      set attempted(val) {
+        viewsHandlerAttempted = val
+      },
+      get handler() {
+        return cachedViewsHandler
+      },
+      set handler(val) {
+        cachedViewsHandler = val
+      }
+    }
+    const { handled, sendJson } = await loadAndRunApiHandler(
+      'views.js',
+      viewsHandlerState,
+      req,
+      res,
+      '/api/views'
+    )
+    if (handled) return
 
     const views = readLocalViews()
     if (req.method === 'GET') {

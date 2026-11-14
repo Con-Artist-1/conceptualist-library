@@ -1873,7 +1873,11 @@ a.breadcrumb-link:hover {
 }
 
 .unified-doc-btn .btn-desktop-text,
-.unified-doc-btn .btn-mobile-text {
+.unified-doc-btn .btn-mobile-text,
+.unified-preview-btn .btn-desktop-text,
+.unified-preview-btn .btn-mobile-text,
+.history-doc-btn .btn-desktop-text,
+.history-doc-btn .btn-mobile-text {
   color: inherit;
   font-weight: inherit;
   font-size: inherit;
@@ -6364,7 +6368,8 @@ html[data-theme='oled'] body {
     -webkit-tap-highlight-color: transparent;
   }
 
-  .file-table .unified-doc-btn .btn-mobile-text {
+  .file-table .unified-doc-btn .btn-mobile-text,
+  .file-table .unified-preview-btn .btn-mobile-text {
     display: inline !important;
     font-size: 13.5px !important;
     font-weight: 800 !important;
@@ -6372,7 +6377,8 @@ html[data-theme='oled'] body {
     color: #FFFFFF !important;
   }
 
-  .file-table .unified-doc-btn .btn-desktop-text {
+  .file-table .unified-doc-btn .btn-desktop-text,
+  .file-table .unified-preview-btn .btn-desktop-text {
     display: none !important;
   }
 
@@ -7453,6 +7459,14 @@ html[data-theme='oled'] body {
     min-height: 34px;
     font-size: 12px;
     touch-action: manipulation;
+  }
+
+  .history-doc-btn .btn-mobile-text {
+    display: inline !important;
+  }
+
+  .history-doc-btn .btn-desktop-text {
+    display: none !important;
   }
 }
 
