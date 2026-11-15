@@ -3317,6 +3317,7 @@ a.breadcrumb-link:hover {
 }
 
 .modal-subtitle-drawer {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;

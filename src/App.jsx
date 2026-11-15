@@ -1597,6 +1597,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const audioPlayerRef = useRef(null);
   const audioCurrentTimeRef = useRef(0);
   const transcriptListRef = useRef(null);
+  const prevTranscriptExpandedRef = useRef(false);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
   const [subtitleEntry, setSubtitleEntry] = useState(null);
@@ -1800,21 +1801,13 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const activeSubtitleIdx = useMemo(() => {
     if (!subtitleSegments.length) return -1;
     const t = audioCurrentTime;
+    let active = 0;
     for (let i = 0; i < subtitleSegments.length; i++) {
-      const s = subtitleSegments[i];
-      if (t >= s.start - 0.25 && t <= s.end + 0.6) {
-        return i;
+      if (subtitleSegments[i].start - 0.18 <= t) {
+        active = i;
       }
     }
-    let lastStarted = 0;
-    for (let i = 0; i < subtitleSegments.length; i++) {
-      if (subtitleSegments[i].start <= t + 0.25) {
-        lastStarted = i;
-      } else {
-        break;
-      }
-    }
-    return lastStarted;
+    return active;
   }, [subtitleSegments, audioCurrentTime]);
 
   const activeSubtitleSeg = activeSubtitleIdx >= 0 ? subtitleSegments[activeSubtitleIdx] : null;
@@ -1824,15 +1817,29 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
       : null;
 
   useEffect(() => {
-    if (!transcriptExpanded || activeSubtitleIdx < 0 || !transcriptListRef.current) return;
+    if (!subtitlesEnabled || !transcriptExpanded || !transcriptListRef.current) {
+      prevTranscriptExpandedRef.current = false;
+      return;
+    }
+    const justOpened = !prevTranscriptExpandedRef.current;
+    prevTranscriptExpandedRef.current = true;
+    if (activeSubtitleIdx < 0) return;
+
     const container = transcriptListRef.current;
     const activeBtn = container.querySelector(`[data-seg-idx="${activeSubtitleIdx}"]`);
     if (activeBtn) {
-      const targetTop =
-        activeBtn.offsetTop - container.clientHeight / 2 + activeBtn.clientHeight / 2;
-      container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeBtn.getBoundingClientRect();
+      const relTop = activeRect.top - containerRect.top + container.scrollTop;
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      const desiredTop = relTop - container.clientHeight / 2 + activeRect.height / 2;
+      const targetTop = Math.min(maxScroll, Math.max(0, desiredTop));
+      container.scrollTo({
+        top: targetTop,
+        behavior: justOpened ? 'auto' : 'smooth'
+      });
     }
-  }, [activeSubtitleIdx, transcriptExpanded]);
+  }, [activeSubtitleIdx, transcriptExpanded, subtitlesEnabled, subtitleSegments]);
 
   const handleAudioTimeUpdate = useCallback((e) => {
     const t = e.currentTarget?.currentTime || 0;
