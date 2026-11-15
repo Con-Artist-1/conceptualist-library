@@ -37,7 +37,7 @@ The naming conventions depend on the source batch:
 ## 3. Web Application, Route Sharding & Indexing
 
 The front-end application (React 19 + Vite 8 + Vercel Web Analytics & Speed Insights + MongoDB view counter `/api/views`) located at `e:\The Library\search-app` uses multi-stage static data loading:
-- `public/meta.json`: High-speed compact metadata & tree for `0ms` initial UI hydration.
+- `public/meta.json`: High-speed compact metadata & wizard catalog for `0ms` initial UI hydration.
 - `dist/shards/*.json`: **40 compact route shards** loaded in parallel with `meta.json` on cold landing pages (up to 96% smaller than full index payloads).
 - `public/index.json`: Tuple-encoded (`keys` + `files`) deduplicated global catalog loaded on demand / background upgrade, with Hugging Face `live_index.json` fallback.
 

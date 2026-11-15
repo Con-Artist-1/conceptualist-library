@@ -10,8 +10,7 @@ import {
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
   getCurriculumSlug,
-  getSubjectSlug,
-  resolveSubjectFromSlug
+  getSubjectSlug
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
@@ -52,10 +51,21 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.7';
+const APP_VERSION = 'v5.8';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.8',
+    date: BUILD_TIMESTAMP,
+    title: 'Zero Theme Layout Shift, Decluttered Centered Layout & Smooth WebPDF',
+    summary: 'Eliminated horizontal and vertical layout shifts across Light, Dark, and Pure OLED themes, removed the redundant left sidebar for a centered layout, restored Dark Mode subject unit cards, placed Recently Viewed counters alongside bottom actions, and stabilized WebPDF loading and scrolling.',
+    changes: [
+      'Zero theme-switch movement: Standardized 8px custom scrollbars, 2px/1px header/search/footer/modal borders, input border & font-weight, subject count badge borders, and theme button minimum widths across Light, Dark, and Pure OLED.',
+      'Decluttered layout & Dark Mode unit cards: Removed the redundant Repository Categories sidebar to center the catalog and search controls at 1280px, and restored high-contrast unit cards and group headings in Dark Mode Subject selection.',
+      'Recently Viewed & WebPDF reliability: Moved the view counter onto the bottom card action bar beside Split View, eliminated initial WebPDF canvas resize jumps by resolving Page 1 dimensions and resetting scroll before mount, and deferred idle index hydration on the home page.'
+    ]
+  },
   {
     version: 'v5.7',
     date: BUILD_TIMESTAMP,
@@ -746,22 +756,6 @@ function getDownloadUrl(filePath) {
   return url.includes('?') ? `${url}&download=true` : `${url}?download=true`;
 }
 
-// Rehydrate compact [name, children] tree into { name, path, children } in ~1ms
-function inflateCompactTree(compactNode, parentPath = '', isRoot = true) {
-  if (!compactNode) return null;
-  if (typeof compactNode === 'string') {
-    const nodePath = isRoot ? '' : (parentPath ? `${parentPath}/${compactNode}` : compactNode);
-    return { name: compactNode, path: nodePath, children: [] };
-  }
-  if (Array.isArray(compactNode)) {
-    const [name, rawChildren] = compactNode;
-    const nodePath = isRoot ? '' : (parentPath ? `${parentPath}/${name}` : name);
-    const children = (rawChildren || []).map(c => inflateCompactTree(c, nodePath, false));
-    return { name, path: nodePath, children };
-  }
-  return compactNode;
-}
-
 // Strip redundant subject prefix from unitName (e.g. "Accounting Unit 1 (WAC11)" -> "Unit 1 (WAC11)")
 function getShortUnitDisplay(file) {
   let u = file.unitName || (file.unitCode ? `Unit ${file.unitCode}` : '');
@@ -857,54 +851,6 @@ function getUnifiedSittingTitle(file) {
   if (!mainParts) return getDisplayTitle(file);
   return timePart ? `${mainParts} • ${timePart}` : mainParts;
 }
-
-// ─── Institutional Sidebar Tree Node ─────────────────────────────
-const TreeNode = React.memo(({ node, currentPath, onSelect, expandedPaths, toggleExpand }) => {
-  if (!node || !node.children) return null;
-  const isExpanded = expandedPaths.has(node.path);
-  const isSelected = currentPath === node.path;
-  const hasSubDirs = node.children && node.children.length > 0;
-
-  const handleClick = (e) => {
-    e.preventDefault();
-    onSelect(node.path);
-    if (hasSubDirs) {
-      toggleExpand(node.path);
-    }
-  };
-
-  return (
-    <div className="tree-node">
-      <div
-        className={`tree-item ${isSelected ? 'selected' : ''}`}
-        onClick={handleClick}
-        role="button"
-        tabIndex={0}
-        aria-expanded={isExpanded}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(e); }}
-      >
-        <span className="tree-indicator">
-          {hasSubDirs ? (isExpanded ? '−' : '+') : '•'}
-        </span>
-        <span className="tree-name">{node.name}</span>
-      </div>
-      {isExpanded && hasSubDirs && (
-        <div className="tree-children">
-          {node.children.map((child) => (
-            <TreeNode
-              key={child.path}
-              node={child}
-              currentPath={currentPath}
-              onSelect={onSelect}
-              expandedPaths={expandedPaths}
-              toggleExpand={toggleExpand}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-});
 
 const HISTORY_STORAGE_KEY = 'cs_recent_papers_v1';
 const VIEWS_CACHE_STORAGE_KEY = 'cs_paper_views_cache_v1';
@@ -2434,9 +2380,6 @@ const WelcomePage = ({
                           <span className="history-session-tag">{item.session}</span>
                         )}
                       </div>
-                      {eligibleForViews && (
-                        <PaperViewsCounter count={views} variant="card" />
-                      )}
                     </div>
                     <div className="history-card-title">{title}</div>
                   </a>
@@ -2484,20 +2427,27 @@ const WelcomePage = ({
                         ER
                       </a>
                     )}
-                    {canSplit && (
-                      <a
-                        href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'split') : '#'}
-                        className="history-doc-btn split"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onOpenPaper(item, 'split');
-                        }}
-                        title="Open Question Paper and Mark Scheme side by side in Split View"
-                      >
-                        <span className="btn-desktop-text">Split View</span>
-                        <span className="btn-mobile-text" aria-hidden="true">Split</span>
-                      </a>
+                    {(eligibleForViews || canSplit) && (
+                      <div className="history-card-actions-right">
+                        {eligibleForViews && (
+                          <PaperViewsCounter count={views} variant="card" />
+                        )}
+                        {canSplit && (
+                          <a
+                            href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'split') : '#'}
+                            className="history-doc-btn split"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onOpenPaper(item, 'split');
+                            }}
+                            title="Open Question Paper and Mark Scheme side by side in Split View"
+                          >
+                            <span className="btn-desktop-text">Split View</span>
+                            <span className="btn-mobile-text" aria-hidden="true">Split</span>
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2676,99 +2626,6 @@ async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
   throw lastErr || new Error('All fetch candidates failed');
 }
 
-const DEFAULT_TREE = {
-  name: 'The Library',
-  path: '',
-  children: [
-    {
-      name: 'Past Papers',
-      path: 'Past Papers',
-      children: [
-        {
-          name: 'IAL',
-          path: 'Past Papers/IAL',
-          children: [
-            { name: 'Accounting', path: 'Past Papers/IAL/Accounting', children: [] },
-            { name: 'Arabic', path: 'Past Papers/IAL/Arabic', children: [] },
-            { name: 'Biology', path: 'Past Papers/IAL/Biology', children: [] },
-            { name: 'Business', path: 'Past Papers/IAL/Business', children: [] },
-            { name: 'Chemistry', path: 'Past Papers/IAL/Chemistry', children: [] },
-            { name: 'Economics', path: 'Past Papers/IAL/Economics', children: [] },
-            { name: 'English Language', path: 'Past Papers/IAL/English Language', children: [] },
-            { name: 'English Literature', path: 'Past Papers/IAL/English Literature', children: [] },
-            { name: 'French', path: 'Past Papers/IAL/French', children: [] },
-            { name: 'Geography', path: 'Past Papers/IAL/Geography', children: [] },
-            { name: 'German', path: 'Past Papers/IAL/German', children: [] },
-            { name: 'Greek', path: 'Past Papers/IAL/Greek', children: [] },
-            { name: 'History', path: 'Past Papers/IAL/History', children: [] },
-            { name: 'Information Technology', path: 'Past Papers/IAL/Information Technology', children: [] },
-            { name: 'Law', path: 'Past Papers/IAL/Law', children: [] },
-            { name: 'Math', path: 'Past Papers/IAL/Math', children: [] },
-            { name: 'Physics', path: 'Past Papers/IAL/Physics', children: [] },
-            { name: 'Psychology', path: 'Past Papers/IAL/Psychology', children: [] },
-            { name: 'Spanish', path: 'Past Papers/IAL/Spanish', children: [] }
-          ]
-        },
-        {
-          name: 'IGCSE',
-          path: 'Past Papers/IGCSE',
-          children: [
-            { name: 'Accounting', path: 'Past Papers/IGCSE/Accounting', children: [] },
-            { name: 'Bangla', path: 'Past Papers/IGCSE/Bangla', children: [] },
-            { name: 'Biology', path: 'Past Papers/IGCSE/Biology', children: [] },
-            { name: 'Business', path: 'Past Papers/IGCSE/Business', children: [] },
-            { name: 'Chemistry', path: 'Past Papers/IGCSE/Chemistry', children: [] },
-            { name: 'Commerce', path: 'Past Papers/IGCSE/Commerce', children: [] },
-            { name: 'Computer Science', path: 'Past Papers/IGCSE/Computer Science', children: [] },
-            { name: 'Economics', path: 'Past Papers/IGCSE/Economics', children: [] },
-            { name: 'English Language A', path: 'Past Papers/IGCSE/English Language A', children: [] },
-            { name: 'English Language B', path: 'Past Papers/IGCSE/English Language B', children: [] },
-            { name: 'English Literature', path: 'Past Papers/IGCSE/English Literature', children: [] },
-            { name: 'Further Pure Mathematics', path: 'Past Papers/IGCSE/Further Pure Mathematics', children: [] },
-            { name: 'Geography', path: 'Past Papers/IGCSE/Geography', children: [] },
-            { name: 'Human Biology', path: 'Past Papers/IGCSE/Human Biology', children: [] },
-            { name: 'Information Technology', path: 'Past Papers/IGCSE/Information Technology', children: [] },
-            { name: 'Mathematics A', path: 'Past Papers/IGCSE/Mathematics A', children: [] },
-            { name: 'Mathematics B', path: 'Past Papers/IGCSE/Mathematics B', children: [] },
-            { name: 'Physics', path: 'Past Papers/IGCSE/Physics', children: [] }
-          ]
-        }
-      ]
-    },
-    {
-      name: 'IAL Books',
-      path: 'IAL Books',
-      children: [
-        { name: 'Accounting', path: 'IAL Books/Accounting', children: [] },
-        { name: 'Biology', path: 'IAL Books/Biology', children: [] },
-        { name: 'Business', path: 'IAL Books/Business', children: [] },
-        { name: 'Chemistry', path: 'IAL Books/Chemistry', children: [] },
-        { name: 'Economics', path: 'IAL Books/Economics', children: [] },
-        { name: 'Information Technology', path: 'IAL Books/Information Technology', children: [] },
-        { name: 'Maths', path: 'IAL Books/Maths', children: [] },
-        { name: 'Physics', path: 'IAL Books/Physics', children: [] },
-        { name: 'Psychology', path: 'IAL Books/Psychology', children: [] }
-      ]
-    },
-    {
-      name: 'IGCSE Books',
-      path: 'IGCSE Books',
-      children: [
-        { name: 'Accounting', path: 'IGCSE Books/Accounting', children: [] },
-        { name: 'Biology', path: 'IGCSE Books/Biology', children: [] },
-        { name: 'Business', path: 'IGCSE Books/Business', children: [] },
-        { name: 'Chemistry', path: 'IGCSE Books/Chemistry', children: [] },
-        { name: 'Economics', path: 'IGCSE Books/Economics', children: [] },
-        { name: 'Further Pure Maths', path: 'IGCSE Books/Further Pure Maths', children: [] },
-        { name: 'Human Biology', path: 'IGCSE Books/Human Biology', children: [] },
-        { name: 'Information Technology', path: 'IGCSE Books/Information Technology', children: [] },
-        { name: 'Maths', path: 'IGCSE Books/Maths', children: [] },
-        { name: 'Physics', path: 'IGCSE Books/Physics', children: [] }
-      ]
-    }
-  ]
-};
-
 const DEFAULT_META = {
   totalFiles: 13939,
   uniqueFiles: 10146,
@@ -2799,9 +2656,8 @@ function getInitialCachedMeta() {
     const raw = localStorage.getItem(META_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    const tree = parsed.compactTree ? inflateCompactTree(parsed.compactTree) : parsed.tree;
-    if (tree && parsed.meta) {
-      return { tree, meta: parsed.meta };
+    if (parsed?.meta) {
+      return { meta: parsed.meta };
     }
   } catch {
     // Ignore storage errors
@@ -2824,7 +2680,6 @@ function App() {
   const [recentHistory, setRecentHistory] = useState(() => getInitialRecentHistory());
 
   const [data, setData] = useState(() => ({
-    tree: initialCache?.tree || DEFAULT_TREE,
     flatFiles: [],
     dedupedFiles: [],
     unifiedFiles: [],
@@ -2837,7 +2692,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState(initialRoute.searchQuery || '');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [selectedPath, setSelectedPath] = useState('');
-  const [expandedPaths, setExpandedPaths] = useState(new Set(['']));
   const [currentTab, setCurrentTab] = useState(initialRoute.currentTab || 'library'); // 'library' | 'about' | 'changelog'
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [previewInitialView, setPreviewInitialView] = useState(initialRoute.viewParam || '');
@@ -3336,7 +3190,6 @@ function App() {
       // Ignore storage errors
     }
 
-    let metaLoadedTree = Boolean(initialCache?.tree);
     let latestMeta = initialCache?.meta || null;
     let shardFailed = false;
 
@@ -3379,9 +3232,6 @@ function App() {
     const applyHydratedIndex = (json, { isFull = true } = {}) => {
       setTimeout(() => {
         if (cancelled || (!isFull && isFullIndexLoadedRef.current)) return;
-        const tree = !metaLoadedTree
-          ? (json.compactTree ? inflateCompactTree(json.compactTree) : json.tree)
-          : null;
             let rawList = [];
             if (json.files && json.keys) {
               const keys = json.keys;
@@ -3617,7 +3467,6 @@ function App() {
             isHydratedRef.current = true;
             if (isFull) isFullIndexLoadedRef.current = true;
             setData(prev => ({
-              tree: tree || prev.tree,
               flatFiles,
               dedupedFiles,
               unifiedFiles,
@@ -3738,34 +3587,42 @@ function App() {
       .then(json => {
         if (cancelled) return;
         latestMeta = json.meta || null;
-        const tree = json.compactTree ? inflateCompactTree(json.compactTree) : json.tree;
-        if (tree) {
-          metaLoadedTree = true;
+        if (json.meta) {
           setData(prev => ({
             ...prev,
-            tree: tree || prev.tree,
             meta: json.meta || prev.meta
           }));
           setLoading(false);
-          setExpandedPaths(prev => new Set([...prev, '', tree.path]));
         }
         try {
           localStorage.setItem(META_CACHE_KEY, JSON.stringify({
-            compactTree: json.compactTree,
             meta: json.meta
           }));
         } catch {
           // Ignore quota errors
         }
         const staleFullCache = isFullIndexLoadedRef.current && latestLoadedGenAtRef.current !== (json.meta?.generatedAt || '');
-        if (!initialShardRoute || shardFailed || staleFullCache) {
+        const hasInitialDemand = Boolean(
+          (initialRoute.currentTab && initialRoute.currentTab !== 'library') ||
+          initialRoute.notFound ||
+          initialRoute.filterCurriculum ||
+          initialRoute.filterDocType ||
+          initialRoute.filterSubject ||
+          initialRoute.filterUnit ||
+          initialRoute.filterYear ||
+          initialRoute.filterSession ||
+          initialRoute.searchQuery ||
+          initialRoute.forceShowTable ||
+          initialRoute.paperParam
+        );
+        if ((!initialShardRoute || shardFailed || staleFullCache) && (hasInitialDemand || staleFullCache)) {
           if (staleFullCache) isFullIndexLoadedRef.current = false;
           setTimeout(() => loadFullIndex(json.meta || null), 0);
         }
       })
       .catch(err => {
         console.warn('Meta fetch error, proceeding to cached or remote full index:', err);
-        if (!initialShardRoute || shardFailed) {
+        if (initialShardRoute && shardFailed) {
           loadFullIndex(null);
         }
       });
@@ -3781,58 +3638,6 @@ function App() {
     setVisibleCount(PAGE_SIZE);
   }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, filterSession, deferredSearchQuery, sortBy, viewMode]);
 
-  const toggleExpand = useCallback((path) => {
-    setExpandedPaths(prev => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }, []);
-
-  // Keep sidebar parent folders expanded when landing on or switching to a subject/book route
-  useEffect(() => {
-    if (!filterCurriculum && !filterSubject) return;
-    setExpandedPaths(prev => {
-      const ancestors = [];
-      if (filterDocType === 'Book') {
-        const rootBook = filterCurriculum === 'Edexcel IGCSE' ? 'IGCSE Books' : 'IAL Books';
-        ancestors.push('', rootBook);
-      } else {
-        ancestors.push('', 'Past Papers');
-        if (filterCurriculum === 'Edexcel IAL') ancestors.push('Past Papers/IAL');
-        else if (filterCurriculum === 'Edexcel IGCSE') ancestors.push('Past Papers/IGCSE');
-      }
-      let changed = false;
-      const next = new Set(prev);
-      for (const a of ancestors) {
-        if (!next.has(a)) {
-          next.add(a);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [filterCurriculum, filterSubject, filterDocType]);
-
-  const effectiveTreePath = useMemo(() => {
-    if (selectedPath && selectedPath !== (data.tree?.path || '')) return selectedPath;
-    if (filterDocType === 'Book') {
-      const bookRoot = filterCurriculum === 'Edexcel IGCSE'
-        ? 'IGCSE Books'
-        : (filterCurriculum === 'Edexcel IAL' ? 'IAL Books' : '');
-      if (bookRoot && filterSubject) return `${bookRoot}/${filterSubject}`;
-      if (bookRoot) return bookRoot;
-    }
-    if (filterCurriculum && filterSubject) {
-      const currFolder = filterCurriculum === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL';
-      return `Past Papers/${currFolder}/${filterSubject}`;
-    }
-    if (filterCurriculum === 'Edexcel IAL') return 'Past Papers/IAL';
-    if (filterCurriculum === 'Edexcel IGCSE') return 'Past Papers/IGCSE';
-    return selectedPath;
-  }, [selectedPath, data.tree, filterDocType, filterCurriculum, filterSubject]);
-
   const handleSubjectSelect = useCallback((subject, curriculum = '') => {
     setCurrentTab('library');
     setIsNotFound(false);
@@ -3843,8 +3648,8 @@ function App() {
     setFilterSession('');
     setSearchQuery('');
     setForceShowTable(true);
-    setSelectedPath(data.tree?.path || '');
-  }, [data.tree]);
+    setSelectedPath('');
+  }, []);
 
   const handleSelectFinalFilter = useCallback(({ subject, curriculum, unit, year }) => {
     setCurrentTab('library');
@@ -3856,8 +3661,8 @@ function App() {
     setFilterSession('');
     setSearchQuery('');
     setForceShowTable(true);
-    setSelectedPath(data.tree?.path || '');
-  }, [data.tree]);
+    setSelectedPath('');
+  }, []);
 
   const clearFilters = useCallback(({ pushUrl = true } = {}) => {
     setIsNotFound(false);
@@ -3870,75 +3675,11 @@ function App() {
     setSearchQuery('');
     setSortBy('newest');
     setForceShowTable(false);
-    setSelectedPath(data.tree?.path || '');
+    setSelectedPath('');
     if (pushUrl && typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '')) {
       window.history.pushState(null, '', '/');
     }
-  }, [data.tree]);
-
-  const handleTreeSelect = useCallback((p) => {
-    setIsNotFound(false);
-    if (!p || p === (data.tree?.path || '')) {
-      clearFilters();
-      return;
-    }
-    const parts = p.split('/').filter(Boolean);
-    if (parts[0] === 'IAL Books' || parts[0] === 'IGCSE Books') {
-      const mappedCurr = parts[0] === 'IGCSE Books' ? 'Edexcel IGCSE' : 'Edexcel IAL';
-      const folderSlug = parts[1] ? parts[1].toLowerCase().trim().replace(/\s+/g, '-') : '';
-      const subj = parts[1] ? (resolveSubjectFromSlug(folderSlug, mappedCurr, data.meta) || parts[1]) : '';
-      setCurrentTab('library');
-      setFilterCurriculum(mappedCurr);
-      setFilterSubject(subj);
-      setFilterUnit('');
-      setFilterYear('');
-      setFilterSession('');
-      setFilterDocType('Book');
-      setSearchQuery('');
-      setSelectedPath(data.tree?.path || '');
-      setForceShowTable(true);
-      return;
-    }
-    if (parts[0] === 'Past Papers') {
-      if (parts.length === 1) {
-        setFilterCurriculum('');
-        setFilterSubject('');
-        setFilterUnit('');
-        setFilterYear('');
-        setFilterSession('');
-        setFilterDocType(null);
-        setSearchQuery('');
-        setSelectedPath(p);
-        setForceShowTable(true);
-        return;
-      }
-      const mappedCurr = parts[1] === 'IGCSE' ? 'Edexcel IGCSE' : (parts[1] === 'IAL' ? 'Edexcel IAL' : '');
-      if (parts.length === 2 && mappedCurr) {
-        setFilterCurriculum(mappedCurr);
-        setFilterSubject('');
-        setFilterUnit('');
-        setFilterYear('');
-        setFilterSession('');
-        setFilterDocType(null);
-        setSearchQuery('');
-        setSelectedPath(data.tree?.path || '');
-        setForceShowTable(true);
-        return;
-      }
-      if (parts.length >= 3 && mappedCurr) {
-        const folderSlug = parts[2].toLowerCase().trim().replace(/\s+/g, '-');
-        const subj = resolveSubjectFromSlug(folderSlug, mappedCurr, data.meta) || parts[2];
-        setFilterDocType(null);
-        handleSubjectSelect(subj, mappedCurr);
-        if (parts.length > 3) {
-          setSelectedPath(p);
-        }
-        return;
-      }
-    }
-    setSelectedPath(p);
-    setForceShowTable(p !== data.tree?.path);
-  }, [data.tree, data.meta, clearFilters, handleSubjectSelect]);
+  }, []);
 
   const navigateToHome = useCallback((e) => {
     if (e) {
@@ -3967,14 +3708,14 @@ function App() {
     setSearchQuery('');
     setSortBy('newest');
     setForceShowTable(false);
-    setSelectedPath(data.tree?.path || '');
+    setSelectedPath('');
     if (typeof window !== 'undefined') {
       if (window.location.pathname !== '/' || window.location.search !== '') {
         window.history.pushState(null, '', '/');
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [data.tree]);
+  }, []);
 
   const handleViewAll = useCallback(() => {
     setCurrentTab('library');
@@ -4041,7 +3782,7 @@ function App() {
   }, [filterSubject, filterCurriculum, filterUnit, data.meta]);
 
   const allMatchedFiles = useMemo(() => {
-    const isSpecificFolder = Boolean(selectedPath && selectedPath !== '' && selectedPath !== data.tree?.path);
+    const isSpecificFolder = Boolean(selectedPath && selectedPath !== '');
     const useUnified = viewMode === 'unified';
 
     const sourceFiles = useUnified
@@ -4208,7 +3949,6 @@ function App() {
     data.flatFiles,
     data.dedupedFiles,
     data.unifiedFiles,
-    data.tree,
     selectedPath,
     deferredSearchQuery,
     filterCurriculum,
@@ -4237,7 +3977,7 @@ function App() {
     searchQuery ||
     forceShowTable
   );
-  const isRoot = selectedPath === data.tree?.path || selectedPath === '';
+  const isRoot = selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
   const activeDateText = useMemo(() => {
@@ -4252,7 +3992,7 @@ function App() {
     return data.meta?.coverage || 'January 2003 – June 2026';
   }, [filterSubject, filterCurriculum, data.meta]);
 
-  // Upgrade from a route shard to the full catalog index whenever global search or cross-route navigation requires it
+  // Upgrade from a route shard to the full catalog index whenever global search, deep links, or cross-route navigation requires it
   useEffect(() => {
     if (isFullIndexLoadedRef.current) return;
     const activeShard = getShardPathForRoute({
@@ -4266,14 +4006,23 @@ function App() {
       hydratedShardPathRef.current &&
       activeShard !== hydratedShardPathRef.current
     );
-    const needsFull =
-      showWelcome ||
+    const needsFullNow =
+      Boolean(pendingPaperParam) ||
       Boolean(deferredSearchQuery && deferredSearchQuery.trim()) ||
-      Boolean(selectedPath && selectedPath !== (data.tree?.path || '')) ||
-      switchedOutOfShard;
-    if (needsFull) {
+      Boolean(selectedPath) ||
+      switchedOutOfShard ||
+      (!showWelcome && !activeShard);
+    if (needsFullNow) {
       ensureFullIndexRef.current?.({ showLoader: switchedOutOfShard && !showWelcome });
+      return undefined;
     }
+    if (showWelcome) {
+      const idleTimer = setTimeout(() => {
+        ensureFullIndexRef.current?.({ showLoader: false });
+      }, 1200);
+      return () => clearTimeout(idleTimer);
+    }
+    return undefined;
   }, [
     currentTab,
     filterCurriculum,
@@ -4281,9 +4030,9 @@ function App() {
     filterDocType,
     isNotFound,
     showWelcome,
+    pendingPaperParam,
     deferredSearchQuery,
-    selectedPath,
-    data.tree
+    selectedPath
   ]);
 
   const archiveContextInfo = useMemo(() => {
@@ -4462,8 +4211,8 @@ function App() {
     );
   }
 
-  if (!data.tree) {
-    return <CrashRecoveryScreen errorMsg="Repository directory tree missing or stale cache encountered." />;
+  if (!data.meta) {
+    return <CrashRecoveryScreen errorMsg="Repository metadata missing or stale cache encountered." />;
   }
 
   const breadcrumbParts = selectedPath ? selectedPath.split(/[\\/]/).filter(Boolean) : [];
@@ -4964,20 +4713,6 @@ function App() {
 
       {/* Main Layout */}
       <div className="main-layout">
-        {/* Sidebar Navigation */}
-        {currentTab === 'library' && (
-          <aside className="sidebar" aria-label="Repository Categories Tree">
-            <div className="sidebar-title">Repository Categories</div>
-            <TreeNode
-              node={data.tree}
-              currentPath={effectiveTreePath}
-              onSelect={handleTreeSelect}
-              expandedPaths={expandedPaths}
-              toggleExpand={toggleExpand}
-            />
-          </aside>
-        )}
-
         {/* Main Content Area */}
         <main className="content-area">
           {currentTab === 'about' ? (

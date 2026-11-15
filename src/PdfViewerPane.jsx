@@ -168,24 +168,35 @@ const VirtualPdfPage = React.memo(({
   }, [pdfDoc, pageNum, scale, rotation, containerWidth, shouldMountCanvas, onPageRendered, isMobile]);
 
   const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
-  const estimatedHeight = targetWidth * effectiveAspectRatio;
+  const exactWidth = Math.max(1, Math.floor(targetWidth));
+  const exactHeight = Math.max(1, Math.floor(targetWidth * effectiveAspectRatio));
 
   return (
     <div
       className={`pdf-page-container ${rendered ? 'rendered' : 'loading-placeholder'}`}
       data-page-number={pageNum}
       style={{
-        width: `${Math.floor(targetWidth)}px`,
-        minHeight: `${Math.floor(estimatedHeight)}px`,
+        width: `${exactWidth}px`,
+        height: `${exactHeight}px`,
+        minHeight: `${exactHeight}px`,
         margin: '0 auto 16px auto',
         position: 'relative'
       }}
     >
       <div className="pdf-page-number-indicator">Page {pageNum}</div>
-      {shouldMountCanvas ? (
-        <canvas ref={canvasRef} className="pdf-canvas" />
-      ) : (
-        <div className="pdf-skeleton-page" style={{ height: `${Math.floor(estimatedHeight)}px` }}>
+      {shouldMountCanvas && (
+        <canvas
+          ref={canvasRef}
+          className="pdf-canvas"
+          style={{
+            width: `${exactWidth}px`,
+            height: `${exactHeight}px`,
+            opacity: rendered ? 1 : 0
+          }}
+        />
+      )}
+      {!rendered && (
+        <div className="pdf-skeleton-page">
           <div className="pdf-skeleton-shimmer" />
         </div>
       )}
@@ -266,6 +277,15 @@ export const PdfViewerPane = ({
   useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
+
+  // Synchronously measure initial scroll stage width before first paint to avoid resize jump
+  useLayoutEffect(() => {
+    const el = scrollAreaRef.current || containerRef.current;
+    if (el && el.clientWidth > 80) {
+      const nextW = el.clientWidth;
+      setContainerWidth((prev) => (Math.abs(prev - nextW) >= 1 ? nextW : prev));
+    }
+  }, []);
 
   // ResizeObserver on inner scroll stage (excludes vertical scrollbar width) with 80ms debounce during drag resize
   useEffect(() => {
@@ -379,6 +399,10 @@ export const PdfViewerPane = ({
     setFirstPagePainted(false);
     setRotation(0);
     setLoadError(null);
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = 0;
+      scrollAreaRef.current.scrollLeft = 0;
+    }
     setPdfDoc((prev) => {
       if (prev) {
         try { prev.destroy(); } catch {}
@@ -405,12 +429,30 @@ export const PdfViewerPane = ({
         }
       };
 
-      loadingTask.promise.then((doc) => {
+      loadingTask.promise.then(async (doc) => {
         if (!active) {
           try { doc.destroy(); } catch {}
           return;
         }
         loadedDoc = doc;
+
+        // Fetch page 1 dimensions BEFORE mounting pages so all placeholders have exact heights in 1 render
+        let measuredRatio = null;
+        try {
+          const p1 = await doc.getPage(1);
+          if (!active) {
+            try { doc.destroy(); } catch {}
+            return;
+          }
+          const vp = p1.getViewport({ scale: 1 });
+          if (vp && vp.width > 0) {
+            measuredRatio = vp.height / vp.width;
+          }
+        } catch {
+          // Fallback to default ratio if page 1 probe fails
+        }
+
+        if (!active) return;
         const requestedStart = Number(initialPageRef.current) || 1;
         const startPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
         const initialWindow = new Set([startPage]);
@@ -418,6 +460,13 @@ export const PdfViewerPane = ({
         if (startPage - 1 >= 1) initialWindow.add(startPage - 1);
 
         pendingInitialJumpRef.current = startPage > 1 ? startPage : null;
+        if (measuredRatio) {
+          setDefaultAspectRatio(measuredRatio);
+        }
+        if (scrollAreaRef.current && startPage <= 1) {
+          scrollAreaRef.current.scrollTop = 0;
+          scrollAreaRef.current.scrollLeft = 0;
+        }
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setCurrentPage(startPage);
@@ -425,15 +474,6 @@ export const PdfViewerPane = ({
         setVisiblePages(initialWindow);
         setDownloadProgress(100);
         setLoading(false);
-
-        // Fetch only page 1 dimensions to calibrate unvisited page skeleton heights
-        doc.getPage(1).then((p1) => {
-          if (!active) return;
-          const vp = p1.getViewport({ scale: 1 });
-          if (vp && vp.width > 0) {
-            setDefaultAspectRatio(vp.height / vp.width);
-          }
-        }).catch(() => {});
       }).catch((err) => {
         if (!active) return;
         console.error('[WebPDF] Load error for URL', url, err);
