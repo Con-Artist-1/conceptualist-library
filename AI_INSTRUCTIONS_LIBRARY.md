@@ -56,15 +56,15 @@ The scripts directory contains strictly **7 essential utilities**. Do not leave 
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\prerender-seo.js"
    ```
-4. **Push Web App to GitHub (`Con-Artist-1/conceptualist-library`):**
+4. **Push Web App to GitHub (`Con-Artist-1/conceptualist-library`) via REST API script** *(NEVER run CLI `git push`, which hangs on interactive credential prompts; always sync local `.git` afterwards via `git fetch origin` + `git reset --mixed origin/main`)*:
    ```powershell
-   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\push-github.js" "<commit message>"
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\push-github.js`" `"<commit message>`" > %TEMP%\gh_push.txt 2>&1 & type %TEMP%\gh_push.txt"
    ```
-5. **Deploy to Vercel Production (`https://www.conceptualist.uk`) & IndexNow Ping:**
+5. **Deploy to Vercel Production (`https://www.conceptualist.uk`) & IndexNow Ping (mandatory production deploy step after pushing):**
    ```powershell
-   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\deploy-vercel.js"
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\deploy-vercel.js`" > %TEMP%\vercel_deploy.txt 2>&1 & type %TEMP%\vercel_deploy.txt"
    ```
-   *(Automatically verifies `https://www.conceptualist.uk/<INDEXNOW_KEY>.txt` once READY and submits all canonical `public/sitemap.xml` URLs to `api.indexnow.org`; supports `--indexnow-only` / `--skip-indexnow` and `npm run indexnow`. Pushing `main` on GitHub also triggers Vercel builds.)*
+   *(Automatically verifies `https://www.conceptualist.uk/<INDEXNOW_KEY>.txt` once READY and submits all canonical `public/sitemap.xml` URLs to `api.indexnow.org`; supports `--indexnow-only` / `--skip-indexnow` and `npm run indexnow`. Always confirm `=== Production Deployment READY! ===`.)*
 6. **Sync Library Files to Hugging Face (`Diavlon/mcmaster-docs-library`):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\sync-hf.js"
@@ -80,9 +80,9 @@ The scripts directory contains strictly **7 essential utilities**. Do not leave 
 
 The application features an in-house PDF reading engine (`search-app/src/PdfViewerPane.jsx`, code-split via `React.lazy`) powered by locally bundled **Mozilla PDF.js `4.10.38`** (`public/pdfjs/`):
 
-- **Progressive Canvas Virtualization:** Renders pages on demand using `IntersectionObserver` with skeleton shimmer fallbacks, adaptive zoomed DPR capping, and offscreen canvas memory release across 100+ page booklets and mobile devices.
-- **Direct Download & Unified Engine:** All PDF previews use WebPDF natively (the legacy native browser `builtIn` PDF toggle has been retired, and header links trigger direct downloads). Animated top linear progress bar tracks streaming document downloads.
-- **Audio & Data File Resource Cards:** Language listening `AUD` tracks render an HTML5 `<audio>` card player, while `DF` archives (`.zip` IT & CS practical exam data files) render direct download cards matching all themes.
+- **Progressive Canvas Virtualization:** Renders pages on demand using `IntersectionObserver` with skeleton shimmer fallbacks, inner `clientWidth` Fit-Width sizing (zero phantom horizontal scrollbars), offscreen-canvas double-buffered zoom/resize redraws, adaptive zoomed DPR capping, and offscreen canvas memory release across 100+ page booklets and mobile devices.
+- **Direct Download, Page Rotation & Unified Engine:** All PDF previews use WebPDF natively (the legacy native browser `builtIn` PDF toggle has been retired, and header links trigger direct downloads). Includes clockwise `90°` page rotation, `autoFocus` control + `Swap Panes` in Split View, and an animated top linear progress bar tracking streaming document downloads.
+- **Persistent Audio Dock & Archive Resource Cards:** Playable language listening tracks (`.mp3`/`.wav`) dock persistently via `.modal-audio-dock` above active `QP` / Split panes so students can study simultaneously; standalone `.zip` audio bundles (`Audio Archive`) and IT/CS `DF` archives render dedicated download cards matching all themes.
 - **Draggable Split Resizer:**
   - **Desktop:** Horizontal resizer bar separating paired Question Paper and Mark Scheme panes with live dragging and double-click 50/50 reset.
   - **Mobile:** Dedicated 12px vertical touch resizer bar (`.modal-mobile-split-resizer`) inside `100dvh` full-screen flex modals.
@@ -106,7 +106,7 @@ The platform supports **three curated academic themes** cycled seamlessly via SV
   - `dark` (`[data-theme='dark'] .pdf-canvas`): `filter: invert(92%) hue-rotate(180deg) contrast(105%) brightness(92%); background-color: #121417 !important;`
   - `oled` (`[data-theme='oled'] .pdf-canvas`): `filter: invert(100%) hue-rotate(180deg) contrast(105%) brightness(95%); background-color: #000000 !important;`
 - **High-Contrast Color System & Mobile Parity:**
-  - Action badges: Question Paper (`Deep Slate Charcoal #2B303A` light / `#79B8FF` badges dark), Mark Scheme (`Collegiate Gold #8C651E` / `#7EE787` dark badges), Examiner Reports (`#FFD33D`), Books (`#FF758F`).
+  - Unified Charcoal & Gold institutional action tokens across Light, Dark, and Pure OLED themes: Question Paper (`#2B303A` light / `#1F242D` dark / `#181818` OLED), Mark Scheme (`#8C651E` light / `#E8C15A` on `#2B2210` dark / `#8C6D20` OLED), Examiner Reports (`#FFD33D`), Books (`#FF758F`).
   - Mobile (`@media (max-width: 768px)`) formats the 9 global footer links into a clean `3 x 3` button grid across Light, Dark, and OLED while keeping the desktop footer inline.
 - **Zero-Emoji Rule:** All controls must use geometric SVG icons or institutional text. No emojis.
 
@@ -140,12 +140,15 @@ Core Conceptualist Systems contributors listed on `/about`:
 2. **Clean file names.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing.
 3. **Strict script hygiene.** Keep no scripts at repo root and strictly retain only the 7 core scripts in `search-app/scripts/`. Remove any temporary scripts immediately.
 4. **Use Forward Slashes (`/`) in JSON.** Windows backslashes break static builds and Hugging Face URL resolution.
-5. **Node Invocations:** Invoke Node on Windows via:
+5. **Node Invocations:** Invoke Node scripts on Windows via Antigravity IDE's Electron runtime, using `cmd /c "... > %TEMP%\out.txt 2>&1"` from PowerShell so stdout/stderr is captured cleanly:
    ```powershell
-   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" <script.js>
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> > %TEMP%\out.txt 2>&1 & type %TEMP%\out.txt"
    ```
-6. **Lint & Headless Testing:** Pass `oxlint` (`0` warnings/errors) and test desktop & mobile views in Brave Headless CDP across Light, Dark, and Pure OLED before deploying.
+6. **Lint & Headless Testing:** Pass `oxlint` (`0` warnings/errors) and test desktop & mobile views in Brave Origin Headless CDP across Light, Dark, and Pure OLED before shipping.
 7. **Version & Changelog Discipline:** Increment `APP_VERSION` and add a concise entry to `CHANGELOG_HISTORY` in `search-app/src/App.jsx` before shipping.
-8. **Production Discipline:** After local verification, push via `push-github.js` and verify live deployment on `https://www.conceptualist.uk`.
+8. **Mandatory Release, Local Git Sync & Production Deploy Order:**
+   - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
+   - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
+   - **Deploy & IndexNow:** Always run `scripts/deploy-vercel.js`, wait for `=== Production Deployment READY! ===` + `[IndexNow] Submitted ... canonical URLs`, and verify live deployment on `https://www.conceptualist.uk`.
 
 Enjoy working with this curated 13,939-file (10,146-unique-record) Edexcel repository!

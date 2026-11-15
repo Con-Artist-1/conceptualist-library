@@ -83,4 +83,18 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\build.js"
    ```
 4. Verify locally via **Brave Origin Headless** (`C:\Program Files\BraveSoftware\Brave-Origin\Application\brave.exe` with `--headless=new` + CDP WebSocket) across desktop (`1440x900`) and mobile (`390x844`) in Light, Dark, and Pure OLED modes, then remove temporary files.
-5. Push via `scripts/push-github.js "<commit message>"` and deploy via `scripts/deploy-vercel.js`.
+5. **Push to GitHub via `scripts/push-github.js`** (NEVER run CLI `git push`, which hangs waiting on interactive credentials since `git` is not on the default system `PATH` and GitHub Desktop manages OAuth separately):
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\push-github.js`" `"<commit message>`" > %TEMP%\gh_push.txt 2>&1 & type %TEMP%\gh_push.txt"
+   ```
+6. **Sync local `.git` immediately after `push-github.js`** so local `main` matches `origin/main` without divergence (using GitHub Desktop's bundled `git.exe`):
+   ```powershell
+   $env:GIT_TERMINAL_PROMPT="0"
+   $git = (Get-ChildItem "$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe" | Select-Object -First 1).FullName
+   & $git fetch origin
+   & $git reset --mixed origin/main
+   ```
+7. **Deploy to Vercel Production & submit IndexNow** using `scripts/deploy-vercel.js`, waiting for `=== Production Deployment READY! ===` and verifying `[IndexNow] Submitted ... canonical URLs`:
+   ```powershell
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\deploy-vercel.js`" > %TEMP%\vercel_deploy.txt 2>&1 & type %TEMP%\vercel_deploy.txt"
+   ```
