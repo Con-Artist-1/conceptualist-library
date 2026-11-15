@@ -36,17 +36,18 @@ The naming conventions depend on the source batch:
 
 ## 3. Web Application, Route Sharding & Indexing
 
-The front-end application (React 19 + Vite 8 + Vercel Web Analytics & Speed Insights + MongoDB view counter `/api/views`) located at `e:\The Library\search-app` uses multi-stage static data loading:
+The front-end application (React 19 + Vite 8 + Vercel Web Analytics & Speed Insights + MongoDB endpoints `/api/views` & `/api/telemetry`) located at `e:\The Library\search-app` uses multi-stage static data loading:
 - `public/meta.json`: High-speed compact metadata & wizard catalog for `0ms` initial UI hydration.
 - `dist/shards/*.json`: **40 compact route shards** loaded in parallel with `meta.json` on cold landing pages (up to 96% smaller than full index payloads).
 - `public/index.json`: Tuple-encoded (`keys` + `files`) deduplicated global catalog loaded on demand / background upgrade, with Hugging Face `live_index.json` fallback.
+- `public/audio-subtitles.json`: Pre-generated Tier 1 subtitle index (`28` cached keys covering `9/96` `AUD` resources: 10 official French Transcript PDFs `2019–2021` + all 4 tracks of `French WFR02 Jan 2026`), incrementally preserved and merged from `.data/audio_subtitles.json` whenever `generate-index.js` runs. Remaining un-indexed French, German, and Spanish audio packs use Tier 2 MongoDB (`audio_subtitles`) caching and Tier 3 on-demand browser generation.
 
 **Core Production Scripts (`search-app/scripts/`):**
 The scripts directory contains strictly **7 essential utilities**. Do not leave temporary or scratch scripts behind.
 
-1. **Rebuild Metadata & Search Index (updates `public/meta.json`, `public/index.json`, and root `live_index.json`):**
+1. **Rebuild Metadata, Search Index & Subtitle Sync (updates `public/meta.json`, `public/index.json`, root `live_index.json`, and preserves/merges `public/audio-subtitles.json`):**
    ```powershell
-   $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\generate-index.js"
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\generate-index.js`" 2>&1" | Write-Output
    ```
 2. **Vite Production Build & SEO Pre-Render (`dist/`):**
    ```powershell
@@ -82,7 +83,8 @@ The application features an in-house PDF reading engine (`search-app/src/PdfView
 
 - **Progressive Canvas Virtualization:** Renders pages on demand using `IntersectionObserver` with skeleton shimmer fallbacks, inner `clientWidth` Fit-Width sizing (zero phantom horizontal scrollbars), offscreen-canvas double-buffered zoom/resize redraws, adaptive zoomed DPR capping, and offscreen canvas memory release across 100+ page booklets and mobile devices.
 - **Direct Download, Page Rotation & Unified Engine:** All PDF previews use WebPDF natively (the legacy native browser `builtIn` PDF toggle has been retired, and header links trigger direct downloads). Includes clockwise `90°` page rotation, `autoFocus` control + `Swap Panes` in Split View, and an animated top linear progress bar tracking streaming document downloads.
-- **Persistent Audio Dock, In-Browser ZIP Audio Player & Synchronized Subtitles (`CC`):** Playable language listening tracks (`.mp3`/`.wav` and `.zip` archives unpacked in-browser via `src/zipAudioExtractor.js` using `DecompressionStream`) play directly on-site in both `.modal-audio-dock` above `QP`/Split panes and standalone audio cards, while preserving individual track and full `.zip` downloads. Synchronized subtitles (`src/audioSubtitles.js` + `public/audio-subtitles.json` + MongoDB `audio_subtitles` cache + live VAD/Whisper fallback) display real-time highlighted captions and a clickable full transcript drawer across all themes.
+- **Persistent Audio Dock, In-Browser ZIP Audio Player & Synchronized Subtitles (`CC`):** Playable language listening tracks (`.mp3`/`.wav` and `.zip`/nested `.zip` archives unpacked in browser memory via `src/zipAudioExtractor.js` using `DecompressionStream`) play directly on-site in `.modal-audio-dock` above `QP`/Split panes and in standalone audio cards, while preserving both per-track downloads and full `.zip` downloads. Synchronized subtitles (`src/audioSubtitles.js`) resolve via Tier 1 `public/audio-subtitles.json` -> Tier 2 MongoDB `audio_subtitles` (`/api/views?subtitles=...`) -> Tier 3 opt-in **Generate AI Subtitles** (browser RMS VAD pause stripping + `Xenova/whisper-tiny` WASM live streaming, saved permanently to MongoDB), paired with a click-to-seek **Full Transcript** drawer (`position: relative` container-relative autoscroll across Light, Dark, and Pure OLED).
+- **Adding New Audio Archives Incrementally:** Drop new `.mp3`/`.zip` files or Official Transcript PDFs into `Past Papers/` and run `generate-index.js` -> `build.js` -> `push-github.js` -> `.git` sync -> `deploy-vercel.js`. Existing entries in `public/audio-subtitles.json` remain untouched without re-transcribing prior years, `.data/audio_subtitles.json` merges incrementally, and uncached new tracks are transcribable on-demand in browser.
 - **Draggable Split Resizer:**
   - **Desktop:** Horizontal resizer bar separating paired Question Paper and Mark Scheme panes with live dragging and double-click 50/50 reset.
   - **Mobile:** Dedicated 12px vertical touch resizer bar (`.modal-mobile-split-resizer`) inside `100dvh` full-screen flex modals.
@@ -140,12 +142,12 @@ Core Conceptualist Systems contributors listed on `/about`:
 2. **Clean file names.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing.
 3. **Strict script hygiene.** Keep no scripts at repo root and strictly retain only the 7 core scripts in `search-app/scripts/`. Remove any temporary scripts immediately.
 4. **Use Forward Slashes (`/`) in JSON.** Windows backslashes break static builds and Hugging Face URL resolution.
-5. **Node Invocations:** Invoke Node scripts on Windows via Antigravity IDE's Electron runtime, using `cmd /c "... > %TEMP%\out.txt 2>&1"` from PowerShell so stdout/stderr is captured cleanly:
+5. **Node Invocations:** Invoke Node scripts on Windows via Antigravity IDE's Electron runtime, piping `cmd /c "... 2>&1" | Write-Output` from PowerShell so GUI-subsystem stdout/stderr is captured cleanly:
    ```powershell
-   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> > %TEMP%\out.txt 2>&1 & type %TEMP%\out.txt"
+   $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
-6. **Lint & Headless Testing:** Pass `oxlint` (`0` warnings/errors) and test desktop & mobile views in Brave Origin Headless CDP across Light, Dark, and Pure OLED before shipping.
-7. **Version & Changelog Discipline:** Increment `APP_VERSION` and add a concise entry to `CHANGELOG_HISTORY` in `search-app/src/App.jsx` before shipping.
+6. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors) and test desktop & mobile views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, and Pure OLED before shipping. Check that `.data/audio_subtitles.json` is not polluted by temporary tests.
+7. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.0` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` up to date when adding features.
 8. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
