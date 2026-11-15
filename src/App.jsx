@@ -14,6 +14,7 @@ import {
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
+import { extractZipAudioTracks } from './zipAudioExtractor.js';
 
 const normalizePaperTelemetryMode = (activeView, canSplit, fallbackDocType) => {
   if (activeView === 'split' && canSplit) return 'split';
@@ -51,10 +52,21 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.8';
+const APP_VERSION = 'v5.9';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.9',
+    date: BUILD_TIMESTAMP,
+    title: 'In-Browser Zero-Backend ZIP Audio Player & Multi-Track Listening Dock',
+    summary: 'Added client-side DecompressionStream ZIP audio extraction so zipped listening archives play directly on-site without backend unzipping, with multi-track question selectors and dual track/archive downloads.',
+    changes: [
+      'Client-side ZIP audio engine: Unpacks STORE and DEFLATE (.zip and nested .zip) listening packages directly in browser memory via DecompressionStream with zero backend extraction.',
+      'Multi-track docked & standalone players: Added Track 1–4 / Unit 2–4 question selectors, auto-advance playback, and dual download controls (individual MP3/WAV track + full ZIP archive) across docked QP/MS views and standalone resource cards.',
+      'Modern Languages archive linking: Linked combined Audio U2U4.zip packages and paired Tracked ZIP archives across French, German, and Spanish sittings with full Light, Dark, and Pure OLED parity.'
+    ]
+  },
   {
     version: 'v5.8',
     date: BUILD_TIMESTAMP,
@@ -1050,15 +1062,24 @@ function buildPendingPaperPlaceholder(paperParam, viewParam = 'QP') {
   }
 
   // Direct file path parameter
-  const isPdf = raw.toLowerCase().endsWith('.pdf');
+  const rawLower = raw.toLowerCase();
+  const isPdf = rawLower.endsWith('.pdf');
+  const extMatch = rawLower.match(/\.([a-z0-9]+)$/);
+  const ext = extMatch ? extMatch[1] : '';
   const fileName = raw.split('/').pop() || raw;
+  const inferredDocType =
+    viewParam && ['QP', 'MS', 'ER', 'AUD', 'SC', 'DF', 'SOL', 'SAM'].includes(viewParam)
+      ? viewParam
+      : ext === 'mp3' || ext === 'wav' || /audio|recording/i.test(fileName)
+      ? 'AUD'
+      : 'QP';
   return {
     id: raw,
     path: raw,
     name: fileName,
-    ext: isPdf ? 'pdf' : '',
-    docType: viewParam === 'MS' || viewParam === 'ER' ? viewParam : 'QP',
-    isPendingSkeleton: !isPdf,
+    ext,
+    docType: inferredDocType,
+    isPendingSkeleton: !isPdf && inferredDocType !== 'AUD',
     docs: {},
     siblings: {}
   };
@@ -1094,6 +1115,8 @@ function serializePaperForHistory(file, preferredView = 'QP') {
   ['QP', 'MS', 'ER', 'SOL', 'AUD', 'SC', 'DF', 'SAM'].forEach(t => {
     if (rawDocs[t]) docs[t] = pickDoc(rawDocs[t]);
   });
+  if (rawDocs.AUD_ZIP) docs.AUD_ZIP = pickDoc(rawDocs.AUD_ZIP);
+  if (rawDocs.AUD_SINGLE) docs.AUD_SINGLE = pickDoc(rawDocs.AUD_SINGLE);
 
   const primary = docs.QP || docs.MS || docs.ER || pickDoc(file.primaryFile || file);
   const docTypes = Object.keys(docs);
@@ -1264,7 +1287,10 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const audExt = audSib
     ? (audSib.ext || (audSib.path ? audSib.path.split('.').pop() : '') || '').toLowerCase()
     : '';
-  const isPlayableAudioSib = audExt === 'mp3' || audExt === 'wav' || audExt === 'm4a' || audExt === 'ogg';
+  const audZipSib = siblings.AUD_ZIP || (audExt === 'zip' ? audSib : null);
+  const audSingleSib = siblings.AUD_SINGLE || (audExt && audExt !== 'zip' ? audSib : null);
+  const isPlayableAudioSib =
+    audExt === 'mp3' || audExt === 'wav' || audExt === 'm4a' || audExt === 'ogg' || audExt === 'zip';
   const hasPdfFallback = Boolean(siblings.QP?.ext === 'pdf' || siblings.MS?.ext === 'pdf');
   const canDockAudio = isPlayableAudioSib && hasPdfFallback;
 
@@ -1473,13 +1499,96 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     return siblings[activeView] || file.primaryFile || file;
   }, [activeView, siblings, file]);
 
-  if (!file) return null;
-
   const isSplit = activeView === 'split' && canSplit;
-
   const singleExt = (currentDoc.ext || (currentDoc.path ? currentDoc.path.split('.').pop() : 'pdf') || 'pdf').toLowerCase();
   const isSinglePdf = singleExt === 'pdf';
   const isSingleAudio = singleExt === 'mp3' || singleExt === 'wav' || singleExt === 'm4a' || singleExt === 'ogg';
+  const isSingleAudioZip =
+    singleExt === 'zip' &&
+    (currentDoc.docType === 'AUD' ||
+      /audio|recording|wfr0[24]|wgn0[24]|wsp0[24]/i.test(currentDoc.name || currentDoc.path || ''));
+
+  const [zipTracks, setZipTracks] = useState([]);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipError, setZipError] = useState(null);
+  const [zipProgress, setZipProgress] = useState(null);
+  const [selectedTrackIdx, setSelectedTrackIdx] = useState(0);
+  const [useFullSingleAudio, setUseFullSingleAudio] = useState(false);
+
+  const activeZipDoc = useMemo(() => {
+    if (!file) return null;
+    if (!isSplit && !isSinglePdf && isSingleAudioZip) return currentDoc;
+    if (audioDockOpen && canDockAudio && audZipSib) return audZipSib;
+    return null;
+  }, [file, isSplit, isSinglePdf, isSingleAudioZip, currentDoc, audioDockOpen, canDockAudio, audZipSib]);
+
+  const activeZipUrl = activeZipDoc ? getHfUrl(activeZipDoc.path) : '';
+  const effectiveUnitCode = file?.unitCode || currentDoc?.unitCode || '';
+
+  useEffect(() => {
+    if (!activeZipUrl) {
+      setZipTracks([]);
+      setZipLoading(false);
+      setZipError(null);
+      setZipProgress(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setZipLoading(true);
+    setZipError(null);
+    setZipProgress({ phase: 'downloading', percent: 0 });
+
+    extractZipAudioTracks(activeZipUrl, (status) => {
+      if (!cancelled) setZipProgress(status);
+    })
+      .then((tracks) => {
+        if (cancelled) return;
+        setZipTracks(tracks);
+        let initialIdx = 0;
+        const hasU2 = tracks.some((t) => t.unitHint === 'U2');
+        const hasU4 = tracks.some((t) => t.unitHint === 'U4');
+        if (hasU2 && hasU4) {
+          if (effectiveUnitCode.endsWith('2')) {
+            const idx2 = tracks.findIndex((t) => t.unitHint === 'U2');
+            if (idx2 !== -1) initialIdx = idx2;
+          } else if (effectiveUnitCode.endsWith('4')) {
+            const idx4 = tracks.findIndex((t) => t.unitHint === 'U4');
+            if (idx4 !== -1) initialIdx = idx4;
+          }
+        }
+        setSelectedTrackIdx(initialIdx);
+        setUseFullSingleAudio(false);
+        setZipLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setZipError(err?.message || 'Failed to unpack audio archive');
+        setZipLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeZipUrl, effectiveUnitCode]);
+
+  const safeTrackIdx = zipTracks.length > 0 ? Math.min(selectedTrackIdx, zipTracks.length - 1) : 0;
+  const activeZipTrack = zipTracks[safeTrackIdx] || null;
+
+  const handleAudioEnded = useCallback(() => {
+    if (useFullSingleAudio || zipTracks.length <= 1) return;
+    setSelectedTrackIdx((prev) => {
+      if (prev >= zipTracks.length - 1) return prev;
+      const curr = zipTracks[prev];
+      const next = zipTracks[prev + 1];
+      if (curr?.unitHint && next?.unitHint && curr.unitHint !== next.unitHint) {
+        return prev;
+      }
+      return prev + 1;
+    });
+  }, [useFullSingleAudio, zipTracks]);
+
+  if (!file) return null;
 
   const singleUrl = getHfUrl(currentDoc.path);
   const singleTitle = getDisplayTitle(currentDoc);
@@ -1580,7 +1689,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     MS: ['Mark Scheme', 'MS'],
                     ER: ['Examiner Report', 'ER'],
                     SC: ['Scientific Article', 'SC'],
-                    AUD: audExt === 'zip' ? ['Audio Archive', 'Audio ZIP'] : ['Audio Track', 'Audio'],
+                    AUD: ['Listening Audio', 'Audio'],
                     DF: ['Data / Formulae', 'Data'],
                     SOL: ['Worked Solution', 'SOL'],
                     SAM: ['Sample Paper', 'SAM']
@@ -1722,29 +1831,114 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
               </svg>
-              <span className="modal-audio-dock-label" title={audSib.name || audSib.path}>
-                {audSib.name || 'Listening Audio Track'}
+              <span
+                className="modal-audio-dock-label"
+                title={
+                  !useFullSingleAudio && activeZipTrack
+                    ? `${activeZipTrack.title} (${audZipSib?.name || audSib.name})`
+                    : audSib.name || audSib.path
+                }
+              >
+                {!useFullSingleAudio && activeZipTrack
+                  ? activeZipTrack.title
+                  : audSib.name || 'Listening Audio Track'}
               </span>
             </div>
-            <audio
-              controls
-              autoPlay
-              preload="metadata"
-              className="modal-audio-dock-player"
-              src={getHfUrl(audSib.path)}
-            >
-              Your browser does not support the audio element.
-            </audio>
-            <div className="modal-audio-dock-actions">
-              <a
-                href={getDownloadUrl(audSib.path)}
-                download
-                rel="noopener noreferrer"
-                className="modal-audio-dock-download"
-                title="Download listening audio file"
+
+            {zipTracks.length > 0 && (zipTracks.length > 1 || audSingleSib) && (
+              <div className="modal-audio-dock-tracks" role="group" aria-label="Select audio track">
+                {zipTracks.map((track, idx) => (
+                  <button
+                    key={track.id}
+                    type="button"
+                    className={`modal-audio-track-pill ${!useFullSingleAudio && safeTrackIdx === idx ? 'active' : ''}`}
+                    onClick={() => {
+                      setUseFullSingleAudio(false);
+                      setSelectedTrackIdx(idx);
+                    }}
+                    title={`${track.title} (${formatBytes(track.size)})`}
+                  >
+                    {track.shortLabel}
+                  </button>
+                ))}
+                {audSingleSib && (
+                  <button
+                    type="button"
+                    className={`modal-audio-track-pill ${useFullSingleAudio ? 'active' : ''}`}
+                    onClick={() => setUseFullSingleAudio(true)}
+                    title={`Play full combined audio (${audSingleSib.name})`}
+                  >
+                    Full Audio
+                  </button>
+                )}
+              </div>
+            )}
+
+            {zipLoading && !useFullSingleAudio && !activeZipTrack ? (
+              <div className="modal-audio-dock-status" role="status" aria-live="polite">
+                <span className="pdf-skeleton-spinner" />
+                <span className="modal-audio-dock-status-text">
+                  {zipProgress?.phase === 'unpacking'
+                    ? `Unpacking ${zipProgress.entryName || 'track'} (${zipProgress.currentTrack}/${zipProgress.totalTracks})...`
+                    : `Streaming & unpacking ZIP audio in browser${zipProgress?.percent ? ` (${zipProgress.percent}%)` : '...'}`}
+                </span>
+              </div>
+            ) : zipError && !useFullSingleAudio && !audSingleSib ? (
+              <div className="modal-audio-dock-status error" role="alert">
+                <span className="modal-audio-dock-status-text">
+                  Unable to unpack archive in browser ({zipError}).
+                </span>
+              </div>
+            ) : (
+              <audio
+                controls
+                autoPlay
+                preload="metadata"
+                className="modal-audio-dock-player"
+                src={
+                  !useFullSingleAudio && activeZipTrack?.blobUrl
+                    ? activeZipTrack.blobUrl
+                    : getHfUrl((audSingleSib || audSib).path)
+                }
+                onEnded={handleAudioEnded}
               >
-                Download {audExt.toUpperCase()}
-              </a>
+                Your browser does not support the audio element.
+              </audio>
+            )}
+
+            <div className="modal-audio-dock-actions">
+              {!useFullSingleAudio && activeZipTrack?.blobUrl && (
+                <a
+                  href={activeZipTrack.blobUrl}
+                  download={activeZipTrack.fileName}
+                  className="modal-audio-dock-download track-dl"
+                  title={`Download unpacked track: ${activeZipTrack.fileName} (${formatBytes(activeZipTrack.size)})`}
+                >
+                  <span>{activeZipTrack.shortLabel} ({activeZipTrack.ext.toUpperCase()})</span>
+                </a>
+              )}
+              {audSingleSib && (
+                <a
+                  href={getDownloadUrl(audSingleSib.path)}
+                  download
+                  rel="noopener noreferrer"
+                  className="modal-audio-dock-download"
+                  title={`Download full audio file (${audSingleSib.name})`}
+                >
+                  Download {(audSingleSib.ext || 'MP3').toUpperCase()}
+                </a>
+              )}
+              {audZipSib && (
+                <a
+                  href={getDownloadUrl(audZipSib.path)}
+                  download
+                  rel="noopener noreferrer"
+                  className="modal-audio-dock-download"
+                  title={`Download full ZIP archive (${audZipSib.name})`}
+                >
+                  Download ZIP
+                </a>
+              )}
               <button
                 type="button"
                 className="modal-audio-dock-close"
@@ -1830,13 +2024,82 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             <div className="modal-single-pane">
               {!isSinglePdf ? (
                 <div className="modal-resource-card">
-                  <div className="modal-resource-box">
+                  <div className={`modal-resource-box ${isSingleAudioZip ? 'audio-zip-box' : ''}`}>
                     <h3>{singleTitle}</h3>
                     <p>{currentDoc.name || currentDoc.path}</p>
                     {isSingleAudio && (
-                      <audio controls className="modal-audio-player" src={singleUrl}>
+                      <audio controls autoPlay className="modal-audio-player" src={singleUrl}>
                         Your browser does not support the audio element.
                       </audio>
+                    )}
+                    {isSingleAudioZip && (
+                      <div className="modal-zip-audio-section">
+                        {zipLoading ? (
+                          <div className="modal-zip-audio-loading" role="status" aria-live="polite">
+                            <span className="pdf-skeleton-spinner" />
+                            <span>
+                              {zipProgress?.phase === 'unpacking'
+                                ? `Unpacking ${zipProgress.entryName || 'audio track'} (${zipProgress.currentTrack}/${zipProgress.totalTracks}) in browser...`
+                                : `Streaming & unpacking ZIP audio in browser${zipProgress?.percent ? ` (${zipProgress.percent}%)` : '...'}`}
+                            </span>
+                          </div>
+                        ) : zipError ? (
+                          <div className="modal-zip-audio-error" role="alert">
+                            Unable to unpack audio in browser ({zipError}). You can still download the ZIP archive below.
+                          </div>
+                        ) : zipTracks.length > 0 ? (
+                          <>
+                            <div className="modal-zip-audio-header">
+                              <span className="modal-zip-audio-badge">
+                                In-Browser Player • {zipTracks.length} {zipTracks.length === 1 ? 'Track' : 'Tracks'} Ready
+                              </span>
+                              {activeZipTrack && (
+                                <span className="modal-zip-active-name">
+                                  Playing: {activeZipTrack.fileName} ({formatBytes(activeZipTrack.size)})
+                                </span>
+                              )}
+                            </div>
+                            {zipTracks.length > 1 && (
+                              <div className="modal-zip-track-list" role="group" aria-label="Audio tracks in archive">
+                                {zipTracks.map((track, idx) => (
+                                  <button
+                                    key={track.id}
+                                    type="button"
+                                    className={`modal-zip-track-btn ${safeTrackIdx === idx ? 'active' : ''}`}
+                                    onClick={() => setSelectedTrackIdx(idx)}
+                                  >
+                                    <span className="modal-zip-track-title">{track.title}</span>
+                                    <span className="modal-zip-track-meta">
+                                      {formatBytes(track.size)} • {track.ext.toUpperCase()}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {activeZipTrack?.blobUrl && (
+                              <>
+                                <audio
+                                  controls
+                                  autoPlay
+                                  preload="metadata"
+                                  className="modal-audio-player"
+                                  src={activeZipTrack.blobUrl}
+                                  onEnded={handleAudioEnded}
+                                >
+                                  Your browser does not support the audio element.
+                                </audio>
+                                <a
+                                  href={activeZipTrack.blobUrl}
+                                  download={activeZipTrack.fileName}
+                                  className="modal-track-download-btn"
+                                >
+                                  Download Current Track — {activeZipTrack.fileName} ({formatBytes(activeZipTrack.size)})
+                                </a>
+                              </>
+                            )}
+                          </>
+                        ) : null}
+                      </div>
                     )}
                     <a
                       href={downloadUrl}
@@ -3339,10 +3602,22 @@ function App() {
 
         const dedupMap = hasPreDeduped ? null : new Map();
         const siblingGroups = new Map();
+        const combinedU2U4Zips = [];
 
         for (let i = 0; i < flatFiles.length; i++) {
           const f = flatFiles[i];
           const isCanonicalPaper = f.category === 'Past Papers' && f.unitCode && f.session && f.docType;
+
+          if (
+            f.category === 'Past Papers' &&
+            f.docType === 'AUD' &&
+            !f.unitCode &&
+            f.session &&
+            f.subject &&
+            /u2u4/i.test(f.name || '')
+          ) {
+            combinedU2U4Zips.push(f);
+          }
 
           if (dedupMap) {
             const dedupKey = isCanonicalPaper
@@ -3364,7 +3639,27 @@ function App() {
             if (preferSiblingCandidate(grp[f.docType], f)) {
               grp[f.docType] = f;
             }
+            if (f.docType === 'AUD') {
+              if (f.ext === 'zip') grp.AUD_ZIP = f;
+              else grp.AUD_SINGLE = f;
+            }
           }
+        }
+
+        // Link combined Audio U2U4.zip packages as fallback AUD/AUD_ZIP for matching U2 and U4 sittings
+        const UNIT_PREFIX_BY_SUBJECT = { French: 'WFR', German: 'WGN', Spanish: 'WSP' };
+        for (let i = 0; i < combinedU2U4Zips.length; i++) {
+          const z = combinedU2U4Zips[i];
+          const prefix = UNIT_PREFIX_BY_SUBJECT[z.subject];
+          if (!prefix) continue;
+          ['02', '04'].forEach((num) => {
+            const sibKey = `${z.spec}|${z.subject}|${prefix}${num}||${z.session}`;
+            const grp = siblingGroups.get(sibKey);
+            if (grp) {
+              if (!grp.AUD) grp.AUD = z;
+              if (!grp.AUD_ZIP) grp.AUD_ZIP = z;
+            }
+          });
         }
 
         // Attach sibling map to each file
@@ -3434,12 +3729,31 @@ function App() {
           if (!group.docs[f.docType] || scoreFile(f) > scoreFile(group.docs[f.docType])) {
             group.docs[f.docType] = f;
           }
+          if (f.docType === 'AUD') {
+            if (f.ext === 'zip') group.docs.AUD_ZIP = f;
+            else group.docs.AUD_SINGLE = f;
+          }
           group.paths.push(f.path);
           if (Array.isArray(f.altPaths) && f.altPaths.length > 0) {
             group.paths.push(...f.altPaths);
           }
           group.searchChunks.push(f.searchTerms);
           group.totalSize += (f.size || 0);
+        }
+
+        // Propagate fallback combined U2U4 audio into unified sittings that only had U2U4.zip
+        for (let i = 0; i < combinedU2U4Zips.length; i++) {
+          const z = combinedU2U4Zips[i];
+          const prefix = UNIT_PREFIX_BY_SUBJECT[z.subject];
+          if (!prefix) continue;
+          ['02', '04'].forEach((num) => {
+            const sittingKey = `${z.spec}|${z.subject}|${prefix}${num}||${z.session}`;
+            const group = sittingMap.get(sittingKey);
+            if (group) {
+              if (!group.docs.AUD) group.docs.AUD = z;
+              if (!group.docs.AUD_ZIP) group.docs.AUD_ZIP = z;
+            }
+          });
         }
 
         // Finalize unified sitting metadata in one fast pass
@@ -4853,9 +5167,12 @@ function App() {
                         const siblings = file.siblings || null;
                         const docs = file.docs || {};
                         const canSplit = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
-                        const defaultViewMode = canSplit
-                          ? 'split'
-                          : (docs.QP ? 'QP' : (activeDoc.docType || 'QP'));
+                        const defaultViewMode =
+                          filterDocType === 'AUD' && (docs.AUD || activeDoc.docType === 'AUD')
+                            ? 'AUD'
+                            : canSplit
+                            ? 'split'
+                            : (docs.QP ? 'QP' : (activeDoc.docType || 'QP'));
                         const eligibleForViews = isQuestionPaperEligibleForViews(file);
                         const paperViews = eligibleForViews
                           ? getPaperTotalViews(file, viewsMap)
@@ -5064,7 +5381,7 @@ function App() {
                                     </>
                                   )}
 
-                                  {isPdf && viewMode !== 'unified' && (
+                                  {(isPdf || activeDoc.docType === 'AUD') && viewMode !== 'unified' && (
                                     <a
                                       href={getOnSitePaperUrl(activeDoc, activeDoc.docType || 'QP')}
                                       onClick={(e) => {
@@ -5072,9 +5389,15 @@ function App() {
                                         openOnSiteReader(activeDoc, activeDoc.docType || 'QP');
                                       }}
                                       className="preview-btn"
-                                      title={siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf' ? "Open Question Paper and Mark Scheme in PDF Reader" : "Quick In-App PDF Preview"}
+                                      title={
+                                        activeDoc.docType === 'AUD'
+                                          ? 'Play Listening Audio On-Site'
+                                          : siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf'
+                                          ? 'Open Question Paper and Mark Scheme in PDF Reader'
+                                          : 'Quick In-App PDF Preview'
+                                      }
                                     >
-                                      View
+                                      {activeDoc.docType === 'AUD' ? 'Listen' : 'View'}
                                     </a>
                                   )}
                                 </div>

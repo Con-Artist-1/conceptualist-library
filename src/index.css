@@ -2377,7 +2377,8 @@ a.breadcrumb-link:hover {
 .modal-audio-dock {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 8px 16px;
   background: #F4F1EA;
   border-bottom: 1px solid var(--border-medium);
@@ -2390,13 +2391,77 @@ a.breadcrumb-link:hover {
   align-items: center;
   gap: 7px;
   min-width: 0;
-  max-width: 250px;
+  max-width: 260px;
   color: var(--mcmaster-maroon);
   font-size: 12.5px;
   font-weight: 700;
 }
 
 .modal-audio-dock-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-audio-dock-tracks {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.modal-audio-track-pill {
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border-medium);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.modal-audio-track-pill:hover {
+  border-color: var(--mcmaster-maroon);
+  color: var(--mcmaster-maroon);
+  background: #FAF8F5;
+}
+
+.modal-audio-track-pill.active {
+  background: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon);
+  color: #FFFFFF;
+}
+
+.modal-audio-dock-status {
+  flex: 1;
+  min-width: 180px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.modal-audio-dock-status.error {
+  border-color: #E2B8BE;
+  background: #FDF2F4;
+  color: var(--mcmaster-maroon);
+}
+
+.modal-audio-dock-status-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2429,6 +2494,12 @@ a.breadcrumb-link:hover {
   text-decoration: none;
   white-space: nowrap;
   box-sizing: border-box;
+}
+
+.modal-audio-dock-download.track-dl {
+  color: var(--mcmaster-maroon);
+  border-color: #D8B4BC;
+  background: #FDF8F9;
 }
 
 .modal-audio-dock-download:hover {
@@ -2774,6 +2845,134 @@ a.breadcrumb-link:hover {
   width: 100%;
   margin: 6px 0;
   border-radius: var(--radius-sm);
+}
+
+.modal-resource-box.audio-zip-box {
+  max-width: 600px;
+}
+
+.modal-zip-audio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-body);
+  border: 1px solid var(--border-light);
+}
+
+.modal-zip-audio-loading,
+.modal-zip-audio-error {
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  text-align: center;
+}
+
+.modal-zip-audio-error {
+  color: var(--mcmaster-maroon);
+  border-color: #E2B8BE;
+  background: #FDF2F4;
+}
+
+.modal-zip-audio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modal-zip-audio-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mcmaster-maroon);
+}
+
+.modal-zip-active-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: 'Roboto Mono', monospace;
+}
+
+.modal-zip-track-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.modal-zip-track-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-medium);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.modal-zip-track-btn:hover {
+  border-color: var(--mcmaster-maroon);
+}
+
+.modal-zip-track-btn.active {
+  background: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon);
+  color: #FFFFFF;
+}
+
+.modal-zip-track-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modal-zip-track-meta {
+  font-size: 10.5px;
+  font-family: 'Roboto Mono', monospace;
+  color: var(--text-muted);
+}
+
+.modal-zip-track-btn.active .modal-zip-track-meta {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.modal-track-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-track-download-btn:hover {
+  border-color: var(--mcmaster-maroon);
+  color: var(--mcmaster-maroon);
 }
 
 .modal-download-btn {
@@ -4387,16 +4586,82 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .modal-audio-dock-download,
-[data-theme='dark'] .modal-audio-dock-close {
+[data-theme='dark'] .modal-audio-dock-close,
+[data-theme='dark'] .modal-audio-track-pill {
   background: #121417 !important;
   border-color: #343A46 !important;
   color: #F0ECE1 !important;
 }
 
+[data-theme='dark'] .modal-audio-dock-download.track-dl {
+  border-color: #5A1926 !important;
+  color: #FF758F !important;
+}
+
+[data-theme='dark'] .modal-audio-track-pill.active {
+  background: #8C1D2F !important;
+  border-color: #A8253B !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .modal-audio-dock-status {
+  background: #121417 !important;
+  border-color: #282C34 !important;
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .modal-audio-dock-status.error {
+  background: #2D151B !important;
+  border-color: #5A1926 !important;
+  color: #FF758F !important;
+}
+
 [data-theme='dark'] .modal-audio-dock-download:hover,
-[data-theme='dark'] .modal-audio-dock-close:hover {
+[data-theme='dark'] .modal-audio-dock-close:hover,
+[data-theme='dark'] .modal-audio-track-pill:hover:not(.active) {
   background: #22262E !important;
   border-color: #D4AF37 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .modal-zip-audio-section {
+  background: #121417 !important;
+  border-color: #282C34 !important;
+}
+
+[data-theme='dark'] .modal-zip-audio-loading {
+  background: #17191E !important;
+  border-color: #282C34 !important;
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .modal-zip-audio-error {
+  background: #2D151B !important;
+  border-color: #5A1926 !important;
+  color: #FF758F !important;
+}
+
+[data-theme='dark'] .modal-zip-audio-badge {
+  color: #D4AF37 !important;
+}
+
+[data-theme='dark'] .modal-zip-track-btn,
+[data-theme='dark'] .modal-track-download-btn {
+  background: #17191E !important;
+  border-color: #343A46 !important;
+  color: #F0ECE1 !important;
+}
+
+[data-theme='dark'] .modal-zip-track-btn:hover:not(.active),
+[data-theme='dark'] .modal-track-download-btn:hover {
+  background: #22262E !important;
+  border-color: #D4AF37 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .modal-zip-track-btn.active {
+  background: #8C1D2F !important;
+  border-color: #A8253B !important;
   color: #FFFFFF !important;
 }
 
@@ -5732,16 +5997,82 @@ html[data-theme='oled'] body {
 }
 
 [data-theme='oled'] .modal-audio-dock-download,
-[data-theme='oled'] .modal-audio-dock-close {
+[data-theme='oled'] .modal-audio-dock-close,
+[data-theme='oled'] .modal-audio-track-pill {
   background: #141414 !important;
   border-color: #333333 !important;
   color: #F0ECE1 !important;
 }
 
+[data-theme='oled'] .modal-audio-dock-download.track-dl {
+  border-color: #4D1420 !important;
+  color: #FF7B72 !important;
+}
+
+[data-theme='oled'] .modal-audio-track-pill.active {
+  background: #8C1D2F !important;
+  border-color: #B82840 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-audio-dock-status {
+  background: #0A0A0A !important;
+  border-color: #262626 !important;
+  color: #CBD5E1 !important;
+}
+
+[data-theme='oled'] .modal-audio-dock-status.error {
+  background: #240A10 !important;
+  border-color: #4D1420 !important;
+  color: #FF7B72 !important;
+}
+
 [data-theme='oled'] .modal-audio-dock-download:hover,
-[data-theme='oled'] .modal-audio-dock-close:hover {
+[data-theme='oled'] .modal-audio-dock-close:hover,
+[data-theme='oled'] .modal-audio-track-pill:hover:not(.active) {
   background: #242424 !important;
   border-color: #E5A823 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-zip-audio-section {
+  background: #050505 !important;
+  border-color: #242424 !important;
+}
+
+[data-theme='oled'] .modal-zip-audio-loading {
+  background: #0F0F0F !important;
+  border-color: #262626 !important;
+  color: #CBD5E1 !important;
+}
+
+[data-theme='oled'] .modal-zip-audio-error {
+  background: #240A10 !important;
+  border-color: #4D1420 !important;
+  color: #FF7B72 !important;
+}
+
+[data-theme='oled'] .modal-zip-audio-badge {
+  color: #E5A823 !important;
+}
+
+[data-theme='oled'] .modal-zip-track-btn,
+[data-theme='oled'] .modal-track-download-btn {
+  background: #121212 !important;
+  border-color: #2E2E2E !important;
+  color: #F0ECE1 !important;
+}
+
+[data-theme='oled'] .modal-zip-track-btn:hover:not(.active),
+[data-theme='oled'] .modal-track-download-btn:hover {
+  background: #222222 !important;
+  border-color: #E5A823 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-zip-track-btn.active {
+  background: #8C1D2F !important;
+  border-color: #B82840 !important;
   color: #FFFFFF !important;
 }
 
@@ -6804,8 +7135,18 @@ html[data-theme='oled'] body {
     margin-left: auto;
   }
 
-  .modal-audio-dock-player {
+  .modal-audio-dock-tracks {
     order: 3;
+    flex: 1 1 100%;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .modal-audio-dock-player,
+  .modal-audio-dock-status {
+    order: 4;
     flex: 1 1 100%;
     width: 100%;
     height: 36px;
