@@ -15,6 +15,14 @@ import {
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
 import { extractZipAudioTracks } from './zipAudioExtractor.js';
+import {
+  buildCandidateSubtitleKeys,
+  adaptSubtitleEntryForTrack,
+  resolveExistingSubtitles,
+  saveSubtitlesToCloud,
+  generateLiveWhisperSubtitles,
+  formatSubtitleTimestamp
+} from './audioSubtitles.js';
 
 const normalizePaperTelemetryMode = (activeView, canSplit, fallbackDocType) => {
   if (activeView === 'split' && canSplit) return 'split';
@@ -52,10 +60,21 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.9';
+const APP_VERSION = 'v6.0';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v6.0',
+    date: BUILD_TIMESTAMP,
+    title: 'Synchronized Audio Subtitles (CC) & 3-Tier Hybrid Transcript Engine',
+    summary: 'Added live synchronized subtitles (CC) and interactive clickable transcripts to both the docked listening bar and standalone audio players, powered by pre-indexed transcripts, shared MongoDB cloud caching, and on-demand browser VAD + Whisper AI fallback.',
+    changes: [
+      'Synchronized CC bar & interactive transcript drawer: Displays real-time highlighted captions with upcoming line preview and click-any-segment audio seeking across Light, Dark, and Pure OLED themes.',
+      'Pre-generated static subtitle index (audio-subtitles.json): Ships instant 0ms timestamped subtitles extracted from official Edexcel Transcript PDFs and pre-generated Whisper AI tracks, incrementally preserved by generate-index.js.',
+      'Shared MongoDB cloud cache & live VAD + Whisper fallback: Automatically transcribes un-indexed or newly added audio tracks in browser via RMS voice activity detection + Whisper WASM and caches completed transcripts to MongoDB Atlas for all subsequent visitors.'
+    ]
+  },
   {
     version: 'v5.9',
     date: BUILD_TIMESTAMP,
@@ -1575,6 +1594,269 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const safeTrackIdx = zipTracks.length > 0 ? Math.min(selectedTrackIdx, zipTracks.length - 1) : 0;
   const activeZipTrack = zipTracks[safeTrackIdx] || null;
 
+  const audioPlayerRef = useRef(null);
+  const audioCurrentTimeRef = useRef(0);
+  const transcriptListRef = useRef(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+  const [subtitleEntry, setSubtitleEntry] = useState(null);
+  const [subtitleLoading, setSubtitleLoading] = useState(false);
+  const [subtitleProgress, setSubtitleProgress] = useState(null);
+  const [subtitleError, setSubtitleError] = useState(null);
+  const [subtitleUncached, setSubtitleUncached] = useState(false);
+  const [whisperApprovedIdentity, setWhisperApprovedIdentity] = useState('');
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [whisperRetryCount, setWhisperRetryCount] = useState(0);
+
+  const activeAudioContext = useMemo(() => {
+    if (!file) return null;
+    const sittingKey = getPaperViewKey(file);
+    const subject = file.subject || currentDoc?.subject || 'French';
+    const spec = file.spec || currentDoc?.spec || 'IAL';
+    const session = file.session || currentDoc?.session || '';
+
+    if (!isSplit && !isSinglePdf) {
+      if (isSingleAudioZip) {
+        if (!activeZipTrack?.blobUrl) return null;
+        return {
+          mode: 'card',
+          audioUrl: activeZipTrack.blobUrl,
+          audioPath: currentDoc.path || '',
+          sittingKey,
+          trackIndex: zipTracks.length > 1 ? safeTrackIdx : 0,
+          isMultiTrack: zipTracks.length > 1,
+          trackFileName: activeZipTrack.fileName || '',
+          unitHint: activeZipTrack.unitHint || '',
+          subject,
+          spec,
+          session
+        };
+      }
+      if (isSingleAudio && currentDoc.path) {
+        return {
+          mode: 'card',
+          audioUrl: getHfUrl(currentDoc.path),
+          audioPath: currentDoc.path || '',
+          sittingKey,
+          trackIndex: null,
+          isMultiTrack: false,
+          trackFileName: currentDoc.name || '',
+          unitHint: '',
+          subject,
+          spec,
+          session
+        };
+      }
+    }
+
+    if (audioDockOpen && canDockAudio && audSib) {
+      if (!useFullSingleAudio && activeZipTrack?.blobUrl) {
+        return {
+          mode: 'dock',
+          audioUrl: activeZipTrack.blobUrl,
+          audioPath: (audZipSib || audSib).path || '',
+          sittingKey,
+          trackIndex: zipTracks.length > 1 ? safeTrackIdx : 0,
+          isMultiTrack: zipTracks.length > 1,
+          trackFileName: activeZipTrack.fileName || '',
+          unitHint: activeZipTrack.unitHint || '',
+          subject,
+          spec,
+          session
+        };
+      }
+      const singleTarget = audSingleSib || (!audZipSib ? audSib : null);
+      if (singleTarget?.path) {
+        return {
+          mode: 'dock',
+          audioUrl: getHfUrl(singleTarget.path),
+          audioPath: singleTarget.path || '',
+          sittingKey,
+          trackIndex: null,
+          isMultiTrack: false,
+          trackFileName: singleTarget.name || '',
+          unitHint: '',
+          subject,
+          spec,
+          session
+        };
+      }
+    }
+
+    return null;
+  }, [
+    file,
+    currentDoc,
+    isSplit,
+    isSinglePdf,
+    isSingleAudioZip,
+    isSingleAudio,
+    activeZipTrack,
+    zipTracks.length,
+    safeTrackIdx,
+    audioDockOpen,
+    canDockAudio,
+    audSib,
+    audZipSib,
+    audSingleSib,
+    useFullSingleAudio
+  ]);
+
+  const activeAudioIdentity = activeAudioContext
+    ? `${activeAudioContext.audioPath}::${activeAudioContext.trackFileName}::${activeAudioContext.trackIndex ?? 'full'}`
+    : '';
+
+  useEffect(() => {
+    audioCurrentTimeRef.current = 0;
+    setAudioCurrentTime(0);
+    setSubtitleEntry(null);
+    setSubtitleLoading(false);
+    setSubtitleProgress(null);
+    setSubtitleError(null);
+    setSubtitleUncached(false);
+  }, [activeAudioIdentity]);
+
+  useEffect(() => {
+    if (!activeAudioContext || !subtitlesEnabled) {
+      setSubtitleLoading(false);
+      setSubtitleProgress(null);
+      setSubtitleUncached(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const candidateKeys = buildCandidateSubtitleKeys(activeAudioContext);
+
+    setSubtitleLoading(true);
+    setSubtitleError(null);
+    setSubtitleUncached(false);
+
+    resolveExistingSubtitles(candidateKeys)
+      .then(async (existing) => {
+        if (cancelled) return;
+        if (existing && Array.isArray(existing.segments) && existing.segments.length > 0) {
+          const adapted = adaptSubtitleEntryForTrack(existing, {
+            isMultiTrack: activeAudioContext.isMultiTrack,
+            trackIndex: activeAudioContext.trackIndex || 0
+          });
+          setSubtitleEntry(adapted);
+          setSubtitleLoading(false);
+          setSubtitleProgress(null);
+          setSubtitleUncached(false);
+          return;
+        }
+
+        if (whisperApprovedIdentity !== activeAudioIdentity) {
+          setSubtitleLoading(false);
+          setSubtitleProgress(null);
+          setSubtitleUncached(true);
+          return;
+        }
+
+        // Tier 3 Fallback: Live VAD + Whisper AI transcription for un-indexed or newly added audio
+        const generated = await generateLiveWhisperSubtitles({
+          audioUrl: activeAudioContext.audioUrl,
+          subject: activeAudioContext.subject,
+          trackIndex: activeAudioContext.trackIndex || 0,
+          getCurrentTime: () => audioCurrentTimeRef.current,
+          shouldCancel: () => cancelled,
+          onProgress: (st) => {
+            if (cancelled) return;
+            setSubtitleProgress(st);
+            if (Array.isArray(st.segments) && st.segments.length > 0) {
+              setSubtitleEntry({
+                source: 'whisper-ai',
+                tier: 'live',
+                language: activeAudioContext.subject.toLowerCase(),
+                segments: st.segments
+              });
+            }
+          }
+        });
+
+        if (cancelled || !generated) return;
+        setSubtitleEntry({ ...generated, tier: 'live' });
+        setSubtitleLoading(false);
+        setSubtitleProgress(null);
+        setSubtitleUncached(false);
+        if (candidateKeys.length > 0 && generated.segments?.length > 0) {
+          saveSubtitlesToCloud(candidateKeys[0], candidateKeys.slice(1), generated);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSubtitleError(err?.message || 'Unable to load subtitles');
+        setSubtitleLoading(false);
+        setSubtitleProgress(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAudioIdentity, activeAudioContext, subtitlesEnabled, whisperApprovedIdentity, whisperRetryCount]);
+
+  const subtitleSegments = useMemo(() => subtitleEntry?.segments || [], [subtitleEntry]);
+
+  const activeSubtitleIdx = useMemo(() => {
+    if (!subtitleSegments.length) return -1;
+    const t = audioCurrentTime;
+    for (let i = 0; i < subtitleSegments.length; i++) {
+      const s = subtitleSegments[i];
+      if (t >= s.start - 0.25 && t <= s.end + 0.6) {
+        return i;
+      }
+    }
+    let lastStarted = 0;
+    for (let i = 0; i < subtitleSegments.length; i++) {
+      if (subtitleSegments[i].start <= t + 0.25) {
+        lastStarted = i;
+      } else {
+        break;
+      }
+    }
+    return lastStarted;
+  }, [subtitleSegments, audioCurrentTime]);
+
+  const activeSubtitleSeg = activeSubtitleIdx >= 0 ? subtitleSegments[activeSubtitleIdx] : null;
+  const nextSubtitleSeg =
+    activeSubtitleIdx >= 0 && activeSubtitleIdx + 1 < subtitleSegments.length
+      ? subtitleSegments[activeSubtitleIdx + 1]
+      : null;
+
+  useEffect(() => {
+    if (!transcriptExpanded || activeSubtitleIdx < 0 || !transcriptListRef.current) return;
+    const container = transcriptListRef.current;
+    const activeBtn = container.querySelector(`[data-seg-idx="${activeSubtitleIdx}"]`);
+    if (activeBtn) {
+      const targetTop =
+        activeBtn.offsetTop - container.clientHeight / 2 + activeBtn.clientHeight / 2;
+      container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    }
+  }, [activeSubtitleIdx, transcriptExpanded]);
+
+  const handleAudioTimeUpdate = useCallback((e) => {
+    const t = e.currentTarget?.currentTime || 0;
+    audioCurrentTimeRef.current = t;
+    setAudioCurrentTime(t);
+  }, []);
+
+  const handleSeekToSubtitle = useCallback((startSec) => {
+    const targetSec = Math.max(0, Number(startSec) || 0);
+    audioCurrentTimeRef.current = targetSec;
+    setAudioCurrentTime(targetSec);
+    const el = audioPlayerRef.current;
+    if (el) {
+      try {
+        el.currentTime = targetSec;
+        if (el.paused) {
+          el.play().catch(() => {});
+        }
+      } catch {
+        // Ignore seek errors before metadata is ready
+      }
+    }
+  }, []);
+
   const handleAudioEnded = useCallback(() => {
     if (useFullSingleAudio || zipTracks.length <= 1) return;
     setSelectedTrackIdx((prev) => {
@@ -1619,6 +1901,157 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
           autoFocus={shouldFocus}
         />
       </Suspense>
+    );
+  };
+
+  const renderSubtitleBar = (variant = 'dock') => {
+    if (!subtitlesEnabled || !activeAudioContext) return null;
+    const isOfficial = subtitleEntry?.source === 'official-transcript-pdf';
+    const sourceBadgeText = isOfficial
+      ? 'Official Transcript'
+      : subtitleEntry?.tier === 'static' || subtitleEntry?.tier === 'cloud'
+      ? 'Synchronized Subtitles'
+      : subtitleUncached && subtitleSegments.length === 0
+      ? 'On-Demand AI Subtitles'
+      : 'Live AI Subtitles';
+
+    return (
+      <div
+        className={`modal-subtitle-bar ${variant === 'card' ? 'card-variant' : 'dock-variant'}`}
+        role="region"
+        aria-label="Synchronized Audio Subtitles"
+      >
+        <div className="modal-subtitle-top-row">
+          <div className="modal-subtitle-meta">
+            <span className="modal-subtitle-cc-pill">CC</span>
+            <span className="modal-subtitle-source">{sourceBadgeText}</span>
+            {subtitleSegments.length > 0 && (
+              <span className="modal-subtitle-count">
+                {subtitleSegments.length} {subtitleSegments.length === 1 ? 'segment' : 'segments'}
+              </span>
+            )}
+            {subtitleLoading && subtitleProgress && (
+              <span className="modal-subtitle-progress-tag" role="status" aria-live="polite">
+                {subtitleProgress.message || `Transcribing (${subtitleProgress.percent || 0}%)...`}
+              </span>
+            )}
+          </div>
+
+          <div className="modal-subtitle-controls">
+            {subtitleSegments.length > 0 && (
+              <button
+                type="button"
+                className={`modal-subtitle-drawer-btn ${transcriptExpanded ? 'active' : ''}`}
+                onClick={() => setTranscriptExpanded((prev) => !prev)}
+                aria-expanded={transcriptExpanded}
+                title={transcriptExpanded ? 'Hide full interactive transcript' : 'View full interactive transcript & click any line to seek'}
+              >
+                <span>{transcriptExpanded ? 'Hide Transcript' : 'Full Transcript'}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="modal-subtitle-hide-btn"
+              onClick={() => setSubtitlesEnabled(false)}
+              title="Hide Subtitles (CC)"
+            >
+              Hide CC
+            </button>
+          </div>
+        </div>
+
+        {subtitleLoading && subtitleSegments.length === 0 ? (
+          <div className="modal-subtitle-loading-row" role="status" aria-live="polite">
+            <span className="pdf-skeleton-spinner" />
+            <span>
+              {subtitleProgress?.message || 'Loading synchronized subtitles for this audio track...'}
+            </span>
+          </div>
+        ) : subtitleError && subtitleSegments.length === 0 ? (
+          <div className="modal-subtitle-error-row" role="alert">
+            <span>Subtitles unavailable ({subtitleError}).</span>
+            <button
+              type="button"
+              className="modal-subtitle-retry-btn"
+              onClick={() => {
+                setWhisperApprovedIdentity(activeAudioIdentity);
+                setWhisperRetryCount((c) => c + 1);
+              }}
+            >
+              Retry AI Subtitles
+            </button>
+          </div>
+        ) : subtitleUncached && subtitleSegments.length === 0 ? (
+          <div className="modal-subtitle-uncached-row">
+            <span className="modal-subtitle-uncached-text">
+              Not pre-indexed yet. Generate synchronized AI captions in your browser &mdash; streams live and saves for everyone.
+            </span>
+            <button
+              type="button"
+              className="modal-subtitle-generate-btn"
+              onClick={() => setWhisperApprovedIdentity(activeAudioIdentity)}
+            >
+              Generate AI Subtitles
+            </button>
+          </div>
+        ) : activeSubtitleSeg ? (
+          <div className="modal-subtitle-live-stage">
+            <button
+              type="button"
+              className="modal-subtitle-active-line"
+              onClick={() => handleSeekToSubtitle(activeSubtitleSeg.start)}
+              title={`Click to replay from ${formatSubtitleTimestamp(activeSubtitleSeg.start)}`}
+            >
+              <span className="modal-subtitle-time-badge">
+                {formatSubtitleTimestamp(activeSubtitleSeg.start)}
+              </span>
+              <span className="modal-subtitle-active-text">{activeSubtitleSeg.text}</span>
+            </button>
+            {nextSubtitleSeg && (
+              <button
+                type="button"
+                className="modal-subtitle-next-line"
+                onClick={() => handleSeekToSubtitle(nextSubtitleSeg.start)}
+                title={`Click to skip to ${formatSubtitleTimestamp(nextSubtitleSeg.start)}`}
+              >
+                <span className="modal-subtitle-next-label">
+                  Next ({formatSubtitleTimestamp(nextSubtitleSeg.start)}):
+                </span>
+                <span className="modal-subtitle-next-text">{nextSubtitleSeg.text}</span>
+              </button>
+            )}
+          </div>
+        ) : null}
+
+        {transcriptExpanded && subtitleSegments.length > 0 && (
+          <div
+            ref={transcriptListRef}
+            className="modal-subtitle-drawer"
+            role="list"
+            aria-label="Full timestamped transcript"
+          >
+            {subtitleSegments.map((seg, idx) => {
+              const isCurrentSeg = idx === activeSubtitleIdx;
+              return (
+                <button
+                  key={`${seg.start}-${idx}`}
+                  type="button"
+                  role="listitem"
+                  data-seg-idx={idx}
+                  className={`modal-subtitle-seg-btn ${isCurrentSeg ? 'active' : ''}`}
+                  onClick={() => handleSeekToSubtitle(seg.start)}
+                  title={`Jump audio to ${formatSubtitleTimestamp(seg.start)}`}
+                >
+                  <span className="modal-subtitle-seg-time">
+                    {formatSubtitleTimestamp(seg.start)}
+                  </span>
+                  <span className="modal-subtitle-seg-text">{seg.text}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -1891,6 +2324,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
               </div>
             ) : (
               <audio
+                ref={audioPlayerRef}
                 controls
                 autoPlay
                 preload="metadata"
@@ -1900,6 +2334,9 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     ? activeZipTrack.blobUrl
                     : getHfUrl((audSingleSib || audSib).path)
                 }
+                onTimeUpdate={handleAudioTimeUpdate}
+                onSeeked={handleAudioTimeUpdate}
+                onLoadedMetadata={handleAudioTimeUpdate}
                 onEnded={handleAudioEnded}
               >
                 Your browser does not support the audio element.
@@ -1907,6 +2344,20 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             )}
 
             <div className="modal-audio-dock-actions">
+              <button
+                type="button"
+                className={`modal-audio-cc-btn ${subtitlesEnabled ? 'active' : ''}`}
+                onClick={() => setSubtitlesEnabled((prev) => !prev)}
+                aria-pressed={subtitlesEnabled}
+                title={subtitlesEnabled ? 'Hide synchronized subtitles (CC)' : 'Show synchronized subtitles (CC)'}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <path d="M10 10.5a2.5 2.5 0 0 0-3.5 0 2.5 2.5 0 0 0 0 3.5 2.5 2.5 0 0 0 3.5 0" />
+                  <path d="M17.5 10.5a2.5 2.5 0 0 0-3.5 0 2.5 2.5 0 0 0 0 3.5 2.5 2.5 0 0 0 3.5 0" />
+                </svg>
+                <span>Subtitles</span>
+              </button>
               {!useFullSingleAudio && activeZipTrack?.blobUrl && (
                 <a
                   href={activeZipTrack.blobUrl}
@@ -1949,6 +2400,8 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 ×
               </button>
             </div>
+
+            {renderSubtitleBar('dock')}
           </div>
         )}
 
@@ -2028,9 +2481,38 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     <h3>{singleTitle}</h3>
                     <p>{currentDoc.name || currentDoc.path}</p>
                     {isSingleAudio && (
-                      <audio controls autoPlay className="modal-audio-player" src={singleUrl}>
-                        Your browser does not support the audio element.
-                      </audio>
+                      <>
+                        <div className="modal-zip-audio-header">
+                          <span className="modal-zip-audio-badge">In-Browser Audio Player</span>
+                          <button
+                            type="button"
+                            className={`modal-audio-cc-btn ${subtitlesEnabled ? 'active' : ''}`}
+                            onClick={() => setSubtitlesEnabled((prev) => !prev)}
+                            aria-pressed={subtitlesEnabled}
+                            title={subtitlesEnabled ? 'Hide synchronized subtitles (CC)' : 'Show synchronized subtitles (CC)'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                              <rect x="2" y="4" width="20" height="16" rx="2" />
+                              <path d="M10 10.5a2.5 2.5 0 0 0-3.5 0 2.5 2.5 0 0 0 0 3.5 2.5 2.5 0 0 0 3.5 0" />
+                              <path d="M17.5 10.5a2.5 2.5 0 0 0-3.5 0 2.5 2.5 0 0 0 0 3.5 2.5 2.5 0 0 0 3.5 0" />
+                            </svg>
+                            <span>Subtitles (CC)</span>
+                          </button>
+                        </div>
+                        <audio
+                          ref={audioPlayerRef}
+                          controls
+                          autoPlay
+                          className="modal-audio-player"
+                          src={singleUrl}
+                          onTimeUpdate={handleAudioTimeUpdate}
+                          onSeeked={handleAudioTimeUpdate}
+                          onLoadedMetadata={handleAudioTimeUpdate}
+                        >
+                          Your browser does not support the audio element.
+                        </audio>
+                        {renderSubtitleBar('card')}
+                      </>
                     )}
                     {isSingleAudioZip && (
                       <div className="modal-zip-audio-section">
@@ -2053,11 +2535,27 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                               <span className="modal-zip-audio-badge">
                                 In-Browser Player • {zipTracks.length} {zipTracks.length === 1 ? 'Track' : 'Tracks'} Ready
                               </span>
-                              {activeZipTrack && (
-                                <span className="modal-zip-active-name">
-                                  Playing: {activeZipTrack.fileName} ({formatBytes(activeZipTrack.size)})
-                                </span>
-                              )}
+                              <div className="modal-zip-header-right">
+                                {activeZipTrack && (
+                                  <span className="modal-zip-active-name">
+                                    Playing: {activeZipTrack.fileName} ({formatBytes(activeZipTrack.size)})
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  className={`modal-audio-cc-btn ${subtitlesEnabled ? 'active' : ''}`}
+                                  onClick={() => setSubtitlesEnabled((prev) => !prev)}
+                                  aria-pressed={subtitlesEnabled}
+                                  title={subtitlesEnabled ? 'Hide synchronized subtitles (CC)' : 'Show synchronized subtitles (CC)'}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                                    <path d="M10 10.5a2.5 2.5 0 0 0-3.5 0 2.5 2.5 0 0 0 0 3.5 2.5 2.5 0 0 0 3.5 0" />
+                                    <path d="M17.5 10.5a2.5 2.5 0 0 0-3.5 0 2.5 2.5 0 0 0 0 3.5 2.5 2.5 0 0 0 3.5 0" />
+                                  </svg>
+                                  <span>Subtitles (CC)</span>
+                                </button>
+                              </div>
                             </div>
                             {zipTracks.length > 1 && (
                               <div className="modal-zip-track-list" role="group" aria-label="Audio tracks in archive">
@@ -2079,15 +2577,20 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                             {activeZipTrack?.blobUrl && (
                               <>
                                 <audio
+                                  ref={audioPlayerRef}
                                   controls
                                   autoPlay
                                   preload="metadata"
                                   className="modal-audio-player"
                                   src={activeZipTrack.blobUrl}
+                                  onTimeUpdate={handleAudioTimeUpdate}
+                                  onSeeked={handleAudioTimeUpdate}
+                                  onLoadedMetadata={handleAudioTimeUpdate}
                                   onEnded={handleAudioEnded}
                                 >
                                   Your browser does not support the audio element.
                                 </audio>
+                                {renderSubtitleBar('card')}
                                 <a
                                   href={activeZipTrack.blobUrl}
                                   download={activeZipTrack.fileName}

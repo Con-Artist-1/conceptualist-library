@@ -99,7 +99,7 @@
       ]
     },
     {
-      "source": "/(index\\.json|meta\\.json)",
+      "source": "/(index\\.json|meta\\.json|audio-subtitles\\.json)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -132,7 +132,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         }
       ]
     }

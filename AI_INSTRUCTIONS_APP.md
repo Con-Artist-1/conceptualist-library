@@ -23,7 +23,10 @@ Keep `search-app/scripts/` strictly limited to these **7 core utilities** (do no
 
 ## 2. Source Layout & Core Architecture
 
-- **`src/App.jsx`**: Main single-page catalog in a centered `1280px` full-width layout (no redundant left sidebar), URL route hydration/404 recovery, client search & single-pass filters (including Exam Session filtering and Most Viewed sorting), two-stage catalog loader (`/meta.json` + `/shards/*.json` on cold landing, idle/on-demand upgrade to `/index.json` with Hugging Face fallback), `PreviewModal` (with Swap Panes and persistent Docked MP3 Audio Bar above `QP`/Split panes), view counter hooks (bottom action row on Recently Viewed cards), About/Team roster, and live `CHANGELOG_HISTORY`.
+- **`src/App.jsx`**: Main single-page catalog in a centered `1280px` full-width layout (no redundant left sidebar), URL route hydration/404 recovery, client search & single-pass filters (including Exam Session filtering and Most Viewed sorting), two-stage catalog loader (`/meta.json` + `/shards/*.json` on cold landing, idle/on-demand upgrade to `/index.json` with Hugging Face fallback), `PreviewModal` (with Swap Panes, persistent Docked Audio Bar & in-browser ZIP audio player, and synchronized Subtitles `CC` + interactive Transcript drawer), view counter hooks (bottom action row on Recently Viewed cards), About/Team roster, and live `CHANGELOG_HISTORY`.
+- **`src/zipAudioExtractor.js` & `src/audioSubtitles.js`**:
+  - `src/zipAudioExtractor.js` unpacks `.zip` and nested `.zip` listening archives (STORE & DEFLATE via native `DecompressionStream`) directly in browser memory with zero backend extraction.
+  - `src/audioSubtitles.js` implements the 3-tier Synchronized Subtitles engine: Tier 1 instant `0ms` lookup from `public/audio-subtitles.json` (official Edexcel Transcript PDFs + pre-generated Whisper tracks, preserved incrementally by `scripts/generate-index.js`), Tier 2 shared MongoDB Atlas cache (`/api/views?subtitles=...` -> `conceptualist_library.audio_subtitles`), and Tier 3 automatic browser RMS Voice Activity Detection (`detectSpeechSegments`) + `Xenova/whisper-tiny` WASM live transcription fallback for un-indexed or newly added audio files.
 - **`src/PdfViewerPane.jsx`**: In-house WebPDF reader powered by locally bundled **Mozilla PDF.js `4.10.38`** (`public/pdfjs/pdf.min.mjs` & `pdf.worker.min.mjs`). Features `IntersectionObserver` canvas virtualization, synchronous `useLayoutEffect` container width measurement, Page 1 pre-mount dimension resolution & `overflow-y: scroll` stage locking to prevent loading/scroll jumpiness, double-buffered offscreen redraws, inner `clientWidth` Fit-Width sizing, `90°` page rotation, live download progress bar, `autoFocus` control, adaptive DPR capping & GPU texture cleanup, synchronized QP/MS Split View (horizontal desktop divider & 12px `.modal-mobile-split-resizer` on mobile), cursor/center-anchored zoom, and direct **Download** links (native browser `builtIn` PDF iframe toggle was intentionally removed). Standalone `.zip` audio packages (`AUD`) and IT/CS archives (`DF`) render dedicated resource cards, while playable `.mp3`/`.wav` listening tracks dock cleanly above the paper.
 - **`src/seoRoutes.js` & `src/unitParser.js`**: Shared ISOMORPHIC helpers consumed by both browser (`src/App.jsx`) and Node build scripts (`generate-index.js`, `prerender-seo.js`).
 - **`src/main.jsx`**: Mounts `<App />` alongside `@vercel/analytics/react` (`<Analytics />`) and `@vercel/speed-insights/react` (`<SpeedInsights />`).
@@ -76,7 +79,7 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
 
 ## 6. Release & Changelog Protocol
 
-1. Increment `APP_VERSION` (currently `'v5.8'`) in `src/App.jsx`.
+1. Increment `APP_VERSION` (currently `'v6.0'`) in `src/App.jsx`.
 2. Prepend a concise, accurate entry to `CHANGELOG_HISTORY` in `src/App.jsx`.
 3. Lint `src/` (`oxlint`) and build + pre-render:
    ```powershell

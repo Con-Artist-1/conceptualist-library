@@ -3,9 +3,11 @@ import path from 'path';
 import {
   PROJECT_ROOT,
   COLLECTION_VIEWS,
+  COLLECTION_SUBTITLES,
   parsePositiveInt,
   hashIdentifier,
   isValidPaperKey,
+  isValidSubtitleKey,
   isAllowedOrigin,
   getClientIp,
   checkSlidingRateLimit,
@@ -30,6 +32,71 @@ const paperCooldownMap = globalThis.__csPaperCooldownMap || (globalThis.__csPape
 // Server-side persistent fallback store (used if MongoDB is temporarily unreachable and synced once reachable)
 const LOCAL_STORE_DIR = path.join(PROJECT_ROOT, '.data');
 const LOCAL_STORE_FILE = path.join(LOCAL_STORE_DIR, 'paper_views.json');
+const LOCAL_SUBTITLES_FILE = path.join(LOCAL_STORE_DIR, 'audio_subtitles.json');
+let memorySubtitlesStore = globalThis.__csMemorySubtitlesStore || null;
+
+function loadLocalSubtitlesStore() {
+  if (memorySubtitlesStore) return memorySubtitlesStore;
+  try {
+    if (fs.existsSync(LOCAL_SUBTITLES_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(LOCAL_SUBTITLES_FILE, 'utf-8'));
+      if (parsed && typeof parsed.tracks === 'object') {
+        memorySubtitlesStore = parsed.tracks;
+        globalThis.__csMemorySubtitlesStore = memorySubtitlesStore;
+        return memorySubtitlesStore;
+      }
+    }
+  } catch {
+    // Ignore local filesystem read errors
+  }
+  memorySubtitlesStore = Object.create(null);
+  globalThis.__csMemorySubtitlesStore = memorySubtitlesStore;
+  return memorySubtitlesStore;
+}
+
+function saveLocalSubtitlesStore(tracksMap) {
+  try {
+    if (!fs.existsSync(LOCAL_STORE_DIR)) {
+      fs.mkdirSync(LOCAL_STORE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(
+      LOCAL_SUBTITLES_FILE,
+      JSON.stringify({ tracks: tracksMap, updatedAt: new Date().toISOString() }, null, 2),
+      'utf-8'
+    );
+  } catch {
+    // Ignore read-only filesystem errors
+  }
+}
+
+function sanitizeSubtitlePayload(raw) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.segments)) return null;
+  const cleanSegments = [];
+  for (const seg of raw.segments.slice(0, 250)) {
+    if (!seg || typeof seg !== 'object') continue;
+    const start = Number(seg.start);
+    const end = Number(seg.end);
+    const text = String(seg.text || '').trim().slice(0, 360);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || !text) continue;
+    const item = {
+      start: Number(start.toFixed(1)),
+      end: Number(end.toFixed(1)),
+      text
+    };
+    if (seg.passage && typeof seg.passage === 'string') {
+      item.passage = seg.passage.trim().slice(0, 80);
+    }
+    cleanSegments.push(item);
+  }
+  if (cleanSegments.length === 0) return null;
+  return {
+    duration: Number.isFinite(Number(raw.duration)) ? Number(Number(raw.duration).toFixed(1)) : 0,
+    source: typeof raw.source === 'string' ? raw.source.slice(0, 40) : 'whisper-ai',
+    language: typeof raw.language === 'string' ? raw.language.slice(0, 24) : 'french',
+    updatedAt: new Date().toISOString(),
+    segments: cleanSegments
+  };
+}
 let memoryViewsStore = globalThis.__csMemoryViewsStore || null;
 let inflightHydratePromise = globalThis.__csInflightViewsHydrate || null;
 let lastHydratedAt = globalThis.__csLastViewsHydratedAt || 0;
@@ -259,6 +326,40 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const urlObj = new URL(req.url || '/', 'http://localhost');
+    const subtitlesKeyParam =
+      typeof req.query?.subtitles === 'string'
+        ? req.query.subtitles.trim()
+        : (urlObj.searchParams.get('subtitles') || '').trim();
+
+    if (subtitlesKeyParam) {
+      if (!isValidSubtitleKey(subtitlesKeyParam)) {
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+        return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle trackKey' });
+      }
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+      const localSubs = loadLocalSubtitlesStore();
+      try {
+        const db = await getMongoDatabase();
+        const subCol = db.collection(COLLECTION_SUBTITLES);
+        const doc = await subCol.findOne(
+          { $or: [{ _id: subtitlesKeyParam }, { aliasKeys: subtitlesKeyParam }] },
+          { projection: { _id: 1, subtitle: 1 } }
+        );
+        if (doc?.subtitle && Array.isArray(doc.subtitle.segments)) {
+          localSubs[subtitlesKeyParam] = doc.subtitle;
+          return sendJsonResponse(res, 200, { ok: true, source: 'mongodb', subtitle: doc.subtitle });
+        }
+      } catch {
+        // Fallback to local subtitles store
+      }
+      const fallbackHit = localSubs[subtitlesKeyParam] || null;
+      return sendJsonResponse(res, 200, {
+        ok: true,
+        source: 'server-store',
+        subtitle: fallbackHit
+      });
+    }
+
     const paperKeyParam =
       typeof req.query?.paperKey === 'string'
         ? req.query.paperKey.trim()
@@ -316,12 +417,51 @@ export default async function handler(req, res) {
 
     let paperKey = '';
     let viewerId = '';
+    let body = null;
     try {
-      const body = await readJsonBody(req, 4096);
+      body = await readJsonBody(req, 65536);
       paperKey = typeof body?.paperKey === 'string' ? body.paperKey.trim() : '';
       viewerId = typeof body?.viewerId === 'string' ? body.viewerId.trim().slice(0, 64) : '';
     } catch {
       return sendJsonResponse(res, 400, { ok: false, error: 'Malformed JSON body' });
+    }
+
+    if (body?.action === 'save_subtitles') {
+      const trackKey = typeof body?.trackKey === 'string' ? body.trackKey.trim() : '';
+      if (!isValidSubtitleKey(trackKey)) {
+        return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle trackKey' });
+      }
+      const cleanSubtitle = sanitizeSubtitlePayload(body?.subtitle);
+      if (!cleanSubtitle) {
+        return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle segments' });
+      }
+      const aliasKeys = Array.isArray(body?.aliasKeys)
+        ? body.aliasKeys.map((k) => String(k || '').trim()).filter(isValidSubtitleKey).slice(0, 4)
+        : [];
+      const localSubs = loadLocalSubtitlesStore();
+      localSubs[trackKey] = cleanSubtitle;
+      for (const ak of aliasKeys) localSubs[ak] = cleanSubtitle;
+      saveLocalSubtitlesStore(localSubs);
+
+      try {
+        const db = await getMongoDatabase();
+        const subCol = db.collection(COLLECTION_SUBTITLES);
+        await subCol.updateOne(
+          { _id: trackKey },
+          {
+            $set: {
+              subtitle: cleanSubtitle,
+              aliasKeys,
+              updatedAt: cleanSubtitle.updatedAt
+            },
+            $setOnInsert: { createdAt: cleanSubtitle.updatedAt }
+          },
+          { upsert: true }
+        );
+        return sendJsonResponse(res, 200, { ok: true, source: 'mongodb', trackKey });
+      } catch {
+        return sendJsonResponse(res, 200, { ok: true, source: 'server-store', trackKey });
+      }
     }
 
     if (!isValidPaperKey(paperKey)) {

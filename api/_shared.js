@@ -11,9 +11,11 @@ export const PROJECT_ROOT = path.resolve(__dirname, '..');
 export const DB_NAME_DEFAULT = 'conceptualist_library';
 export const COLLECTION_VIEWS = 'paper_views';
 export const COLLECTION_SESSIONS = 'site_sessions';
+export const COLLECTION_SUBTITLES = 'audio_subtitles';
 
 export const PAPER_KEY_MAX_LEN = 220;
 export const PAPER_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&]+$/;
+export const SUBTITLE_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&#]+$/;
 
 const MONGO_RETRY_BACKOFF_MS = 15 * 1000;
 let cachedMongoClientPromise = globalThis.__csMongoClientPromise || null;
@@ -35,6 +37,14 @@ export function isValidPaperKey(key) {
   if (trimmed.length < 3 || trimmed.length > PAPER_KEY_MAX_LEN) return false;
   if (trimmed.includes('$') || trimmed.includes('{') || trimmed.includes('}')) return false;
   return PAPER_KEY_REGEX.test(trimmed);
+}
+
+export function isValidSubtitleKey(key) {
+  if (typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  if (trimmed.length < 3 || trimmed.length > PAPER_KEY_MAX_LEN) return false;
+  if (trimmed.includes('$') || trimmed.includes('{') || trimmed.includes('}')) return false;
+  return SUBTITLE_KEY_REGEX.test(trimmed);
 }
 
 export function isAllowedOrigin(req, requireHeader = false) {

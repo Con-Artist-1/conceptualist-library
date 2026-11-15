@@ -39,6 +39,7 @@ const EXCLUDE_DIRS = new Set([
   'dist-ssr',
   '.vercel',
   '.git',
+  '.data',
   'pi-deploy',
   '.vscode',
   '.idea',
