@@ -239,8 +239,8 @@ export const SUBJECT_FOLDER_NORMALIZER = {
 const MATH_LABEL_RULES = [
   { code: 'WMA11', nameNeedle: 'PURE MATHEMATICS 1', tokenRegex: /\b(?:P1|P1A|P1R)\b/, label: 'Pure Mathematics 1 (P1)' },
   { code: 'WMA12', nameNeedle: 'PURE MATHEMATICS 2', tokenRegex: /\b(?:P2|P2A|P2R)\b/, label: 'Pure Mathematics 2 (P2)' },
-  { code: 'WMA13', nameNeedle: 'PURE MATHEMATICS 3', tokenRegex: /\b(?:P3|P3A)\b/, label: 'Pure Mathematics 3 (P3)' },
-  { code: 'WMA14', nameNeedle: 'PURE MATHEMATICS 4', tokenRegex: /\b(?:P4|P4A)\b/, label: 'Pure Mathematics 4 (P4)' },
+  { code: 'WMA13', nameNeedle: 'PURE MATHEMATICS 3', tokenRegex: /\b(?:P3|P3A|P3R)\b/, label: 'Pure Mathematics 3 (P3)' },
+  { code: 'WMA14', nameNeedle: 'PURE MATHEMATICS 4', tokenRegex: /\b(?:P4|P4A|P4R)\b/, label: 'Pure Mathematics 4 (P4)' },
   { code: 'WMA01', nameNeedle: 'CORE MATHEMATICS 12', tokenRegex: /\bC12\b/, label: 'Core Mathematics 12 (C12)' },
   { code: 'WMA02', nameNeedle: 'CORE MATHEMATICS 34', tokenRegex: /\bC34\b/, label: 'Core Mathematics 34 (C34)' },
   { code: 'C1', nameNeedle: 'CORE MATHEMATICS 1 (C1)', tokenRegex: null, label: 'Core Mathematics 1 (C1)' },

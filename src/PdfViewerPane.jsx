@@ -24,10 +24,10 @@ function loadPdfJs() {
 }
 
 function computePageTargetWidth(containerWidth, scale, isMobile) {
-  const safeWidth = Math.max(containerWidth - (isMobile ? 12 : 28), 220);
+  const safeWidth = Math.max(containerWidth - (isMobile ? 16 : 36), 200);
   if (scale === 'fit-width') return safeWidth;
   if (scale === 'fit-page') return Math.min(safeWidth, 640);
-  if (typeof scale === 'number') return Math.max(safeWidth * scale, 220);
+  if (typeof scale === 'number') return Math.max(safeWidth * scale, 200);
   return safeWidth;
 }
 
@@ -36,6 +36,7 @@ const VirtualPdfPage = React.memo(({
   pdfDoc,
   pageNum,
   scale,
+  rotation = 0,
   containerWidth,
   isVisible,
   isNear,
@@ -49,7 +50,10 @@ const VirtualPdfPage = React.memo(({
   const [rendered, setRendered] = useState(false);
 
   const shouldMountCanvas = isVisible || isNear;
-  const effectiveAspectRatio = aspectRatio || defaultAspectRatio || 1.414;
+  const effectiveAspectRatio = useMemo(() => {
+    const base = aspectRatio || defaultAspectRatio || 1.414;
+    return rotation % 180 === 90 && !aspectRatio ? 1 / base : base;
+  }, [aspectRatio, defaultAspectRatio, rotation]);
 
   // Release GPU texture memory when page scrolls far out of active viewport buffer
   useEffect(() => {
@@ -64,16 +68,18 @@ const VirtualPdfPage = React.memo(({
     }
   }, [shouldMountCanvas]);
 
-  // Render page only when visible or in the immediate buffer window
+  // Render page to an offscreen buffer first to prevent zoom/resize blank flicker
   useEffect(() => {
     if (!shouldMountCanvas || !pdfDoc) return;
 
     let active = true;
+    let offscreenCanvas = null;
 
     pdfDoc.getPage(pageNum).then((page) => {
       if (!active || !canvasRef.current) return;
 
-      const unscaledViewport = page.getViewport({ scale: 1 });
+      const totalRotation = ((page.rotate || 0) + rotation) % 360;
+      const unscaledViewport = page.getViewport({ scale: 1, rotation: totalRotation });
       if (unscaledViewport && unscaledViewport.width > 0) {
         const ratio = unscaledViewport.height / unscaledViewport.width;
         setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
@@ -85,18 +91,22 @@ const VirtualPdfPage = React.memo(({
 
       const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
       const computedScale = targetWidth / unscaledViewport.width;
-      const viewport = page.getViewport({ scale: computedScale });
+      const viewport = page.getViewport({ scale: computedScale, rotation: totalRotation });
 
       // High-DPI scaling capped adaptively on zoomed mobile to preserve GPU memory
       const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : 2.5;
       const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
+      const pixelW = Math.max(1, Math.floor(viewport.width * dpr));
+      const pixelH = Math.max(1, Math.floor(viewport.height * dpr));
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = pixelW;
+      offscreenCanvas.height = pixelH;
+      const offscreenCtx = offscreenCanvas.getContext('2d');
+      if (!offscreenCtx) return;
+
+      offscreenCtx.fillStyle = '#FFFFFF';
+      offscreenCtx.fillRect(0, 0, pixelW, pixelH);
 
       const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
 
@@ -105,7 +115,7 @@ const VirtualPdfPage = React.memo(({
       }
 
       const renderTask = page.render({
-        canvasContext: ctx,
+        canvasContext: offscreenCtx,
         viewport,
         transform,
         intent: 'display'
@@ -113,11 +123,29 @@ const VirtualPdfPage = React.memo(({
       renderTaskRef.current = renderTask;
 
       renderTask.promise.then(() => {
-        if (active) {
-          setRendered(true);
-          if (onPageRendered) onPageRendered(pageNum);
-        }
+        if (!active || !canvasRef.current) return;
+        const targetCanvas = canvasRef.current;
+        const targetCtx = targetCanvas.getContext('2d');
+        if (!targetCtx) return;
+
+        targetCanvas.width = pixelW;
+        targetCanvas.height = pixelH;
+        targetCanvas.style.width = `${Math.floor(viewport.width)}px`;
+        targetCanvas.style.height = `${Math.floor(viewport.height)}px`;
+        targetCtx.drawImage(offscreenCanvas, 0, 0);
+
+        offscreenCanvas.width = 0;
+        offscreenCanvas.height = 0;
+        offscreenCanvas = null;
+
+        setRendered(true);
+        if (onPageRendered) onPageRendered(pageNum);
       }).catch((err) => {
+        if (offscreenCanvas) {
+          offscreenCanvas.width = 0;
+          offscreenCanvas.height = 0;
+          offscreenCanvas = null;
+        }
         if (err?.name !== 'RenderingCancelledException') {
           console.warn(`[WebPDF] Render error on page ${pageNum}:`, err);
         }
@@ -131,8 +159,13 @@ const VirtualPdfPage = React.memo(({
       if (renderTaskRef.current) {
         try { renderTaskRef.current.cancel(); } catch { /* noop */ }
       }
+      if (offscreenCanvas) {
+        offscreenCanvas.width = 0;
+        offscreenCanvas.height = 0;
+        offscreenCanvas = null;
+      }
     };
-  }, [pdfDoc, pageNum, scale, containerWidth, shouldMountCanvas, onPageRendered, isMobile]);
+  }, [pdfDoc, pageNum, scale, rotation, containerWidth, shouldMountCanvas, onPageRendered, isMobile]);
 
   const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
   const estimatedHeight = targetWidth * effectiveAspectRatio;
@@ -145,8 +178,7 @@ const VirtualPdfPage = React.memo(({
         width: `${Math.floor(targetWidth)}px`,
         minHeight: `${Math.floor(estimatedHeight)}px`,
         margin: '0 auto 16px auto',
-        position: 'relative',
-        backgroundColor: '#FFFFFF'
+        position: 'relative'
       }}
     >
       <div className="pdf-page-number-indicator">Page {pageNum}</div>
@@ -167,7 +199,8 @@ export const PdfViewerPane = ({
   docType = 'QP',
   isMobile = false,
   initialPage = 1,
-  onDownload = true
+  onDownload = true,
+  autoFocus = false
 }) => {
   const downloadUrl = url ? (url.includes('?') ? `${url}&download=true` : `${url}?download=true`) : '';
   const paneIdRef = useRef(null);
@@ -180,7 +213,10 @@ export const PdfViewerPane = ({
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [inputPage, setInputPage] = useState(String(initialPage));
   const [scale, setScale] = useState('fit-width'); // 'fit-width' | 'fit-page' | number
+  const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [downloadProgress, setDownloadProgress] = useState(null);
+  const [firstPagePainted, setFirstPagePainted] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [containerWidth, setContainerWidth] = useState(() => (
     typeof window !== 'undefined' ? (isMobile ? Math.min(window.innerWidth, 390) : 640) : 640
@@ -190,41 +226,77 @@ export const PdfViewerPane = ({
   useEffect(() => {
     const id = paneIdRef.current;
     mountedPaneIds.add(id);
-    activePaneId = id;
+    if (autoFocus || activePaneId === null) {
+      activePaneId = id;
+    }
+    let rafId = null;
+    if (autoFocus) {
+      rafId = requestAnimationFrame(() => {
+        const el = containerRef.current;
+        if (el && !el.contains(document.activeElement)) {
+          el.focus({ preventScroll: true });
+        }
+      });
+    }
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       mountedPaneIds.delete(id);
       if (activePaneId === id) {
         activePaneId = mountedPaneIds.size > 0 ? Array.from(mountedPaneIds)[mountedPaneIds.size - 1] : null;
       }
     };
-  }, []);
+  }, [autoFocus]);
 
   const containerRef = useRef(null);
   const scrollAreaRef = useRef(null);
   const observerRef = useRef(null);
 
   const currentPageRef = useRef(currentPage);
+  const initialPageRef = useRef(initialPage);
+  const pendingInitialJumpRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
   const pendingZoomAnchorRef = useRef(null);
   const pageInputRef = useRef(null);
 
   useEffect(() => {
+    initialPageRef.current = initialPage;
+  }, [initialPage]);
+
+  useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
-  // ResizeObserver to adapt canvas automatically to pane width
+  // ResizeObserver on inner scroll stage (excludes vertical scrollbar width) with 80ms debounce during drag resize
   useEffect(() => {
-    if (!containerRef.current) return;
-    const updateWidth = () => {
-      if (containerRef.current && containerRef.current.clientWidth > 0) {
-        setContainerWidth(containerRef.current.clientWidth);
+    const target = scrollAreaRef.current || containerRef.current;
+    if (!target) return;
+    let timerId = null;
+    let hasMeasured = false;
+
+    const applyWidth = () => {
+      const el = scrollAreaRef.current || containerRef.current;
+      if (el && el.clientWidth > 0) {
+        const nextW = el.clientWidth;
+        setContainerWidth((prev) => (Math.abs(prev - nextW) >= 1 ? nextW : prev));
+        hasMeasured = true;
       }
     };
-    updateWidth();
-    const observer = new ResizeObserver(updateWidth);
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
+
+    applyWidth();
+    const observer = new ResizeObserver(() => {
+      if (!hasMeasured) {
+        applyWidth();
+        return;
+      }
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(applyWidth, 80);
+    });
+    observer.observe(target);
+    return () => {
+      if (timerId) clearTimeout(timerId);
+      observer.disconnect();
+    };
   }, []);
 
   // Record anchor coordinates so zoom scales directly into focal point (mouse or screen center)
@@ -303,6 +375,9 @@ export const PdfViewerPane = ({
     let loadedDoc = null;
 
     setLoading(true);
+    setDownloadProgress(null);
+    setFirstPagePainted(false);
+    setRotation(0);
     setLoadError(null);
     setPdfDoc((prev) => {
       if (prev) {
@@ -322,17 +397,33 @@ export const PdfViewerPane = ({
         rangeChunkSize: 262144
       });
 
+      loadingTask.onProgress = (progressData) => {
+        if (!active || !progressData) return;
+        if (typeof progressData.total === 'number' && progressData.total > 0) {
+          const pct = Math.min(99, Math.max(0, Math.round((progressData.loaded / progressData.total) * 100)));
+          setDownloadProgress(pct);
+        }
+      };
+
       loadingTask.promise.then((doc) => {
         if (!active) {
           try { doc.destroy(); } catch {}
           return;
         }
         loadedDoc = doc;
+        const requestedStart = Number(initialPageRef.current) || 1;
+        const startPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
+        const initialWindow = new Set([startPage]);
+        if (startPage + 1 <= doc.numPages) initialWindow.add(startPage + 1);
+        if (startPage - 1 >= 1) initialWindow.add(startPage - 1);
+
+        pendingInitialJumpRef.current = startPage > 1 ? startPage : null;
         setPdfDoc(doc);
         setNumPages(doc.numPages);
-        setCurrentPage(1);
-        setInputPage('1');
-        setVisiblePages(new Set([1, 2]));
+        setCurrentPage(startPage);
+        setInputPage(String(startPage));
+        setVisiblePages(initialWindow);
+        setDownloadProgress(100);
         setLoading(false);
 
         // Fetch only page 1 dimensions to calibrate unvisited page skeleton heights
@@ -511,6 +602,31 @@ export const PdfViewerPane = ({
     }
   };
 
+  // Scroll to requested initialPage once document pages are mounted
+  useEffect(() => {
+    const target = pendingInitialJumpRef.current;
+    if (!loading && numPages > 0 && target && target > 1) {
+      pendingInitialJumpRef.current = null;
+      const raf = requestAnimationFrame(() => scrollToPage(target, false));
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [loading, numPages, scrollToPage]);
+
+  // Safety reveal if a page takes unusually long after metadata resolves
+  useEffect(() => {
+    if (loading || firstPagePainted || loadError) return;
+    const t = setTimeout(() => setFirstPagePainted(true), 2200);
+    return () => clearTimeout(t);
+  }, [loading, firstPagePainted, loadError]);
+
+  const handlePageRendered = useCallback(() => {
+    setFirstPagePainted(true);
+  }, []);
+
+  const handleRotateClockwise = useCallback(() => {
+    setRotation((prev) => (prev + 90) % 360);
+  }, []);
+
   // Zoom handlers (zoom centered to the middle of the screen)
   const handleZoomIn = useCallback(() => {
     recordZoomAnchor();
@@ -590,6 +706,7 @@ export const PdfViewerPane = ({
   return (
     <div
       ref={containerRef}
+      tabIndex={-1}
       className={`custom-pdf-pane ${isMobile ? 'mobile-mode' : ''}`}
       onMouseEnter={markPaneActive}
       onPointerDown={markPaneActive}
@@ -675,6 +792,19 @@ export const PdfViewerPane = ({
             +
           </button>
 
+          <button
+            type="button"
+            className={`pdf-tool-btn ${rotation !== 0 ? 'active' : ''}`}
+            onClick={handleRotateClockwise}
+            title={`Rotate Page 90° (${rotation}°)`}
+            aria-label="Rotate Page 90 Degrees"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+              <polyline points="21 3 21 9 15 9" />
+            </svg>
+          </button>
+
           {onDownload && downloadUrl && (
             <a
               href={downloadUrl}
@@ -695,14 +825,28 @@ export const PdfViewerPane = ({
       </div>
 
       {/* Main PDF Scrollable Stage */}
-      <div ref={scrollAreaRef} className="pdf-scroll-stage">
-        {loading && (
+      <div
+        ref={scrollAreaRef}
+        className={`pdf-scroll-stage ${scale === 'fit-width' || scale === 'fit-page' ? 'fit-mode' : ''}`}
+      >
+        {(loading || !firstPagePainted) && !loadError && (
           <div className="pdf-loading-overlay">
             <div className="pdf-loading-card">
               <div className="pdf-loading-bar-track">
-                <div className="pdf-loading-bar-fill" />
+                {typeof downloadProgress === 'number' ? (
+                  <div
+                    className="pdf-loading-bar-fill determinate"
+                    style={{ width: `${Math.max(8, downloadProgress)}%` }}
+                  />
+                ) : (
+                  <div className="pdf-loading-bar-fill" />
+                )}
               </div>
-              <div className="pdf-loading-title">Rendering Document</div>
+              <div className="pdf-loading-title">
+                {typeof downloadProgress === 'number' && downloadProgress < 100
+                  ? `Downloading Document (${downloadProgress}%)`
+                  : 'Rendering Document'}
+              </div>
               <div className="pdf-loading-subtext">{title || 'Preparing vector pages...'}</div>
             </div>
           </div>
@@ -740,11 +884,13 @@ export const PdfViewerPane = ({
                 pdfDoc={pdfDoc}
                 pageNum={pageNum}
                 scale={scale}
+                rotation={rotation}
                 containerWidth={containerWidth}
                 isVisible={visiblePages.has(pageNum)}
                 isNear={Math.abs(pageNum - currentPage) <= 2}
                 isMobile={isMobile}
                 defaultAspectRatio={defaultAspectRatio}
+                onPageRendered={handlePageRendered}
               />
             ))}
           </div>

@@ -177,6 +177,27 @@ async function attachApiAndLibraryMiddlewares(server) {
     res.end()
   })
 
+  const SHARDS_DIR = path.join(__dirname, 'dist', 'shards')
+  server.middlewares.use('/shards', (req, res) => {
+    const cleanUrl = (req.url || '').split('?')[0].replace(/^\/+/, '')
+    if (!cleanUrl || cleanUrl.includes('..') || !cleanUrl.endsWith('.json')) {
+      res.statusCode = 404
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.end('{"error":"Shard not found"}')
+      return
+    }
+    const shardPath = path.resolve(SHARDS_DIR, cleanUrl)
+    if (!shardPath.startsWith(SHARDS_DIR + path.sep) || !fs.existsSync(shardPath)) {
+      res.statusCode = 404
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.end('{"error":"Shard not found in dev"}')
+      return
+    }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    fs.createReadStream(shardPath).pipe(res)
+  })
+
   const ALLOWED_LIBRARY_PREFIXES = ['Past Papers/', 'IAL Books/', 'IGCSE Books/']
 
   server.middlewares.use('/library-files', (req, res) => {

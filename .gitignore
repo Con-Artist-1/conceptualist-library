@@ -36,3 +36,4 @@ pi-deploy.zip
 *.njsproj
 *.sln
 *.sw?
+.data/paper_views.json

@@ -10,7 +10,8 @@ import {
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
   getCurriculumSlug,
-  getSubjectSlug
+  getSubjectSlug,
+  resolveSubjectFromSlug
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
@@ -51,10 +52,22 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v5.6';
+const APP_VERSION = 'v5.7';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v5.7',
+    date: BUILD_TIMESTAMP,
+    title: 'WebPDF Zero-Overflow Upgrade, Persistent Audio Dock & Unified Palette',
+    summary: 'Eliminated horizontal scrollbars and white scroll-corners in WebPDF FIT mode, added double-buffered rendering, 90° page rotation, Split pane swapping, a docked MP3 player above QP papers, Session filter and Most Viewed sorting, Sidebar subject-to-unit linking, and unified Charcoal & Gold QP/MS styling across all 3 themes.',
+    changes: [
+      'WebPDF Reader overhaul: Fixed FIT mode scrollbar calculation via inner viewport clientWidth tracking, suppressed horizontal overflow in fit modes, double-buffered page redraws to prevent zoom flicker, added 90° page rotation and live download progress, preserved QP focus in Split View with Swap Panes support, and fixed Dark/OLED scroll corners plus mobile Page 1 badge headroom.',
+      'Docked Audio & Standalone Audio UX: Added a persistent Audio Track dock above Question Papers for listening sittings (e.g., WFR02 2023 MP3s), labeled ZIP audio packages accurately as Audio Archive, and fixed mobile/desktop audio pill accessibility.',
+      'Catalog filtering, Sidebar & Navigation: Added Exam Session filter (January / June / October) alongside Most Viewed sorting, routed sidebar subject and textbook clicks through canonical filter state to unlock Unit/Paper dropdowns, removed duplicate View buttons on Past Papers and Textbooks, and exposed a mobile theme toggle on subject routes.',
+      'Palette & Backend Performance: Unified QP/MS accents to Charcoal/Obsidian Slate & Gold/Brass across Light, Dark, and Pure OLED themes, fixed /api/views local JSON persistence and added a 15-second hydration cache, and optimized Damerau-Levenshtein search matching.'
+    ]
+  },
   {
     version: 'v5.6',
     date: BUILD_TIMESTAMP,
@@ -586,33 +599,51 @@ const SEARCH_VOCAB = [
   '4wbi1', '4wch1', '4wph1'
 ];
 
-// Fast bounded Damerau-Levenshtein distance (supports insertions, deletions, substitutions, and adjacent transpositions)
+const _dlPrevPrev = new Int32Array(64);
+const _dlPrev = new Int32Array(64);
+const _dlCurr = new Int32Array(64);
+
+// Fast bounded Damerau-Levenshtein distance using reusable typed rows
 function damerauLevenshtein(a, b, maxDist = 2) {
   const lenA = a.length;
   const lenB = b.length;
   if (Math.abs(lenA - lenB) > maxDist) return maxDist + 1;
-  const dp = Array.from({ length: lenA + 1 }, () => new Array(lenB + 1).fill(0));
-  for (let i = 0; i <= lenA; i++) dp[i][0] = i;
-  for (let j = 0; j <= lenB; j++) dp[0][j] = j;
+  if (lenA === 0) return lenB <= maxDist ? lenB : maxDist + 1;
+  if (lenB === 0) return lenA <= maxDist ? lenA : maxDist + 1;
+  const need = lenB + 1;
+  let prevPrev = need <= _dlPrevPrev.length ? _dlPrevPrev : new Int32Array(need);
+  let prev = need <= _dlPrev.length ? _dlPrev : new Int32Array(need);
+  let curr = need <= _dlCurr.length ? _dlCurr : new Int32Array(need);
+
+  for (let j = 0; j <= lenB; j++) prev[j] = j;
 
   for (let i = 1; i <= lenA; i++) {
+    curr[0] = i;
     let rowMin = maxDist + 1;
+    const chA = a.charCodeAt(i - 1);
+    const chAPrev = i > 1 ? a.charCodeAt(i - 2) : -1;
     for (let j = 1; j <= lenB; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      let val = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-        val = Math.min(val, dp[i - 2][j - 2] + 1);
+      const chB = b.charCodeAt(j - 1);
+      const cost = chA === chB ? 0 : 1;
+      let val = prev[j] + 1;
+      const ins = curr[j - 1] + 1;
+      if (ins < val) val = ins;
+      const sub = prev[j - 1] + cost;
+      if (sub < val) val = sub;
+      if (i > 1 && j > 1 && chA === b.charCodeAt(j - 2) && chAPrev === chB) {
+        const trans = prevPrev[j - 2] + 1;
+        if (trans < val) val = trans;
       }
-      dp[i][j] = val;
+      curr[j] = val;
       if (val < rowMin) rowMin = val;
     }
     if (rowMin > maxDist) return maxDist + 1;
+    const tmp = prevPrev;
+    prevPrev = prev;
+    prev = curr;
+    curr = tmp;
   }
-  return dp[lenA][lenB];
+  return prev[lenB];
 }
 
 // Parse user search query into expanded synonym + typo-tolerant token groups (<0.05ms per query)
@@ -702,7 +733,11 @@ function formatSubjectDisplay(subj) {
 
 function getHfUrl(filePath) {
   if (!filePath) return '';
-  return `https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/${(filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/')}`;
+  const encoded = (filePath || '').split(/[\\/]/).map(encodeURIComponent).join('/');
+  if (import.meta.env.DEV) {
+    return `/library-files/${encoded}`;
+  }
+  return `https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/${encoded}`;
 }
 
 function getDownloadUrl(filePath) {
@@ -1022,7 +1057,7 @@ function getPaperViewKey(file) {
 
 function isQuestionPaperEligibleForViews(file) {
   if (!file) return false;
-  if (file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') return false;
+  if (file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books' || file.docType === 'Book') return true;
   if (file.isUnifiedSitting) return Boolean(file.docs?.QP || file.docType === 'QP' || file.isPendingSkeleton);
   return file.docType === 'QP' || Boolean(file.docs?.QP);
 }
@@ -1270,7 +1305,7 @@ function getInitialRecentHistory() {
 }
 
 // ─── In-App Quick PDF Preview Modal (with WebPDF Engine & Refined Split View) ────
-const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = false, onClose, theme, onToggleTheme }) => {
+const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = false, onClose, onViewModeChange, theme, onToggleTheme }) => {
   const siblings = useMemo(() => ({
     ...(file?.siblings || {}),
     ...(file?.docs || {})
@@ -1279,12 +1314,43 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
   const isMobile = useIsMobile();
 
+  const audSib = siblings.AUD;
+  const audExt = audSib
+    ? (audSib.ext || (audSib.path ? audSib.path.split('.').pop() : '') || '').toLowerCase()
+    : '';
+  const isPlayableAudioSib = audExt === 'mp3' || audExt === 'wav' || audExt === 'm4a' || audExt === 'ogg';
+  const hasPdfFallback = Boolean(siblings.QP?.ext === 'pdf' || siblings.MS?.ext === 'pdf');
+  const canDockAudio = isPlayableAudioSib && hasPdfFallback;
+
+  const [audioDockOpen, setAudioDockOpen] = useState(() => Boolean(initialView === 'AUD' && canDockAudio));
+  const [swapSplit, setSwapSplit] = useState(false);
+
   // On mobile portrait, default to single QP view for maximum readable document height; on desktop, default to split view
   const [activeView, setActiveView] = useState(() => {
+    if (initialView === 'AUD' && canDockAudio) {
+      return !isMobile && canSplit ? 'split' : (siblings.QP ? 'QP' : siblings.MS ? 'MS' : 'QP');
+    }
     if (initialView === 'split' && canSplit) return 'split';
     if (initialView && (siblings[initialView] || file?.docType === initialView)) return initialView;
     return isMobile ? (file?.docType || (siblings.QP ? 'QP' : 'split')) : (canSplit ? 'split' : (file?.docType || 'QP'));
   });
+
+  useEffect(() => {
+    if (canDockAudio && activeView === 'AUD') {
+      setAudioDockOpen(true);
+      const fallbackView = !isMobile && canSplit ? 'split' : (siblings.QP ? 'QP' : 'MS');
+      setActiveView(fallbackView);
+    }
+  }, [canDockAudio, activeView, isMobile, canSplit, siblings.QP]);
+
+  const handleSelectView = useCallback((nextView) => {
+    if (nextView === 'AUD' && canDockAudio) {
+      setAudioDockOpen((prev) => !prev);
+      return;
+    }
+    setActiveView(nextView);
+    if (onViewModeChange) onViewModeChange(nextView);
+  }, [canDockAudio, onViewModeChange]);
 
   const telemetryPaperKey = file && !file.isPendingSkeleton ? getPaperViewKey(file) : '';
   const telemetryMode = useMemo(() => {
@@ -1467,7 +1533,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
 
   const singleExt = (currentDoc.ext || (currentDoc.path ? currentDoc.path.split('.').pop() : 'pdf') || 'pdf').toLowerCase();
   const isSinglePdf = singleExt === 'pdf';
-  const isSingleAudio = singleExt === 'mp3' || singleExt === 'wav';
+  const isSingleAudio = singleExt === 'mp3' || singleExt === 'wav' || singleExt === 'm4a' || singleExt === 'ogg';
 
   const singleUrl = getHfUrl(currentDoc.path);
   const singleTitle = getDisplayTitle(currentDoc);
@@ -1481,6 +1547,25 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
 
   const downloadUrl = isSplit ? getDownloadUrl(siblings.QP?.path) : getDownloadUrl(currentDoc.path);
+
+  const renderSplitPdfPane = (docTypeKey, shouldFocus) => {
+    const targetSib = docTypeKey === 'QP' ? siblings.QP : siblings.MS;
+    const labelText = docTypeKey === 'QP' ? 'Question Paper' : 'Mark Scheme';
+    return (
+      <Suspense fallback={<PdfPaneSkeleton title={`Loading ${labelText}...`} subtitle="Initializing WebPDF Reader" />}>
+        <PdfViewerPane
+          key={docTypeKey}
+          url={getHfUrl(targetSib.path)}
+          title={targetSib.name || labelText}
+          docType={docTypeKey}
+          isMobile={isMobile}
+          initialPage={1}
+          onDownload={true}
+          autoFocus={shouldFocus}
+        />
+      </Suspense>
+    );
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={modalTitle}>
@@ -1540,13 +1625,16 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 {['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM'].map((type) => {
                   const sib = siblings[type];
                   if (!sib) return null;
-                  const isCurrent = !isSplit && (activeView === type || currentDoc.path === sib.path);
+                  const isDockedAudioTab = type === 'AUD' && canDockAudio;
+                  const isCurrent = isDockedAudioTab
+                    ? audioDockOpen
+                    : (!isSplit && (activeView === type || currentDoc.path === sib.path));
                   const labelMap = {
                     QP: ['Question Paper', 'QP'],
                     MS: ['Mark Scheme', 'MS'],
                     ER: ['Examiner Report', 'ER'],
                     SC: ['Scientific Article', 'SC'],
-                    AUD: ['Audio Track', 'Audio'],
+                    AUD: audExt === 'zip' ? ['Audio Archive', 'Audio ZIP'] : ['Audio Track', 'Audio'],
                     DF: ['Data / Formulae', 'Data'],
                     SOL: ['Worked Solution', 'SOL'],
                     SAM: ['Sample Paper', 'SAM']
@@ -1556,14 +1644,15 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     <button
                       key={type}
                       type="button"
-                      role="tab"
-                      aria-selected={isCurrent}
+                      role={isDockedAudioTab ? undefined : 'tab'}
+                      aria-selected={isDockedAudioTab ? undefined : isCurrent}
+                      aria-pressed={isDockedAudioTab ? audioDockOpen : undefined}
                       className={`modal-btn modal-view-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
-                      onClick={() => setActiveView(type)}
-                      title={`View ${fullLabel}`}
+                      onClick={() => handleSelectView(type)}
+                      title={isDockedAudioTab ? (audioDockOpen ? 'Hide docked audio player' : 'Play listening audio above paper') : `View ${fullLabel}`}
                     >
                       <span className="btn-desktop-text">{fullLabel}</span>
-                      <span className="btn-mobile-text">{shortLabel}</span>
+                      <span className="btn-mobile-text" aria-hidden="true">{shortLabel}</span>
                     </button>
                   );
                 })}
@@ -1574,11 +1663,30 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     role="tab"
                     aria-selected={isSplit}
                     className={`modal-btn modal-view-btn split ${isSplit ? 'active' : ''}`}
-                    onClick={() => setActiveView('split')}
+                    onClick={() => handleSelectView('split')}
                     title="View Question Paper and Mark Scheme side-by-side"
                   >
                     <span className="btn-desktop-text">Split View</span>
-                    <span className="btn-mobile-text">Split</span>
+                    <span className="btn-mobile-text" aria-hidden="true">Split</span>
+                  </button>
+                )}
+
+                {isSplit && (
+                  <button
+                    type="button"
+                    className={`modal-btn modal-swap-split-btn ${swapSplit ? 'active' : ''}`}
+                    onClick={() => setSwapSplit((prev) => !prev)}
+                    aria-pressed={swapSplit}
+                    title={swapSplit ? 'Restore Question Paper left / Mark Scheme right' : 'Swap Question Paper and Mark Scheme pane positions'}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                      <polyline points="17 1 21 5 17 9" />
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                      <polyline points="7 23 3 19 7 15" />
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                    </svg>
+                    <span className="btn-desktop-text">Swap Panes</span>
+                    <span className="btn-mobile-text" aria-hidden="true">Swap</span>
                   </button>
                 )}
               </div>
@@ -1626,7 +1734,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 title="Hide header for distraction-free reading (Press H to restore)"
               >
                 <span className="btn-desktop-text">Hide Header</span>
-                <span className="btn-mobile-text">Hide</span>
+                <span className="btn-mobile-text" aria-hidden="true">Hide</span>
               </button>
 
               {/* Download PDF directly */}
@@ -1659,6 +1767,51 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
           </div>
         )}
 
+        {/* Persistent Docked Audio Player above Question Paper / Split Stage */}
+        {audioDockOpen && canDockAudio && audSib && (
+          <div className="modal-audio-dock" role="region" aria-label="Listening Audio Player">
+            <div className="modal-audio-dock-info">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
+              <span className="modal-audio-dock-label" title={audSib.name || audSib.path}>
+                {audSib.name || 'Listening Audio Track'}
+              </span>
+            </div>
+            <audio
+              controls
+              autoPlay
+              preload="metadata"
+              className="modal-audio-dock-player"
+              src={getHfUrl(audSib.path)}
+            >
+              Your browser does not support the audio element.
+            </audio>
+            <div className="modal-audio-dock-actions">
+              <a
+                href={getDownloadUrl(audSib.path)}
+                download
+                rel="noopener noreferrer"
+                className="modal-audio-dock-download"
+                title="Download listening audio file"
+              >
+                Download {audExt.toUpperCase()}
+              </a>
+              <button
+                type="button"
+                className="modal-audio-dock-close"
+                onClick={() => setAudioDockOpen(false)}
+                aria-label="Close docked audio player"
+                title="Hide Audio Bar"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Modal Stage (Hardware-accelerated CSS split sizing) */}
         <div
           ref={modalBodyRef}
@@ -1675,18 +1828,9 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             />
           ) : isSplit ? (
             <>
-              {/* Question Paper Pane */}
+              {/* First Split Pane (QP by default, MS when swapped) */}
               <div className="modal-split-pane qp-pane">
-                <Suspense fallback={<PdfPaneSkeleton title="Loading Question Paper..." subtitle="Initializing WebPDF Reader" />}>
-                  <PdfViewerPane
-                    url={getHfUrl(siblings.QP.path)}
-                    title={siblings.QP.name || 'Question Paper'}
-                    docType="QP"
-                    isMobile={isMobile}
-                    initialPage={1}
-                    onDownload={true}
-                  />
-                </Suspense>
+                {swapSplit ? renderSplitPdfPane('MS', true) : renderSplitPdfPane('QP', true)}
               </div>
 
               {/* Desktop Horizontal Split Resizer */}
@@ -1700,7 +1844,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                   tabIndex={0}
                   title="Drag or use Left/Right Arrow keys to resize panes (Double-click or Home to reset 50/50)"
                   role="separator"
-                  aria-label="Resize Question Paper and Mark Scheme panes"
+                  aria-label="Resize split panes"
                   aria-orientation="vertical"
                   aria-valuenow={Math.round(desktopSplitRatio)}
                   aria-valuemin={15}
@@ -1731,18 +1875,9 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 </div>
               )}
 
-              {/* Mark Scheme Pane */}
+              {/* Second Split Pane (MS by default, QP when swapped) */}
               <div className="modal-split-pane ms-pane">
-                <Suspense fallback={<PdfPaneSkeleton title="Loading Mark Scheme..." subtitle="Initializing WebPDF Reader" />}>
-                  <PdfViewerPane
-                    url={getHfUrl(siblings.MS.path)}
-                    title={siblings.MS.name || 'Mark Scheme'}
-                    docType="MS"
-                    isMobile={isMobile}
-                    initialPage={1}
-                    onDownload={true}
-                  />
-                </Suspense>
+                {swapSplit ? renderSplitPdfPane('QP', false) : renderSplitPdfPane('MS', false)}
               </div>
             </>
           ) : (
@@ -1777,6 +1912,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     isMobile={isMobile}
                     initialPage={1}
                     onDownload={true}
+                    autoFocus={true}
                   />
                 </Suspense>
               )}
@@ -2360,7 +2496,7 @@ const WelcomePage = ({
                         title="Open Question Paper and Mark Scheme side by side in Split View"
                       >
                         <span className="btn-desktop-text">Split View</span>
-                        <span className="btn-mobile-text">Split</span>
+                        <span className="btn-mobile-text" aria-hidden="true">Split</span>
                       </a>
                     )}
                   </div>
@@ -2800,6 +2936,7 @@ function App() {
   const [filterSubject, setFilterSubject] = useState(initialRoute.filterSubject || '');
   const [filterUnit, setFilterUnit] = useState(initialRoute.filterUnit || '');
   const [filterYear, setFilterYear] = useState(initialRoute.filterYear || '');
+  const [filterSession, setFilterSession] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // Default to newest first so recent 2026/2025 papers appear at top
   const [forceShowTable, setForceShowTable] = useState(Boolean(initialRoute.forceShowTable));
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -2948,6 +3085,7 @@ function App() {
       setFilterSubject(parsed.filterSubject || '');
       setFilterUnit(parsed.filterUnit || '');
       setFilterYear(parsed.filterYear || '');
+      setFilterSession('');
       setFilterDocType(parsed.filterDocType || null);
       setSearchQuery(parsed.searchQuery || '');
       setForceShowTable(Boolean(parsed.forceShowTable));
@@ -3641,7 +3779,7 @@ function App() {
   // Reset pagination when filters/search change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, deferredSearchQuery, sortBy, viewMode]);
+  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, filterSession, deferredSearchQuery, sortBy, viewMode]);
 
   const toggleExpand = useCallback((path) => {
     setExpandedPaths(prev => {
@@ -3652,6 +3790,49 @@ function App() {
     });
   }, []);
 
+  // Keep sidebar parent folders expanded when landing on or switching to a subject/book route
+  useEffect(() => {
+    if (!filterCurriculum && !filterSubject) return;
+    setExpandedPaths(prev => {
+      const ancestors = [];
+      if (filterDocType === 'Book') {
+        const rootBook = filterCurriculum === 'Edexcel IGCSE' ? 'IGCSE Books' : 'IAL Books';
+        ancestors.push('', rootBook);
+      } else {
+        ancestors.push('', 'Past Papers');
+        if (filterCurriculum === 'Edexcel IAL') ancestors.push('Past Papers/IAL');
+        else if (filterCurriculum === 'Edexcel IGCSE') ancestors.push('Past Papers/IGCSE');
+      }
+      let changed = false;
+      const next = new Set(prev);
+      for (const a of ancestors) {
+        if (!next.has(a)) {
+          next.add(a);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [filterCurriculum, filterSubject, filterDocType]);
+
+  const effectiveTreePath = useMemo(() => {
+    if (selectedPath && selectedPath !== (data.tree?.path || '')) return selectedPath;
+    if (filterDocType === 'Book') {
+      const bookRoot = filterCurriculum === 'Edexcel IGCSE'
+        ? 'IGCSE Books'
+        : (filterCurriculum === 'Edexcel IAL' ? 'IAL Books' : '');
+      if (bookRoot && filterSubject) return `${bookRoot}/${filterSubject}`;
+      if (bookRoot) return bookRoot;
+    }
+    if (filterCurriculum && filterSubject) {
+      const currFolder = filterCurriculum === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL';
+      return `Past Papers/${currFolder}/${filterSubject}`;
+    }
+    if (filterCurriculum === 'Edexcel IAL') return 'Past Papers/IAL';
+    if (filterCurriculum === 'Edexcel IGCSE') return 'Past Papers/IGCSE';
+    return selectedPath;
+  }, [selectedPath, data.tree, filterDocType, filterCurriculum, filterSubject]);
+
   const handleSubjectSelect = useCallback((subject, curriculum = '') => {
     setCurrentTab('library');
     setIsNotFound(false);
@@ -3659,6 +3840,7 @@ function App() {
     setFilterSubject(subject);
     setFilterUnit('');
     setFilterYear('');
+    setFilterSession('');
     setSearchQuery('');
     setForceShowTable(true);
     setSelectedPath(data.tree?.path || '');
@@ -3671,6 +3853,7 @@ function App() {
     if (subject) setFilterSubject(subject);
     setFilterUnit(unit || '');
     setFilterYear(year ? String(year) : '');
+    setFilterSession('');
     setSearchQuery('');
     setForceShowTable(true);
     setSelectedPath(data.tree?.path || '');
@@ -3683,6 +3866,7 @@ function App() {
     setFilterSubject('');
     setFilterUnit('');
     setFilterYear('');
+    setFilterSession('');
     setSearchQuery('');
     setSortBy('newest');
     setForceShowTable(false);
@@ -3691,6 +3875,70 @@ function App() {
       window.history.pushState(null, '', '/');
     }
   }, [data.tree]);
+
+  const handleTreeSelect = useCallback((p) => {
+    setIsNotFound(false);
+    if (!p || p === (data.tree?.path || '')) {
+      clearFilters();
+      return;
+    }
+    const parts = p.split('/').filter(Boolean);
+    if (parts[0] === 'IAL Books' || parts[0] === 'IGCSE Books') {
+      const mappedCurr = parts[0] === 'IGCSE Books' ? 'Edexcel IGCSE' : 'Edexcel IAL';
+      const folderSlug = parts[1] ? parts[1].toLowerCase().trim().replace(/\s+/g, '-') : '';
+      const subj = parts[1] ? (resolveSubjectFromSlug(folderSlug, mappedCurr, data.meta) || parts[1]) : '';
+      setCurrentTab('library');
+      setFilterCurriculum(mappedCurr);
+      setFilterSubject(subj);
+      setFilterUnit('');
+      setFilterYear('');
+      setFilterSession('');
+      setFilterDocType('Book');
+      setSearchQuery('');
+      setSelectedPath(data.tree?.path || '');
+      setForceShowTable(true);
+      return;
+    }
+    if (parts[0] === 'Past Papers') {
+      if (parts.length === 1) {
+        setFilterCurriculum('');
+        setFilterSubject('');
+        setFilterUnit('');
+        setFilterYear('');
+        setFilterSession('');
+        setFilterDocType(null);
+        setSearchQuery('');
+        setSelectedPath(p);
+        setForceShowTable(true);
+        return;
+      }
+      const mappedCurr = parts[1] === 'IGCSE' ? 'Edexcel IGCSE' : (parts[1] === 'IAL' ? 'Edexcel IAL' : '');
+      if (parts.length === 2 && mappedCurr) {
+        setFilterCurriculum(mappedCurr);
+        setFilterSubject('');
+        setFilterUnit('');
+        setFilterYear('');
+        setFilterSession('');
+        setFilterDocType(null);
+        setSearchQuery('');
+        setSelectedPath(data.tree?.path || '');
+        setForceShowTable(true);
+        return;
+      }
+      if (parts.length >= 3 && mappedCurr) {
+        const folderSlug = parts[2].toLowerCase().trim().replace(/\s+/g, '-');
+        const subj = resolveSubjectFromSlug(folderSlug, mappedCurr, data.meta) || parts[2];
+        setFilterDocType(null);
+        handleSubjectSelect(subj, mappedCurr);
+        if (parts.length > 3) {
+          setSelectedPath(p);
+        }
+        return;
+      }
+    }
+    setSelectedPath(p);
+    setForceShowTable(p !== data.tree?.path);
+  }, [data.tree, data.meta, clearFilters, handleSubjectSelect]);
 
   const navigateToHome = useCallback((e) => {
     if (e) {
@@ -3715,6 +3963,7 @@ function App() {
     setFilterSubject('');
     setFilterUnit('');
     setFilterYear('');
+    setFilterSession('');
     setSearchQuery('');
     setSortBy('newest');
     setForceShowTable(false);
@@ -3808,10 +4057,11 @@ function App() {
     const hasSubject = Boolean(filterSubject);
     const hasUnit = Boolean(filterUnit);
     const hasYear = Boolean(filterYear);
+    const hasSession = Boolean(filterSession);
     const hasDocType = Boolean(filterDocType);
 
     let files;
-    if (!hasFolder && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasDocType) {
+    if (!hasFolder && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasDocType) {
       files = sourceFiles;
     } else {
       const filtered = [];
@@ -3835,6 +4085,7 @@ function App() {
         if (hasSubject && f.subject !== filterSubject) continue;
         if (hasUnit && f.cleanUnitLabel !== filterUnit) continue;
         if (hasYear && String(f.year) !== String(filterYear)) continue;
+        if (hasSession && !String(f.session || '').toLowerCase().startsWith(filterSession.toLowerCase())) continue;
 
         if (hasDocType) {
           if (filterDocType === 'Book') {
@@ -3922,6 +4173,14 @@ function App() {
         if (aVar !== bVar) return aVar < bVar ? -1 : 1;
         return (docOrder[a.docType] || 9) - (docOrder[b.docType] || 9);
       });
+    } else if (sortBy === 'popular') {
+      sorted.sort((a, b) => {
+        const vDiff = getPaperTotalViews(b, viewsMap) - getPaperTotalViews(a, viewsMap);
+        if (vDiff !== 0) return vDiff;
+        const kDiff = (b.sortKey || 0) - (a.sortKey || 0);
+        if (kDiff !== 0) return kDiff;
+        return (docOrder[a.docType] || 9) - (docOrder[b.docType] || 9);
+      });
     } else if (sortBy === 'oldest') {
       sorted.sort((a, b) => {
         const diff = (a.sortKey || 999999) - (b.sortKey || 999999);
@@ -3957,8 +4216,10 @@ function App() {
     filterSubject,
     filterUnit,
     filterYear,
+    filterSession,
     sortBy,
-    viewMode
+    viewMode,
+    viewsMap
   ]);
 
   const visibleFiles = useMemo(
@@ -3972,6 +4233,7 @@ function App() {
     filterSubject ||
     filterUnit ||
     filterYear ||
+    filterSession ||
     searchQuery ||
     forceShowTable
   );
@@ -3987,7 +4249,7 @@ function App() {
             : data.meta?.subjectCoverage?.[filterSubject]);
       if (cov) return `${formatSubjectDisplay(filterSubject)}: ${cov}`;
     }
-    return data.meta?.coverage || 'January 2003 – January 2026';
+    return data.meta?.coverage || 'January 2003 – June 2026';
   }, [filterSubject, filterCurriculum, data.meta]);
 
   // Upgrade from a route shard to the full catalog index whenever global search or cross-route navigation requires it
@@ -4211,7 +4473,7 @@ function App() {
       <div className="breadcrumb-trail">
         <a href="/" className="breadcrumb-link home" onClick={navigateToHome}>
           <span className="btn-desktop-text">← Library Home</span>
-          <span className="btn-mobile-text">← Home</span>
+          <span className="btn-mobile-text" aria-hidden="true">← Home</span>
         </a>
         {filterCurriculum && (
           <>
@@ -4242,6 +4504,14 @@ function App() {
             <span className="breadcrumb-separator">/</span>
             <button type="button" className="breadcrumb-link" onClick={() => setFilterYear('')} title="Click to remove year filter">
               {filterYear} ×
+            </button>
+          </>
+        )}
+        {filterSession && (
+          <>
+            <span className="breadcrumb-separator">/</span>
+            <button type="button" className="breadcrumb-link" onClick={() => setFilterSession('')} title="Click to remove session filter">
+              {filterSession} ×
             </button>
           </>
         )}
@@ -4287,14 +4557,18 @@ function App() {
         ) : allMatchedFiles.length > visibleFiles.length ? (
           <>
             Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong>{' '}
-            {viewMode === 'unified' ? 'exam sittings' : 'documents'}
+            {filterDocType === 'Book'
+              ? 'textbooks'
+              : (viewMode === 'unified' ? 'exam sittings' : 'documents')}
           </>
         ) : (
           <>
             Displaying <strong>{allMatchedFiles.length.toLocaleString()}</strong> matching{' '}
-            {viewMode === 'unified'
-              ? (allMatchedFiles.length === 1 ? 'exam sitting' : 'exam sittings')
-              : (allMatchedFiles.length === 1 ? 'document' : 'documents')}
+            {filterDocType === 'Book'
+              ? (allMatchedFiles.length === 1 ? 'textbook' : 'textbooks')
+              : viewMode === 'unified'
+                ? (allMatchedFiles.length === 1 ? 'exam sitting' : 'exam sittings')
+                : (allMatchedFiles.length === 1 ? 'document' : 'documents')}
           </>
         )}
       </div>
@@ -4381,6 +4655,36 @@ function App() {
         {isMobile && currentTab === 'library' && !showWelcome && !isNotFound && (
           <div className="mobile-header-breadcrumb">
             {renderBreadcrumbs('mobile-header-breadcrumb-content')}
+            <button
+              type="button"
+              className="mobile-breadcrumb-theme-btn"
+              onClick={toggleTheme}
+              title={
+                theme === 'light'
+                  ? 'Current: Light - Tap for Dark'
+                  : theme === 'dark'
+                  ? 'Current: Dark - Tap for Pure OLED'
+                  : 'Current: OLED - Tap for Light'
+              }
+              aria-label={`Switch color theme (current: ${theme})`}
+            >
+              {theme === 'light' ? (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  <span>Light</span>
+                </>
+              ) : theme === 'dark' ? (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  <span>Dark</span>
+                </>
+              ) : (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18A9 9 0 0 0 12 3z" fill="currentColor"/></svg>
+                  <span>OLED</span>
+                </>
+              )}
+            </button>
           </div>
         )}
       </header>
@@ -4542,7 +4846,7 @@ function App() {
 
               {availableUnitsForFilter.length > 0 && (
                 <>
-                  <label htmlFor="unit-select" className="filter-group-label" style={{ marginLeft: '8px' }}>Unit/Paper:</label>
+                  <label htmlFor="unit-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Unit/Paper:</label>
                   <select
                     id="unit-select"
                     aria-label="Filter documents by unit or paper"
@@ -4562,7 +4866,7 @@ function App() {
                 </>
               )}
 
-              <label htmlFor="year-select" className="filter-group-label" style={{ marginLeft: '8px' }}>Year:</label>
+              <label htmlFor="year-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Year:</label>
               <select
                 id="year-select"
                 aria-label="Filter documents by examination year"
@@ -4580,7 +4884,29 @@ function App() {
                 ))}
               </select>
 
-              <label htmlFor="sort-select" className="filter-group-label" style={{ marginLeft: '8px' }}>Sort:</label>
+              {filterDocType !== 'Book' && (
+                <>
+                  <label htmlFor="session-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Session:</label>
+                  <select
+                    id="session-select"
+                    aria-label="Filter documents by examination session"
+                    className="filter-select"
+                    value={filterSession}
+                    onChange={(e) => {
+                      setIsNotFound(false);
+                      setFilterSession(e.target.value);
+                      if (e.target.value) setForceShowTable(true);
+                    }}
+                  >
+                    <option value="">All Sessions</option>
+                    <option value="January">January</option>
+                    <option value="June">June</option>
+                    <option value="October">October</option>
+                  </select>
+                </>
+              )}
+
+              <label htmlFor="sort-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Sort:</label>
               <select
                 id="sort-select"
                 aria-label="Sort documents"
@@ -4589,13 +4915,14 @@ function App() {
                 onChange={(e) => { setSortBy(e.target.value); setForceShowTable(true); }}
               >
                 <option value="newest">Newest First</option>
+                <option value="popular">Most Viewed</option>
                 <option value="oldest">Oldest First</option>
                 <option value="name_asc">Name (A–Z)</option>
                 <option value="name_desc">Name (Z–A)</option>
                 <option value="size_desc">File Size (Largest)</option>
               </select>
 
-              <span className="filter-group-label" style={{ marginLeft: '8px' }}>View:</span>
+              <span className="filter-group-label" style={{ marginLeft: '4px' }}>View:</span>
               <div className="view-mode-toggle" role="group" aria-label="Toggle Unified Sittings vs Individual Files">
                 <button
                   type="button"
@@ -4643,8 +4970,8 @@ function App() {
             <div className="sidebar-title">Repository Categories</div>
             <TreeNode
               node={data.tree}
-              currentPath={selectedPath}
-              onSelect={(p) => { setIsNotFound(false); setSelectedPath(p); setForceShowTable(p !== data.tree?.path); }}
+              currentPath={effectiveTreePath}
+              onSelect={handleTreeSelect}
               expandedPaths={expandedPaths}
               toggleExpand={toggleExpand}
             />
@@ -4763,11 +5090,17 @@ function App() {
                     <thead>
                       <tr>
                         <th style={{ width: viewMode === 'unified' ? '42%' : '50%' }}>
-                          {viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
+                          {filterDocType === 'Book'
+                            ? 'Textbook / Solution Resource'
+                            : viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
                         </th>
-                        <th style={{ width: viewMode === 'unified' ? '23%' : '28%' }}>Course & Session</th>
+                        <th style={{ width: viewMode === 'unified' ? '23%' : '28%' }}>
+                          {filterDocType === 'Book' ? 'Course & Category' : 'Course & Session'}
+                        </th>
                         <th style={{ width: viewMode === 'unified' ? '35%' : '22%' }}>
-                          {viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
+                          {filterDocType === 'Book'
+                            ? 'Open Textbook / Resource'
+                            : viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
                         </th>
                       </tr>
                     </thead>
@@ -4871,7 +5204,7 @@ function App() {
                                       title={`Open Question Paper — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
                                     >
                                       <span className="btn-desktop-text">Question Paper</span>
-                                      <span className="btn-mobile-text">QP</span>
+                                      <span className="btn-mobile-text" aria-hidden="true">QP</span>
                                     </a>
                                   )}
                                   {docs.MS && (
@@ -4885,7 +5218,7 @@ function App() {
                                       title={`Open Mark Scheme — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
                                     >
                                       <span className="btn-desktop-text">Mark Scheme</span>
-                                      <span className="btn-mobile-text">MS</span>
+                                      <span className="btn-mobile-text" aria-hidden="true">MS</span>
                                     </a>
                                   )}
                                   {docs.ER && (
@@ -4899,7 +5232,7 @@ function App() {
                                       title={`Open Examiner Report — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
                                     >
                                       <span className="btn-desktop-text">Examiner Report</span>
-                                      <span className="btn-mobile-text">ER</span>
+                                      <span className="btn-mobile-text" aria-hidden="true">ER</span>
                                     </a>
                                   )}
                                   {['AUD', 'SC', 'DF', 'SOL', 'SAM'].map((extraType) => {
@@ -4920,30 +5253,26 @@ function App() {
                                           e.preventDefault();
                                           openOnSiteReader(file, extraType);
                                         }}
-                                        className="unified-doc-btn extra"
+                                        className={`unified-doc-btn ${extraType === 'AUD' ? 'aud' : 'extra'}`}
                                         title={`Open ${DOC_TYPE_INFO[extraType]?.fullLabel || extraType} on-site — ${extraDoc.name}`}
                                       >
                                         <span className="btn-desktop-text">{labelMap[extraType] || extraType} ({extraType})</span>
-                                        <span className="btn-mobile-text">{extraType}</span>
+                                        <span className="btn-mobile-text" aria-hidden="true">{extraType}</span>
                                       </a>
                                     );
                                   })}
-                                  {isPdf && (
+                                  {isPdf && canSplit && (
                                     <a
-                                      href={getOnSitePaperUrl(file, canSplit ? 'split' : 'QP')}
+                                      href={getOnSitePaperUrl(file, 'split')}
                                       onClick={(e) => {
                                         e.preventDefault();
-                                        openOnSiteReader(file, canSplit ? 'split' : 'QP');
+                                        openOnSiteReader(file, 'split');
                                       }}
-                                      className={`unified-preview-btn ${canSplit ? 'split-btn' : ''}`}
-                                      title={canSplit ? "Open Question Paper and Mark Scheme side by side in Split View" : "Quick In-App PDF Preview"}
+                                      className="unified-preview-btn split-btn"
+                                      title="Open Question Paper and Mark Scheme side by side in Split View"
                                     >
-                                      {canSplit ? (
-                                        <>
-                                          <span className="btn-desktop-text">Split View</span>
-                                          <span className="btn-mobile-text">Split</span>
-                                        </>
-                                      ) : 'View'}
+                                      <span className="btn-desktop-text">Split View</span>
+                                      <span className="btn-mobile-text" aria-hidden="true">Split</span>
                                     </a>
                                   )}
                                 </div>
@@ -4965,7 +5294,7 @@ function App() {
                                             ? 'Worked Solutions'
                                             : `Open ${badge?.fullLabel || 'Resource'}`}
                                       </span>
-                                      <span className="btn-mobile-text">{badge?.label || 'DOC'}</span>
+                                      <span className="btn-mobile-text" aria-hidden="true">{badge?.label || 'DOC'}</span>
                                     </a>
                                   ) : (
                                     <>
@@ -5000,14 +5329,14 @@ function App() {
                                     </>
                                   )}
 
-                                  {isPdf && (
+                                  {isPdf && viewMode !== 'unified' && (
                                     <a
                                       href={getOnSitePaperUrl(activeDoc, activeDoc.docType || 'QP')}
                                       onClick={(e) => {
                                         e.preventDefault();
                                         openOnSiteReader(activeDoc, activeDoc.docType || 'QP');
                                       }}
-                                      className={viewMode === 'unified' ? 'unified-preview-btn' : 'preview-btn'}
+                                      className="preview-btn"
                                       title={siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf' ? "Open Question Paper and Mark Scheme in PDF Reader" : "Quick In-App PDF Preview"}
                                     >
                                       View
@@ -5126,6 +5455,7 @@ function App() {
           key={previewFile.id || previewFile.path}
           file={previewFile}
           initialView={previewInitialView}
+          onViewModeChange={(nextMode) => setPreviewInitialView(nextMode)}
           showViews={isQuestionPaperEligibleForViews(previewFile)}
           viewsCount={isQuestionPaperEligibleForViews(previewFile) ? getPaperTotalViews(previewFile, viewsMap) : 0}
           onClose={() => {

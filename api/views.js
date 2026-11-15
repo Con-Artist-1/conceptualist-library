@@ -32,6 +32,9 @@ const LOCAL_STORE_DIR = path.join(PROJECT_ROOT, '.data');
 const LOCAL_STORE_FILE = path.join(LOCAL_STORE_DIR, 'paper_views.json');
 let memoryViewsStore = globalThis.__csMemoryViewsStore || null;
 let inflightHydratePromise = globalThis.__csInflightViewsHydrate || null;
+let lastHydratedAt = globalThis.__csLastViewsHydratedAt || 0;
+let lastHydratedSource = globalThis.__csLastViewsHydratedSource || 'server-store';
+const HYDRATION_TTL_MS = 15 * 1000;
 let hasSyncedFallbackToMongo = false;
 
 function loadLocalServerStore() {
@@ -162,6 +165,11 @@ async function getViewsCollection() {
 }
 
 async function hydrateViewsFromDatabase(store) {
+  const now = Date.now();
+  if (lastHydratedAt > 0 && now - lastHydratedAt < HYDRATION_TTL_MS) {
+    return { source: lastHydratedSource, views: store.views };
+  }
+
   if (inflightHydratePromise) {
     return inflightHydratePromise;
   }
@@ -188,8 +196,17 @@ async function hydrateViewsFromDatabase(store) {
         }
       }
 
+      lastHydratedAt = Date.now();
+      lastHydratedSource = 'mongodb';
+      globalThis.__csLastViewsHydratedAt = lastHydratedAt;
+      globalThis.__csLastViewsHydratedSource = lastHydratedSource;
+
       return { source: 'mongodb', views };
     } catch {
+      lastHydratedAt = Date.now();
+      lastHydratedSource = 'server-store';
+      globalThis.__csLastViewsHydratedAt = lastHydratedAt;
+      globalThis.__csLastViewsHydratedSource = lastHydratedSource;
       return { source: 'server-store', views: { ...store.views } };
     } finally {
       inflightHydratePromise = null;
@@ -228,11 +245,15 @@ function sendCooldownResponse(res, { store, source, paperKey, views, remainingMs
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader(
+    'Cache-Control',
+    req.method === 'GET' ? 'public, max-age=5, s-maxage=15, stale-while-revalidate=30' : 'no-store, max-age=0'
+  );
 
   const isPost = req.method === 'POST';
   const requirePostOrigin = isPost && Boolean(process.env.VERCEL);
   if (!isAllowedOrigin(req, requirePostOrigin)) {
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     return sendJsonResponse(res, 403, { error: 'Forbidden origin' });
   }
 
@@ -250,6 +271,7 @@ export default async function handler(req, res) {
           : (urlObj.searchParams.get('q') || urlObj.searchParams.get('search') || '').trim();
 
     if (paperKeyParam && !isValidPaperKey(paperKeyParam)) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
       return sendJsonResponse(res, 400, { ok: false, error: 'Invalid paperKey' });
     }
 

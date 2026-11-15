@@ -23,12 +23,12 @@ Keep `search-app/scripts/` strictly limited to these **7 core utilities** (do no
 
 ## 2. Source Layout & Core Architecture
 
-- **`src/App.jsx`**: Main single-page catalog, URL route hydration/404 recovery, client search & single-pass filters, two-stage catalog loader (`/meta.json` + `/shards/*.json` on cold landing, background/global upgrade to `/index.json` with Hugging Face fallback), `PreviewModal`, view counter hooks, About/Team roster, and live `CHANGELOG_HISTORY`.
-- **`src/PdfViewerPane.jsx`**: In-house WebPDF reader powered by locally bundled **Mozilla PDF.js `4.10.38`** (`public/pdfjs/pdf.min.mjs` & `pdf.worker.min.mjs`). Features `IntersectionObserver` canvas virtualization, adaptive DPR capping & GPU texture cleanup, synchronized QP/MS Split View (horizontal desktop divider & 12px `.modal-mobile-split-resizer` on mobile), animated top linear streaming progress bar, cursor/center-anchored zoom, and direct **Download** links (native browser `builtIn` PDF iframe toggle was intentionally removed). Audio (`AUD`) and IT/CS practical archives (`DF`) render dedicated themed HTML5 audio/ZIP resource cards.
+- **`src/App.jsx`**: Main single-page catalog, URL route hydration/404 recovery, client search & single-pass filters (including Exam Session filtering and Most Viewed sorting), two-stage catalog loader (`/meta.json` + `/shards/*.json` on cold landing, background/global upgrade to `/index.json` with Hugging Face fallback), sidebar subject-to-unit routing, `PreviewModal` (with Swap Panes and persistent Docked MP3 Audio Bar above `QP`/Split panes), view counter hooks, About/Team roster, and live `CHANGELOG_HISTORY`.
+- **`src/PdfViewerPane.jsx`**: In-house WebPDF reader powered by locally bundled **Mozilla PDF.js `4.10.38`** (`public/pdfjs/pdf.min.mjs` & `pdf.worker.min.mjs`). Features `IntersectionObserver` canvas virtualization, double-buffered offscreen redraws, inner `clientWidth` Fit-Width sizing, `90°` page rotation, live download progress bar, `autoFocus` control, adaptive DPR capping & GPU texture cleanup, synchronized QP/MS Split View (horizontal desktop divider & 12px `.modal-mobile-split-resizer` on mobile), cursor/center-anchored zoom, and direct **Download** links (native browser `builtIn` PDF iframe toggle was intentionally removed). Standalone `.zip` audio packages (`AUD`) and IT/CS archives (`DF`) render dedicated resource cards, while playable `.mp3`/`.wav` listening tracks dock cleanly above the paper.
 - **`src/seoRoutes.js` & `src/unitParser.js`**: Shared ISOMORPHIC helpers consumed by both browser (`src/App.jsx`) and Node build scripts (`generate-index.js`, `prerender-seo.js`).
 - **`src/main.jsx`**: Mounts `<App />` alongside `@vercel/analytics/react` (`<Analytics />`) and `@vercel/speed-insights/react` (`<SpeedInsights />`).
-- **`api/views.js`**: Vercel serverless endpoint managing paper popularity counters against MongoDB (`MONGODB_URI` -> `conceptualist_library.paper_views`) with a 30s per-user per-paper cooldown, 45/min IP burst limiter, 15s GET response cache, and `.data/paper_views.json` fallback.
-- **`vite.config.js`**: Attaches local dev/preview middleware for `/api/views`, `/_vercel/*` stubs, and byte-range streaming of `/library-files/` directly from disk.
+- **`api/views.js`**: Vercel serverless endpoint managing paper popularity counters against MongoDB (`MONGODB_URI` -> `conceptualist_library.paper_views`) with a 30s per-user per-paper cooldown, 45/min IP burst limiter, 15s DB hydration TTL + GET `Cache-Control` (`s-maxage=15`), and `.data/paper_views.json` fallback.
+- **`vite.config.js`**: Attaches local dev/preview middleware for `/api/views`, `/api/telemetry`, `/_vercel/*` stubs, `/shards/` JSON serving from `dist/shards/`, and byte-range streaming of `/library-files/` directly from disk.
 - **`vercel.json`**: Enforces CSP, HSTS, `X-Frame-Options: DENY`, `nosniff`, immutable 1-year caching for `/assets/`, `/fonts/`, `/pdfjs/`, stale-while-revalidate for `/shards/`, `/index.json`, `/meta.json`, and `must-revalidate` for HTML routes.
 
 ---
@@ -62,25 +62,25 @@ Keep documentation and UI references aligned with all 6 core team members:
 
 ## 5. Node Invocations & Linting
 
-On this Windows environment, invoke Node scripts via the Antigravity IDE Electron runtime:
+On this Windows environment (no standalone `node.exe` on `PATH`), invoke Node scripts via the Antigravity IDE Electron runtime (`v22.21.1`). When running from PowerShell, redirect stdout/stderr via `cmd /c` so output from the Electron binary is captured reliably:
 ```powershell
 $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" <path/to/script.js>
 ```
 
 **Linting (`.oxlintrc.json` — must pass with 0 warnings/errors):**
 ```powershell
-$env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\node_modules\oxlint\bin\oxlint" "e:\The Library\search-app\src"
+$env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\node_modules\oxlint\bin\oxlint`" `"e:\The Library\search-app\src`" > %TEMP%\oxlint.txt 2>&1"; Get-Content "$env:TEMP\oxlint.txt"
 ```
 
 ---
 
 ## 6. Release & Changelog Protocol
 
-1. Increment `APP_VERSION` (currently `'v5.6'`) in `src/App.jsx`.
+1. Increment `APP_VERSION` (currently `'v5.7'`) in `src/App.jsx`.
 2. Prepend a concise, accurate entry to `CHANGELOG_HISTORY` in `src/App.jsx`.
 3. Lint `src/` (`oxlint`) and build + pre-render:
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; & "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe" "e:\The Library\search-app\scripts\build.js"
    ```
-4. Verify locally via Brave Headless CDP across desktop (`1440x900`) and mobile (`360px`/`375px`) in Light, Dark, and Pure OLED modes, then delete temporary scratch files.
+4. Verify locally via **Brave Origin Headless** (`C:\Program Files\BraveSoftware\Brave-Origin\Application\brave.exe` with `--headless=new` + CDP WebSocket) across desktop (`1440x900`) and mobile (`390x844`) in Light, Dark, and Pure OLED modes, then remove temporary files.
 5. Push via `scripts/push-github.js "<commit message>"` and deploy via `scripts/deploy-vercel.js`.
