@@ -993,81 +993,6 @@ a.brand-section {
   min-width: 0;
 }
 
-/* ===================== SIDEBAR TREE ===================== */
-.sidebar {
-  width: 280px;
-  background: var(--bg-sidebar);
-  border-right: 2px solid var(--border-medium);
-  overflow-y: auto;
-  padding: 14px 0;
-  flex-shrink: 0;
-}
-
-.sidebar-title {
-  padding: 0 16px 10px;
-  font-size: 11.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.6px;
-  border-bottom: 2px solid var(--border-light);
-  margin-bottom: 6px;
-}
-
-.tree-node {
-  padding: 1px 6px;
-}
-
-.tree-item {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  user-select: none;
-  transition: background-color 0.12s;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  width: 100%;
-}
-
-.tree-item:hover {
-  background-color: var(--bg-subtle);
-  color: var(--mcmaster-maroon);
-}
-
-.tree-item.selected {
-  background-color: #F8EEF0;
-  color: var(--mcmaster-maroon);
-  border-left: 3px solid var(--mcmaster-maroon);
-  font-weight: 800;
-}
-
-.tree-indicator {
-  font-size: 13px;
-  width: 16px;
-  text-align: center;
-  color: var(--text-muted);
-  font-weight: 800;
-  flex-shrink: 0;
-  pointer-events: none;
-}
-
-.tree-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-
-.tree-children {
-  margin-left: 14px;
-  padding-left: 8px;
-  border-left: 2px solid var(--border-medium);
-}
-
 /* ===================== CONTENT AREA ===================== */
 .content-area {
   flex: 1;
@@ -1978,6 +1903,9 @@ a.breadcrumb-link:hover {
 }
 
 .subject-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
   background: #FFFFFF;
   border: 1px solid var(--border-medium);
   border-left: 4px solid var(--mcmaster-maroon);
@@ -2163,8 +2091,9 @@ a.breadcrumb-link:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-top: 3px;
+  min-width: 0;
 }
 
 .file-path-subtext.file-location {
@@ -2177,7 +2106,9 @@ a.breadcrumb-link:hover {
   border-radius: 3px;
   border: 1px solid #E2DDD5;
   display: inline-block;
-  max-width: 82%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2188,6 +2119,7 @@ a.breadcrumb-link:hover {
   font-weight: 700;
   color: var(--text-muted);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .unified-meta-subline {
@@ -2765,7 +2697,8 @@ a.breadcrumb-link:hover {
   flex-shrink: 0;
 }
 
-.modal-view-tabs {
+.modal-view-tabs,
+.modal-view-extras {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -3565,7 +3498,7 @@ a.breadcrumb-link:hover {
   margin-top: 4px;
   padding: 14px;
   border-radius: var(--radius-sm);
-  background: var(--bg-body);
+  background: var(--bg-subtle);
   border: 1px solid var(--border-light);
 }
 
@@ -4362,6 +4295,22 @@ a.breadcrumb-link:hover {
   border: 1px solid #583E23;
 }
 
+.pdf-doc-badge.book,
+.pdf-doc-badge.sol {
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF;
+  border: 1px solid var(--mcmaster-maroon);
+}
+
+.pdf-doc-badge.aud {
+  background: #1E4E8C;
+  color: #FFFFFF;
+  border: 1px solid #1E4E8C;
+}
+
+.pdf-doc-badge.df,
+.pdf-doc-badge.sc,
+.pdf-doc-badge.sam,
 .pdf-doc-badge.doc,
 .pdf-doc-badge.extra {
   background: #4B5563;
@@ -4895,53 +4844,6 @@ html[data-theme='dark'] body {
   color: #FFE380 !important;
 }
 
-/* Category Sidebar / Tree */
-[data-theme='dark'] .category-sidebar,
-[data-theme='dark'] .sidebar {
-  background-color: #17191E !important;
-  border-right: 1px solid #282C34 !important;
-}
-
-[data-theme='dark'] .sidebar-header,
-[data-theme='dark'] .sidebar-title {
-  background-color: #17191E !important;
-  border-bottom: 1px solid #282C34 !important;
-  color: #F0F2F5 !important;
-}
-
-[data-theme='dark'] .sidebar-header h2 {
-  color: #F0F2F5 !important;
-}
-
-[data-theme='dark'] .tree-node-content,
-[data-theme='dark'] .tree-item {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .tree-indicator {
-  color: #8892A0 !important;
-}
-
-[data-theme='dark'] .tree-count-badge {
-  background: #121417 !important;
-  border: 1px solid #343A46 !important;
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .tree-node-content:hover,
-[data-theme='dark'] .tree-item:hover {
-  background: #22262E !important;
-  color: #FFFFFF !important;
-}
-
-[data-theme='dark'] .tree-node-content.selected,
-[data-theme='dark'] .tree-item.selected {
-  background: #2D151B !important;
-  border-left: 3px solid #8C1D2F !important;
-  color: #FFFFFF !important;
-  font-weight: 700 !important;
-}
-
 /* Main Content Area */
 [data-theme='dark'] .main-content-layout {
   background-color: #121417 !important;
@@ -5305,8 +5207,7 @@ html[data-theme='dark'] body {
 }
 
 [data-theme='dark'] .file-path-subtext.file-location,
-[data-theme='dark'] .unified-count-tag,
-[data-theme='dark'] .paper-views-counter {
+[data-theme='dark'] .unified-count-tag {
   background: #1B1E24 !important;
   border: 1px solid #2B303C !important;
   color: #CBD5E1 !important;
@@ -5371,10 +5272,21 @@ html[data-theme='dark'] body {
   border: 1px solid #6E4E10 !important;
 }
 
-[data-theme='dark'] .doc-badge.book {
+[data-theme='dark'] .doc-badge.book,
+[data-theme='dark'] .doc-badge.sol {
   background: #2B0D16 !important;
   color: #FF758F !important;
   border: 1px solid #5A1926 !important;
+}
+
+[data-theme='dark'] .doc-badge.df,
+[data-theme='dark'] .doc-badge.aud,
+[data-theme='dark'] .doc-badge.sc,
+[data-theme='dark'] .doc-badge.sam,
+[data-theme='dark'] .doc-badge.default {
+  background: #1F242D !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #383F4C !important;
 }
 
 [data-theme='dark'] .sibling-pill.qp {
@@ -6159,8 +6071,31 @@ html[data-theme='dark'] body {
 }
 
 /* Split View & Resizer */
-[data-theme='dark'] .modal-body {
+[data-theme='dark'] .modal-body,
+[data-theme='dark'] .modal-split-pane {
   background: #121417 !important;
+}
+
+[data-theme='dark'] .modal-split-resizer {
+  background: #1E222B !important;
+  border-color: #343A46 !important;
+}
+
+[data-theme='dark'] .modal-split-resizer:hover,
+[data-theme='dark'] .modal-split-resizer.dragging,
+[data-theme='dark'] .modal-split-resizer:focus-visible {
+  background: #8C1D2F !important;
+  border-color: #8C1D2F !important;
+}
+
+[data-theme='dark'] .resizer-handle-grip {
+  background: #64748B !important;
+}
+
+[data-theme='dark'] .modal-subtitle-error-row {
+  background: #2D151B !important;
+  border-color: #5A1926 !important;
+  color: #FF8DA1 !important;
 }
 
 [data-theme='dark'] .modal-resource-card {
@@ -6232,6 +6167,29 @@ html[data-theme='dark'] body {
   border: 1px solid #6E4E10 !important;
 }
 
+[data-theme='dark'] .pdf-doc-badge.book,
+[data-theme='dark'] .pdf-doc-badge.sol {
+  background: #8C1D2F !important;
+  color: #FFFFFF !important;
+  border: 1px solid #A8253B !important;
+}
+
+[data-theme='dark'] .pdf-doc-badge.aud {
+  background: #1D3557 !important;
+  color: #DBEAFE !important;
+  border: 1px solid #2F5284 !important;
+}
+
+[data-theme='dark'] .pdf-doc-badge.df,
+[data-theme='dark'] .pdf-doc-badge.sc,
+[data-theme='dark'] .pdf-doc-badge.sam,
+[data-theme='dark'] .pdf-doc-badge.doc,
+[data-theme='dark'] .pdf-doc-badge.extra {
+  background: #252932 !important;
+  color: #E2E6ED !important;
+  border: 1px solid #383F4C !important;
+}
+
 [data-theme='dark'] .pdf-tool-btn {
   background: #121417 !important;
   border: 1px solid #343A46 !important;
@@ -6297,7 +6255,7 @@ html[data-theme='dark'] body {
   color: #8892A0 !important;
 }
 
-[data-theme='dark'] .pdf-page-loading-skeleton {
+[data-theme='dark'] .pdf-skeleton-page {
   background: #17191E !important;
 }
 
@@ -6442,7 +6400,7 @@ html[data-theme='dark'] body {
   color: #D4AF37 !important;
 }
 
-[data-theme='dark'] .pdf-page-skeleton-shimmer {
+[data-theme='dark'] .pdf-skeleton-shimmer {
   background: linear-gradient(90deg, #17191E 0%, #22262E 50%, #17191E 100%) !important;
 }
 
@@ -6620,23 +6578,7 @@ html[data-theme='oled'] body {
   color: #FFFFFF !important;
 }
 
-/* Sidebar & Navigation Tree */
-[data-theme='oled'] .sidebar {
-  background-color: #000000 !important;
-  border-right: 1px solid #202020 !important;
-}
-
-[data-theme='oled'] .sidebar-header {
-  background-color: #000000 !important;
-  border-bottom: 1px solid #202020 !important;
-}
-
-[data-theme='oled'] .sidebar-title {
-  color: #FFFFFF !important;
-  font-weight: 800 !important;
-  border-bottom: 1px solid #202020 !important;
-}
-
+/* Filter Controls */
 [data-theme='oled'] .filter-section {
   border-bottom: 1px solid #202020 !important;
 }
@@ -6650,32 +6592,6 @@ html[data-theme='oled'] body {
   background-color: #111111 !important;
   border: 1px solid #333333 !important;
   color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .tree-item {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='oled'] .tree-item:hover {
-  background-color: #141414 !important;
-  color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .tree-item.selected {
-  background-color: #1A160B !important;
-  color: #E5A823 !important;
-  border-left: 3px solid #E5A823 !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='oled'] .tree-indicator {
-  color: #718096 !important;
-}
-
-[data-theme='oled'] .tree-count-badge {
-  background: #161616 !important;
-  border: 1px solid #2B2B2B !important;
-  color: #A0AEC0 !important;
 }
 
 /* Welcome Hero & Subject Wizard */
@@ -7027,10 +6943,21 @@ html[data-theme='oled'] body {
   border: 1px solid #6E4E10 !important;
 }
 
-[data-theme='oled'] .doc-badge.book {
+[data-theme='oled'] .doc-badge.book,
+[data-theme='oled'] .doc-badge.sol {
   background: #2B0D16 !important;
   color: #FF758F !important;
   border: 1px solid #5A1926 !important;
+}
+
+[data-theme='oled'] .doc-badge.df,
+[data-theme='oled'] .doc-badge.aud,
+[data-theme='oled'] .doc-badge.sc,
+[data-theme='oled'] .doc-badge.sam,
+[data-theme='oled'] .doc-badge.default {
+  background: #121212 !important;
+  color: #E2E8F0 !important;
+  border: 1px solid #333333 !important;
 }
 
 [data-theme='oled'] .sibling-pill.qp {
@@ -7689,8 +7616,35 @@ html[data-theme='oled'] body {
 }
 
 /* Split View & Resizer */
-[data-theme='oled'] .modal-body {
+[data-theme='oled'] .modal-body,
+[data-theme='oled'] .modal-split-pane {
   background: #000000 !important;
+}
+
+[data-theme='oled'] .modal-split-resizer,
+[data-theme='oled'] .modal-mobile-split-resizer {
+  background: #121212 !important;
+  border-color: #2A2A2A !important;
+}
+
+[data-theme='oled'] .modal-split-resizer:hover,
+[data-theme='oled'] .modal-split-resizer.dragging,
+[data-theme='oled'] .modal-split-resizer:focus-visible,
+[data-theme='oled'] .modal-mobile-split-resizer:active,
+[data-theme='oled'] .modal-mobile-split-resizer.dragging {
+  background: #8C1D2F !important;
+  border-color: #FF5370 !important;
+}
+
+[data-theme='oled'] .resizer-handle-grip,
+[data-theme='oled'] .mobile-resizer-grip {
+  background: #64748B !important;
+}
+
+[data-theme='oled'] .modal-subtitle-error-row {
+  background: #22090F !important;
+  border-color: #5A1926 !important;
+  color: #FF8DA1 !important;
 }
 
 [data-theme='oled'] .modal-resource-card {
@@ -7714,6 +7668,10 @@ html[data-theme='oled'] body {
 }
 
 /* Custom WebPDF Reader Toolbars & Workspace (CRITICAL FIX) */
+[data-theme='oled'] .custom-pdf-pane {
+  background: #000000 !important;
+}
+
 [data-theme='oled'] .pdf-pane-toolbar {
   background: #000000 !important;
   border-bottom: 1px solid #202020 !important;
@@ -7740,6 +7698,29 @@ html[data-theme='oled'] body {
   background: #2E2008 !important;
   color: #FFD33D !important;
   border: 1px solid #6E4E10 !important;
+}
+
+[data-theme='oled'] .pdf-doc-badge.book,
+[data-theme='oled'] .pdf-doc-badge.sol {
+  background: #8C1D2F !important;
+  color: #FFFFFF !important;
+  border: 1px solid #A8253B !important;
+}
+
+[data-theme='oled'] .pdf-doc-badge.aud {
+  background: #152C47 !important;
+  color: #DBEAFE !important;
+  border: 1px solid #2A4F7A !important;
+}
+
+[data-theme='oled'] .pdf-doc-badge.df,
+[data-theme='oled'] .pdf-doc-badge.sc,
+[data-theme='oled'] .pdf-doc-badge.sam,
+[data-theme='oled'] .pdf-doc-badge.doc,
+[data-theme='oled'] .pdf-doc-badge.extra {
+  background: #181818 !important;
+  color: #F0F2F5 !important;
+  border: 1px solid #333333 !important;
 }
 
 /* CRITICAL: Target .pdf-tool-btn directly so buttons are dark with crisp white text! */
@@ -7814,11 +7795,11 @@ html[data-theme='oled'] body {
   color: #A0AEC0 !important;
 }
 
-[data-theme='oled'] .pdf-page-loading-skeleton {
+[data-theme='oled'] .pdf-skeleton-page {
   background: #080808 !important;
 }
 
-[data-theme='oled'] .pdf-page-skeleton-shimmer {
+[data-theme='oled'] .pdf-skeleton-shimmer {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent) !important;
 }
 
@@ -7879,10 +7860,6 @@ html[data-theme='oled'] body {
   .main-layout {
     flex-direction: column;
     overflow: visible;
-  }
-
-  .sidebar {
-    display: none;
   }
 
   .header-top {
@@ -7952,8 +7929,8 @@ html[data-theme='oled'] body {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    height: 28px;
-    padding: 0 9px;
+    height: 32px;
+    padding: 0 10px;
     flex-shrink: 0;
     background: rgba(0, 0, 0, 0.25);
     color: var(--mcmaster-gold);
@@ -7975,13 +7952,15 @@ html[data-theme='oled'] body {
 
   .mobile-header-breadcrumb-content .breadcrumb-trail {
     display: flex !important;
-    flex-wrap: wrap !important;
-    overflow-x: visible !important;
-    white-space: normal !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap !important;
     color: rgba(255, 255, 255, 0.9);
     font-size: 11px;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     padding-bottom: 2px;
     width: 100% !important;
     max-width: 100% !important;
@@ -7999,16 +7978,16 @@ html[data-theme='oled'] body {
     color: var(--mcmaster-gold);
     border: 1px solid rgba(253, 191, 87, 0.3);
     padding: 4px 10px;
-    min-height: 28px;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-height: 32px;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
     white-space: nowrap;
     line-height: 1.1;
     display: inline-flex;
     align-items: center;
     border-radius: 100px;
-    flex-shrink: 1;
+    flex-shrink: 0;
     box-sizing: border-box;
     text-decoration: none;
     touch-action: manipulation;
@@ -8067,20 +8046,20 @@ html[data-theme='oled'] body {
   }
 
   .header-theme-btn {
-    height: 32px;
+    height: 36px;
     line-height: 1;
     box-sizing: border-box;
-    padding: 0 10px;
+    padding: 0 11px;
     font-size: 12px;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   .header-nav-btn {
-    height: 32px;
+    height: 36px;
     line-height: 1;
     box-sizing: border-box;
-    padding: 0 10px;
+    padding: 0 11px;
     font-size: 12px;
     white-space: nowrap;
     flex-shrink: 0;
@@ -8168,6 +8147,10 @@ html[data-theme='oled'] body {
   .filter-controls-container {
     width: 100%;
     gap: 10px;
+    max-height: calc(100dvh - 148px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
   }
 
   .filter-row {
@@ -8190,7 +8173,7 @@ html[data-theme='oled'] body {
 
   .filter-btn {
     flex-shrink: 0;
-    min-height: 34px;
+    min-height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -8343,12 +8326,12 @@ html[data-theme='oled'] body {
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: 36px;
+    min-height: 38px;
     padding: 6px;
     background: #232529;
     border: 1px solid rgba(212, 175, 55, 0.32);
     border-radius: 6px;
-    font-size: clamp(10.5px, 2.85vw, 12px);
+    font-size: clamp(11px, 3vw, 12px);
     font-weight: 700;
     line-height: 1.2;
     text-align: center;
@@ -8416,9 +8399,12 @@ html[data-theme='oled'] body {
   }
 
   .filter-apply-btn {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
     width: 100%;
     min-height: 40px;
-    margin-top: 10px;
+    margin-top: 8px;
     padding: 10px 14px;
     background: var(--mcmaster-maroon);
     color: #FFFFFF;
@@ -8428,7 +8414,7 @@ html[data-theme='oled'] body {
     border-radius: var(--radius-sm);
     cursor: pointer;
     text-align: center;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.12), var(--shadow-sm);
     transition: background 0.15s ease;
     touch-action: manipulation;
   }
@@ -8520,6 +8506,16 @@ html[data-theme='oled'] body {
 
   .file-table td:last-child {
     padding-top: 6px;
+  }
+
+  .file-title-cell a.title-unified,
+  .file-title-cell a.title-qp,
+  .file-title-cell a.title-ms,
+  .file-title-cell a.title-er,
+  .file-title-cell a.title-book,
+  .file-title-cell a.title-sol {
+    display: inline-block;
+    padding: 4px 0;
   }
 
   /* In mobile cards, hide redundant folder paths and duplicate title strings */
@@ -8696,36 +8692,45 @@ html[data-theme='oled'] body {
 
   .modal-header-controls-bar {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     width: 100%;
     max-width: 100%;
-    gap: 5px;
+    gap: 4px;
     box-sizing: border-box;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .modal-view-tabs {
+  .modal-header-controls-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .modal-view-tabs,
+  .modal-view-extras {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 4px;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
   }
 
   .modal-btn {
     height: 32px;
     min-height: 32px;
-    padding: 0 9px;
+    padding: 0 8px;
     font-size: 11px;
     border-radius: 4px;
+    flex-shrink: 0;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
 
   .modal-view-btn {
-    flex: 1 1 auto;
-    min-width: 44px;
+    flex: 0 0 auto;
+    min-width: 36px;
     text-align: center;
     white-space: nowrap;
   }
@@ -9078,12 +9083,12 @@ html[data-theme='oled'] body {
   gap: 7px;
   padding: 3px 9px;
   border-radius: 5px;
-  background: #FFFFFF;
-  border: 1px solid #E2DDD5;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
   color: var(--text-secondary);
   flex-shrink: 0;
   user-select: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .paper-views-counter:hover {
@@ -10354,6 +10359,28 @@ html[data-theme='oled'] body {
 
   .home-pillars-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Tablet Portrait (600px–768px): two-column cards instead of over-stretched single rows */
+@media (min-width: 600px) and (max-width: 768px) {
+  .subject-grid,
+  .home-pillars-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .file-table tbody {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .file-table tbody tr {
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 }
 

@@ -6,9 +6,21 @@ const mountedPaneIds = new Set();
 let activePaneId = null;
 let nextPaneSeq = 1;
 
-const LARGE_PDF_STREAM_THRESHOLD = 5 * 1024 * 1024; // Stream byte ranges only for >= 5 MB PDFs
-const STREAM_BOOTSTRAP_BYTES = 65536; // 64 KB initial header + single-hop CDN URL resolution
-const STREAM_CHUNK_SIZE = 131072; // 128 KB HTTP/2 range chunks for fast startup & page jumps
+const LARGE_PDF_STREAM_THRESHOLD = 5 * 1024 * 1024; // Inspect byte-range strategy for >= 5 MB PDFs
+const UNLINEARIZED_SINGLE_STREAM_MAX = 15 * 1024 * 1024; // Fetch non-linearized <= 15 MB PDFs progressively without 206 storms
+const STREAM_BOOTSTRAP_BYTES = 131072; // 128 KB header probe aligned to chunk boundary (avoids duplicate 0-128 KB fetch)
+const STREAM_CHUNK_SIZE = 131072; // 128 KB HTTP/2 range chunks for linearized PDFs
+const UNLINEARIZED_BOOK_CHUNK_SIZE = 262144; // 256 KB chunks for huge un-linearized textbooks
+const MAX_CONCURRENT_RANGE_FETCHES = 6;
+
+function bufferSliceContainsAscii(u8, needle) {
+  const limit = Math.min(u8.byteLength, 2048);
+  let header = '';
+  for (let i = 0; i < limit; i++) {
+    header += String.fromCharCode(u8[i]);
+  }
+  return header.includes(needle);
+}
 
 function loadPdfJs() {
   if (!pdfjsPromise) {
@@ -55,6 +67,13 @@ async function createLargePdfRangeTransport(pdfjsLib, url, signal, onBytesProgre
     return null;
   }
 
+  const isLinearized = bufferSliceContainsAscii(initialData, '/Linearized');
+  if (!isLinearized && totalLength <= UNLINEARIZED_SINGLE_STREAM_MAX) {
+    // Non-linearized 5–15 MB papers load much faster in one progressive stream than 40+ tail-seeking 206 round-trips
+    return null;
+  }
+
+  const chunkSize = isLinearized ? STREAM_CHUNK_SIZE : UNLINEARIZED_BOOK_CHUNK_SIZE;
   onBytesProgress?.(initialData.byteLength, totalLength);
 
   class DirectRangeTransport extends pdfjsLib.PDFDataRangeTransport {
@@ -62,7 +81,10 @@ async function createLargePdfRangeTransport(pdfjsLib, url, signal, onBytesProgre
       super(totalLength, initialData);
       this.cdnUrl = resolvedCdnUrl;
       this.originalUrl = url;
+      this.chunkSize = chunkSize;
       this.activeCtrls = new Set();
+      this.pendingQueue = [];
+      this.inFlightCount = 0;
       this.seenRanges = new Set();
       this.loadedBytes = initialData.byteLength;
       this.aborted = false;
@@ -87,54 +109,76 @@ async function createLargePdfRangeTransport(pdfjsLib, url, signal, onBytesProgre
       return this.refreshPromise;
     }
 
+    pumpQueue() {
+      while (!this.aborted && this.inFlightCount < MAX_CONCURRENT_RANGE_FETCHES && this.pendingQueue.length > 0) {
+        const job = this.pendingQueue.shift();
+        this.inFlightCount++;
+        job().finally(() => {
+          this.inFlightCount = Math.max(0, this.inFlightCount - 1);
+          this.pumpQueue();
+        });
+      }
+    }
+
     requestDataRange(begin, end) {
       if (this.aborted) return;
-      const ctrl = new AbortController();
-      this.activeCtrls.add(ctrl);
+      if (end <= initialData.byteLength && begin >= 0) {
+        this.onDataRange(begin, initialData.slice(begin, end));
+        return;
+      }
 
-      const fetchSlice = async (attempt = 0) => {
-        try {
-          const res = await fetch(this.cdnUrl, {
-            headers: { Range: `bytes=${begin}-${end - 1}` },
-            signal: ctrl.signal
-          });
-          if ((res.status === 401 || res.status === 403) && attempt === 0 && this.cdnUrl !== this.originalUrl) {
-            await this.refreshCdnUrl(ctrl.signal);
-            return fetchSlice(1);
-          }
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-          }
-          const ab = await res.arrayBuffer();
-          if (this.aborted) return;
-          const chunk = new Uint8Array(ab);
-          const rangeKey = `${begin}:${end}`;
-          if (!this.seenRanges.has(rangeKey)) {
-            this.seenRanges.add(rangeKey);
-            this.loadedBytes = Math.min(this.length, this.loadedBytes + chunk.byteLength);
-            onBytesProgress?.(this.loadedBytes, this.length);
-          }
-          this.onDataRange(begin, chunk);
-        } catch (err) {
-          if (this.aborted || err?.name === 'AbortError') return;
-          if (attempt === 0 && this.cdnUrl !== this.originalUrl) {
-            this.cdnUrl = this.originalUrl;
-            return fetchSlice(1);
-          }
-          console.warn(`[WebPDF] Range request failed (${begin}-${end}):`, err);
-          if (!this.docReady && !this.aborted) {
-            onInitialRangeError?.(err);
-          }
-        } finally {
-          this.activeCtrls.delete(ctrl);
-        }
-      };
+      this.pendingQueue.push(() => {
+        if (this.aborted) return Promise.resolve();
+        const ctrl = new AbortController();
+        this.activeCtrls.add(ctrl);
 
-      fetchSlice(0);
+        const fetchSlice = async (attempt = 0) => {
+          try {
+            const res = await fetch(this.cdnUrl, {
+              headers: { Range: `bytes=${begin}-${end - 1}` },
+              signal: ctrl.signal
+            });
+            if ((res.status === 401 || res.status === 403) && attempt === 0 && this.cdnUrl !== this.originalUrl) {
+              await this.refreshCdnUrl(ctrl.signal);
+              return fetchSlice(1);
+            }
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}`);
+            }
+            const ab = await res.arrayBuffer();
+            if (this.aborted) return;
+            const chunk = new Uint8Array(ab);
+            const rangeKey = `${begin}:${end}`;
+            if (!this.seenRanges.has(rangeKey)) {
+              this.seenRanges.add(rangeKey);
+              this.loadedBytes = Math.min(this.length, this.loadedBytes + chunk.byteLength);
+              onBytesProgress?.(this.loadedBytes, this.length);
+            }
+            this.onDataRange(begin, chunk);
+          } catch (err) {
+            if (this.aborted || err?.name === 'AbortError') return;
+            if (attempt === 0 && this.cdnUrl !== this.originalUrl) {
+              this.cdnUrl = this.originalUrl;
+              return fetchSlice(1);
+            }
+            console.warn(`[WebPDF] Range request failed (${begin}-${end}):`, err);
+            if (!this.docReady && !this.aborted) {
+              onInitialRangeError?.(err);
+            }
+          } finally {
+            this.activeCtrls.delete(ctrl);
+          }
+        };
+
+        return fetchSlice(0);
+      });
+
+      this.pumpQueue();
     }
 
     abort() {
       this.aborted = true;
+      this.pendingQueue.length = 0;
       for (const ctrl of this.activeCtrls) {
         try { ctrl.abort(); } catch { }
       }
@@ -521,6 +565,15 @@ export const PdfViewerPane = ({
     el.scrollTop = targetTop;
   }, [scale, containerWidth]);
 
+  const getCurrentBaseScale = useCallback((prevScale) => {
+    if (typeof prevScale === 'number') return prevScale;
+    if (prevScale === 'fit-page') {
+      const safeW = Math.max(containerWidth - (isMobile ? 16 : 36), 200);
+      return Math.max(0.4, Math.min(1.0, Number((Math.min(safeW, 640) / safeW).toFixed(2))));
+    }
+    return 1.0;
+  }, [containerWidth, isMobile]);
+
   // Ctrl + MouseWheel / Trackpad pinch zoom centered on mouse hover position
   useEffect(() => {
     const el = scrollAreaRef.current;
@@ -537,10 +590,7 @@ export const PdfViewerPane = ({
 
         const delta = e.deltaY < 0 ? 0.15 : -0.15;
         setScale((prev) => {
-          let currentNumeric = 1.0;
-          if (prev !== 'fit-width' && prev !== 'fit-page' && typeof prev === 'number') {
-            currentNumeric = prev;
-          }
+          const currentNumeric = getCurrentBaseScale(prev);
           return Math.max(0.4, Math.min(3.5, Number((currentNumeric + delta).toFixed(2))));
         });
       }
@@ -548,7 +598,7 @@ export const PdfViewerPane = ({
 
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
-  }, [recordZoomAnchor]);
+  }, [recordZoomAnchor, getCurrentBaseScale]);
 
   // Fetch and parse document with PDF.js (byte-range streaming for >= 5 MB PDFs; in-memory data or single-pass for smaller papers)
   const loadDocument = useCallback(() => {
@@ -622,7 +672,7 @@ export const PdfViewerPane = ({
           ? {
             range: activeTransport,
             length: activeTransport.length,
-            rangeChunkSize: STREAM_CHUNK_SIZE,
+            rangeChunkSize: activeTransport.chunkSize || STREAM_CHUNK_SIZE,
             disableAutoFetch: true,
             disableStream: true,
             cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
@@ -913,18 +963,20 @@ export const PdfViewerPane = ({
   const handleZoomIn = useCallback(() => {
     recordZoomAnchor();
     setScale((prev) => {
-      if (prev === 'fit-width' || prev === 'fit-page') return 1.25;
-      return Math.min(Number((prev + 0.2).toFixed(2)), 3.5);
+      const current = getCurrentBaseScale(prev);
+      if (prev === 'fit-width') return 1.25;
+      return Math.min(Number((current + 0.2).toFixed(2)), 3.5);
     });
-  }, [recordZoomAnchor]);
+  }, [recordZoomAnchor, getCurrentBaseScale]);
 
   const handleZoomOut = useCallback(() => {
     recordZoomAnchor();
     setScale((prev) => {
-      if (prev === 'fit-width' || prev === 'fit-page') return 0.85;
-      return Math.max(Number((prev - 0.2).toFixed(2)), 0.4);
+      const current = getCurrentBaseScale(prev);
+      if (prev === 'fit-width') return 0.85;
+      return Math.max(Number((current - 0.2).toFixed(2)), 0.4);
     });
-  }, [recordZoomAnchor]);
+  }, [recordZoomAnchor, getCurrentBaseScale]);
 
   const handleFitWidth = () => {
     recordZoomAnchor();

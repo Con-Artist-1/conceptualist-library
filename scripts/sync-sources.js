@@ -745,13 +745,15 @@ function packLargePdf(qpdfExe, absPath, tmpPack) {
   const st = fs.statSync(absPath);
   if (st.size < 5 * 1024 * 1024) return;
   const buf = fs.readFileSync(absPath);
-  if (buf.includes('/ObjStm')) return;
+  const isLinearized = buf.slice(0, 2048).includes('/Linearized');
+  const hasObjStm = buf.includes('/ObjStm');
+  if (isLinearized && hasObjStm) return;
   try {
     const pOld = execFileSync(qpdfExe, ['--show-npages', '--warning-exit-0', absPath], { encoding: 'utf8' }).trim();
-    execFileSync(qpdfExe, ['--warning-exit-0', '--object-streams=generate', '--stream-data=compress', '--recompress-flate', absPath, tmpPack], { stdio: 'pipe' });
+    execFileSync(qpdfExe, ['--warning-exit-0', '--linearize', '--object-streams=generate', '--stream-data=compress', '--recompress-flate', absPath, tmpPack], { stdio: 'pipe' });
     const pNew = execFileSync(qpdfExe, ['--show-npages', tmpPack], { encoding: 'utf8' }).trim();
     const outBuf = fs.readFileSync(tmpPack);
-    if (pOld === pNew && outBuf.includes('/ObjStm')) {
+    if (pOld === pNew && outBuf.slice(0, 2048).includes('/Linearized')) {
       fs.writeFileSync(absPath, outBuf);
     }
   } catch {}

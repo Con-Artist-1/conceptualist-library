@@ -245,7 +245,9 @@ async function hydrateViewsFromDatabase(store) {
     try {
       const col = await getViewsCollection();
       const docs = await col
-        .find({}, { projection: { _id: 1, views: 1 }, limit: 10000 })
+        .find({}, { projection: { _id: 1, views: 1 } })
+        .sort({ views: -1 })
+        .limit(25000)
         .toArray();
 
       const views = Object.create(null);

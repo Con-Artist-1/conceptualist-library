@@ -406,7 +406,7 @@ const DOC_TYPE_TOKENS = {
   QP: ['qp', 'question', 'paper', 'past'],
   MS: ['ms', 'mark', 'scheme', 'markscheme', 'answers'],
   ER: ['er', 'examiner', 'report', 'pef'],
-  SOL: ['sol', 'solution', 'solutions', 'solutionbank', 'worked', 'answers'],
+  SOL: ['sol', 'solution', 'solutions', 'solutionbank', 'bank', 'worked', 'answers'],
   DF: ['df', 'data', 'datafile', 'datafiles', 'practical', 'zip'],
   AUD: ['aud', 'audio', 'listening', 'mp3', 'subtitles', 'transcript'],
   SC: ['sc', 'source', 'transcript', 'insert'],

@@ -151,8 +151,9 @@ export function resolveMongoConfig() {
   // Repair truncated URI if atlas_cred.env had a cut-off line
   if (uri && uri.endsWith('.m') && username && password) {
     const hostMatch = uri.match(/@([a-zA-Z0-9.-]+)\.m$/);
-    const clusterHost = hostMatch ? hostMatch[1] : 'cluster0.4sqcgaf';
-    uri = `mongodb+srv://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${clusterHost}.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+    if (hostMatch && hostMatch[1]) {
+      uri = `mongodb+srv://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${hostMatch[1]}.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+    }
   }
 
   return {

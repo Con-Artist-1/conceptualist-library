@@ -237,13 +237,23 @@ export const DEFAULT_UNIT_LABELS = {
       'Unit 3: Practical Biology I (WBI13)',
       'Unit 4: Energy, Environment & Immunity (WBI14)',
       'Unit 5: Respiration & Muscles (WBI15)',
-      'Unit 6: Practical Biology II (WBI16)'
+      'Unit 6: Practical Biology II (WBI16)',
+      'Unit WBI01',
+      'Unit WBI02',
+      'Unit WBI03',
+      'Unit WBI04',
+      'Unit WBI05',
+      'Unit WBI06'
     ],
     'Business': [
       'Unit 1: Marketing & People (WBS11)',
       'Unit 2: Managing Business Activities (WBS12)',
       'Unit 3: Business Decisions & Strategy (WBS13)',
-      'Unit 4: Global Business (WBS14)'
+      'Unit 4: Global Business (WBS14)',
+      'Unit WBS01',
+      'Unit WBS02',
+      'Unit WBS03',
+      'Unit WBS04'
     ],
     'Chemistry': [
       'Unit 1: Structure & Bonding (WCH11)',
@@ -251,13 +261,27 @@ export const DEFAULT_UNIT_LABELS = {
       'Unit 3: Practical Chemistry I (WCH13)',
       'Unit 4: Rates & Organic Chemistry (WCH14)',
       'Unit 5: Transition Metals (WCH15)',
-      'Unit 6: Practical Chemistry II (WCH16)'
+      'Unit 6: Practical Chemistry II (WCH16)',
+      'Unit WCH01',
+      'Unit WCH02',
+      'Unit WCH03',
+      'Unit WCH04',
+      'Unit WCH05',
+      'Unit WCH06',
+      'Unit WCH07'
     ],
     'Economics': [
       'Unit 1: Markets in Action (WEC11)',
       'Unit 2: Macroeconomic Performance (WEC12)',
       'Unit 3: Business Behaviour (WEC13)',
-      'Unit 4: A Global Perspective (WEC14)'
+      'Unit 4: A Global Perspective (WEC14)',
+      'Unit 6ECA1',
+      'Unit 6ECA2',
+      'Unit 6ECA3',
+      'Unit WEC01',
+      'Unit WEC02',
+      'Unit WEC03',
+      'Unit WEC04'
     ],
     'Information Technology': [
       'IT Unit 1 (WIT11)',
@@ -293,7 +317,13 @@ export const DEFAULT_UNIT_LABELS = {
       'Unit 3: Practical Physics I (WPH13)',
       'Unit 4: Further Mechanics & Fields (WPH14)',
       'Unit 5: Thermodynamics & Oscillations (WPH15)',
-      'Unit 6: Practical Physics II (WPH16)'
+      'Unit 6: Practical Physics II (WPH16)',
+      'Unit WPH01',
+      'Unit WPH02',
+      'Unit WPH03',
+      'Unit WPH04',
+      'Unit WPH05',
+      'Unit WPH06'
     ],
     'Psychology': [
       'Psychology Unit 1 (WPS01)',
@@ -312,7 +342,8 @@ export const DEFAULT_UNIT_LABELS = {
       'English Literature Unit 1 (WET01)',
       'English Literature Unit 2 (WET02)',
       'English Literature Unit 3 (WET03)',
-      'English Literature Unit 4 (WET04)'
+      'English Literature Unit 4 (WET04)',
+      'Unit WET12'
     ],
     'French': [
       'French Unit 1 (WFR01)',
@@ -1108,7 +1139,7 @@ export function getSeoMetadata({
 
   if (filterCurriculum === 'Edexcel IGCSE') {
     const igcseCount = getCurriculumUniqueCount(meta, 'Edexcel IGCSE');
-    const igcseSubjCount = meta?.igcseSubjects?.length || 27;
+    const igcseSubjCount = meta?.igcseSubjects?.length || 43;
     return {
       title: 'Edexcel IGCSE Past Papers & Mark Schemes (9–1) | Conceptualist',
       description: fitDescription(`Browse ${igcseCount.toLocaleString()}+ Edexcel IGCSE (9–1 & Modular) past papers, mark schemes, examiner reports & textbooks across ${igcseSubjCount} subjects (4MA1, 4PH1, 4CH1, 4BI1).`),

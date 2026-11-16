@@ -19,6 +19,7 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
+const VERCEL_CONFIG_PATH = path.join(ROOT_DIR, 'vercel.json');
 
 const DOC_TYPE_HUMAN = {
   QP: 'Question Paper (QP)',
@@ -139,7 +140,9 @@ function writeDistShards(rawIndex) {
 
 function collectAllRoutes(meta, indexLookup) {
   const routes = [];
+  const aliasRedirects = [];
   const seenPaths = new Set();
+  const seenRedirects = new Set();
 
   const addRoute = (routeObj) => {
     if (seenPaths.has(routeObj.path)) return;
@@ -302,23 +305,17 @@ function collectAllRoutes(meta, indexLookup) {
           }
         });
 
-        // Also pre-render direct unit-code alias paths (e.g., /ial/mathematics/wma11, /ial/mathematics/p1)
+        // Map direct unit-code alias paths (e.g., /ial/mathematics/wma11, /ial/mathematics/p1) to permanent 308 redirects
         const unitCode = getUnitCodeFromLabel(unitLabel);
         if (unitCode) {
           const codeSlug = unitCode.toLowerCase();
           const aliasPath = `/${currSlug}/${subjSlug}/${codeSlug}`;
-          if (aliasPath !== unitPath) {
-            addRoute({
-              path: aliasPath,
-              priority: '0.80',
-              changefreq: 'weekly',
-              includeInSitemap: false, // Canonical points to unitPath
-              state: {
-                currentTab: 'library',
-                filterCurriculum: curr,
-                filterSubject: subj,
-                filterUnit: unitLabel
-              }
+          if (aliasPath !== unitPath && !seenRedirects.has(aliasPath)) {
+            seenRedirects.add(aliasPath);
+            aliasRedirects.push({
+              source: aliasPath,
+              destination: unitPath,
+              permanent: true
             });
           }
         }
@@ -326,7 +323,7 @@ function collectAllRoutes(meta, indexLookup) {
     }
   }
 
-  return routes;
+  return { routes, aliasRedirects };
 }
 
 function groupSittingsForHtml(items, limit = 80) {
@@ -412,7 +409,6 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
   } else if (filterSubject && filterCurriculum && filterUnit) {
     const currSlug = getCurriculumSlug(filterCurriculum);
     const subjSlug = getSubjectSlug(filterSubject);
-    const unitSlug = getUnitSlug(filterUnit);
     const subjItems = indexLookup?.byCurrSubj?.get(`${filterCurriculum}::${filterSubject}`) || [];
     const unitItems = subjItems.filter(it => it.cleanUnitLabel === filterUnit);
     for (const grp of groupSittingsForHtml(unitItems, 90)) {
@@ -424,17 +420,14 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
         `<li><strong>${escapeHtml(grp.session)}${escapeHtml(variantTxt)}</strong> — ${escapeHtml(filterSubject)} ${escapeHtml(filterUnit)}: ${escapeHtml(dtLabels.join(', '))}</li>`
       );
     }
-    const years = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units?.[filterUnit]?.years || [];
-    for (const yr of years.slice(0, 12)) {
-      links.push(
-        `<li><a href="/${currSlug}/${subjSlug}/${unitSlug}?year=${yr}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${filterUnit} (${yr})`)}</a></li>`
-      );
-    }
     if (indexLookup?.booksByCurrSubj?.has(`${filterCurriculum}::${filterSubject}`)) {
       links.push(
         `<li><a href="/textbooks/${currSlug}/${subjSlug}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} Textbooks & Solutions`)}</a></li>`
       );
     }
+    links.push(
+      `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`All ${filterCurriculum} ${formatSubjectName(filterSubject)} Units & Past Papers`)}</a></li>`
+    );
   } else if (filterSubject && filterCurriculum) {
     const currSlug = getCurriculumSlug(filterCurriculum);
     const subjSlug = getSubjectSlug(filterSubject);
@@ -504,7 +497,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
           <a href="/changelog">Changelog</a>
         </p>
         ${itemEntries.length > 0 ? `<section><h2>Archived Documents &amp; Examination Sittings</h2><ul>${itemEntries.join('\n          ')}</ul></section>` : ''}
-        ${links.length > 0 ? `<section><h2>Browse Related Subjects &amp; Years</h2><ul>${links.join('\n          ')}</ul></section>` : ''}
+        ${links.length > 0 ? `<section><h2>Browse Related Subjects &amp; Resources</h2><ul>${links.join('\n          ')}</ul></section>` : ''}
       </nav>
     </main>`;
 }
@@ -551,12 +544,16 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
     `<meta name="keywords" content="${escapeHtml(seo.keywords)}" />`
   );
 
-  // Replace or inject canonical
-  html = setOrInsertTag(
-    html,
-    /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
-    `<link rel="canonical" href="${escapeHtml(seo.canonicalUrl)}" />`
-  );
+  // Replace or inject canonical only when indexable (avoid noindex + cross-canonical conflict)
+  if (String(seo.robots || '').includes('noindex')) {
+    html = html.replace(/\s*<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/gi, '');
+  } else {
+    html = setOrInsertTag(
+      html,
+      /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
+      `<link rel="canonical" href="${escapeHtml(seo.canonicalUrl)}" />`
+    );
+  }
 
   // Replace OpenGraph & Twitter tags
   html = setOrInsertTag(
@@ -636,8 +633,21 @@ function run() {
   const unpacked = unpackIndexFile(rawIndex);
   const indexLookup = buildIndexLookup(unpacked.items);
 
-  const routes = collectAllRoutes(meta, indexLookup);
+  const { routes, aliasRedirects } = collectAllRoutes(meta, indexLookup);
   const lastmodDate = new Date().toISOString().split('T')[0];
+
+  // Sync permanent 308 alias redirects into vercel.json so shorthand unit URLs redirect cleanly instead of duplicating HTML
+  if (fs.existsSync(VERCEL_CONFIG_PATH)) {
+    try {
+      const vercelCfg = JSON.parse(fs.readFileSync(VERCEL_CONFIG_PATH, 'utf8'));
+      const sortedRedirects = [...aliasRedirects].sort((a, b) => a.source.localeCompare(b.source));
+      vercelCfg.redirects = sortedRedirects;
+      fs.writeFileSync(VERCEL_CONFIG_PATH, JSON.stringify(vercelCfg, null, 2) + '\n', 'utf8');
+      console.log(`✅ Synced ${sortedRedirects.length} permanent unit alias redirects into vercel.json.`);
+    } catch (err) {
+      console.warn('⚠️ Could not sync vercel.json redirects:', err.message);
+    }
+  }
 
   // 1. Write public/sitemap.xml
   const sitemapXml = generateSitemapXml(routes, lastmodDate);
@@ -673,7 +683,15 @@ function run() {
         prerenderedCount++;
       }
     }
-    console.log(`✅ Pre-rendered ${prerenderedCount} static HTML route pages in dist/.`);
+    // Also write static 404.html so unknown routes return genuine HTTP 404 with clean navigation links
+    const notFoundHtml = injectSeoIntoHtml(
+      templateHtml,
+      { path: '/404.html', state: { currentTab: 'library', notFound: true } },
+      meta,
+      indexLookup
+    );
+    fs.writeFileSync(path.join(DIST_DIR, '404.html'), notFoundHtml, 'utf8');
+    console.log(`✅ Pre-rendered ${prerenderedCount} canonical HTML route pages + 404.html in dist/.`);
   }
 }
 

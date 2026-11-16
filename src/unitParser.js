@@ -368,11 +368,11 @@ export function detectDocType(name, pathStr) {
   const ext = dotIdx >= 0 ? name.slice(dotIdx).toLowerCase() : '';
   const combined = `${name} ${pathStr}`;
 
-  // Audio recordings (.mp3, .wav, or Audio/recording/listening zip archives)
+  // Audio recordings (.mp3, .wav, or Audio/recording/listening packages; exclude PDF transcripts)
   if (
     ext === '.mp3' ||
     ext === '.wav' ||
-    /audio|recording|listening|\bmp3s?\b|(?:^|[^a-z0-9])aud(?:[^a-z0-9]|$)/i.test(name) ||
+    (!/transcript/i.test(name) && /audio|recording|listening|\bmp3s?\b|(?:^|[^a-z0-9])aud(?:[^a-z0-9]|$)/i.test(name)) ||
     ((ext === '.zip' || ext === '.rar') && /audio|recording|listening/i.test(combined) && !/transcript/i.test(name))
   ) {
     return 'AUD';
@@ -619,6 +619,12 @@ export function extractUnitInfo(pathStr, subject, spec) {
       return {
         unitCode: `P${pNum}`,
         unitName: `Paper ${pNum}`
+      };
+    }
+    if (subject === 'Accounting' && /(?:^|[^A-Z0-9])4AC0(?:[^A-Z0-9]|$)/i.test(pathStr)) {
+      return {
+        unitCode: 'P1',
+        unitName: 'Paper 1'
       };
     }
     const igcsePaperMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:Paper[-_\s]*0?([1-4])(?!\d)(?:[A-E]R?|[BCPFH]?R?|[-_\s]*Mod)?|Unit[-_\s]*0?([1-6])(?!\d)[A-Z]*|Modular[-_\s]*0?([1-6])(?!\d)[A-Z]*|P0?([1-4])(?!\d)(?:[A-E]R?|[BCPFH]?R?|[-_\s]*Mod)?|(?:QP|MS)[-_\s]+0?([1-4])(?!\d)[A-Z]*)(?:[^A-Z0-9]|$)/i);

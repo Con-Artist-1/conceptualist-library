@@ -48,6 +48,10 @@ const normalizePaperTelemetryMode = (activeView, canSplit, fallbackDocType) => {
   return 'other';
 };
 
+const shouldHandleClientNavigation = (e) => (
+  !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1)
+);
+
 const PdfViewerPane = lazy(() => import('./PdfViewerPane.jsx'));
 
 function useIsMobile(breakpointPx = 768) {
@@ -71,13 +75,25 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.7';
+const APP_VERSION = 'v6.8';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.7',
+    version: 'v6.8',
     date: BUILD_TIMESTAMP,
+    title: 'PDF Streaming Reliability, Search Console SEO & Multi-Resolution UI Polish',
+    summary: 'Eliminated non-linearized large PDF range stalls, fixed search & unit indexing edge cases, resolved Google Search Console noindex/canonical duplicates, and refined Dark/OLED, tablet, and mobile layouts.',
+    changes: [
+      'WebPDF streaming & zoom: Aligned 128 KB bootstrap chunking, bypassed backwards range storms on un-linearized <= 15 MB PDFs, queued large-PDF range requests, and fixed smooth Fit -> 125% zoom stepping across Fit-Width viewers.',
+      'Search & catalog indexing: Tightened strict Solution Bank matching ("solution bank p1"), excluded listening transcripts from audio classification, and mapped legacy single-paper IGCSE 4AC0 Accounting files to Paper 1.',
+      'SEO & assets: Replaced 176 duplicate shorthand unit alias HTML pages with permanent 308 redirects, removed ?year= crawl traps, preloaded cold legacy IAL unit labels, added multi-size favicon.ico & static 404.html, and updated Open Graph preview cards.',
+      'Responsive UI & themes: Fixed OLED/Dark split-pane/resizer/skeleton/badge theming and ARIA tablist structure, added 2-column tablet grids, kept mobile breadcrumbs single-row scrollable, and constrained mobile filter drawers with sticky Apply actions.'
+    ]
+  },
+  {
+    version: 'v6.7',
+    date: '2026-11-17T02:45:12+06:00',
     title: 'Header Coverage Date Pill Restored',
     summary: 'Restored the top-right archive year-range badge in the header, displaying full library span (January 2003 – June 2026) and active subject date ranges.',
     changes: [
@@ -733,6 +749,18 @@ function readLocalViewsCache() {
     return sanitizeViewsMap(rawViews);
   } catch {
     return null;
+  }
+}
+
+function isLocalViewsCacheStale(maxAgeMs = 10 * 60 * 1000) {
+  try {
+    const raw = localStorage.getItem(VIEWS_CACHE_STORAGE_KEY);
+    if (raw === null) return true;
+    const parsed = JSON.parse(raw);
+    const updatedAt = Number(parsed?.updatedAt || 0);
+    return !updatedAt || (Date.now() - updatedAt > maxAgeMs);
+  } catch {
+    return true;
   }
 }
 
@@ -2041,9 +2069,8 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                   const sib = siblings[type];
                   if (!sib) return null;
                   const isDockedAudioTab = type === 'AUD' && canDockAudio;
-                  const isCurrent = isDockedAudioTab
-                    ? audioDockOpen
-                    : (!isSplit && (activeView === type || currentDoc.path === sib.path));
+                  if (isDockedAudioTab) return null;
+                  const isCurrent = !isSplit && (activeView === type || currentDoc.path === sib.path);
                   const labelMap = {
                     QP: ['Question Paper', 'QP'],
                     MS: ['Mark Scheme', 'MS'],
@@ -2059,12 +2086,11 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     <button
                       key={type}
                       type="button"
-                      role={isDockedAudioTab ? undefined : 'tab'}
-                      aria-selected={isDockedAudioTab ? undefined : isCurrent}
-                      aria-pressed={isDockedAudioTab ? audioDockOpen : undefined}
+                      role="tab"
+                      aria-selected={isCurrent}
                       className={`modal-btn modal-view-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
                       onClick={() => handleSelectView(type)}
-                      title={isDockedAudioTab ? (audioDockOpen ? 'Hide docked audio player' : 'Play listening audio above paper') : `View ${fullLabel}`}
+                      title={`View ${fullLabel}`}
                     >
                       <span className="btn-desktop-text">{fullLabel}</span>
                       <span className="btn-mobile-text" aria-hidden="true">{shortLabel}</span>
@@ -2085,26 +2111,43 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     <span className="btn-mobile-text" aria-hidden="true">Split</span>
                   </button>
                 )}
-
-                {isSplit && (
-                  <button
-                    type="button"
-                    className={`modal-btn modal-swap-split-btn ${swapSplit ? 'active' : ''}`}
-                    onClick={() => setSwapSplit((prev) => !prev)}
-                    aria-pressed={swapSplit}
-                    title={swapSplit ? 'Restore Question Paper left / Mark Scheme right' : 'Swap Question Paper and Mark Scheme pane positions'}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-                      <polyline points="17 1 21 5 17 9" />
-                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                      <polyline points="7 23 3 19 7 15" />
-                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                    </svg>
-                    <span className="btn-desktop-text">Swap Panes</span>
-                    <span className="btn-mobile-text" aria-hidden="true">Swap</span>
-                  </button>
-                )}
               </div>
+
+              {((siblings.AUD && canDockAudio) || isSplit) && (
+                <div className="modal-view-extras">
+                  {siblings.AUD && canDockAudio && (
+                    <button
+                      type="button"
+                      aria-pressed={audioDockOpen}
+                      className={`modal-btn modal-view-btn aud ${audioDockOpen ? 'active' : ''}`}
+                      onClick={() => handleSelectView('AUD')}
+                      title={audioDockOpen ? 'Hide docked audio player' : 'Play listening audio above paper'}
+                    >
+                      <span className="btn-desktop-text">Listening Audio</span>
+                      <span className="btn-mobile-text" aria-hidden="true">Audio</span>
+                    </button>
+                  )}
+
+                  {isSplit && (
+                    <button
+                      type="button"
+                      className={`modal-btn modal-swap-split-btn ${swapSplit ? 'active' : ''}`}
+                      onClick={() => setSwapSplit((prev) => !prev)}
+                      aria-pressed={swapSplit}
+                      title={swapSplit ? 'Restore Question Paper left / Mark Scheme right' : 'Swap Question Paper and Mark Scheme pane positions'}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <polyline points="17 1 21 5 17 9" />
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                        <polyline points="7 23 3 19 7 15" />
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                      </svg>
+                      <span className="btn-desktop-text">Swap Panes</span>
+                      <span className="btn-mobile-text" aria-hidden="true">Swap</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="modal-control-separator" />
 
@@ -2803,7 +2846,7 @@ const CrashRecoveryScreen = ({ errorMsg }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#F2F1ED',
+      backgroundColor: 'var(--bg-page, #F2F1ED)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -2811,9 +2854,9 @@ const CrashRecoveryScreen = ({ errorMsg }) => {
       fontFamily: 'Roboto, Inter, sans-serif'
     }}>
       <div style={{
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #C8C4BC',
-        borderTop: '4px solid #6F1D2B',
+        backgroundColor: 'var(--bg-surface, #FFFFFF)',
+        border: '1px solid var(--border-medium, #C8C4BC)',
+        borderTop: '4px solid var(--mcmaster-maroon, #6F1D2B)',
         borderRadius: '3px',
         maxWidth: '540px',
         width: '100%',
@@ -2825,7 +2868,7 @@ const CrashRecoveryScreen = ({ errorMsg }) => {
           fontWeight: 800,
           textTransform: 'uppercase',
           letterSpacing: '0.6px',
-          color: '#6F1D2B',
+          color: 'var(--text-link, #6F1D2B)',
           marginBottom: '6px'
         }}>
           Conceptualist Systems — Repository Recovery
@@ -2833,14 +2876,14 @@ const CrashRecoveryScreen = ({ errorMsg }) => {
         <h1 style={{
           fontSize: '20px',
           fontWeight: 800,
-          color: '#1A1D20',
+          color: 'var(--text-primary, #1A1D20)',
           marginBottom: '10px'
         }}>
           Outdated Browser Cache Detected
         </h1>
         <p style={{
           fontSize: '14px',
-          color: '#2E343B',
+          color: 'var(--text-secondary, #2E343B)',
           lineHeight: 1.55,
           marginBottom: '20px'
         }}>
@@ -2850,10 +2893,10 @@ const CrashRecoveryScreen = ({ errorMsg }) => {
           <div style={{
             fontSize: '11.5px',
             fontFamily: 'Roboto Mono, monospace',
-            backgroundColor: '#F2F1ED',
-            border: '1px solid #E2DFD9',
+            backgroundColor: 'var(--bg-subtle, #F2F1ED)',
+            border: '1px solid var(--border-light, #E2DFD9)',
             padding: '8px 12px',
-            color: '#525860',
+            color: 'var(--text-muted, #525860)',
             marginBottom: '20px',
             wordBreak: 'break-word'
           }}>
@@ -3086,7 +3129,7 @@ const WelcomePage = ({
   const audioCount = useMemo(() => (
     Array.isArray(data.flatFiles) && data.flatFiles.length > 0
       ? data.flatFiles.filter((f) => f.docType === 'AUD').length
-      : 273
+      : 272
   ), [data.flatFiles]);
 
   const ialSubjects = data.meta?.ialSubjects || data.meta?.subjects || IAL_SUBJECTS_DEFAULT;
@@ -3217,7 +3260,9 @@ const WelcomePage = ({
                 </svg>
                 <h2>Past Exam Papers</h2>
               </div>
-              <span className="pillar-badge">2003–2026</span>
+              <span className="pillar-badge">
+                {(data.meta?.coverage || '2003–2026').replace(/[A-Za-z]+\s+/g, '').replace(/\s+/g, '') || '2003–2026'}
+              </span>
             </div>
             <p className="pillar-desc">
               Paired Question Papers, Mark Schemes &amp; Examiner Reports with instant side-by-side Split View.
@@ -3283,9 +3328,10 @@ const WelcomePage = ({
             <div className="pillar-actions">
               <a
                 href="/?paper=IAL%7CFrench%7CWFR02%7C%7CJune%202021&view=AUD"
+                rel="nofollow"
                 className="pillar-btn primary"
                 onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                  if (!shouldHandleClientNavigation(e)) return;
                   e.preventDefault();
                   onTrySampleAudio();
                 }}
@@ -3350,8 +3396,10 @@ const WelcomePage = ({
                 >
                   <a
                     href={qpHref}
+                    rel="nofollow"
                     className="history-card-main-link"
                     onClick={(e) => {
+                      if (!shouldHandleClientNavigation(e)) return;
                       e.preventDefault();
                       onOpenPaper(item, primaryMode);
                     }}
@@ -3374,8 +3422,10 @@ const WelcomePage = ({
                     {hasQP && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'QP') : '#'}
+                        rel="nofollow"
                         className="history-doc-btn qp"
                         onClick={(e) => {
+                          if (!shouldHandleClientNavigation(e)) return;
                           e.preventDefault();
                           e.stopPropagation();
                           onOpenPaper(item, 'QP');
@@ -3388,8 +3438,10 @@ const WelcomePage = ({
                     {hasMS && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'MS') : '#'}
+                        rel="nofollow"
                         className="history-doc-btn ms"
                         onClick={(e) => {
+                          if (!shouldHandleClientNavigation(e)) return;
                           e.preventDefault();
                           e.stopPropagation();
                           onOpenPaper(item, 'MS');
@@ -3402,8 +3454,10 @@ const WelcomePage = ({
                     {hasER && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'ER') : '#'}
+                        rel="nofollow"
                         className="history-doc-btn er"
                         onClick={(e) => {
+                          if (!shouldHandleClientNavigation(e)) return;
                           e.preventDefault();
                           e.stopPropagation();
                           onOpenPaper(item, 'ER');
@@ -3416,8 +3470,10 @@ const WelcomePage = ({
                     {hasAUD && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'AUD') : '#'}
+                        rel="nofollow"
                         className="history-doc-btn aud"
                         onClick={(e) => {
+                          if (!shouldHandleClientNavigation(e)) return;
                           e.preventDefault();
                           e.stopPropagation();
                           onOpenPaper(item, 'AUD');
@@ -3430,8 +3486,10 @@ const WelcomePage = ({
                     {hasSC && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'SC') : '#'}
+                        rel="nofollow"
                         className="history-doc-btn extra"
                         onClick={(e) => {
+                          if (!shouldHandleClientNavigation(e)) return;
                           e.preventDefault();
                           e.stopPropagation();
                           onOpenPaper(item, 'SC');
@@ -3444,8 +3502,10 @@ const WelcomePage = ({
                     {canSplit && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'split') : '#'}
+                        rel="nofollow"
                         className="history-doc-btn split"
                         onClick={(e) => {
+                          if (!shouldHandleClientNavigation(e)) return;
                           e.preventDefault();
                           e.stopPropagation();
                           onOpenPaper(item, 'split');
@@ -3558,14 +3618,17 @@ const WelcomePage = ({
               const subjWizard = wizardMeta?.['Edexcel IAL']?.[subject];
               const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
               const docCount = subjWizard?.totalFiles || 0;
+              const subjHref = `/ial/${getSubjectSlug(subject)}`;
               return (
-                <div
+                <a
                   key={`ial-${subject}`}
+                  href={subjHref}
                   className="subject-card"
-                  onClick={() => handleSubjectClick(subject, 'Edexcel IAL')}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IAL'); } }}
+                  onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
+                    e.preventDefault();
+                    handleSubjectClick(subject, 'Edexcel IAL');
+                  }}
                 >
                   <div className="subject-card-top">
                     <div className="subject-card-title">{formatSubjectDisplay(subject)}</div>
@@ -3575,7 +3638,7 @@ const WelcomePage = ({
                     {ialSubjectCoverage[subject] || 'Edexcel IAL Collection'}
                     {unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -3588,14 +3651,17 @@ const WelcomePage = ({
             {igcseSubjects.map(subject => {
               const subjWizard = wizardMeta?.['Edexcel IGCSE']?.[subject];
               const docCount = subjWizard?.totalFiles || 0;
+              const subjHref = `/igcse/${getSubjectSlug(subject)}`;
               return (
-                <div
+                <a
                   key={`igcse-${subject}`}
+                  href={subjHref}
                   className="subject-card igcse"
-                  onClick={() => handleSubjectClick(subject, 'Edexcel IGCSE')}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IGCSE'); } }}
+                  onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
+                    e.preventDefault();
+                    handleSubjectClick(subject, 'Edexcel IGCSE');
+                  }}
                 >
                   <div className="subject-card-top">
                     <div className="subject-card-title">{subject}</div>
@@ -3604,7 +3670,7 @@ const WelcomePage = ({
                   <div className="subject-card-subtitle">
                     {igcseSubjectCoverage[subject] || 'International GCSE Collection'}
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -3916,7 +3982,7 @@ function App() {
       // Ignore storage errors
     }
 
-    if (readLocalViewsCache() === null) {
+    if (readLocalViewsCache() === null || isLocalViewsCacheStale()) {
       void refreshViewsFromApi();
     }
   }, [refreshViewsFromApi]);
@@ -4169,21 +4235,26 @@ function App() {
       el.setAttribute('content', contentVal);
     };
 
+    const robotsVal = seoMeta.robots || 'index, follow';
     setMetaTag('meta[name="description"]', 'name', 'description', seoMeta.description);
     setMetaTag('meta[name="keywords"]', 'name', 'keywords', seoMeta.keywords);
-    setMetaTag('meta[name="robots"]', 'name', 'robots', seoMeta.robots || 'index, follow');
+    setMetaTag('meta[name="robots"]', 'name', 'robots', robotsVal);
     setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
     setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
     setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
     setMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
 
     let canonicalEl = document.querySelector('link[rel="canonical"]');
-    if (!canonicalEl) {
-      canonicalEl = document.createElement('link');
-      canonicalEl.setAttribute('rel', 'canonical');
-      document.head.appendChild(canonicalEl);
+    if (robotsVal.includes('noindex')) {
+      if (canonicalEl) canonicalEl.remove();
+    } else {
+      if (!canonicalEl) {
+        canonicalEl = document.createElement('link');
+        canonicalEl.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonicalEl);
+      }
+      canonicalEl.setAttribute('href', seoMeta.canonicalUrl);
     }
-    canonicalEl.setAttribute('href', seoMeta.canonicalUrl);
 
     let ldScript = document.getElementById('seo-json-ld');
     if (!ldScript) {
@@ -4281,7 +4352,7 @@ function App() {
       'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index.json'
     ];
 
-    const INDEX_CACHE_URL = `https://cs-cache.local/index_${APP_VERSION}.json`;
+    const INDEX_CACHE_URL = `https://cs-cache.local/index_${APP_VERSION}_${buildQuery}.json`;
 
     const getCachedIndex = async () => {
       if (typeof caches === 'undefined') return null;
@@ -5337,7 +5408,7 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#1A1D20', fontFamily: 'Roboto, sans-serif' }}>
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-primary, #1A1D20)', backgroundColor: 'var(--bg-page, transparent)', fontFamily: 'Roboto, sans-serif' }}>
         Loading Repository Index...
       </div>
     );
@@ -5587,7 +5658,7 @@ function App() {
                 id="search-input"
                 type="text"
                 className="search-input"
-                placeholder={isMobile ? "Search unit, code, or year..." : "Search by course code, subject, unit or year (e.g. WMA11, Chemistry, M1 Jan 2025, 4MA1)..."}
+                placeholder={isMobile ? "Search unit, code, or year..." : "Search by course code, subject, unit or year (e.g. WMA11, Biology, 4MA1)..."}
                 value={searchQuery}
                 onFocus={() => ensureFullIndexRef.current?.()}
                 onChange={(e) => { setIsNotFound(false); setSearchQuery(e.target.value); }}
@@ -5913,6 +5984,7 @@ function App() {
                   href="/ial"
                   className="filter-btn"
                   onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
                     e.preventDefault();
                     clearFilters({ pushUrl: false });
                     setFilterCurriculum('Edexcel IAL');
@@ -5925,6 +5997,7 @@ function App() {
                   href="/igcse"
                   className="filter-btn"
                   onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
                     e.preventDefault();
                     clearFilters({ pushUrl: false });
                     setFilterCurriculum('Edexcel IGCSE');
@@ -5937,6 +6010,7 @@ function App() {
                   href="/textbooks"
                   className="filter-btn"
                   onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
                     e.preventDefault();
                     clearFilters({ pushUrl: false });
                     setFilterDocType('Book');
@@ -5949,6 +6023,7 @@ function App() {
                   href="/data-files"
                   className="filter-btn"
                   onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
                     e.preventDefault();
                     clearFilters({ pushUrl: false });
                     setFilterDocType('DF');
@@ -5961,6 +6036,7 @@ function App() {
                   href="/audio"
                   className="filter-btn"
                   onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
                     e.preventDefault();
                     clearFilters({ pushUrl: false });
                     setFilterDocType('AUD');
@@ -6105,7 +6181,9 @@ function App() {
                                   <div className="file-title-row">
                                     <a
                                       href={getOnSitePaperUrl(file, defaultViewMode)}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(file, defaultViewMode);
                                       }}
@@ -6176,7 +6254,9 @@ function App() {
                                   {docs.QP && (
                                     <a
                                       href={getOnSitePaperUrl(file, 'QP')}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(file, 'QP');
                                       }}
@@ -6190,7 +6270,9 @@ function App() {
                                   {docs.MS && (
                                     <a
                                       href={getOnSitePaperUrl(file, 'MS')}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(file, 'MS');
                                       }}
@@ -6204,7 +6286,9 @@ function App() {
                                   {docs.ER && (
                                     <a
                                       href={getOnSitePaperUrl(file, 'ER')}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(file, 'ER');
                                       }}
@@ -6229,7 +6313,9 @@ function App() {
                                       <a
                                         key={extraType}
                                         href={getOnSitePaperUrl(file, extraType)}
+                                        rel="nofollow"
                                         onClick={(e) => {
+                                          if (!shouldHandleClientNavigation(e)) return;
                                           e.preventDefault();
                                           openOnSiteReader(file, extraType);
                                         }}
@@ -6244,7 +6330,9 @@ function App() {
                                   {isPdf && canSplit && (
                                     <a
                                       href={getOnSitePaperUrl(file, 'split')}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(file, 'split');
                                       }}
@@ -6261,7 +6349,9 @@ function App() {
                                   {viewMode === 'unified' ? (
                                     <a
                                       href={getOnSitePaperUrl(file, file.docType || 'Book')}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(file, file.docType || 'Book');
                                       }}
@@ -6295,7 +6385,9 @@ function App() {
                                           <a
                                             key={sibType}
                                             href={getOnSitePaperUrl(sib, sibType)}
+                                            rel="nofollow"
                                             onClick={(e) => {
+                                              if (!shouldHandleClientNavigation(e)) return;
                                               e.preventDefault();
                                               openOnSiteReader(sib, sibType);
                                             }}
@@ -6312,7 +6404,9 @@ function App() {
                                   {(isPdf || activeDoc.docType === 'AUD' || (activeDoc.docType === 'SOL' && activeDoc.ext === 'zip')) && viewMode !== 'unified' && (
                                     <a
                                       href={getOnSitePaperUrl(activeDoc, activeDoc.docType || 'QP')}
+                                      rel="nofollow"
                                       onClick={(e) => {
+                                        if (!shouldHandleClientNavigation(e)) return;
                                         e.preventDefault();
                                         openOnSiteReader(activeDoc, activeDoc.docType || 'QP');
                                       }}
@@ -6492,6 +6586,7 @@ function App() {
             href="/ial"
             className="footer-link"
             onClick={(e) => {
+              if (!shouldHandleClientNavigation(e)) return;
               e.preventDefault();
               setCurrentTab('library');
               clearFilters({ pushUrl: false });
@@ -6506,6 +6601,7 @@ function App() {
             href="/igcse"
             className="footer-link"
             onClick={(e) => {
+              if (!shouldHandleClientNavigation(e)) return;
               e.preventDefault();
               setCurrentTab('library');
               clearFilters({ pushUrl: false });
@@ -6520,6 +6616,7 @@ function App() {
             href="/textbooks"
             className="footer-link"
             onClick={(e) => {
+              if (!shouldHandleClientNavigation(e)) return;
               e.preventDefault();
               setCurrentTab('library');
               clearFilters({ pushUrl: false });
@@ -6533,7 +6630,12 @@ function App() {
           <a
             href="/changelog"
             className="footer-link"
-            onClick={(e) => { e.preventDefault(); setIsNotFound(false); setCurrentTab('changelog'); }}
+            onClick={(e) => {
+              if (!shouldHandleClientNavigation(e)) return;
+              e.preventDefault();
+              setIsNotFound(false);
+              setCurrentTab('changelog');
+            }}
           >
             Changelog
           </a>
@@ -6541,7 +6643,12 @@ function App() {
           <a
             href="/about"
             className="footer-link"
-            onClick={(e) => { e.preventDefault(); setIsNotFound(false); setCurrentTab('about'); }}
+            onClick={(e) => {
+              if (!shouldHandleClientNavigation(e)) return;
+              e.preventDefault();
+              setIsNotFound(false);
+              setCurrentTab('about');
+            }}
           >
             About Us &amp; Team
           </a>
