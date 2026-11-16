@@ -1,6 +1,8 @@
 // Client-side zero-backend ZIP audio extractor & session cache
 // Supports STORE (method 0), DEFLATE (method 8 via browser DecompressionStream), and nested .zip packages.
 
+import { getFileExt, findEocdOffset, inflateRawBytes } from './zipUtils.js';
+
 const AUDIO_MIME_BY_EXT = {
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
@@ -12,24 +14,17 @@ const MAX_CACHED_ZIPS = 6;
 const zipExtractionCache = new Map();
 const inFlightExtractions = new Map();
 
-function getAudioExt(fileName) {
-  const clean = String(fileName || '').trim().toLowerCase();
-  const dotIdx = clean.lastIndexOf('.');
-  if (dotIdx === -1) return '';
-  return clean.slice(dotIdx + 1);
-}
-
 function isPlayableAudioEntry(fileName) {
   if (!fileName) return false;
   const base = fileName.split('/').pop() || '';
   if (!base || base.startsWith('.') || base.startsWith('__MACOSX')) return false;
-  const ext = getAudioExt(base);
+  const ext = getFileExt(base);
   return Boolean(AUDIO_MIME_BY_EXT[ext]);
 }
 
 function buildTrackLabels(rawEntryPath, index, total) {
   const baseName = (rawEntryPath.split('/').pop() || rawEntryPath).trim();
-  const ext = getAudioExt(baseName);
+  const ext = getFileExt(baseName);
   const stem = ext ? baseName.slice(0, -(ext.length + 1)) : baseName;
 
   // Pattern 1: Tracked question recordings (e.g., WFR2_001.mp3, WSP4_003.mp3)
@@ -74,63 +69,6 @@ function buildTrackLabels(rawEntryPath, index, total) {
   };
 }
 
-async function inflateRawBytes(compressedBytes, uncompressedSize) {
-  if (typeof DecompressionStream === 'undefined') {
-    throw new Error('Browser does not support DecompressionStream for ZIP audio playback.');
-  }
-  const ds = new DecompressionStream('deflate-raw');
-  const writer = ds.writable.getWriter();
-  writer
-    .write(compressedBytes)
-    .then(() => writer.close())
-    .catch(() => {});
-
-  const reader = ds.readable.getReader();
-  const expectedLen = Number(uncompressedSize) > 0 ? Number(uncompressedSize) : 0;
-  const out = expectedLen > 0 ? new Uint8Array(expectedLen) : null;
-  let offset = 0;
-  const overflow = [];
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (out && offset + value.byteLength <= out.byteLength) {
-      out.set(value, offset);
-    } else {
-      overflow.push(value);
-    }
-    offset += value.byteLength;
-  }
-
-  if (out && overflow.length === 0 && offset === out.byteLength) {
-    return out;
-  }
-
-  const exact = new Uint8Array(offset);
-  let pos = 0;
-  if (out && offset > 0) {
-    const copied = Math.min(offset, out.byteLength);
-    exact.set(out.subarray(0, copied), 0);
-    pos = copied;
-  }
-  for (let i = 0; i < overflow.length; i++) {
-    const chunk = overflow[i];
-    exact.set(chunk, pos);
-    pos += chunk.byteLength;
-  }
-  return exact;
-}
-
-function findEocdOffset(bytes, view) {
-  const minOffset = Math.max(0, bytes.byteLength - 65558);
-  for (let i = bytes.byteLength - 22; i >= minOffset; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) {
-      return i;
-    }
-  }
-  return -1;
-}
-
 async function parseZipBufferForAudioEntries(bytes, depth = 0, onStatus = null) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocdOffset = findEocdOffset(bytes, view);
@@ -162,7 +100,7 @@ async function parseZipBufferForAudioEntries(bytes, depth = 0, onStatus = null) 
 
     if (!entryPath || entryPath.endsWith('/') || entryPath.includes('__MACOSX')) continue;
 
-    const ext = getAudioExt(entryPath);
+    const ext = getFileExt(entryPath);
     if (AUDIO_MIME_BY_EXT[ext] || (ext === 'zip' && depth < 1)) {
       rawEntries.push({
         entryPath,

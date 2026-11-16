@@ -377,6 +377,7 @@ html.theme-vt.modal-open .modal-header {
 }
 
 .modal-audio-dock,
+.modal-sol-dock,
 .modal-subtitle-bar,
 .modal-subtitle-drawer {
   animation: uiRevealDown 150ms cubic-bezier(0.65, 0, 0.35, 1);
@@ -390,7 +391,10 @@ html.theme-vt.modal-open .modal-header {
 .pillar-btn:active,
 .unified-doc-btn:active,
 .unified-preview-btn:active,
-.modal-btn:not(:disabled):active {
+.modal-btn:not(:disabled):active,
+.modal-sol-pill:active,
+.modal-sol-step-btn:not(:disabled):active,
+.modal-sol-toggle-btn:active {
   transform: scale(0.975);
 }
 
@@ -3079,6 +3083,158 @@ a.breadcrumb-link:hover {
   color: var(--text-primary);
 }
 
+/* Worked Solutions ZIP Chapter & Exercise Selector Bar */
+.modal-sol-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #F4F1EA;
+  border-bottom: 1px solid var(--border-medium);
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.modal-sol-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.modal-sol-status-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.modal-sol-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(111, 29, 43, 0.1);
+  color: var(--mcmaster-maroon);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.modal-sol-active-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-sol-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.modal-sol-counter {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-family: 'Roboto Mono', monospace;
+  min-width: 34px;
+  text-align: center;
+}
+
+.modal-sol-step-btn,
+.modal-sol-toggle-btn,
+.modal-sol-pill {
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border-medium);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 140ms cubic-bezier(0.65, 0, 0.35, 1),
+    border-color 140ms cubic-bezier(0.65, 0, 0.35, 1),
+    color 140ms cubic-bezier(0.65, 0, 0.35, 1),
+    transform 120ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.modal-sol-step-btn {
+  width: 26px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.modal-sol-step-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.modal-sol-step-btn:not(:disabled):hover,
+.modal-sol-toggle-btn:hover,
+.modal-sol-pill:hover:not(.active) {
+  border-color: var(--mcmaster-maroon);
+  color: var(--mcmaster-maroon);
+}
+
+.modal-sol-toggle-btn.active {
+  background: #EFECE4;
+  color: var(--text-primary);
+}
+
+.modal-sol-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.modal-sol-pill.chapter.active {
+  background: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon);
+  color: #FFFFFF;
+}
+
+.modal-sol-pill.exercise {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  background: #FAF8F3;
+}
+
+.modal-sol-pill.exercise.active {
+  background: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon);
+  color: #FFFFFF;
+}
+
+.modal-sol-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modal-sol-error-actions .modal-download-btn {
+  margin-top: 0;
+}
+
 .modal-hide-header-btn {
   background: #F2F0EB;
   color: var(--text-secondary);
@@ -4141,6 +4297,12 @@ a.breadcrumb-link:hover {
   background: #EAE8E2;
   overflow: hidden;
   position: relative;
+}
+
+.modal-single-pane > .custom-pdf-pane {
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 .custom-pdf-pane:focus {
@@ -5850,6 +6012,56 @@ html[data-theme='dark'] body {
   color: #FFFFFF !important;
 }
 
+[data-theme='dark'] .modal-sol-dock {
+  background: #17191E !important;
+  border-bottom-color: #282C34 !important;
+}
+
+[data-theme='dark'] .modal-sol-badge {
+  background: rgba(212, 175, 55, 0.14) !important;
+  color: #D4AF37 !important;
+}
+
+[data-theme='dark'] .modal-sol-active-label {
+  color: #F0ECE1 !important;
+}
+
+[data-theme='dark'] .modal-sol-counter {
+  color: #94A3B8 !important;
+}
+
+[data-theme='dark'] .modal-sol-step-btn,
+[data-theme='dark'] .modal-sol-toggle-btn,
+[data-theme='dark'] .modal-sol-pill {
+  background: #121417 !important;
+  border-color: #343A46 !important;
+  color: #E2E8F0 !important;
+}
+
+[data-theme='dark'] .modal-sol-pill.exercise {
+  background: #1B1E23 !important;
+}
+
+[data-theme='dark'] .modal-sol-toggle-btn.active {
+  background: #22262E !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .modal-sol-step-btn:not(:disabled):hover,
+[data-theme='dark'] .modal-sol-toggle-btn:hover,
+[data-theme='dark'] .modal-sol-pill:hover:not(.active) {
+  background: #22262E !important;
+  border-color: #D4AF37 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .modal-sol-pill.chapter.active,
+[data-theme='dark'] .modal-sol-pill.exercise.active {
+  background: #8C1D2F !important;
+  border-color: #A8253B !important;
+  color: #FFFFFF !important;
+}
+
 [data-theme='dark'] .modal-zip-audio-section {
   background: #121417 !important;
   border-color: #282C34 !important;
@@ -7342,6 +7554,52 @@ html[data-theme='oled'] body {
   color: #FFFFFF !important;
 }
 
+[data-theme='oled'] .modal-sol-dock {
+  background: #080808 !important;
+  border-bottom-color: #202020 !important;
+}
+
+[data-theme='oled'] .modal-sol-badge {
+  background: rgba(255, 211, 61, 0.14) !important;
+  color: #FFD33D !important;
+}
+
+[data-theme='oled'] .modal-sol-active-label {
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-sol-counter {
+  color: #9CA3AF !important;
+}
+
+[data-theme='oled'] .modal-sol-step-btn,
+[data-theme='oled'] .modal-sol-toggle-btn,
+[data-theme='oled'] .modal-sol-pill {
+  background: #121212 !important;
+  border-color: #303030 !important;
+  color: #F0ECE1 !important;
+}
+
+[data-theme='oled'] .modal-sol-toggle-btn.active {
+  background: #1C1C1C !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-sol-step-btn:not(:disabled):hover,
+[data-theme='oled'] .modal-sol-toggle-btn:hover,
+[data-theme='oled'] .modal-sol-pill:hover:not(.active) {
+  background: #202020 !important;
+  border-color: #FFD33D !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .modal-sol-pill.chapter.active,
+[data-theme='oled'] .modal-sol-pill.exercise.active {
+  background: #8C1D2F !important;
+  border-color: #FF5370 !important;
+  color: #FFFFFF !important;
+}
+
 [data-theme='oled'] .modal-zip-audio-section {
   background: #050505 !important;
   border-color: #242424 !important;
@@ -8523,6 +8781,41 @@ html[data-theme='oled'] body {
 
   .modal-subtitle-bar.dock-variant {
     order: 5;
+  }
+
+  .modal-sol-dock {
+    padding: 7px 10px;
+    gap: 5px;
+  }
+
+  .modal-sol-badge {
+    display: none;
+  }
+
+  .modal-sol-pill-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 1px;
+  }
+
+  .modal-sol-pill-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .modal-sol-pill.chapter,
+  .modal-sol-pill.exercise {
+    height: 28px;
+  }
+
+  .modal-sol-step-btn,
+  .modal-sol-toggle-btn {
+    height: 28px;
+  }
+
+  .modal-sol-step-btn {
+    width: 28px;
   }
 
   .modal-theme-toggle-btn {

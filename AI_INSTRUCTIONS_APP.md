@@ -23,12 +23,14 @@ Keep `search-app/scripts/` strictly limited to these **7 core utilities** (do no
 
 ## 2. Source Layout & Core Architecture
 
-- **`src/App.jsx`**: Main single-page catalog (`APP_VERSION = 'v6.3'`) in a centered `1280px` full-width layout (no left sidebar):
+- **`src/App.jsx`**: Main single-page catalog (`APP_VERSION = 'v6.4'`) in a centered `1280px` full-width layout (no left sidebar):
   - **Homepage Showcase (`.home-pillars-grid`):** Highlights **Past Exam Papers** (`<a href="/papers">`), **Textbooks & Solutions** (`/textbooks`), and **Listening Audio & Subtitles** (`LIVE CC · IN-BROWSER` badge, `/audio`, plus one-click `Try Sample Track + CC` previewing `WFR02_2021_Jun`). Keep primary browse actions as semantic `<a href>` links integrated with `buildRoutePath` / `parseRouteFromLocation` and `popstate` so browser Back/Forward works cleanly.
   - **Search & Collapsible Filters:** Secondary catalog filters stay inside `#catalog-filter-drawer` toggled via `.filter-drawer-toggle` (`Filters` button); keep the search results view minimal without re-adding redundant top archive banners while surfacing clickable `"Did you mean"` hints (`.search-did-you-mean-btn`) and partial-fallback banners (`.search-fallback-banner`). Supports `src/searchEngine.js` fuzzy queries, single-pass filters (Exam Session, Document Type, Year, Most Viewed), two-stage catalog loading (`/meta.json` + `/shards/*.json` upgrading to `/index.json` with Hugging Face fallback), view counters, About/Team roster, and concise human release notes in `CHANGELOG_HISTORY`.
 - **`src/searchEngine.js`**: Standalone client search & ranking module (`buildFileSearchData`, `finalizeUnifiedSearchData`, `buildCatalogVocab`, `parseSearchQuery`, `executeSmartSearch`). Handles atomic whole-token & phrase matching, subject-scoped Edexcel code equivalences (including cover/syllabus formats like `WMA11/01` and `4MA1/2HR`), bidirectional session aliases (`May`/`June`/`Summer`, `Oct`/`Nov`, `Jan`/`Feb`), first-letter & digit-preserving Damerau-Levenshtein typo tolerance against dynamic `catalogVocab`, `"quoted phrases"`, `-exclusion` filters, multi-field relevance scoring, and automatic partial-match recovery when strict `AND` returns 0 hits.
-- **`src/zipAudioExtractor.js` & `src/audioSubtitles.js`**:
-  - `src/zipAudioExtractor.js` unpacks `.zip` and nested `.zip` listening archives (STORE & DEFLATE via native `DecompressionStream`) directly in browser memory with zero backend extraction.
+- **`src/zipUtils.js`, `src/zipAudioExtractor.js`, `src/zipPdfExtractor.js` & `src/audioSubtitles.js`**:
+  - `src/zipUtils.js` shares low-level ZIP EOCD lookup and `DecompressionStream('deflate-raw')` inflation helpers.
+  - `src/zipAudioExtractor.js` unpacks `.zip` and nested `.zip` listening archives (STORE & DEFLATE) directly in browser memory with zero backend extraction.
+  - `src/zipPdfExtractor.js` streams only the ZIP Central Directory (`~3–22 KB`) via HTTP `206` Range requests (`listZipPdfEntries`), organizes all 14 IAL Maths Worked Solution Banks (`P1–P4`, `M1–M3`, `S1–S3`, `D1`, `FP1–FP3`) by chapter/exercise/review, and unpacks only the clicked PDF slice (`extractZipPdfEntry`) directly into `PdfViewerPane`.
   - `src/audioSubtitles.js` implements the 3-tier Synchronized Subtitles engine:
     - **Tier 1 (`0ms` Static Index — `public/audio-subtitles.json`):** Stores `version`, `generatedAt`, and `tracks` keyed by sitting/track IDs (`buildCandidateSubtitleKeys`), sliced per track via `adaptSubtitleEntryForTrack` for multi-passage Edexcel Transcript PDFs (`source: 'official-transcript-pdf'`) alongside pre-generated Whisper tracks (`28` keys covering `9/96` `AUD` resources: 10 French Transcript PDFs `2019–2021` U2/U4 + all 4 tracks of `WFR02 Jan 2026`).
     - **Tier 2 (Shared Cloud Cache — `/api/views`):** Reads/writes `audio_subtitles` in MongoDB Atlas (`.data/audio_subtitles.json` locally) so any track transcribed in-browser is shared with subsequent visitors.
@@ -104,7 +106,7 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
 
 ## 7. Release & Changelog Protocol
 
-1. Increment `APP_VERSION` (`'v6.3'`) in `src/App.jsx` for feature/minor releases, and keep `CHANGELOG_HISTORY` concise, accurate, and conversational (with real timestamps rather than overwriting every older entry with `BUILD_TIMESTAMP`).
+1. Increment `APP_VERSION` (`'v6.4'`) in `src/App.jsx` for feature/minor releases, and keep `CHANGELOG_HISTORY` concise, accurate, and conversational (with real timestamps rather than overwriting every older entry with `BUILD_TIMESTAMP`).
 2. Lint `src api scripts` (`oxlint`, `0` warnings/errors), regenerate the index (`scripts/generate-index.js` when library files/subtitles change), and build + pre-render:
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output

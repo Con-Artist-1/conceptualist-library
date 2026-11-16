@@ -845,7 +845,7 @@ export function getSeoMetadata({
         `${curr.replace('Edexcel ', '')} ${subjDisplay} Books & Solutions | Conceptualist`
       ], 65);
       const description = pickTitleVariant([
-        `Read and download ${curr} ${subjDisplay} student textbooks${isIalMath ? ', P1–P4, M1–M3, S1–S2 & FP1–FP3 Solution Banks' : ', revision guides & answer books'} on Conceptualist.`,
+        `Read and download ${curr} ${subjDisplay} student textbooks${isIalMath ? ', P1–P4, M1–M3, S1–S3, D1 & FP1–FP3 Solution Banks' : ', revision guides & answer books'} on Conceptualist.`,
         `Study ${curr} ${subjDisplay} student books${isIalMath ? ' & Solution Banks' : ' & answers'} in fast in-app WebPDF reader.`
       ], 158);
       return {

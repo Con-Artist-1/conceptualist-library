@@ -363,7 +363,10 @@ const VirtualPdfPage = React.memo(({
 });
 
 export const PdfViewerPane = ({
-  url,
+  url = '',
+  pdfData = null,
+  downloadHref = '',
+  downloadName = '',
   title,
   docType = 'QP',
   fileSize = 0,
@@ -372,7 +375,7 @@ export const PdfViewerPane = ({
   onDownload = true,
   autoFocus = false
 }) => {
-  const downloadUrl = url ? (url.includes('?') ? `${url}&download=true` : `${url}?download=true`) : '';
+  const downloadUrl = downloadHref || (url ? (url.includes('?') ? `${url}&download=true` : `${url}?download=true`) : '');
   const paneIdRef = useRef(null);
   if (paneIdRef.current === null) {
     paneIdRef.current = nextPaneSeq++;
@@ -547,15 +550,15 @@ export const PdfViewerPane = ({
     return () => el.removeEventListener('wheel', handleWheel);
   }, [recordZoomAnchor]);
 
-  // Fetch and parse document with PDF.js (byte-range streaming for >= 5 MB PDFs; single-pass for smaller papers)
+  // Fetch and parse document with PDF.js (byte-range streaming for >= 5 MB PDFs; in-memory data or single-pass for smaller papers)
   const loadDocument = useCallback(() => {
-    if (!url) return;
+    if (!url && !pdfData) return;
     let active = true;
     let loadingTask = null;
     let loadedDoc = null;
     let activeTransport = null;
     const bootCtrl = new AbortController();
-    const shouldStreamLargePdf = Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
+    const shouldStreamLargePdf = !pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
 
     setLoading(true);
     setDownloadProgress(null);
@@ -626,17 +629,24 @@ export const PdfViewerPane = ({
             cMapPacked: true,
             enableXfa: false
           }
-          : {
-            url,
-            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-            cMapPacked: true,
-            enableXfa: false,
-            disableAutoFetch: false,
-            rangeChunkSize: 262144
-          }
+          : pdfData
+            ? {
+              data: pdfData.slice(),
+              cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+              cMapPacked: true,
+              enableXfa: false
+            }
+            : {
+              url,
+              cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+              cMapPacked: true,
+              enableXfa: false,
+              disableAutoFetch: false,
+              rangeChunkSize: 262144
+            }
       );
 
-      if (!activeTransport) {
+      if (!activeTransport && !pdfData) {
         loadingTask.onProgress = (progressData) => {
           if (!active || !progressData) return;
           if (typeof progressData.total === 'number' && progressData.total > 0) {
@@ -718,7 +728,7 @@ export const PdfViewerPane = ({
         try { loadedDoc.destroy(); } catch { }
       }
     };
-  }, [url, fileSize]);
+  }, [url, pdfData, fileSize]);
 
   useEffect(() => {
     const cleanup = loadDocument();
@@ -1080,11 +1090,11 @@ export const PdfViewerPane = ({
           {onDownload && downloadUrl && (
             <a
               href={downloadUrl}
-              download
+              download={downloadName || true}
               rel="noopener noreferrer"
               className="pdf-tool-btn open-tab-btn"
-              title="Download PDF"
-              aria-label="Download PDF"
+              title={downloadName ? `Download ${downloadName}` : 'Download PDF'}
+              aria-label={downloadName ? `Download ${downloadName}` : 'Download PDF'}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1144,14 +1154,16 @@ export const PdfViewerPane = ({
               >
                 Retry
               </button>
-              <a
-                href={downloadUrl || url}
-                download
-                rel="noopener noreferrer"
-                className="modal-action-link"
-              >
-                Download
-              </a>
+              {(downloadUrl || url) && (
+                <a
+                  href={downloadUrl || url}
+                  download={downloadName || true}
+                  rel="noopener noreferrer"
+                  className="modal-action-link"
+                >
+                  Download
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -1169,7 +1181,7 @@ export const PdfViewerPane = ({
                 isVisible={visiblePages.has(pageNum) && (firstPagePainted || pageNum === currentPage)}
                 isNear={firstPagePainted && Math.abs(pageNum - currentPage) <= 2}
                 isMobile={isMobile}
-                isLargePdf={Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD}
+                isLargePdf={!pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD}
                 defaultAspectRatio={defaultAspectRatio}
                 onPageRendered={handlePageRendered}
               />

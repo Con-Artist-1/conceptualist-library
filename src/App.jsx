@@ -23,6 +23,7 @@ import {
 } from './searchEngine.js';
 import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
 import { extractZipAudioTracks } from './zipAudioExtractor.js';
+import { listZipPdfEntries, extractZipPdfEntry } from './zipPdfExtractor.js';
 import {
   buildCandidateSubtitleKeys,
   adaptSubtitleEntryForTrack,
@@ -68,13 +69,23 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.3';
+const APP_VERSION = 'v6.4';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.3',
+    version: 'v6.4',
     date: BUILD_TIMESTAMP,
+    title: 'In-Browser Worked Solutions Reader',
+    summary: 'Made all 14 IAL Maths Worked Solution Banks (P1–P4, M1–M3, S1–S3, D1, FP1–FP3) viewable chapter-by-chapter right inside WebPDF without downloading full archives.',
+    changes: [
+      'On-demand ZIP chapter streaming: Reads only the ZIP Central Directory (~3–22 KB) via HTTP Range requests to list every chapter, exercise, and review paper, then unpacks only the clicked PDF in browser memory.',
+      'M3 & S3 archive conversion: Repacked the M3 and S3 RAR solution banks into standard DEFLATE ZIPs so all 14 solution packs open cleanly on-site.'
+    ]
+  },
+  {
+    version: 'v6.3',
+    date: '2026-11-16T02:43:09.000Z',
     title: 'Smarter Search, Large PDF Streaming & Device Theme Sync',
     summary: 'Upgraded catalog search with precision/partial matching, added on-demand byte-range streaming for large textbooks (>= 5 MB), and synced initial light/dark themes to your device.',
     changes: [
@@ -1297,6 +1308,109 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     singleExt === 'zip' &&
     (currentDoc.docType === 'AUD' ||
       /audio|recording|wfr0[24]|wgn0[24]|wsp0[24]/i.test(currentDoc.name || currentDoc.path || ''));
+  const isSingleSolutionZip =
+    !isSplit &&
+    !isSinglePdf &&
+    !isSingleAudioZip &&
+    singleExt === 'zip' &&
+    (currentDoc.docType === 'SOL' || /solution/i.test(currentDoc.name || currentDoc.path || ''));
+
+  const [solDirectory, setSolDirectory] = useState(null);
+  const [solDirLoading, setSolDirLoading] = useState(false);
+  const [solDirError, setSolDirError] = useState(null);
+  const [solDirRetry, setSolDirRetry] = useState(0);
+  const [selectedSolPath, setSelectedSolPath] = useState('');
+  const [solNavExpanded, setSolNavExpanded] = useState(true);
+  const [activeSolPdf, setActiveSolPdf] = useState(null);
+  const [solPdfLoading, setSolPdfLoading] = useState(false);
+  const [solPdfError, setSolPdfError] = useState(null);
+  const [solPdfRetry, setSolPdfRetry] = useState(0);
+
+  const solZipUrl = isSingleSolutionZip && currentDoc.path ? getHfUrl(currentDoc.path) : '';
+
+  useEffect(() => {
+    if (!solZipUrl) {
+      setSolDirectory(null);
+      setSolDirLoading(false);
+      setSolDirError(null);
+      setSelectedSolPath('');
+      setActiveSolPdf(null);
+      setSolPdfLoading(false);
+      setSolPdfError(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setSolDirLoading(true);
+    setSolDirError(null);
+    setSolDirectory(null);
+    setSelectedSolPath('');
+    setActiveSolPdf(null);
+    setSolNavExpanded(true);
+
+    listZipPdfEntries(solZipUrl, currentDoc.size || 0)
+      .then((dirData) => {
+        if (cancelled) return;
+        setSolDirectory(dirData);
+        setSelectedSolPath(dirData.entries[0]?.entryPath || '');
+        setSolDirLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSolDirError(err?.message || 'Unable to read Solution Bank chapters');
+        setSolDirLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [solZipUrl, currentDoc.size, solDirRetry]);
+
+  const selectedSolEntry = useMemo(() => {
+    if (!solDirectory?.entries?.length) return null;
+    return (
+      solDirectory.entries.find((e) => e.entryPath === selectedSolPath) ||
+      solDirectory.entries[0]
+    );
+  }, [solDirectory, selectedSolPath]);
+
+  const activeSolGroup = useMemo(() => {
+    if (!solDirectory?.groups?.length || !selectedSolEntry) return null;
+    return (
+      solDirectory.groups.find((g) => g.key === selectedSolEntry.groupKey) ||
+      solDirectory.groups[0]
+    );
+  }, [solDirectory, selectedSolEntry]);
+
+  useEffect(() => {
+    if (!solZipUrl || !selectedSolEntry) {
+      setActiveSolPdf(null);
+      setSolPdfLoading(false);
+      setSolPdfError(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setSolPdfLoading(true);
+    setSolPdfError(null);
+    setActiveSolPdf(null);
+
+    extractZipPdfEntry(solZipUrl, selectedSolEntry, currentDoc.size || 0)
+      .then((pdfResult) => {
+        if (cancelled) return;
+        setActiveSolPdf(pdfResult);
+        setSolPdfLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSolPdfError(err?.message || 'Unable to unpack selected PDF');
+        setSolPdfLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [solZipUrl, selectedSolEntry, currentDoc.size, solPdfRetry]);
 
   const [zipTracks, setZipTracks] = useState([]);
   const [zipLoading, setZipLoading] = useState(false);
@@ -2004,13 +2118,13 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 <span className="btn-mobile-text" aria-hidden="true">Hide</span>
               </button>
 
-              {/* Download PDF directly */}
+              {/* Download PDF or full archive directly */}
               <a
                 href={downloadUrl}
                 download
                 rel="noopener noreferrer"
                 className="modal-btn modal-link-btn"
-                title="Download document"
+                title={isSingleSolutionZip ? 'Download full Solution Bank archive (.zip)' : 'Download document'}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -2254,7 +2368,193 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
             </>
           ) : (
             <div className="modal-single-pane">
-              {!isSinglePdf ? (
+              {isSingleSolutionZip ? (
+                <>
+                  {solDirectory?.groups?.length > 0 && (
+                    <div className="modal-sol-dock" role="navigation" aria-label="Worked Solutions Chapter Selector">
+                      <div className="modal-sol-top-row">
+                        <div className="modal-sol-status-group">
+                          <span className="modal-sol-badge">Solution Bank</span>
+                          {selectedSolEntry && (
+                            <span className="modal-sol-active-label" title={`${selectedSolEntry.fullLabel} — ${selectedSolEntry.fileName}`}>
+                              {selectedSolEntry.fullLabel}
+                            </span>
+                          )}
+                        </div>
+                        <div className="modal-sol-nav-actions">
+                          <button
+                            type="button"
+                            className="modal-sol-step-btn"
+                            disabled={!selectedSolEntry || selectedSolEntry.flatIndex <= 0}
+                            onClick={() => {
+                              if (!selectedSolEntry || selectedSolEntry.flatIndex <= 0) return;
+                              const prevEntry = solDirectory.entries[selectedSolEntry.flatIndex - 1];
+                              if (prevEntry) setSelectedSolPath(prevEntry.entryPath);
+                            }}
+                            title="Previous exercise"
+                            aria-label="Previous exercise"
+                          >
+                            ‹
+                          </button>
+                          <span className="modal-sol-counter">
+                            {selectedSolEntry ? `${selectedSolEntry.flatIndex + 1}/${solDirectory.entries.length}` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            className="modal-sol-step-btn"
+                            disabled={!selectedSolEntry || selectedSolEntry.flatIndex >= solDirectory.entries.length - 1}
+                            onClick={() => {
+                              if (!selectedSolEntry) return;
+                              const nextEntry = solDirectory.entries[selectedSolEntry.flatIndex + 1];
+                              if (nextEntry) setSelectedSolPath(nextEntry.entryPath);
+                            }}
+                            title="Next exercise"
+                            aria-label="Next exercise"
+                          >
+                            ›
+                          </button>
+                          <button
+                            type="button"
+                            className={`modal-sol-toggle-btn ${solNavExpanded ? 'active' : ''}`}
+                            onClick={() => setSolNavExpanded((prev) => !prev)}
+                            aria-expanded={solNavExpanded}
+                            title={solNavExpanded ? 'Collapse chapter and exercise picker' : 'Show chapters and exercises'}
+                          >
+                            {solNavExpanded ? 'Hide Chapters' : 'Chapters'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {solNavExpanded && (
+                        <>
+                          <div className="modal-sol-pill-row" role="tablist" aria-label="Chapters">
+                            {solDirectory.groups.map((grp) => {
+                              const isActiveGroup = activeSolGroup?.key === grp.key;
+                              return (
+                                <button
+                                  key={grp.key}
+                                  type="button"
+                                  role="tab"
+                                  aria-selected={isActiveGroup}
+                                  className={`modal-sol-pill chapter ${isActiveGroup ? 'active' : ''}`}
+                                  onClick={() => {
+                                    if (grp.items[0]) setSelectedSolPath(grp.items[0].entryPath);
+                                  }}
+                                  title={`${grp.label} (${grp.items.length} PDFs)`}
+                                >
+                                  {grp.shortLabel}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {activeSolGroup?.items?.length > 0 && (
+                            <div className="modal-sol-pill-row exercises" role="group" aria-label={`${activeSolGroup.label} exercises`}>
+                              {activeSolGroup.items.map((item) => {
+                                const isActiveItem = selectedSolEntry?.entryPath === item.entryPath;
+                                return (
+                                  <button
+                                    key={item.entryPath}
+                                    type="button"
+                                    aria-pressed={isActiveItem}
+                                    className={`modal-sol-pill exercise ${isActiveItem ? 'active' : ''}`}
+                                    onClick={() => setSelectedSolPath(item.entryPath)}
+                                    title={`${item.fullLabel} (${formatBytes(item.uncompressedSize)})`}
+                                  >
+                                    {item.shortLabel}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {solDirLoading ? (
+                    <PdfPaneSkeleton
+                      title={`Opening ${singleTitle}...`}
+                      subtitle="Reading chapters and exercises from Solution Bank"
+                    />
+                  ) : solDirError ? (
+                    <div className="modal-resource-card">
+                      <div className="modal-resource-box">
+                        <h3>{singleTitle}</h3>
+                        <p>{currentDoc.name || currentDoc.path}</p>
+                        <div className="modal-zip-audio-error" role="alert">
+                          Unable to read chapters in browser ({solDirError}). You can retry or download the full ZIP archive below.
+                        </div>
+                        <div className="modal-sol-error-actions">
+                          <button
+                            type="button"
+                            className="modal-action-link"
+                            onClick={() => setSolDirRetry((n) => n + 1)}
+                          >
+                            Retry
+                          </button>
+                          <a
+                            href={downloadUrl}
+                            rel="noopener noreferrer"
+                            download
+                            className="modal-download-btn"
+                          >
+                            Download ZIP Resource ({formatBytes(currentDoc.size)})
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : solPdfLoading ? (
+                    <PdfPaneSkeleton
+                      title={`Loading ${selectedSolEntry?.fullLabel || 'Solution'}...`}
+                      subtitle={selectedSolEntry ? `Unpacking ${selectedSolEntry.fileName} (${formatBytes(selectedSolEntry.uncompressedSize)})` : 'Streaming from Solution Bank'}
+                    />
+                  ) : solPdfError ? (
+                    <div className="modal-resource-card">
+                      <div className="modal-resource-box">
+                        <h3>{selectedSolEntry?.fullLabel || singleTitle}</h3>
+                        <p>{selectedSolEntry?.fileName || currentDoc.name}</p>
+                        <div className="modal-zip-audio-error" role="alert">
+                          Unable to unpack this solution PDF ({solPdfError}).
+                        </div>
+                        <div className="modal-sol-error-actions">
+                          <button
+                            type="button"
+                            className="modal-action-link"
+                            onClick={() => setSolPdfRetry((n) => n + 1)}
+                          >
+                            Retry
+                          </button>
+                          <a
+                            href={downloadUrl}
+                            rel="noopener noreferrer"
+                            download
+                            className="modal-download-btn"
+                          >
+                            Download Full ZIP ({formatBytes(currentDoc.size)})
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : activeSolPdf ? (
+                    <Suspense fallback={<PdfPaneSkeleton title={`Loading ${selectedSolEntry?.fullLabel || singleTitle}...`} subtitle="Initializing WebPDF Reader" />}>
+                      <PdfViewerPane
+                        key={`${currentDoc.path}::${selectedSolEntry?.entryPath || ''}`}
+                        pdfData={activeSolPdf.bytes}
+                        downloadHref={activeSolPdf.blobUrl}
+                        downloadName={activeSolPdf.fileName}
+                        title={`${singleTitle} — ${selectedSolEntry?.fullLabel || activeSolPdf.fileName}`}
+                        docType="SOL"
+                        fileSize={activeSolPdf.bytes.byteLength}
+                        isMobile={isMobile}
+                        initialPage={1}
+                        onDownload={true}
+                        autoFocus={true}
+                      />
+                    </Suspense>
+                  ) : null}
+                </>
+              ) : !isSinglePdf ? (
                 <div className="modal-resource-card">
                   <div className={`modal-resource-box ${isSingleAudioZip ? 'audio-zip-box' : ''}`}>
                     <h3>{singleTitle}</h3>
@@ -5974,7 +6274,7 @@ function App() {
                                     </>
                                   )}
 
-                                  {(isPdf || activeDoc.docType === 'AUD') && viewMode !== 'unified' && (
+                                  {(isPdf || activeDoc.docType === 'AUD' || (activeDoc.docType === 'SOL' && activeDoc.ext === 'zip')) && viewMode !== 'unified' && (
                                     <a
                                       href={getOnSitePaperUrl(activeDoc, activeDoc.docType || 'QP')}
                                       onClick={(e) => {
