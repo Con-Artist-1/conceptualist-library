@@ -71,13 +71,22 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.6';
+const APP_VERSION = 'v6.7';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.6',
+    version: 'v6.7',
     date: BUILD_TIMESTAMP,
+    title: 'Header Coverage Date Pill Restored',
+    summary: 'Restored the top-right archive year-range badge in the header, displaying full library span (January 2003 – June 2026) and active subject date ranges.',
+    changes: [
+      'Dynamic header coverage indicator: Brought back the top-right date-span badge next to the theme toggle, switching dynamically to show each selected subject’s exact earliest-to-latest sitting range.'
+    ]
+  },
+  {
+    version: 'v6.6',
+    date: '2026-11-16T20:38:32.000Z',
     title: '16 New IGCSE Subjects, Sciences Double/Single Award & 2025–2026 Modular Coverage',
     summary: 'Grew the archive to 19,938 total files (16,077 unique records) across 19 IAL and 43 IGCSE subjects, adding 16 new IGCSE courses, Oct 2025 & May/June 2026 Modular Maths A, and expanded listening audio.',
     changes: [
@@ -5087,6 +5096,18 @@ function App() {
   const isRoot = selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
+  const activeDateText = useMemo(() => {
+    if (filterSubject) {
+      const cov = filterCurriculum === 'Edexcel IGCSE'
+        ? data.meta?.igcseSubjectCoverage?.[filterSubject]
+        : (filterCurriculum === 'Edexcel IAL'
+            ? data.meta?.ialSubjectCoverage?.[filterSubject]
+            : data.meta?.subjectCoverage?.[filterSubject]);
+      if (cov) return `${formatSubjectDisplay(filterSubject)}: ${cov}`;
+    }
+    return data.meta?.coverage || 'January 2003 – June 2026';
+  }, [filterSubject, filterCurriculum, data.meta]);
+
   const activeDrawerFilterCount = useMemo(() => {
     let count = 0;
     if (filterDocType) count += 1;
@@ -5456,6 +5477,9 @@ function App() {
           </a>
 
           <div className="header-right-group">
+            <div className="header-coverage-badge">
+              <strong>{activeDateText}</strong>
+            </div>
             <button
               type="button"
               className="header-theme-btn"
