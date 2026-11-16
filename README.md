@@ -8,7 +8,7 @@ A high-speed web application for searching, browsing, and viewing Pearson Edexce
 - **In-House WebPDF Reader & Split View:** Lazy-loaded canvas PDF reader powered by Mozilla PDF.js (`4.10.38`) featuring `IntersectionObserver` viewport virtualization, adaptive DPR scaling, animated download progress tracking, direct document download links, keyboard shortcuts, and synchronized side-by-side Split View (with adjustable desktop and mobile dividers).
 - **Three Academic Themes:** Instant, flicker-free cycling between **Academic Light**, **Academic Dark** (slate charcoal), and **Pure OLED** (`#000000`) with hue-preserving diagram/graph canvas inversion and dual persistence (`localStorage` + 1-year cookie).
 - **Dedicated Resource Viewers, ZIP Audio & Synchronized Subtitles (`CC`):** Automatically pairs Question Papers, Mark Schemes, and Examiner Reports per exam sitting; unpacks `.zip` and nested `.zip` listening packages directly in browser memory via `DecompressionStream` (`src/zipAudioExtractor.js`) for docked & standalone playback with individual track + full archive downloads; and provides synchronized captions + click-to-seek **Full Transcript** drawers via `src/audioSubtitles.js` (pre-indexed Transcript PDFs & Whisper tracks in `public/audio-subtitles.json`, shared MongoDB `audio_subtitles` caching, and opt-in on-demand browser VAD + `Xenova/whisper-tiny` WASM generation), plus `DF` archives on `/data-files`.
-- **Canonical SEO, Route Sharding & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **40 compact JSON route shards**, **318 pre-rendered static HTML routes**, JSON-LD schema, Open Graph preview cards, a **192-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
+- **Canonical SEO, Route Sharding & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **40 compact JSON route shards**, **319 pre-rendered static HTML routes**, JSON-LD schema, Open Graph preview cards, a **193-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
 - **View Tracking, History & Telemetry:** Serverless `/api/views` & `/api/telemetry` endpoints backed by MongoDB (shared view counters, subtitle caching, 90-day anonymized session study-time metrics, per-paper cooldown, rate limiting, and local `.data/*.json` fallbacks), browser Recent History cards, and Vercel Web Analytics & Speed Insights.
 - **Mobile & Desktop Polish:** Responsive `100dvh` full-screen reader modals, `3 × 3` button navigation grid in the mobile footer, pixel-uniform headers, and `>= 16px` mobile inputs to prevent iOS Safari zoom.
 
@@ -63,7 +63,7 @@ npm run lint
 
 ### Building for Production
 
-Compile the Vite bundle, generate `public/sitemap.xml` (`192` URLs), create `dist/shards/` (`40` route shards), and pre-render `318` static HTML pages into `dist/`:
+Compile the Vite bundle, generate `public/sitemap.xml` (`193` URLs), create `dist/shards/` (`40` route shards), and pre-render `319` static HTML pages into `dist/`:
 
 ```bash
 npm run build
@@ -106,8 +106,8 @@ npm run indexnow
 
 ## Team
 
-- **Diavlon** — Founder & Lead Architect
-- **Naz** — Co-Founder & Systems Lead
+- **Nafiz.R** — Founder & Lead Architect
+- **Nazmul.K** — Co-Founder & Systems Lead
 - **Jemison Flaren** — Systems Architect
 - **Gemin Arghen** — Infrastructure Engineer
 - **Claudis Oppen** — Research & Intelligence Lead

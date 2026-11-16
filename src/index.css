@@ -2370,18 +2370,26 @@ a.breadcrumb-link:hover {
 .unified-actions-cell {
   display: flex;
   align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.unified-actions-cell::-webkit-scrollbar {
+  display: none;
 }
 
 .unified-doc-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 11px;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   text-decoration: none !important;
   border: 1px solid transparent;
@@ -2468,12 +2476,13 @@ a.breadcrumb-link:hover {
   color: #FFFFFF !important;
   border: 1px solid var(--mcmaster-maroon);
   border-radius: var(--radius-sm);
-  padding: 5px 12px;
-  font-size: 12.5px;
+  padding: 5px 9px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   font-family: var(--font-family);
   white-space: nowrap;
+  flex-shrink: 0;
   line-height: 1.25;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   display: inline-flex;
@@ -2481,6 +2490,18 @@ a.breadcrumb-link:hover {
   justify-content: center;
   gap: 4px;
   box-sizing: border-box;
+}
+
+@media (min-width: 769px) and (max-width: 1180px) {
+  .unified-doc-btn .btn-desktop-text,
+  .unified-preview-btn .btn-desktop-text {
+    display: none;
+  }
+
+  .unified-doc-btn .btn-mobile-text,
+  .unified-preview-btn .btn-mobile-text {
+    display: inline;
+  }
 }
 
 .unified-preview-btn.split-btn {
@@ -5333,6 +5354,13 @@ html[data-theme='dark'] body {
 [data-theme='dark'] .history-doc-btn.er {
   background: #3D2E24 !important;
   border-color: #5A4537 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .history-doc-btn.aud,
+[data-theme='dark'] .history-doc-btn.extra {
+  background: #262A30 !important;
+  border-color: #3C424B !important;
   color: #FFFFFF !important;
 }
 
@@ -8202,20 +8230,28 @@ html[data-theme='oled'] body {
   }
 
   .file-table .unified-actions-cell {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
-    gap: 6px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 5px;
     width: 100%;
     margin-top: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .file-table .unified-actions-cell::-webkit-scrollbar {
+    display: none;
   }
 
   .file-table .unified-doc-btn,
   .file-table .unified-preview-btn {
-    min-height: 38px;
-    padding: 8px 6px;
-    font-size: 13.5px;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 4px;
+    font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     justify-content: center;
     text-align: center;
     border-radius: 4px;
@@ -8903,8 +8939,10 @@ html[data-theme='oled'] body {
 .history-card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   opacity: 1;
   pointer-events: auto;
   margin-top: 10px;
@@ -8912,13 +8950,19 @@ html[data-theme='oled'] body {
   border-top: 1px solid var(--border-light);
 }
 
+.history-card-actions::-webkit-scrollbar {
+  display: none;
+}
+
 .history-doc-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 4px 7px;
   border-radius: 4px;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 800;
   text-decoration: none !important;
   border: 1px solid transparent;
@@ -8951,22 +8995,19 @@ html[data-theme='oled'] body {
   border-color: #3F2913;
 }
 
+.history-doc-btn.aud,
+.history-doc-btn.extra {
+  background: #2E343B;
+  color: #FFFFFF !important;
+  border-color: #1F242A;
+}
+
 .history-doc-btn.split {
   background: var(--mcmaster-maroon);
   color: #FFFFFF !important;
   border-color: var(--mcmaster-maroon-hover);
+  padding: 4px 8px;
   margin-left: auto;
-}
-
-.history-card-actions-right {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.history-card-actions-right .history-doc-btn.split {
-  margin-left: 0;
 }
 
 /* ============================================================
@@ -9282,6 +9323,13 @@ html[data-theme='oled'] body {
   color: #FFFFFF !important;
 }
 
+[data-theme='oled'] .history-doc-btn.aud,
+[data-theme='oled'] .history-doc-btn.extra {
+  background: #1C2026 !important;
+  border-color: #323741 !important;
+  color: #FFFFFF !important;
+}
+
 [data-theme='oled'] .history-doc-btn.split {
   background: #8C2435 !important;
   border-color: #A32D40 !important;
@@ -9358,8 +9406,9 @@ html[data-theme='oled'] body {
   }
 
   .history-doc-btn {
-    min-height: 34px;
-    font-size: 12px;
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 11.5px;
     touch-action: manipulation;
   }
 
@@ -9894,15 +9943,15 @@ html[data-theme='oled'] body {
   }
 
   .file-table th.col-sitting {
-    width: 48% !important;
+    width: 42% !important;
   }
 
   .file-table th.col-series {
-    width: 26% !important;
+    width: 20% !important;
   }
 
   .file-table th.col-actions {
-    width: 26% !important;
+    width: 38% !important;
   }
 
   .file-table .unified-doc-btn .btn-desktop-text,
@@ -9917,8 +9966,8 @@ html[data-theme='oled'] body {
 
   .file-table .unified-doc-btn,
   .file-table .unified-preview-btn {
-    padding: 5px 10px;
-    font-size: 12px;
+    padding: 4px 8px;
+    font-size: 11.5px;
   }
 
   .filter-select {

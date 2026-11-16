@@ -117,8 +117,8 @@ Encrypted Vault Payload (`salt.iv.authTag.ciphertext`) using **AES-256-GCM** (PB
 ## 7. Team & Credits
 
 Core Conceptualist Systems contributors listed on `/about`:
-- **Diavlon** — Founder & Lead Architect
-- **Naz** — Co-Founder & Systems Lead
+- **Nafiz.R** — Founder & Lead Architect
+- **Nazmul.K** — Co-Founder & Systems Lead
 - **Jemison Flaren** — Systems Architect
 - **Gemin Arghen** — Infrastructure Engineer
 - **Claudis Oppen** — Research & Intelligence Lead
@@ -138,7 +138,7 @@ Core Conceptualist Systems contributors listed on `/about`:
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, `/papers` Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.1` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.2` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.

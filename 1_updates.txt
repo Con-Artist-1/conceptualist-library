@@ -2,14 +2,15 @@ this page is not for ai TO READ, AI ignore this page, this is only for the devel
 
 
 DO--------------------
-paper view counter
-links for specific sections
 embed papers on site, so that ppl are on site
-give proper credits
 sitemaps for reach paper and thing
 upgrade to NEXT.JS (nafiz keep this in mind)
+Add batch download (login only) {with quota}
+
 
 DOING-----------------
-
+give proper credits(added our names)
 
 DONE------------------
+paper view counter
+links for specific sections

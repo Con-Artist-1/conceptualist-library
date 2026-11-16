@@ -61,13 +61,23 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.1';
+const APP_VERSION = 'v6.2';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.1',
+    version: 'v6.2',
     date: BUILD_TIMESTAMP,
+    title: 'Single-Row Action Buttons & Real Team Names',
+    summary: 'Fixed multi-button rows wrapping onto two lines on recent cards and sitting tables, removed the card view badge, and updated founder names.',
+    changes: [
+      'Single-row actions: Removed the view counter from Recently Viewed cards and balanced table/card action pills so QP, MS, ER, Audio, and Split View stay on one clean row.',
+      'Team roster: Updated founder credits on /about to Nafiz.R and Nazmul.K.'
+    ]
+  },
+  {
+    version: 'v6.1',
+    date: '2026-11-16T00:34:32.000Z',
     title: 'Cleaner Layout, Audio Showcase & S-Curve Theme Wipes',
     summary: 'Freed up screen room on laptops, showcased in-browser audio + subtitles on Home, made /papers a real route, updated disclaimers, and added fast S-curve theme wipes.',
     changes: [
@@ -2862,11 +2872,11 @@ const AboutPage = ({ onGoHome }) => {
           </p>
           <div className="team-grid">
             <div className="team-card">
-              <div className="team-name">Diavlon</div>
+              <div className="team-name">Nafiz.R</div>
               <div className="team-role">Founder &amp; Lead Architect</div>
             </div>
             <div className="team-card">
-              <div className="team-name">Naz</div>
+              <div className="team-name">Nazmul.K</div>
               <div className="team-role">Co-Founder &amp; Systems Lead</div>
             </div>
             <div className="team-card">
@@ -2934,7 +2944,6 @@ const AboutPage = ({ onGoHome }) => {
 const WelcomePage = ({
   data,
   recentHistory = [],
-  viewsMap = {},
   onOpenPaper,
   onClearHistory,
   getOnSitePaperUrl,
@@ -3212,10 +3221,10 @@ const WelcomePage = ({
               const hasQP = Boolean(docs.QP || item.docType === 'QP');
               const hasMS = Boolean(docs.MS || item.docType === 'MS');
               const hasER = Boolean(docs.ER || item.docType === 'ER');
+              const hasAUD = Boolean(docs.AUD || item.docType === 'AUD');
+              const hasSC = Boolean(docs.SC || item.docType === 'SC');
               const canSplit = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
               const primaryMode = hasQP ? 'QP' : (item.lastView || item.docType || 'QP');
-              const eligibleForViews = isQuestionPaperEligibleForViews(item);
-              const views = eligibleForViews ? getPaperTotalViews(item, viewsMap) : 0;
               const qpHref = getOnSitePaperUrl ? getOnSitePaperUrl(item, primaryMode) : '#';
 
               return (
@@ -3288,27 +3297,48 @@ const WelcomePage = ({
                         ER
                       </a>
                     )}
-                    {(eligibleForViews || canSplit) && (
-                      <div className="history-card-actions-right">
-                        {eligibleForViews && (
-                          <PaperViewsCounter count={views} variant="card" />
-                        )}
-                        {canSplit && (
-                          <a
-                            href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'split') : '#'}
-                            className="history-doc-btn split"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onOpenPaper(item, 'split');
-                            }}
-                            title="Open Question Paper and Mark Scheme side by side in Split View"
-                          >
-                            <span className="btn-desktop-text">Split View</span>
-                            <span className="btn-mobile-text" aria-hidden="true">Split</span>
-                          </a>
-                        )}
-                      </div>
+                    {hasAUD && (
+                      <a
+                        href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'AUD') : '#'}
+                        className="history-doc-btn aud"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenPaper(item, 'AUD');
+                        }}
+                        title="Open Listening Audio"
+                      >
+                        AUD
+                      </a>
+                    )}
+                    {hasSC && (
+                      <a
+                        href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'SC') : '#'}
+                        className="history-doc-btn extra"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenPaper(item, 'SC');
+                        }}
+                        title="Open Source / Transcript"
+                      >
+                        SC
+                      </a>
+                    )}
+                    {canSplit && (
+                      <a
+                        href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'split') : '#'}
+                        className="history-doc-btn split"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenPaper(item, 'split');
+                        }}
+                        title="Open Question Paper and Mark Scheme side by side in Split View"
+                      >
+                        <span className="btn-desktop-text">Split View</span>
+                        <span className="btn-mobile-text" aria-hidden="true">Split</span>
+                      </a>
                     )}
                   </div>
                 </div>
@@ -5845,7 +5875,6 @@ function App() {
             <WelcomePage
               data={data}
               recentHistory={recentHistory}
-              viewsMap={viewsMap}
               onOpenPaper={openOnSiteReader}
               onClearHistory={handleClearHistory}
               getOnSitePaperUrl={getOnSitePaperUrl}
@@ -5903,15 +5932,15 @@ function App() {
                   <table className="file-table">
                     <thead>
                       <tr>
-                        <th className="col-sitting" style={{ width: viewMode === 'unified' ? '46%' : '50%' }}>
+                        <th className="col-sitting" style={{ width: viewMode === 'unified' ? '39%' : '50%' }}>
                           {filterDocType === 'Book'
                             ? 'Textbook / Solution Resource'
                             : viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
                         </th>
-                        <th className="col-series" style={{ width: viewMode === 'unified' ? '20%' : '26%' }}>
+                        <th className="col-series" style={{ width: viewMode === 'unified' ? '15%' : '26%' }}>
                           {filterDocType === 'Book' ? 'Course & Category' : viewMode === 'unified' ? 'Series' : 'Course & Session'}
                         </th>
-                        <th className="col-actions" style={{ width: viewMode === 'unified' ? '34%' : '24%' }}>
+                        <th className="col-actions" style={{ width: viewMode === 'unified' ? '46%' : '24%' }}>
                           {filterDocType === 'Book'
                             ? 'Open Textbook / Resource'
                             : viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}

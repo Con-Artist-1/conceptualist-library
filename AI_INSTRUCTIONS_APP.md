@@ -23,7 +23,7 @@ Keep `search-app/scripts/` strictly limited to these **7 core utilities** (do no
 
 ## 2. Source Layout & Core Architecture
 
-- **`src/App.jsx`**: Main single-page catalog (`APP_VERSION = 'v6.1'`) in a centered `1280px` full-width layout (no left sidebar):
+- **`src/App.jsx`**: Main single-page catalog (`APP_VERSION = 'v6.2'`) in a centered `1280px` full-width layout (no left sidebar):
   - **Homepage Showcase (`.home-pillars-grid`):** Highlights **Past Exam Papers** (`<a href="/papers">`), **Textbooks & Solutions** (`/textbooks`), and **Listening Audio & Subtitles** (`LIVE CC · IN-BROWSER` badge, `/audio`, plus one-click `Try Sample Track + CC` previewing `WFR02_2021_Jun`). Keep primary browse actions as semantic `<a href>` links integrated with `buildRoutePath` / `parseRouteFromLocation` and `popstate` so browser Back/Forward works cleanly.
   - **Search & Collapsible Filters:** Secondary catalog filters stay inside `#catalog-filter-drawer` toggled via `.filter-drawer-toggle` (`Filters` button); keep the search results view minimal without re-adding redundant top archive banners. Supports client search, single-pass filters (Exam Session, Document Type, Year, Most Viewed), two-stage catalog loading (`/meta.json` + `/shards/*.json` upgrading to `/index.json` with Hugging Face fallback), view counters, About/Team roster, and concise human release notes in `CHANGELOG_HISTORY`.
 - **`src/zipAudioExtractor.js` & `src/audioSubtitles.js`**:
@@ -69,8 +69,8 @@ Keep `search-app/scripts/` strictly limited to these **7 core utilities** (do no
 ## 4. Team Roster (`src/App.jsx` — About Page)
 
 Keep documentation and UI references aligned with all 6 core team members:
-- **Diavlon** — Founder & Lead Architect
-- **Naz** — Co-Founder & Systems Lead
+- **Nafiz.R** — Founder & Lead Architect
+- **Nazmul.K** — Co-Founder & Systems Lead
 - **Jemison Flaren** — Systems Architect
 - **Gemin Arghen** — Infrastructure Engineer
 - **Claudis Oppen** — Research & Intelligence Lead
@@ -101,7 +101,7 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
 
 ## 7. Release & Changelog Protocol
 
-1. Increment `APP_VERSION` (`'v6.1'`) in `src/App.jsx` for feature/minor releases, and keep `CHANGELOG_HISTORY` concise, accurate, and conversational (with real timestamps rather than overwriting every older entry with `BUILD_TIMESTAMP`).
+1. Increment `APP_VERSION` (`'v6.2'`) in `src/App.jsx` for feature/minor releases, and keep `CHANGELOG_HISTORY` concise, accurate, and conversational (with real timestamps rather than overwriting every older entry with `BUILD_TIMESTAMP`).
 2. Lint `src api scripts` (`oxlint`, `0` warnings/errors), regenerate the index (`scripts/generate-index.js` when library files/subtitles change), and build + pre-render:
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output

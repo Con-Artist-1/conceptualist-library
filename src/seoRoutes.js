@@ -788,7 +788,7 @@ export function getSeoMetadata({
     return {
       title: 'About Conceptualist Systems | Edexcel IAL & IGCSE Archive',
       description: fitDescription(`Learn about Conceptualist Systems, an independent study index of ${uniqueFiles.toLocaleString()}+ Edexcel IAL & IGCSE papers, mark schemes, reports & books (${totalFiles.toLocaleString()} archived files).`),
-      keywords: 'Conceptualist Systems, Edexcel past papers, IAL past papers, IGCSE past papers, academic repository, Diavlon, Naz',
+      keywords: 'Conceptualist Systems, Edexcel past papers, IAL past papers, IGCSE past papers, academic repository, Nafiz.R, Nazmul.K',
       canonicalUrl,
       robots: 'index, follow',
       h1: 'About Conceptualist Systems',
