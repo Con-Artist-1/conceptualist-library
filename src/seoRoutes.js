@@ -2,13 +2,20 @@
 // Used by both the browser React app (src/App.jsx) and build-time SSG (scripts/prerender-seo.js)
 
 export const IGCSE_MODULAR_CODES = {
+  'Accounting': '4WAC1',
   'Biology': '4WBI1',
   'Chemistry': '4WCH1',
+  'Commerce': '4WCM1',
+  'Economics': '4WEC1',
+  'English as a Second Language': '4WES1',
   'English Language A': '4WEA1',
   'English Literature': '4WET1',
   'Geography': '4WGE1',
+  'History': '4WHI1',
   'Mathematics A': '4WM1H',
-  'Physics': '4WPH1'
+  'Physics': '4WPH1',
+  'Religious Studies': '4WRS1',
+  'Sciences (Double Award)': '4WSD1'
 };
 
 export const LEGACY_UNIT_EQUIVALENTS = {
@@ -69,16 +76,47 @@ export const SUBJECT_LEGACY_SPEC_CODES = {
     'Psychology': 'XPS01 / YPS01'
   },
   'Edexcel IGCSE': {
-    'Accounting': '4AC1 (Legacy 4AC0)',
+    'Accounting': '4AC1 / Modular 4WAC1 (Legacy 4AC0)',
+    'Arabic': '4AA1 (Legacy 4AR0, 4308)',
+    'Art and Design': '4FA1 (Legacy 4FA0)',
+    'Bangla': '4BA0 (Legacy 4BE0)',
+    'Bangladesh Studies': '4BN1 (Legacy 4BN0)',
     'Biology': '4BI1 / Modular 4WBI1 (Legacy 4BI0)',
+    'Business': '4BS1 (Legacy 4BS0)',
     'Chemistry': '4CH1 / Modular 4WCH1 (Legacy 4CH0)',
-    'Economics': '4EC1 (Legacy 4EC0)',
+    'Chinese': '4CN1 (Legacy 4CN0)',
+    'Commerce': '4CM1 / Modular 4WCM1 (Legacy 4CM0)',
+    'Economics': '4EC1 / Modular 4WEC1 (Legacy 4EC0)',
+    'English as a Second Language': '4ES1 / Modular 4WES1 (Legacy 4ES0, 4357)',
     'English Language A': '4EA1 / Modular 4WEA1 (Legacy 4EA0)',
+    'English Language B': '4EB1 (Legacy 4EB0)',
     'English Literature': '4ET1 / Modular 4WET1 (Legacy 4ET0)',
+    'French': '4FR1 (Legacy 4FR0)',
+    'Further Pure Mathematics': '4PM1 (Legacy 4PM0)',
     'Geography': '4GE1 / Modular 4WGE1 (Legacy 4GE0)',
-    'Mathematics A': '4MA1 / Modular 4WM1H (Legacy 4MA0)',
+    'German': '4GN1 (Legacy 4GN0)',
+    'Global Citizenship': '4GL1',
+    'Greek (First Language)': '4GK1',
+    'Gujarati': '4GU0',
+    'Hindi': '4HN0',
+    'History': '4HI1 / Modular 4WHI1 (Legacy 4HI0)',
+    'Human Biology': '4HB1 (Legacy 4HB0, 7042)',
+    'Islamic Studies': '4IS1',
+    'Islamiyat': '4IS0',
+    'Mathematics A': '4MA1 / Modular 4WM1H (Legacy 4MA0, 4400)',
     'Mathematics B': '4MB1 (Legacy 4MB0)',
-    'Physics': '4PH1 / Modular 4WPH1 (Legacy 4PH0)'
+    'Modern Greek': '4MG0',
+    'Pakistan Studies': '4PA1',
+    'Physics': '4PH1 / Modular 4WPH1 (Legacy 4PH0)',
+    'Religious Studies': '4RS1 / Modular 4WRS1 (Legacy 4RS0)',
+    'Sciences (Double Award)': '4SD0 / Modular 4WSD1 (Legacy 4SC0)',
+    'Sciences (Single Award)': '4SS0',
+    'Sinhala': '4SI0',
+    'Spanish': '4SP1 (Legacy 4SP0)',
+    'Swahili': '4SW1 (Legacy 4SW0)',
+    'Tamil': '4TA0',
+    'Turkish': '4TU0',
+    'Urdu': '4UR0'
   }
 };
 
@@ -103,15 +141,19 @@ export function getLegacyEquivalentsForState({ filterCurriculum = '', filterSubj
 export const SITE_URL = 'https://www.conceptualist.uk';
 
 export const IGCSE_SPEC_CODES = {
-  'Accounting': '4AC1',
+  'Accounting': '4AC1 / 4WAC1',
   'Arabic': '4AA1',
-  'Bangla': '4BA0',
+  'Art and Design': '4FA1',
+  'Bangla': '4BA0 / 4BE0',
+  'Bangladesh Studies': '4BN1',
   'Biology': '4BI1 / 4WBI1',
   'Business': '4BS1',
   'Chemistry': '4CH1 / 4WCH1',
-  'Commerce': '4CM1',
+  'Chinese': '4CN1',
+  'Commerce': '4CM1 / 4WCM1',
   'Computer Science': '4CP0',
-  'Economics': '4EC1',
+  'Economics': '4EC1 / 4WEC1',
+  'English as a Second Language': '4ES1 / 4WES1',
   'English Language A': '4EA1 / 4WEA1',
   'English Language B': '4EB1',
   'English Literature': '4ET1 / 4WET1',
@@ -119,14 +161,29 @@ export const IGCSE_SPEC_CODES = {
   'Further Pure Mathematics': '4PM1',
   'Geography': '4GE1 / 4WGE1',
   'German': '4GN1',
-  'Greek': '4GK1',
-  'History': '4HI1',
+  'Global Citizenship': '4GL1',
+  'Greek (First Language)': '4GK1',
+  'Gujarati': '4GU0',
+  'Hindi': '4HN0',
+  'History': '4HI1 / 4WHI1',
   'Human Biology': '4HB1',
   'Information Technology': '4IT1',
+  'Islamic Studies': '4IS1',
+  'Islamiyat': '4IS0',
   'Mathematics A': '4MA1 / 4WM1H',
   'Mathematics B': '4MB1',
+  'Modern Greek': '4MG0',
+  'Pakistan Studies': '4PA1',
   'Physics': '4PH1 / 4WPH1',
-  'Spanish': '4SP1'
+  'Religious Studies': '4RS1 / 4WRS1',
+  'Sciences (Double Award)': '4SD0 / 4WSD1',
+  'Sciences (Single Award)': '4SS0',
+  'Sinhala': '4SI0',
+  'Spanish': '4SP1',
+  'Swahili': '4SW1',
+  'Tamil': '4TA0',
+  'Turkish': '4TU0',
+  'Urdu': '4UR0'
 };
 
 export const IAL_MATH_UNIT_CODES = {
@@ -159,10 +216,13 @@ export const IAL_SUBJECTS_DEFAULT = [
 ];
 
 export const IGCSE_SUBJECTS_DEFAULT = [
-  'Accounting', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
-  'Computer Science', 'Economics', 'English Language A', 'English Language B', 'English Literature',
-  'Further Pure Mathematics', 'Geography', 'Human Biology', 'Information Technology',
-  'Mathematics A', 'Mathematics B', 'Physics'
+  'Accounting', 'Arabic', 'Art and Design', 'Bangla', 'Bangladesh Studies', 'Biology', 'Business', 'Chemistry',
+  'Chinese', 'Commerce', 'Computer Science', 'Economics', 'English Language A', 'English Language B',
+  'English Literature', 'English as a Second Language', 'French', 'Further Pure Mathematics', 'Geography',
+  'German', 'Global Citizenship', 'Greek (First Language)', 'Gujarati', 'Hindi', 'History', 'Human Biology',
+  'Information Technology', 'Islamic Studies', 'Islamiyat', 'Mathematics A', 'Mathematics B', 'Modern Greek',
+  'Pakistan Studies', 'Physics', 'Religious Studies', 'Sciences (Double Award)', 'Sciences (Single Award)',
+  'Sinhala', 'Spanish', 'Swahili', 'Tamil', 'Turkish', 'Urdu'
 ];
 
 export const DEFAULT_UNIT_LABELS = {
@@ -289,23 +349,48 @@ export const DEFAULT_UNIT_LABELS = {
   },
   'Edexcel IGCSE': {
     'Accounting': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Arabic': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Art and Design': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Bangla': ['Paper 1 (P1)'],
+    'Bangladesh Studies': ['Paper 1 (P1)', 'Paper 2 (P2)'],
     'Biology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
     'Business': ['Paper 1 (P1)', 'Paper 2 (P2)'],
     'Chemistry': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Economics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Further Pure Mathematics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Human Biology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Information Technology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Mathematics A': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Physics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Bangla': ['Paper 1 (P1)'],
+    'Chinese': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
     'Commerce': ['Paper 1 (P1)', 'Paper 2 (P2)'],
     'Computer Science': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'English Language A': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Economics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'English as a Second Language': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)', 'Paper 4 (P4)'],
+    'English Language A': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
     'English Language B': ['Paper 1 (P1)', 'Paper 2 (P2)'],
     'English Literature': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
+    'French': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
+    'Further Pure Mathematics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
     'Geography': ['Paper 1 (P1)', 'Paper 2 (P2)'],
-    'Mathematics B': ['Paper 1 (P1)', 'Paper 2 (P2)']
+    'German': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
+    'Global Citizenship': ['Paper 1 (P1)'],
+    'Greek (First Language)': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Gujarati': ['Paper 1 (P1)'],
+    'Hindi': ['Paper 1 (P1)'],
+    'History': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Human Biology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Information Technology': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Islamic Studies': ['Paper 1 (P1)'],
+    'Islamiyat': ['Paper 1 (P1)'],
+    'Mathematics A': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Mathematics B': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Modern Greek': ['Paper 1 (P1)'],
+    'Pakistan Studies': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Physics': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Religious Studies': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Sciences (Double Award)': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)', 'Paper 4 (P4)', 'Paper 5 (P5)', 'Paper 6 (P6)'],
+    'Sciences (Single Award)': ['Paper 1 (P1)'],
+    'Sinhala': ['Paper 1 (P1)'],
+    'Spanish': ['Paper 1 (P1)', 'Paper 2 (P2)', 'Paper 3 (P3)'],
+    'Swahili': ['Paper 1 (P1)', 'Paper 2 (P2)'],
+    'Tamil': ['Paper 1 (P1)'],
+    'Turkish': ['Paper 1 (P1)'],
+    'Urdu': ['Paper 1 (P1)']
   }
 };
 
@@ -414,7 +499,7 @@ export function resolveUnitFromSlug(unitSlug, curriculum, subject, meta) {
     if (unitNumMatch && label.toLowerCase().includes(`unit ${unitNumMatch[1]}`)) {
       return label;
     }
-    const paperNumMatch = clean.match(/^p(?:aper)?[-_]?([1-4])$/);
+    const paperNumMatch = clean.match(/^p(?:aper)?[-_]?([1-6])$/);
     if (paperNumMatch && label.toLowerCase().includes(`paper ${paperNumMatch[1]}`)) {
       return label;
     }
@@ -427,9 +512,12 @@ export function inferCurriculumForSubject(subject, fallbackCurriculum = '') {
   if (fallbackCurriculum) return fallbackCurriculum;
   if (!subject) return '';
   const igcseOnly = [
-    'Bangla', 'Commerce', 'Computer Science', 'English Language A',
-    'English Language B', 'Further Pure Mathematics', 'Human Biology',
-    'Mathematics A', 'Mathematics B'
+    'Art and Design', 'Bangla', 'Bangladesh Studies', 'Chinese', 'Commerce', 'Computer Science',
+    'English as a Second Language', 'English Language A', 'English Language B', 'Further Pure Mathematics',
+    'Global Citizenship', 'Greek (First Language)', 'Gujarati', 'Hindi', 'Human Biology',
+    'Islamic Studies', 'Islamiyat', 'Mathematics A', 'Mathematics B', 'Modern Greek',
+    'Pakistan Studies', 'Religious Studies', 'Sciences (Double Award)', 'Sciences (Single Award)',
+    'Sinhala', 'Swahili', 'Tamil', 'Turkish', 'Urdu'
   ];
   return igcseOnly.includes(subject) ? 'Edexcel IGCSE' : 'Edexcel IAL';
 }
@@ -592,12 +680,12 @@ function getCurriculumUniqueCount(meta, curr) {
   if (subjectsMap && Object.keys(subjectsMap).length > 0) {
     return Object.values(subjectsMap).reduce((sum, entry) => sum + (entry?.totalFiles || 0), 0);
   }
-  return curr === 'Edexcel IGCSE' ? 3040 : 7106;
+  return curr === 'Edexcel IGCSE' ? 7450 : 8627;
 }
 
 function getArchiveCounts(meta) {
-  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 10146;
-  const totalFiles = meta?.totalFiles || 13939;
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16077;
+  const totalFiles = meta?.totalFiles || 19938;
   return { uniqueFiles, totalFiles };
 }
 
@@ -735,138 +823,7 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null)
   return result;
 }
 
-const DOC_TYPE_SEO_LABELS = {
-  QP: { plural: 'Question Papers', singular: 'Question Paper' },
-  MS: { plural: 'Mark Schemes', singular: 'Mark Scheme' },
-  ER: { plural: 'Examiner Reports', singular: 'Examiner Report' },
-  SOL: { plural: 'Worked Solutions', singular: 'Solution Bank' },
-  SC: { plural: 'Source Booklets', singular: 'Source Booklet' },
-  SAM: { plural: 'Sample Assessment Materials', singular: 'Sample Assessment' },
-  Book: { plural: 'Textbooks & Solutions', singular: 'Textbook PDF' },
-  DF: { plural: 'Practical Data Files', singular: 'Data File' },
-  AUD: { plural: 'Listening Audio Tracks', singular: 'Listening Audio' }
-};
-
-function parsePaperParamForSeo(paperParam) {
-  const raw = String(paperParam || '').trim();
-  if (!raw) return null;
-
-  if (raw.includes('|')) {
-    const [spec = 'IAL', subject = '', unitCode = '', variant = '', session = ''] = raw.split('|');
-    const curr = spec.toUpperCase() === 'IGCSE' ? 'Edexcel IGCSE' : 'Edexcel IAL';
-    const currShort = curr.replace('Edexcel ', '');
-    const subjDisplay = formatSubjectName(subject);
-    const codeLabel = variant ? `${unitCode} (${variant})` : unitCode;
-    const fullTitle = [curr, subjDisplay, codeLabel, session].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    const compactTitle = [curr, subjDisplay, unitCode || variant, session].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    const shortTitle = [currShort, subjDisplay, unitCode || variant, session].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    const keywords = [
-      fullTitle,
-      unitCode && session ? `${unitCode} ${session} question paper` : '',
-      unitCode && session ? `${unitCode} ${session} mark scheme` : '',
-      unitCode ? `${unitCode} past papers` : '',
-      `${curr} ${subjDisplay} past papers`
-    ].filter(Boolean);
-    return { fullTitle, compactTitle, shortTitle, keywords: [...new Set(keywords)].join(', ') };
-  }
-
-  const baseName = raw.split('/').pop()?.replace(/\.[a-z0-9]+$/i, '').replace(/[_]+/g, ' ').trim() || raw;
-  return {
-    fullTitle: `Edexcel ${baseName}`,
-    compactTitle: `Edexcel ${baseName}`,
-    shortTitle: baseName,
-    keywords: `${baseName}, Edexcel past papers, Edexcel question paper, Edexcel mark scheme`
-  };
-}
-
-function enrichSeoForQueryParams(baseSeo, {
-  filterCurriculum = '',
-  filterSubject = '',
-  filterUnit = '',
-  filterYear = '',
-  filterDocType = null,
-  searchQuery = '',
-  paperParam = ''
-}) {
-  if (paperParam) {
-    const parsedPaper = parsePaperParamForSeo(paperParam);
-    if (parsedPaper) {
-      return {
-        ...baseSeo,
-        title: pickTitleVariant([
-          `${parsedPaper.fullTitle} Paper & MS | Conceptualist`,
-          `${parsedPaper.compactTitle} Past Paper | Conceptualist`,
-          `${parsedPaper.shortTitle} Paper & MS | Conceptualist`,
-          `${parsedPaper.shortTitle} | Conceptualist`
-        ], 65),
-        description: fitDescription(
-          `Study ${parsedPaper.fullTitle} Question Paper, Mark Scheme & Examiner Report side-by-side in Split View free on Conceptualist.`
-        ),
-        keywords: parsedPaper.keywords,
-        robots: 'index, follow',
-        h1: `${parsedPaper.fullTitle} — Question Paper & Mark Scheme`
-      };
-    }
-  }
-
-  const isCanonicalDocTypeFilter =
-    (filterDocType === 'Book' && !filterUnit) ||
-    (filterDocType === 'DF' && !filterCurriculum && !filterSubject && !filterUnit) ||
-    (filterDocType === 'AUD' && !filterCurriculum && !filterSubject && !filterUnit);
-  const cleanYear = String(filterYear || '').trim();
-  const cleanSearch = String(searchQuery || '').trim();
-  const nonCanonicalDocInfo = filterDocType && !isCanonicalDocTypeFilter ? DOC_TYPE_SEO_LABELS[filterDocType] : null;
-
-  if (!cleanYear && !cleanSearch && !nonCanonicalDocInfo) {
-    return { ...baseSeo, robots: 'index, follow' };
-  }
-
-  const qualifiers = [];
-  if (cleanYear) qualifiers.push(cleanYear);
-  if (nonCanonicalDocInfo) qualifiers.push(nonCanonicalDocInfo.plural);
-
-  const baseHead = baseSeo.title.replace(/\s*\|\s*Conceptualist.*$/i, '').trim();
-  let nextTitle = baseSeo.title;
-  if (cleanSearch) {
-    nextTitle = pickTitleVariant([
-      `${cleanSearch} — ${baseHead} | Conceptualist`,
-      `${cleanSearch} Edexcel Papers | Conceptualist`
-    ], 65);
-  } else if (qualifiers.length > 0) {
-    const qualStr = qualifiers.join(' ');
-    nextTitle = pickTitleVariant([
-      `${baseHead} (${qualStr}) | Conceptualist`,
-      `${baseHead} ${qualStr} | Conceptualist`,
-      `${qualStr} — ${baseHead}`
-    ], 65);
-  }
-
-  const qualDesc = [cleanYear, nonCanonicalDocInfo?.plural, cleanSearch ? `"${cleanSearch}"` : ''].filter(Boolean).join(' ');
-  const extraKeywords = [
-    cleanYear ? `${baseSeo.h1} ${cleanYear}` : '',
-    nonCanonicalDocInfo ? `${baseHead} ${nonCanonicalDocInfo.plural}` : '',
-    cleanSearch ? `${cleanSearch} Edexcel past papers` : ''
-  ].filter(Boolean);
-
-  return {
-    ...baseSeo,
-    title: nextTitle,
-    description: fitDescription(`${qualDesc}: ${baseSeo.description}`),
-    keywords: extraKeywords.length > 0 ? `${extraKeywords.join(', ')}, ${baseSeo.keywords}` : baseSeo.keywords,
-    robots: 'index, follow',
-    h1: cleanSearch
-      ? `Search "${cleanSearch}" — ${baseSeo.h1}`
-      : `${baseSeo.h1} (${qualifiers.join(' · ')})`
-  };
-}
-
-export function getSeoMetadata(params = {}) {
-  const baseSeo = computeBaseSeoMetadata(params);
-  if (params.notFound) return baseSeo;
-  return enrichSeoForQueryParams(baseSeo, params);
-}
-
-function computeBaseSeoMetadata({
+export function getSeoMetadata({
   currentTab = 'library',
   filterCurriculum = '',
   filterSubject = '',
@@ -880,6 +837,16 @@ function computeBaseSeoMetadata({
   meta = null
 }) {
   const { uniqueFiles, totalFiles } = getArchiveCounts(meta);
+  const isCanonicalDocTypeFilter =
+    (filterDocType === 'Book' && !filterUnit) ||
+    (filterDocType === 'DF' && !filterCurriculum && !filterSubject && !filterUnit) ||
+    (filterDocType === 'AUD' && !filterCurriculum && !filterSubject && !filterUnit);
+  const hasFacetedQuery = Boolean(
+    filterYear ||
+    searchQuery ||
+    paperParam ||
+    (filterDocType && !isCanonicalDocTypeFilter)
+  );
 
   if (notFound) {
     return {
@@ -898,14 +865,12 @@ function computeBaseSeoMetadata({
     filterCurriculum,
     filterSubject,
     filterUnit,
-    filterYear,
-    filterDocType,
-    searchQuery,
-    pendingPaperParam: paperParam,
+    filterYear: '',
+    filterDocType: isCanonicalDocTypeFilter ? filterDocType : null,
     forceShowTable
   });
   const canonicalUrl = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`;
-  const robots = 'index, follow';
+  const robots = hasFacetedQuery ? 'noindex, follow' : 'index, follow';
 
   if (currentTab === 'about') {
     return {
@@ -934,7 +899,7 @@ function computeBaseSeoMetadata({
   if (filterDocType === 'DF' && !filterCurriculum && !filterSubject) {
     return {
       title: 'Edexcel IAL & IGCSE IT & CS Data Files (.zip) | Conceptualist',
-      description: 'Download 34 archived Edexcel IAL IT (WIT12, WIT14) and IGCSE ICT & Computer Science (4IT1, 4CP0) practical exam data files free.',
+      description: 'Download 46 archived Edexcel IAL IT (WIT12, WIT14) and IGCSE ICT & Computer Science (4IT1, 4CP0) practical exam data files free.',
       keywords: 'Edexcel IAL IT data files, WIT12 data files, WIT14 data files, Edexcel IGCSE ICT 4IT1 data files, Computer Science 4CP0 data files',
       canonicalUrl,
       robots,
@@ -945,13 +910,13 @@ function computeBaseSeoMetadata({
 
   if (filterDocType === 'AUD' && !filterCurriculum && !filterSubject) {
     return {
-      title: 'Edexcel IAL Language Listening Audio MP3s | Conceptualist',
-      description: 'Stream and download 96 archived Edexcel IAL French (WFR01–02), German (WGN01–02) & Spanish (WSP01–02) past exam listening audio MP3 tracks.',
-      keywords: 'Edexcel IAL French listening audio, Edexcel IAL German listening mp3, Edexcel IAL Spanish listening audio, WFR02 mp3, WGN02 mp3, WSP02 mp3',
+      title: 'Edexcel IAL & IGCSE Listening Audio MP3s | Conceptualist',
+      description: 'Stream and download archived Edexcel IAL & IGCSE ESL, French, German, Spanish, Chinese & Swahili listening audio MP3s and ZIPs with synced transcripts.',
+      keywords: 'Edexcel IAL listening audio, Edexcel IGCSE listening audio, ESL 4ES1 audio, French 4FR1 WFR02 mp3, German 4GN1 WGN02 mp3, Spanish 4SP1 WSP02 mp3, Chinese 4CN1 audio, Swahili 4SW1 audio',
       canonicalUrl,
       robots,
-      h1: 'Edexcel IAL Modern Languages Listening Audio Archive',
-      subtitle: 'Direct MP3 listening examination audio tracks across IAL French (42), Spanish (28), and German (26) past papers with matching question papers and transcripts.'
+      h1: 'Edexcel IAL & IGCSE Listening Audio Archive',
+      subtitle: 'Direct MP3 & ZIP listening examination audio tracks across IGCSE ESL, Chinese, Swahili, and IAL/IGCSE French, German & Spanish with synced transcripts.'
     };
   }
 
@@ -1143,7 +1108,7 @@ function computeBaseSeoMetadata({
 
   if (filterCurriculum === 'Edexcel IGCSE') {
     const igcseCount = getCurriculumUniqueCount(meta, 'Edexcel IGCSE');
-    const igcseSubjCount = meta?.igcseSubjects?.length || 18;
+    const igcseSubjCount = meta?.igcseSubjects?.length || 27;
     return {
       title: 'Edexcel IGCSE Past Papers & Mark Schemes (9–1) | Conceptualist',
       description: fitDescription(`Browse ${igcseCount.toLocaleString()}+ Edexcel IGCSE (9–1 & Modular) past papers, mark schemes, examiner reports & textbooks across ${igcseSubjCount} subjects (4MA1, 4PH1, 4CH1, 4BI1).`),
@@ -1172,7 +1137,7 @@ function computeBaseSeoMetadata({
     title: 'Conceptualist Systems | Edexcel IAL & IGCSE Past Papers',
     description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.coverage || '2003–2026'}) side-by-side in Split View.`),
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Conceptualist Systems, WMA11, WCH11, WPH11, WBI11, 4MA1, mark schemes, examiner reports, Edexcel textbooks pdf',
-    canonicalUrl,
+    canonicalUrl: `${SITE_URL}/`,
     robots,
     h1: 'Edexcel IAL & IGCSE Past Exam Papers & Textbooks',
     subtitle: `${uniqueFiles.toLocaleString()}+ unique Question Papers, Mark Schemes, Examiner Reports, and Textbooks across ${totalFiles.toLocaleString()} archived files (${meta?.coverage || 'January 2003 – June 2026'}).`

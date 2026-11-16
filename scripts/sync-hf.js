@@ -33,6 +33,20 @@ if (!TOKEN) {
 }
 const ALLOWED_ROOT_DIRS = ['Past Papers', 'IAL Books', 'IGCSE Books'];
 
+async function fetchWithRetry(url, options = {}, attempts = 6) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      lastErr = err;
+      if (i === attempts) throw err;
+      await new Promise(r => setTimeout(r, i * 1500));
+    }
+  }
+  throw lastErr;
+}
+
 function collectAllLocalFiles() {
   let results = [];
   for (const rootSub of ALLOWED_ROOT_DIRS) {
@@ -117,27 +131,34 @@ async function ensureLfsObjectsUploaded(files) {
 
   for (let i = 0; i < uniqueFiles.length; i += BATCH_SIZE) {
     const chunk = uniqueFiles.slice(i, i + BATCH_SIZE);
-    const res = await fetch(`https://huggingface.co/datasets/${REPO_ID}.git/info/lfs/objects/batch`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${TOKEN}`,
-        'Accept': 'application/vnd.git-lfs+json',
-        'Content-Type': 'application/vnd.git-lfs+json'
-      },
-      body: JSON.stringify({
-        operation: 'upload',
-        transfers: ['basic'],
-        objects: chunk.map(f => ({ oid: f.oid, size: f.size })),
-        hash_algo: 'sha256'
-      })
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`LFS batch request failed (${res.status}): ${text}`);
+    let data = null;
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      try {
+        const res = await fetchWithRetry(`https://huggingface.co/datasets/${REPO_ID}.git/info/lfs/objects/batch`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${TOKEN}`,
+            'Accept': 'application/vnd.git-lfs+json',
+            'Content-Type': 'application/vnd.git-lfs+json'
+          },
+          body: JSON.stringify({
+            operation: 'upload',
+            transfers: ['basic'],
+            objects: chunk.map(f => ({ oid: f.oid, size: f.size })),
+            hash_algo: 'sha256'
+          })
+        });
+        if (res.ok) {
+          data = await res.json();
+          break;
+        }
+        const text = await res.text();
+        if (attempt === 6) throw new Error(`LFS batch request failed (${res.status}): ${text}`);
+      } catch (err) {
+        if (attempt === 6) throw err;
+      }
+      await new Promise(r => setTimeout(r, attempt * 1500));
     }
-
-    const data = await res.json();
     const toUpload = (data.objects || []).filter(obj => obj.actions && obj.actions.upload);
     alreadyPresentCount += (chunk.length - toUpload.length);
 
@@ -149,35 +170,43 @@ async function ensureLfsObjectsUploaded(files) {
         const fileBuf = fs.readFileSync(fileMeta.fullPath);
         const uploadAction = obj.actions.upload;
 
-        for (let attempt = 1; attempt <= 5; attempt++) {
-          const putRes = await fetch(uploadAction.href, {
-            method: 'PUT',
-            headers: uploadAction.header || {},
-            body: fileBuf
-          });
-          if (putRes.ok) break;
-          const errText = await putRes.text();
-          if (attempt === 5) {
-            throw new Error(`LFS PUT failed for ${fileMeta.relPath} (${putRes.status}): ${errText}`);
+        for (let attempt = 1; attempt <= 6; attempt++) {
+          try {
+            const putRes = await fetchWithRetry(uploadAction.href, {
+              method: 'PUT',
+              headers: uploadAction.header || {},
+              body: fileBuf
+            });
+            if (putRes.ok) break;
+            const errText = await putRes.text();
+            if (attempt === 6) {
+              throw new Error(`LFS PUT failed for ${fileMeta.relPath} (${putRes.status}): ${errText}`);
+            }
+          } catch (err) {
+            if (attempt === 6) throw err;
           }
           await new Promise(r => setTimeout(r, attempt * 1500));
         }
 
         if (obj.actions.verify) {
-          for (let attempt = 1; attempt <= 5; attempt++) {
-            const verifyRes = await fetch(obj.actions.verify.href, {
-              method: 'POST',
-              headers: {
-                'Accept': 'application/vnd.git-lfs+json',
-                'Content-Type': 'application/vnd.git-lfs+json',
-                ...(obj.actions.verify.header || {})
-              },
-              body: JSON.stringify({ oid: obj.oid, size: obj.size })
-            });
-            if (verifyRes.ok) break;
-            const errText = await verifyRes.text();
-            if (attempt === 5) {
-              throw new Error(`LFS verify failed for ${fileMeta.relPath} (${verifyRes.status}): ${errText}`);
+          for (let attempt = 1; attempt <= 6; attempt++) {
+            try {
+              const verifyRes = await fetchWithRetry(obj.actions.verify.href, {
+                method: 'POST',
+                headers: {
+                  'Accept': 'application/vnd.git-lfs+json',
+                  'Content-Type': 'application/vnd.git-lfs+json',
+                  ...(obj.actions.verify.header || {})
+                },
+                body: JSON.stringify({ oid: obj.oid, size: obj.size })
+              });
+              if (verifyRes.ok) break;
+              const errText = await verifyRes.text();
+              if (attempt === 6) {
+                throw new Error(`LFS verify failed for ${fileMeta.relPath} (${verifyRes.status}): ${errText}`);
+              }
+            } catch (err) {
+              if (attempt === 6) throw err;
             }
             await new Promise(r => setTimeout(r, attempt * 1500));
           }
@@ -197,7 +226,7 @@ async function sendCommit(summary, operations) {
   const ndjson = lines.join('\n') + '\n';
 
   for (let attempt = 1; attempt <= 5; attempt++) {
-    const res = await fetch(`https://huggingface.co/api/datasets/${REPO_ID}/commit/main`, {
+    const res = await fetchWithRetry(`https://huggingface.co/api/datasets/${REPO_ID}/commit/main`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${TOKEN}`,

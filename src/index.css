@@ -1350,8 +1350,6 @@ a.breadcrumb-link:hover {
   font-weight: 700;
   color: var(--text-primary);
   text-align: left;
-  text-decoration: none;
-  box-sizing: border-box;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1980,10 +1978,6 @@ a.breadcrumb-link:hover {
 }
 
 .subject-card {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  box-sizing: border-box;
   background: #FFFFFF;
   border: 1px solid var(--border-medium);
   border-left: 4px solid var(--mcmaster-maroon);

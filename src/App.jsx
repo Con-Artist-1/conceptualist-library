@@ -12,7 +12,8 @@ import {
   inferCurriculumForSubject,
   getCurriculumSlug,
   getSubjectSlug,
-  getUnitSlug
+  IAL_SUBJECTS_DEFAULT,
+  IGCSE_SUBJECTS_DEFAULT
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 import {
@@ -70,10 +71,32 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.4';
+const APP_VERSION = 'v6.6';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
+  {
+    version: 'v6.6',
+    date: BUILD_TIMESTAMP,
+    title: '16 New IGCSE Subjects, Sciences Double/Single Award & 2025–2026 Modular Coverage',
+    summary: 'Grew the archive to 19,938 total files (16,077 unique records) across 19 IAL and 43 IGCSE subjects, adding 16 new IGCSE courses, Oct 2025 & May/June 2026 Modular Maths A, and expanded listening audio.',
+    changes: [
+      '16 new IGCSE subjects & Bengali merge: Added Art & Design, Bangladesh Studies, Chinese, Greek (First Language), Modern Greek, Gujarati, Hindi, Islamiyat, Pakistan Studies, Sciences (Double & Single Award with Linear 1B/1C/1P & Modular Unit 1B–6P), Sinhala, Swahili, Tamil, Turkish, and Urdu, plus 2011–2019 legacy Bengali merged into Bangla.',
+      '2025–2026 Modular & gap fill: Added October 2025 and May/June 2026 Modular Mathematics A (4WM1H/4WM2H), filled missing 2014–2024 IAL Economics/Science/Law/History/IT gaps, recovered extra-time ESL/Chinese/Swahili/MFL listening tracks, and expanded audio to 273 tracks and archives with Chinese & Swahili Whisper support.',
+      'Search & streaming refinements: Disambiguated IGCSE paper variants (F/H Tiers, Double/Single Science B/C/P disciplines), guarded IGCSE doc IDs from colliding with IAL W-codes, expanded Data Files to 46 archives, and packed new >= 5 MB PDFs with compact /ObjStm object streams.'
+    ]
+  },
+  {
+    version: 'v6.5',
+    date: '2026-11-16T14:15:00.000Z',
+    title: 'Massive Archive Expansion: 9 New IGCSE Subjects, 2011–2018 & Solomon Maths',
+    summary: 'Expanded the archive to 18,180 total files (14,384 unique records) across 19 IAL and 27 IGCSE subjects with 9 new IGCSE courses, legacy 2011–2018 IAL/IGCSE series, Solomon Maths papers, and IGCSE listening audio.',
+    changes: [
+      '9 new IGCSE subjects: Added Arabic (2006–2025), English as a Second Language (2006–2025), French, German, Spanish, History, Religious Studies, Global Citizenship, and Islamic Studies with full search aliases and Modular 4W* support.',
+      'Historical & Modular coverage: Filled 2014–2018 IAL and 2011–2018 IGCSE papers & Examiner Reports, added 2025 June IAL Humanities/Geography/Law papers, sorted Computer Science/IT Data Files out of Unknown_Year, and added all 168 Solomon Maths practice papers (C1–C4, M1–M2, S1–S2).',
+      'Audio & streaming polish: Grew listening audio to 189 tracks & archives (adding IGCSE ESL, French, German & Spanish with English Whisper support), packed large new PDFs (>= 5 MB) with /ObjStm object streams, and synced search codes (4308, 4357, 4400, 7042, 4WES1).'
+    ]
+  },
   {
     version: 'v6.4',
     date: BUILD_TIMESTAMP,
@@ -525,6 +548,7 @@ const SUBJECTS_WITH_BOOKS = {
 };
 
 const IAL_AUDIO_SUBJECTS = new Set(['French', 'German', 'Spanish']);
+const IGCSE_AUDIO_SUBJECTS = new Set(['Chinese', 'English as a Second Language', 'French', 'German', 'Spanish', 'Swahili']);
 
 function hasDataFilesForCourse(curriculum, subject) {
   if (subject === 'Information Technology') return true;
@@ -3053,16 +3077,11 @@ const WelcomePage = ({
   const audioCount = useMemo(() => (
     Array.isArray(data.flatFiles) && data.flatFiles.length > 0
       ? data.flatFiles.filter((f) => f.docType === 'AUD').length
-      : 96
+      : 273
   ), [data.flatFiles]);
 
-  const ialSubjects = data.meta?.ialSubjects || data.meta?.subjects || [];
-  const igcseSubjects = data.meta?.igcseSubjects || [
-    'Accounting', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
-    'Computer Science', 'Economics', 'English Language A', 'English Language B',
-    'English Literature', 'Further Pure Mathematics', 'Geography', 'Human Biology',
-    'Information Technology', 'Mathematics A', 'Mathematics B', 'Physics'
-  ];
+  const ialSubjects = data.meta?.ialSubjects || data.meta?.subjects || IAL_SUBJECTS_DEFAULT;
+  const igcseSubjects = data.meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT;
   const ialSubjectCoverage = data.meta?.ialSubjectCoverage || data.meta?.subjectCoverage || {};
   const igcseSubjectCoverage = data.meta?.igcseSubjectCoverage || data.meta?.subjectCoverage || {};
   const wizardMeta = data.meta?.wizard || null;
@@ -3153,62 +3172,28 @@ const WelcomePage = ({
     });
   };
 
-    const renderSubjectCard = (subject, curriculum) => {
-      const isIgcse = curriculum === 'Edexcel IGCSE';
-      const subjWizard = wizardMeta?.[curriculum]?.[subject];
-      const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
-      const docCount = subjWizard?.totalFiles || 0;
-      const coverageMap = isIgcse ? igcseSubjectCoverage : ialSubjectCoverage;
-      const href = `/${getCurriculumSlug(curriculum)}/${getSubjectSlug(subject)}`;
-
-      return (
-        <a
-          key={`${isIgcse ? 'igcse' : 'ial'}-${subject}`}
-          href={href}
-          className={`subject-card${isIgcse ? ' igcse' : ''}`}
-          onClick={(e) => {
-            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-            e.preventDefault();
-            handleSubjectClick(subject, curriculum);
-          }}
-        >
-          <div className="subject-card-top">
-            <div className="subject-card-title">{isIgcse ? subject : formatSubjectDisplay(subject)}</div>
-            {docCount > 0 && <span className={`subject-card-count${isIgcse ? ' igcse' : ''}`}>{docCount} docs</span>}
+  return (
+    <div className="welcome-container">
+      <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
+        <div className="welcome-hero-top">
+          <div>
+            <h1>Past Exam Papers &amp; Course Resources</h1>
+            <p>
+              Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
+            </p>
           </div>
-          <div className="subject-card-subtitle">
-            {coverageMap[subject] || (isIgcse ? 'International GCSE Collection' : 'Edexcel IAL Collection')}
-            {!isIgcse && unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
-          </div>
-        </a>
-      );
-    };
-
-    const selectedCurrSlug = selectedSubject ? getCurriculumSlug(selectedSubject.curriculum) : '';
-    const selectedSubjSlug = selectedSubject ? getSubjectSlug(selectedSubject.name) : '';
-
-    return (
-      <div className="welcome-container">
-        <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
-          <div className="welcome-hero-top">
-            <div>
-              <h1>Past Exam Papers &amp; Course Resources</h1>
-              <p>
-                Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
-              </p>
+          <div className="hero-stats-row">
+            <div className="hero-stat-pill">
+              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 16077).toLocaleString()}</strong>
+              <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
             </div>
-            <div className="hero-stats-row">
-              <div className="hero-stat-pill">
-                <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 10146).toLocaleString()}</strong>
-                <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
-              </div>
-              <div className="hero-stat-pill">
-                <strong>{ialSubjects.length + igcseSubjects.length}</strong>
-                <span>Subjects</span>
-              </div>
+            <div className="hero-stat-pill">
+              <strong>{ialSubjects.length + igcseSubjects.length}</strong>
+              <span>Subjects</span>
             </div>
           </div>
         </div>
+      </div>
 
       {!selectedSubject && (
         <section className="home-pillars-grid" aria-label="Core archive collections">
@@ -3284,7 +3269,7 @@ const WelcomePage = ({
               <span className="pillar-badge pillar-badge-audio">Live CC · In-Browser</span>
             </div>
             <p className="pillar-desc">
-              Play {audioCount} French, German &amp; Spanish MP3s and ZIP archives above Question Papers with clickable synced transcripts.
+              Play {audioCount} ESL, Chinese, Swahili, French, German &amp; Spanish MP3s and ZIP archives above Question Papers with clickable synced transcripts.
             </p>
             <div className="pillar-actions">
               <a
@@ -3492,18 +3477,13 @@ const WelcomePage = ({
             <div className="wizard-step">
               <h2>Select {formatSubjectDisplay(selectedSubject.name)} Unit or Paper:</h2>
               <div style={{ marginBottom: '24px' }}>
-                <a
-                  href={`/${selectedCurrSlug}/${selectedSubjSlug}`}
+                <button
                   className="wizard-option-btn primary"
-                  onClick={(e) => {
-                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-                    e.preventDefault();
-                    onSubjectSelect(selectedSubject.name, selectedSubject.curriculum);
-                  }}
+                  onClick={() => onSubjectSelect(selectedSubject.name, selectedSubject.curriculum)}
                   style={{ width: '100%', marginBottom: '20px' }}
                 >
-                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers &amp; Textbooks →</span>
-                </a>
+                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers & Textbooks →</span>
+                </button>
                 {Object.entries(groupedUnits).map(([groupName, units]) => (
                   <div key={groupName} style={{ marginBottom: '20px' }}>
                     {Object.keys(groupedUnits).length > 1 && (
@@ -3514,21 +3494,15 @@ const WelcomePage = ({
                     <div className="wizard-button-grid">
                       {units.map(unitName => {
                         const unitCount = availableUnitsMap[unitName]?.count;
-                        const unitHref = `/${selectedCurrSlug}/${selectedSubjSlug}/${getUnitSlug(unitName)}`;
                         return (
-                          <a
+                          <button
                             key={unitName}
-                            href={unitHref}
                             className="wizard-option-btn"
-                            onClick={(e) => {
-                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-                              e.preventDefault();
-                              handleUnitClick(unitName);
-                            }}
+                            onClick={() => handleUnitClick(unitName)}
                           >
                             <span>{unitName}</span>
                             {unitCount ? <span className="wizard-unit-count">{unitCount}</span> : null}
-                          </a>
+                          </button>
                         );
                       })}
                     </div>
@@ -3541,33 +3515,23 @@ const WelcomePage = ({
             <div className="wizard-step">
               <h2>Select Examination Year for {selectedUnit}:</h2>
               <div style={{ marginBottom: '20px' }}>
-                <a
-                  href={`/${selectedCurrSlug}/${selectedSubjSlug}/${getUnitSlug(selectedUnit)}`}
+                <button
                   className="wizard-option-btn primary"
-                  onClick={(e) => {
-                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-                    e.preventDefault();
-                    handleYearClick('');
-                  }}
+                  onClick={() => handleYearClick('')}
                   style={{ width: '100%' }}
                 >
                   <span>All Examination Years for {selectedUnit} →</span>
-                </a>
+                </button>
               </div>
               <div className="wizard-button-grid-years">
                 {availableYears.map(year => (
-                  <a
+                  <button
                     key={year}
-                    href={`/${selectedCurrSlug}/${selectedSubjSlug}/${getUnitSlug(selectedUnit)}?year=${year}`}
                     className="wizard-option-btn year"
-                    onClick={(e) => {
-                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-                      e.preventDefault();
-                      handleYearClick(year);
-                    }}
+                    onClick={() => handleYearClick(year)}
                   >
                     {year}
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>
@@ -3581,7 +3545,30 @@ const WelcomePage = ({
             <span className="section-count-badge">{ialSubjects.length} Subjects</span>
           </div>
           <div className="subject-grid" style={{ marginBottom: '32px' }}>
-            {ialSubjects.map(subject => renderSubjectCard(subject, 'Edexcel IAL'))}
+            {ialSubjects.map(subject => {
+              const subjWizard = wizardMeta?.['Edexcel IAL']?.[subject];
+              const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
+              const docCount = subjWizard?.totalFiles || 0;
+              return (
+                <div
+                  key={`ial-${subject}`}
+                  className="subject-card"
+                  onClick={() => handleSubjectClick(subject, 'Edexcel IAL')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IAL'); } }}
+                >
+                  <div className="subject-card-top">
+                    <div className="subject-card-title">{formatSubjectDisplay(subject)}</div>
+                    {docCount > 0 && <span className="subject-card-count">{docCount} docs</span>}
+                  </div>
+                  <div className="subject-card-subtitle">
+                    {ialSubjectCoverage[subject] || 'Edexcel IAL Collection'}
+                    {unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="section-header-row">
@@ -3589,7 +3576,28 @@ const WelcomePage = ({
             <span className="section-count-badge igcse">{igcseSubjects.length} Subjects</span>
           </div>
           <div className="subject-grid" style={{ marginBottom: '32px' }}>
-            {igcseSubjects.map(subject => renderSubjectCard(subject, 'Edexcel IGCSE'))}
+            {igcseSubjects.map(subject => {
+              const subjWizard = wizardMeta?.['Edexcel IGCSE']?.[subject];
+              const docCount = subjWizard?.totalFiles || 0;
+              return (
+                <div
+                  key={`igcse-${subject}`}
+                  className="subject-card igcse"
+                  onClick={() => handleSubjectClick(subject, 'Edexcel IGCSE')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IGCSE'); } }}
+                >
+                  <div className="subject-card-top">
+                    <div className="subject-card-title">{subject}</div>
+                    {docCount > 0 && <span className="subject-card-count igcse">{docCount} docs</span>}
+                  </div>
+                  <div className="subject-card-subtitle">
+                    {igcseSubjectCoverage[subject] || 'International GCSE Collection'}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
@@ -3616,27 +3624,14 @@ async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
   throw lastErr || new Error('All fetch candidates failed');
 }
 
+const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
+
 const DEFAULT_META = {
-  totalFiles: 13939,
-  uniqueFiles: 10146,
-  subjects: [
-    'Accounting', 'Arabic', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
-    'Computer Science', 'Economics', 'English Language', 'English Language A', 'English Language B',
-    'English Literature', 'French', 'Further Pure Mathematics', 'Geography', 'German', 'Greek',
-    'History', 'Human Biology', 'Information Technology', 'Law', 'Math',
-    'Mathematics A', 'Mathematics B', 'Physics', 'Psychology', 'Spanish'
-  ],
-  ialSubjects: [
-    'Accounting', 'Arabic', 'Biology', 'Business', 'Chemistry', 'Economics',
-    'English Language', 'English Literature', 'French', 'Geography', 'German', 'Greek',
-    'History', 'Information Technology', 'Law', 'Math', 'Physics', 'Psychology', 'Spanish'
-  ],
-  igcseSubjects: [
-    'Accounting', 'Bangla', 'Biology', 'Business', 'Chemistry', 'Commerce',
-    'Computer Science', 'Economics', 'English Language A', 'English Language B',
-    'English Literature', 'Further Pure Mathematics', 'Geography', 'Human Biology',
-    'Information Technology', 'Mathematics A', 'Mathematics B', 'Physics'
-  ],
+  totalFiles: 19938,
+  uniqueFiles: 16077,
+  subjects: DEFAULT_ALL_SUBJECTS,
+  ialSubjects: IAL_SUBJECTS_DEFAULT,
+  igcseSubjects: IGCSE_SUBJECTS_DEFAULT,
   coverage: 'January 2003 – June 2026'
 };
 
@@ -4172,8 +4167,6 @@ function App() {
     setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
     setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
     setMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
-    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', pageTitle);
-    setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', seoMeta.description);
 
     let canonicalEl = document.querySelector('link[rel="canonical"]');
     if (!canonicalEl) {
@@ -5207,10 +5200,14 @@ function App() {
           }
         });
       }
-      if (effCurr === 'Edexcel IAL' && IAL_AUDIO_SUBJECTS.has(filterSubject) && filterDocType !== 'AUD') {
+      if (
+        filterDocType !== 'AUD' &&
+        ((effCurr === 'Edexcel IAL' && IAL_AUDIO_SUBJECTS.has(filterSubject)) ||
+          (effCurr === 'Edexcel IGCSE' && IGCSE_AUDIO_SUBJECTS.has(filterSubject)))
+      ) {
         links.push({
           href: '/audio',
-          label: 'IAL Listening Audio (MP3)',
+          label: `${effCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} Listening Audio (MP3)`,
           onClick: () => {
             clearFilters({ pushUrl: false });
             setFilterDocType('AUD');

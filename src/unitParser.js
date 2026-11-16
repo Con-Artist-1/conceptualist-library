@@ -113,6 +113,17 @@ export const CODE_ALIAS_MAP = {
   'WMA13R': 'WMA13',
   'WMA14R': 'WMA14',
   'WDM01': 'WDM11',
+  'WMD11': 'WDM11',
+  'WH101': 'WHI01',
+  'WH102': 'WHI02',
+  'WH103': 'WHI03',
+  'WH104': 'WHI04',
+  'WB101': 'WBI01',
+  'WB102': 'WBI02',
+  'WB103': 'WBI03',
+  'WB104': 'WBI04',
+  'WB105': 'WBI05',
+  'WB106': 'WBI06',
   'YLA0': 'YLA1',
   '6BI01': 'WBI11',
   '6BI02': 'WBI12',
@@ -202,27 +213,49 @@ export const MONTH_MAP = {
 export const SUBJECT_FOLDER_NORMALIZER = {
   'accounting': 'Accounting',
   'arabic': 'Arabic',
+  'art & design': 'Art and Design',
+  'art and design': 'Art and Design',
+  'bangala': 'Bangla',
   'bangla': 'Bangla',
+  'bengali': 'Bangla',
+  'bangladesh studies': 'Bangladesh Studies',
   'biology': 'Biology',
   'human biology': 'Human Biology',
+  'buisness': 'Business',
   'business': 'Business',
   'business studies': 'Business',
   'chemistry': 'Chemistry',
+  'chinese': 'Chinese',
   'commerce': 'Commerce',
   'computer science': 'Computer Science',
   'economics': 'Economics',
+  'english as a second language': 'English as a Second Language',
+  'english as second language esl': 'English as a Second Language',
+  'english second language': 'English as a Second Language',
+  'esl': 'English as a Second Language',
   'english language': 'English Language',
   'english language a': 'English Language A',
   'english language b': 'English Language B',
   'english literature': 'English Literature',
   'french': 'French',
+  'further pure math': 'Further Pure Mathematics',
   'further pure mathematics': 'Further Pure Mathematics',
   'further pure maths': 'Further Pure Mathematics',
   'geography': 'Geography',
   'german': 'German',
+  'global citizenship': 'Global Citizenship',
   'greek': 'Greek',
+  'greek (first language)': 'Greek (First Language)',
+  'greek first language': 'Greek (First Language)',
+  'modern greek': 'Modern Greek',
+  'gujarati': 'Gujarati',
+  'hindi': 'Hindi',
   'history': 'History',
+  'information and communicatio technology': 'Information Technology',
+  'information and communication technology': 'Information Technology',
   'information technology': 'Information Technology',
+  'islamic studies': 'Islamic Studies',
+  'islamiyat': 'Islamiyat',
   'it': 'Information Technology',
   'ict': 'Information Technology',
   'law': 'Law',
@@ -231,9 +264,22 @@ export const SUBJECT_FOLDER_NORMALIZER = {
   'maths': 'Math',
   'mathematics a': 'Mathematics A',
   'mathematics b': 'Mathematics B',
+  'pakistan studies': 'Pakistan Studies',
   'physics': 'Physics',
   'psychology': 'Psychology',
-  'spanish': 'Spanish'
+  'religious studies': 'Religious Studies',
+  'sciences (double award)': 'Sciences (Double Award)',
+  'science (double award)': 'Sciences (Double Award)',
+  'double award science': 'Sciences (Double Award)',
+  'sciences (single award)': 'Sciences (Single Award)',
+  'science (single award)': 'Sciences (Single Award)',
+  'single award science': 'Sciences (Single Award)',
+  'sinhala': 'Sinhala',
+  'spanish': 'Spanish',
+  'swahili': 'Swahili',
+  'tamil': 'Tamil',
+  'turkish': 'Turkish',
+  'urdu': 'Urdu'
 };
 
 const MATH_LABEL_RULES = [
@@ -322,8 +368,13 @@ export function detectDocType(name, pathStr) {
   const ext = dotIdx >= 0 ? name.slice(dotIdx).toLowerCase() : '';
   const combined = `${name} ${pathStr}`;
 
-  // Audio recordings (.mp3, .wav, or Audio/recording zip archives, including CamelCase e.g. RecordingTracked)
-  if (ext === '.mp3' || ext === '.wav' || /audio|recording/i.test(name)) {
+  // Audio recordings (.mp3, .wav, or Audio/recording/listening zip archives)
+  if (
+    ext === '.mp3' ||
+    ext === '.wav' ||
+    /audio|recording|listening|\bmp3s?\b|(?:^|[^a-z0-9])aud(?:[^a-z0-9]|$)/i.test(name) ||
+    ((ext === '.zip' || ext === '.rar') && /audio|recording|listening/i.test(combined) && !/transcript/i.test(name))
+  ) {
     return 'AUD';
   }
 
@@ -337,14 +388,20 @@ export function detectDocType(name, pathStr) {
     }
   }
 
-  // Standard Past Paper types (QP, MS, ER)
-  if (/question[-_\s]?paper|(?:^|[^a-z0-9])qp(?:[^a-z0-9]|\d|$)|[-_]que[-_.]/i.test(combined)) return 'QP';
-  if (/mark[-_\s]?scheme|(?:^|[^a-z0-9])ms(?:[^a-z0-9]|\d|$)|[-_](?:rms|msc|eams)[-_.]/i.test(combined)) return 'MS';
-  if (/examiner[-_\s]?report|(?:^|[^a-z0-9])er(?:[^a-z0-9]|\d|$)|[-_]pef(?:[-_.]|$)/i.test(combined)) return 'ER';
+  // Explicit Pearson filename code suffixes take precedence over potentially misfiled folder names
+  if (/[-_](?:rms|msc|mcs|eams)[-_.]/.test(name)) return 'MS';
+  if (/[-_](?:pef|perf)(?:[-_.]|$)/.test(name)) return 'ER';
+  if (/[-_]que[-_.]/.test(name)) return 'QP';
 
-  // Scientific articles, source booklets, transcripts, SAMs
-  if (/(?:^|[^a-z0-9])sc(?:[^a-z0-9]|$)|scientific[-_\s]?article|transcript/i.test(combined)) return 'SC';
+  // Standard Past Paper types (QP, MS, ER)
+  if (/question[-_\s]?paper|(?:^|[^a-z0-9])qp(?:[^a-z0-9]|\d|$)|[-_]que[-_.]|modified[-_\s]*papers?|externally[-_\s]*(?:assessed|set)/i.test(combined)) return 'QP';
+  if (/mark[-_\s]?scheme|(?:^|[^a-z0-9])ms(?:[^a-z0-9]|\d|$)|[-_](?:rms|msc|mcs|eams)[-_.]/i.test(combined)) return 'MS';
+  if (/(?:examiner|moderator)[-_\s']*s?[-_\s]*report|(?:^|[^a-z0-9])er(?:[^a-z0-9]|\d|$)|[-_](?:pef|perf)(?:[-_.]|$)/i.test(combined)) return 'ER';
+
+  // Scientific articles, source booklets, transcripts, inserts/extracts, speaking materials, SAMs
+  if (/(?:^|[^a-z0-9])sc(?:[^a-z0-9]|$)|scientific[-_\s]?article|transcript|insert|extract|source[-_\s]?booklet|anthology|speaking[-_\s]*(?:exam|material)|speakin[-_\s]*exam|testcards?|(?:rand(?:omisation)?[-_\s]*)?grid|paper[-_\s]*3[-_\s]*speaking|exemplar|exp[-_\s]*and[-_\s]*com|centre[-_\s]*guidance|equations?[-_\s]*list|[-_]ib[-_.\d]|handbook|redraft/i.test(combined)) return 'SC';
   if (/(?:^|[^a-z0-9])sams?(?:[^a-z0-9]|$)|sample[-_\s]?assessment|specimen|mock|syllabus|\bgce\b/i.test(combined)) return 'SAM';
+  if (/art[-_\s]*(?:and|&)[-_\s]*design.*4FA[01]/i.test(name)) return 'QP';
 
   return null;
 }
@@ -369,35 +426,62 @@ export function detectSubject(pathStr) {
 
   const lower = pathStr.toLowerCase();
   const orderedSubjects = [
+    ['sciences (double award)', 'Sciences (Double Award)'],
+    ['science (double award)', 'Sciences (Double Award)'],
+    ['sciences (single award)', 'Sciences (Single Award)'],
+    ['science (single award)', 'Sciences (Single Award)'],
+    ['greek (first language)', 'Greek (First Language)'],
     ['human biology', 'Human Biology'],
     ['further pure mathematics', 'Further Pure Mathematics'],
     ['further pure maths', 'Further Pure Mathematics'],
+    ['english as a second language', 'English as a Second Language'],
+    ['english second language', 'English as a Second Language'],
     ['english language a', 'English Language A'],
     ['english language b', 'English Language B'],
     ['english language', 'English Language'],
     ['english literature', 'English Literature'],
+    ['bangladesh studies', 'Bangladesh Studies'],
+    ['pakistan studies', 'Pakistan Studies'],
+    ['global citizenship', 'Global Citizenship'],
+    ['islamic studies', 'Islamic Studies'],
+    ['religious studies', 'Religious Studies'],
+    ['information and communicatio technology', 'Information Technology'],
+    ['information and communication technology', 'Information Technology'],
     ['information technology', 'Information Technology'],
     ['computer science', 'Computer Science'],
     ['business studies', 'Business'],
     ['mathematics a', 'Mathematics A'],
     ['mathematics b', 'Mathematics B'],
+    ['art and design', 'Art and Design'],
+    ['art & design', 'Art and Design'],
+    ['modern greek', 'Modern Greek'],
     ['accounting', 'Accounting'],
+    ['islamiyat', 'Islamiyat'],
+    ['gujarati', 'Gujarati'],
+    ['sinhala', 'Sinhala'],
+    ['swahili', 'Swahili'],
+    ['turkish', 'Turkish'],
+    ['bengali', 'Bangla'],
     ['arabic', 'Arabic'],
     ['bangla', 'Bangla'],
     ['biology', 'Biology'],
     ['business', 'Business'],
     ['chemistry', 'Chemistry'],
+    ['chinese', 'Chinese'],
     ['commerce', 'Commerce'],
     ['economics', 'Economics'],
     ['french', 'French'],
     ['geography', 'Geography'],
     ['german', 'German'],
     ['greek', 'Greek'],
+    ['hindi', 'Hindi'],
     ['history', 'History'],
     ['law', 'Law'],
     ['physics', 'Physics'],
     ['psychology', 'Psychology'],
     ['spanish', 'Spanish'],
+    ['tamil', 'Tamil'],
+    ['urdu', 'Urdu'],
     ['math', 'Math']
   ];
   for (const [needle, canonical] of orderedSubjects) {
@@ -439,29 +523,37 @@ export function extractSessionDate(pathStr) {
 }
 
 export function extractUnitInfo(pathStr, subject, spec) {
-  // 1. Explicit parenthesized code e.g. (WMA11), (WAC11), (WMA11R)
-  const parenMatch = pathStr.match(/\(([W6Y][A-Z0-9]{3,5})\)/i);
-  if (parenMatch) {
-    const code = normalizeCode(parenMatch[1]);
-    return {
-      unitCode: code,
-      unitName: UNIT_FRIENDLY_NAMES[code] || `Unit ${code}`
-    };
-  }
+  if (spec === 'IAL') {
+    // 1. Explicit parenthesized code e.g. (WMA11), (WAC11), (WMA11R)
+    const parenMatch = pathStr.match(/\(([W6Y][A-Z0-9]{3,5})\)/i);
+    if (parenMatch) {
+      const code = normalizeCode(parenMatch[1]);
+      return {
+        unitCode: code,
+        unitName: UNIT_FRIENDLY_NAMES[code] || `Unit ${code}`
+      };
+    }
 
-  // 2. Explicit W-code / YLA-code / 6-code in filename or path
-  const codeMatch = pathStr.match(/(?:^|[^A-Z0-9])(W[A-Z]{2}\d{2}R?|YLA\d|6[0-9]{3}|6[A-Z]{2}\d{2})(?:[^A-Z0-9]|$)/i);
-  if (codeMatch) {
-    const code = normalizeCode(codeMatch[1]);
-    return {
-      unitCode: code,
-      unitName: UNIT_FRIENDLY_NAMES[code] || `Unit ${code}`
-    };
+    // 2. Explicit YLA1-02 (Paper 2) or W-code / YLA-code / 6-code in filename or path
+    if (subject === 'Law' && /(?:^|[^A-Z0-9])YLA1[-_\s]*02(?:[^A-Z0-9]|$)/i.test(pathStr)) {
+      return {
+        unitCode: 'YLA2',
+        unitName: UNIT_FRIENDLY_NAMES['YLA2'] || 'Law Paper 2 (YLA2)'
+      };
+    }
+    const codeMatch = pathStr.match(/(?:^|[^A-Z0-9])(W[A-Z0-9]{2}\d{2}R?|YLA\d|6[0-9]{3}|6[A-Z]{2}\d{2})(?:0?[1-4])?(?:[^A-Z0-9]|$)/i);
+    if (codeMatch) {
+      const code = normalizeCode(codeMatch[1]);
+      return {
+        unitCode: code,
+        unitName: UNIT_FRIENDLY_NAMES[code] || `Unit ${code}`
+      };
+    }
   }
 
   // 3. IAL Math shorthand (P1..P4, C12, C34, C1..C4, M1..M3, S1..S3, FP1..FP3, F1..F3, D1)
   if (subject === 'Math' && spec === 'IAL') {
-    const mathMatch = pathStr.match(/(?:^|[^A-Z0-9])(P[1-4][A-Z]?|C12[A-Z]?|C34[A-Z]?|C[1-4][A-Z]?|M[1-3][A-Z]?|S[1-3][A-Z]?|FP[1-3][A-Z]?|F[1-3][A-Z]?|D1[A-Z]?)(?:[^A-Z0-9]|$)/i);
+    const mathMatch = pathStr.match(/(?:^|[^A-Z0-9]|PureMathematics[-_\s]*)(P[1-4][A-Z]?|C12[A-Z]?|C34[A-Z]?|C[1-4][A-Z]?|M[1-3][A-Z]?|S[1-3][A-Z]?|FP[1-3][A-Z]?|F[1-3][A-Z]?|D1[A-Z]?)(?:[^A-Z0-9]|$)/i);
     if (mathMatch) {
       const token = mathMatch[1].toUpperCase();
       const mappedCode = MATH_UNIT_CODE_MAP[token] || MATH_UNIT_CODE_MAP[token.replace(/[AR]$/, '')];
@@ -493,8 +585,8 @@ export function extractUnitInfo(pathStr, subject, spec) {
       };
     }
 
-    if (subject === 'Accounting' || subject === 'Law') {
-      const pMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:P([1-2])[A-Z]?|Paper[-_\s]*([1-2])[A-Z]?)(?:[^A-Z0-9]|$)/i);
+    if (subject !== 'Math' && SUBJECT_UNIT_CODE_MAP[subject]) {
+      const pMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:P([1-6])(?=[-_.\sA-D]|$)|Paper[-_\s]*([1-6])[A-Z]?)(?:[^A-Z0-9]|$)/i);
       if (pMatch) {
         const pNum = parseInt(pMatch[1] || pMatch[2], 10);
         const mappedCode = SUBJECT_UNIT_CODE_MAP[subject]?.[pNum];
@@ -508,18 +600,36 @@ export function extractUnitInfo(pathStr, subject, spec) {
     }
   }
 
-  // 5. IGCSE Paper shorthand (Paper1, Paper1R, P1, P2, Unit1, Modular 2B, 4WBI1, 4WM2H, QP 1, MS 2, 4IT1_02, 4MA1-1F, 4PH1-1P)
+  // 5. IGCSE Paper shorthand (Paper1, Paper1R, P1, P2, Unit1, Modular 2B, 4WBI1, 4WES4, 4WM2H, QP 1, MS 2, 4IT1_02, 4MA1-1F, 4PH1-1P, legacy 4308/4357/4400/7042)
   // Standalone 'ER 1..10.pdf' in IGCSE stays unmapped to P1..P4 since AutomatePapers numbered ERs sequentially across variants.
   if (spec === 'IGCSE') {
-    const igcsePaperMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:Paper[-_\s]*([1-3])[A-Z0-9]*|Unit[-_\s]*([1-3])[A-Z0-9]*|Modular[-_\s]*([1-3])[A-Z0-9]*|P([1-3])[A-Z0-9]*|(?:QP|MS)[-_\s]+([1-3])[A-Z]*|4[A-Z]{2}[01][-_. ]0?([1-3])[A-Z]*|4W[A-Z]{1,2}([1-3])[A-Z0-9]*)(?:[^A-Z0-9]|$)/i);
-    if (igcsePaperMatch) {
-      const pNum = igcsePaperMatch[1] || igcsePaperMatch[2] || igcsePaperMatch[3] || igcsePaperMatch[4] || igcsePaperMatch[5] || igcsePaperMatch[6] || igcsePaperMatch[7];
+    if (subject === 'Mathematics A') {
+      const legacyMathH = pathStr.match(/(?:^|[^A-Z0-9])(?:(?:4MA0|4400|Paper|P)[-_. ]*)?([34])HR?(?:[^A-Z0-9]|$)/i);
+      if (legacyMathH) {
+        const pNum = legacyMathH[1] === '3' ? 1 : 2;
+        return {
+          unitCode: `P${pNum}`,
+          unitName: `Paper ${pNum}`
+        };
+      }
+    }
+    const explicitCodeMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:4W[A-Z]{1,3}0?([1-6])(?!\d)[A-Z0-9]*|(?:4[A-Z0-9]{2}[01]|4308|4357|4400|7042)[-_. ]0?([1-6])(?!\d)[A-Z]*)(?:[^A-Z0-9]|$)/i);
+    if (explicitCodeMatch) {
+      const pNum = explicitCodeMatch[1] || explicitCodeMatch[2];
       return {
         unitCode: `P${pNum}`,
         unitName: `Paper ${pNum}`
       };
     }
-    if (subject === 'Information Technology' && /data[-_\s]*files/i.test(pathStr)) {
+    const igcsePaperMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:Paper[-_\s]*0?([1-4])(?!\d)(?:[A-E]R?|[BCPFH]?R?|[-_\s]*Mod)?|Unit[-_\s]*0?([1-6])(?!\d)[A-Z]*|Modular[-_\s]*0?([1-6])(?!\d)[A-Z]*|P0?([1-4])(?!\d)(?:[A-E]R?|[BCPFH]?R?|[-_\s]*Mod)?|(?:QP|MS)[-_\s]+0?([1-4])(?!\d)[A-Z]*)(?:[^A-Z0-9]|$)/i);
+    if (igcsePaperMatch) {
+      const pNum = igcsePaperMatch[1] || igcsePaperMatch[2] || igcsePaperMatch[3] || igcsePaperMatch[4] || igcsePaperMatch[5];
+      return {
+        unitCode: `P${pNum}`,
+        unitName: `Paper ${pNum}`
+      };
+    }
+    if (subject === 'Information Technology' && /(?:data[-_\s]*files|office[-_\s]*2007|(?:^|[^a-z0-9])df(?:[^a-z0-9]|$))/i.test(pathStr)) {
       return {
         unitCode: 'P2',
         unitName: 'Paper 2'
@@ -533,10 +643,14 @@ export function extractUnitInfo(pathStr, subject, spec) {
 export function extractVariant(file) {
   const p = file.path || '';
   const n = (file.name || '').replace(/\.[^.]+$/, '');
-  const isMod = /modular|(?:^|[^a-z0-9])4w[a-z]{1,2}[1-3]/i.test(p);
+  const isMod = /modular|(?:^|[^a-z0-9])4w[a-z]{1,3}[1-6]/i.test(p);
+
+  if (/modified[-_\s]*papers?/i.test(p)) {
+    return 'Modified';
+  }
 
   if (file.subject === 'History') {
-    const mHist = n.match(/(?:Unit[-_\s]*[1-4]|WHI0[1-4][-_\s]*1)([A-D])\b/i);
+    const mHist = n.match(/(?:(?:Unit|Paper)[-_\s]*[1-4]|WH[I1]0[1-4][-_\s]*1)([A-D])(?:[^A-Z0-9]|$)/i);
     if (mHist) return `Opt${mHist[1].toUpperCase()}`;
   }
 
@@ -545,9 +659,30 @@ export function extractVariant(file) {
     if (mCs) return `P2${mCs[1].toUpperCase()}`;
   }
 
-  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*[12]F[-_\s]*R?|Foundation)(?:[^A-Z0-9]|$)/i.test(p);
-  const isH = /(?:^|[^A-Z0-9])(?:[12]H[-_]?R?|Paper[-_\s]*[12]H[-_\s]*R?|4WM[12]H|Higher)(?:[^A-Z0-9]|$)/i.test(p);
-  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*[1-4][FH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-3][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][BCPFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R)(?:[^A-Z0-9]|$)/i.test(p);
+  if (file.subject === 'Sciences (Double Award)' || file.subject === 'Sciences (Single Award)') {
+    const isSciR = /(?:^|[^A-Z0-9])(?:(?:Paper|Unit|Modular)[-_\s]*0?[1-6][BCP][-_\s]*R|[PU]?[1-6][BCP]R|4(?:SD0|SS0|WSD)[-_.\s]*0?[1-6]?[BCP]R)(?:[^A-Z0-9]|$)/i.test(p)
+      || /[-_][BCP]-R(?:[-_.]|$)/i.test(p);
+    const mSci = p.match(/(?:^|[^A-Z0-9])(?:(?:Paper|Unit|Modular)[-_\s]*0?[1-6]([BCP])R?|[PU]?[1-6]([BCP])R?|4(?:SD0|SS0|WSD)[-_.\s]*0?[1-6]?([BCP])R?)(?:[^A-Z0-9]|$)/i);
+    const disc = (mSci && (mSci[1] || mSci[2] || mSci[3]) || '').toUpperCase();
+    if (disc) {
+      if (isMod) return `${disc}${isSciR ? '-R' : ''}-Mod`;
+      return `${disc}${isSciR ? '-R' : ''}`;
+    }
+  }
+
+  if (file.subject === 'Religious Studies') {
+    const mRs = p.match(/(?:^|[^A-Z0-9])(?:4RS1[-_\s]*2|Opt)([A-E])(?:[^A-Z0-9]|$)/i);
+    if (mRs) return `Opt${mRs[1].toUpperCase()}`;
+  }
+
+  if (/solomon/i.test(p)) {
+    const mSol = p.match(/solomon[-_\s]*([A-L])(?:[^A-Z0-9]|$)/i);
+    if (mSol) return `Sol-${mSol[1].toUpperCase()}`;
+  }
+
+  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*0?[12]F[-_\s]*R?|4WM[12]F|Foundation|F(?=[-_](?:R|Mod|QP|MS|ER)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
+  const isH = /(?:^|[^A-Z0-9])(?:[1-4]H[-_]?R?|Paper[-_\s]*0?[1-4]H[-_\s]*R?|4WM[12]H|Higher|H(?=[-_](?:R|Mod|QP|MS|ER)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
+  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*0?[1-4][A-EBCPFH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-6][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][A-EFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R|(?:[FH]-)?R(?=[-_](?:Mod|QP|MS|ER)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
 
   if (isMod) {
     if (isF && isR) return 'F-R-Mod';
@@ -565,8 +700,10 @@ export function extractVariant(file) {
   if (isR) return 'R';
 
   if (/(?:^|[^A-Z0-9])(?:U[1-6]A|P[1-4]A|C12A|C34A|M[1-3]A|S[1-3]A|FP[1-3]A|F[1-3]A|D1A)(?:[^A-Z0-9]|$)/i.test(p)) return 'A';
-  const mOpt = n.match(/_([2-9]|\d{2})$/);
-  if (mOpt) return `Opt${mOpt[1]}`;
+  if (file.subject === 'History') {
+    const mOpt = n.match(/_([2-8])$/);
+    if (mOpt) return `Opt${mOpt[1]}`;
+  }
   const mVer = n.match(/\((v\d+|\d+)\)/i);
   if (mVer) return mVer[1].toLowerCase();
   const mEr = n.match(/^ER\s+(\d+)$/i);
@@ -584,9 +721,8 @@ export function getCleanUnitLabel(file) {
   const curr = file.curriculum || getCurriculum(file);
 
   if (curr === 'Edexcel IGCSE') {
-    if (code === 'P1' || name === 'PAPER 1') return 'Paper 1 (P1)';
-    if (code === 'P2' || name === 'PAPER 2') return 'Paper 2 (P2)';
-    if (code === 'P3' || name === 'PAPER 3') return 'Paper 3 (P3)';
+    const mP = code.match(/^P([1-6])$/) || name.match(/^PAPER ([1-6])$/);
+    if (mP) return `Paper ${mP[1]} (P${mP[1]})`;
     return (file.unitName && !file.unitName.includes('.pdf') && !file.unitName.includes('_177'))
       ? file.unitName
       : null;

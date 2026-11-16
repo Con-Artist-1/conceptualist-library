@@ -6,11 +6,11 @@ Welcome! If you are an AI assistant tasked with working on the curated document 
 
 ## 1. Directory Structure
 
-The library is an independent study archive indexing **100% Pearson Edexcel** exam resources containing **13,939 archived files** (**10,146 deduplicated unique documents**) across **19 IAL subjects** and **18 IGCSE subjects** (**28 distinct subjects**) covering **January 2003 – June 2026**.
+The library is an independent study archive indexing **100% Pearson Edexcel** exam resources containing **19,938 archived files** (**16,077 deduplicated unique documents**) across **19 IAL subjects** and **43 IGCSE subjects** covering **January 2003 – June 2026**.
 
 **Main Root Folders:**
-1. **`Past Papers\IAL`**: Contains Edexcel International A-Level (IAL) and legacy GCE papers across 19 subjects.
-2. **`Past Papers\IGCSE`**: Contains Edexcel International GCSE (9–1) and legacy papers across 18 subjects.
+1. **`Past Papers\IAL`**: Contains Edexcel International A-Level (IAL) and legacy GCE Maths papers across 19 subjects (strictly excludes UK GCE non-Math specs and pre-launch years).
+2. **`Past Papers\IGCSE`**: Contains Edexcel International GCSE (9–1) Modular (`4W*`), Linear (`4*`), and Legacy (`4*0` / 4-digit) papers across 43 subjects (including `Sciences (Double Award)` `B`/`C`/`P` papers and merged `Bangla`/`Bengali`).
 3. **`IAL Books`**: Contains Edexcel IAL student textbooks, lab books, and solution banks sorted by subject.
 4. **`IGCSE Books`**: Contains Edexcel IGCSE (9–1) student textbooks sorted by subject.
 
@@ -38,12 +38,12 @@ The naming conventions depend on the source batch:
 
 The front-end application (React 19 + Vite 8 + Vercel Web Analytics & Speed Insights + MongoDB endpoints `/api/views` & `/api/telemetry`) located at `e:\The Library\search-app` uses multi-stage static data loading:
 - `public/meta.json`: High-speed compact metadata & wizard catalog for `0ms` initial UI hydration.
-- `dist/shards/*.json`: **40 compact route shards** loaded in parallel with `meta.json` on cold landing pages (up to 96% smaller than full index payloads).
+- `dist/shards/*.json`: **65 compact route shards** loaded in parallel with `meta.json` on cold landing pages (up to 96% smaller than full index payloads).
 - `public/index.json`: Tuple-encoded (`keys` + `files`) deduplicated global catalog loaded on demand / background upgrade, with Hugging Face `live_index.json` fallback.
-- `public/audio-subtitles.json`: Pre-generated Tier 1 subtitle index (`28` cached keys covering `9/96` `AUD` resources: 10 French Transcript PDFs `2019–2021` + all 4 tracks of `French WFR02 Jan 2026`), incrementally preserved and merged from `.data/audio_subtitles.json` whenever `generate-index.js` runs. Remaining un-indexed French, German, and Spanish audio packs use Tier 2 MongoDB (`audio_subtitles`) caching and Tier 3 on-demand browser generation.
+- `public/audio-subtitles.json`: Pre-generated Tier 1 subtitle index (`28` cached keys covering `9/273` `AUD` resources: 10 French Transcript PDFs `2019–2021` + all 4 tracks of `French WFR02 Jan 2026`), incrementally preserved and merged from `.data/audio_subtitles.json` whenever `generate-index.js` runs. Remaining un-indexed ESL, Chinese, Swahili, French, German, and Spanish audio packs use Tier 2 MongoDB (`audio_subtitles`) caching and Tier 3 on-demand browser generation (`inferWhisperLanguage`).
 
 **Core Production Scripts (`search-app/scripts/`):**
-The scripts directory contains strictly **7 essential utilities**. Keep all temporary/verification scripts outside the repo (e.g. in AppData scratch directories).
+The scripts directory contains strictly **8 essential utilities**. Keep all temporary/verification scripts outside the repo (e.g. in AppData scratch directories).
 
 1. **Rebuild Metadata, Search Index & Subtitle Sync (updates `public/meta.json`, `public/index.json`, root `live_index.json`, and preserves/merges `public/audio-subtitles.json`):**
    ```powershell
@@ -53,7 +53,7 @@ The scripts directory contains strictly **7 essential utilities**. Keep all temp
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output
    ```
-3. **SEO Sitemap, Route Shards & Static HTML Pre-rendering (`193` sitemap URLs including `/papers`, `40` shards, `319` HTML routes):**
+3. **SEO Sitemap, Route Shards & Static HTML Pre-rendering (`299` sitemap URLs including `/papers`, `65` shards, `475` HTML routes):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\prerender-seo.js`" 2>&1" | Write-Output
    ```
@@ -74,6 +74,19 @@ The scripts directory contains strictly **7 essential utilities**. Keep all temp
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\upload-live-index-hf.js`" 2>&1" | Write-Output
    ```
+8. **Sync New Past Papers From Verified Upstream Sources (`scripts/sync-sources.js`):**
+   - **Dry-run preview (fast filter for new sessions, e.g. `2026+`):**
+     ```powershell
+     $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\sync-sources.js`" --dry-run --since=2026 2>&1" | Write-Output
+     ```
+   - **Download, optimize (`>= 5 MB` `/ObjStm`), and re-index:**
+     ```powershell
+     $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\sync-sources.js`" --apply --since=2026 2>&1" | Write-Output
+     ```
+   - **Supported `--sources=`:** `bsr` (British Student Room `/edexcel/` public Google Drive folders via `embeddedfolderview?id=...#list`, filtering `data-level` strictly to `IAL` & `IGCSE`), `dp` (`dynamicpapers.com` authenticated with `post_password=159357`), `igexams` (`igexams.com` Edexcel IGCSE/IAL + Drive folders), `ssc` (`smartstudycampus.com` `igcse-edexcel-subject` / `as-edexcel-subject`), `pmt` (`physicsandmathstutor.com/past-papers/` Edexcel IAL/IGCSE + Solomon), and `pl` (`paperlords.org` REST API).
+   - **Built-in Safeguards:**
+     - **Strict IAL vs UK GCE & clutter isolation:** Blocks UK GCE (`6BI0x`, `6CH0x`, `6PH0x`, `6EC0x`, `66xx` non-Math, `8xx`/`9xx`), enforces true IAL subject launch years (`Accounting >= 2012`; `Bio/Chem/Phys/Math/Econ/Bus/Law >= 2014`; `Psych/Hist/Eng >= 2016`; `Geog/MFL >= 2017`; `IT >= 2019`), and excludes grade boundaries, grade characteristics, syllabuses, timetables, formula sheets, notes, and specimen/SAMs.
+     - **Fast incremental SHA-256 & large-file streaming:** Caches `(size, mtimeMs, sha256)` in `.data/library_sha_cache.json` (git-excluded via `push-github.js`) to avoid re-hashing unchanged files, automatically falls back to `curl.exe` (`600s` timeout) when large MP3/Modified-paper ZIPs (`50–155 MB`) exceed `fetch` timeouts, copies shared cross-subject `Sciences (Double Award)` papers (`1B`/`1C`/`1P` matching local Bio/Chem/Phys SHA-256) directly from disk, prioritizes explicit Pearson filename codes (`_rms_`, `_pef_`, `_que_`) over misfiled Drive folders, packs new `>= 5 MB` PDFs lacking `/ObjStm` when `qpdf` (`--qpdf=<path>` or `PATH`) is available, and triggers `generate-index.js`.
 
 ---
 
@@ -132,17 +145,17 @@ Core Conceptualist Systems contributors listed on `/about`:
 1. **Do not break folder structures.** Stick to `Past Papers\IAL`, `Past Papers\IGCSE`, `IAL Books`, and `IGCSE Books`.
 2. **Independent Archive & Non-Affiliation Copy.** NEVER claim the site, papers, or books are "Official Pearson" or "Official Edexcel" in UI headings, badges, SEO titles/descriptions, JSON-LD, or docs. Keep the **Not affiliated with Pearson or Edexcel** disclaimer intact on Home, Footer, and `/about`.
 3. **Clean file names & Large-PDF `/ObjStm` prep.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing. For new `>= 5 MB` non-linearized PDFs lacking `/ObjStm` (such as ReportLab books), repack compressed object streams (`pikepdf` `ObjectStreamMode.generate`, verifying page count and keeping any pre-existing corrupt source files like `Past Papers\IGCSE\Biology\2023 May\Examiner-report\IGCSE_BIOLOGY_2023_MayJune_P1_ER.pdf` untouched) before `generate-index.js`, `sync-hf.js`, and `upload-live-index-hf.js`.
-4. **Strict script hygiene.** Keep no scripts at repo root and strictly retain only the 7 core scripts in `search-app/scripts/`. Store temporary/verification scripts outside the repo (AppData scratch folder).
+4. **Strict script hygiene.** Keep no scripts at repo root and strictly retain only the 8 core scripts in `search-app/scripts/` (`build.js`, `deploy-vercel.js`, `generate-index.js`, `prerender-seo.js`, `push-github.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`). Store temporary/verification scripts outside the repo (AppData scratch folder).
 5. **Use Forward Slashes (`/`) in JSON.** Windows backslashes break static builds and Hugging Face URL resolution.
 6. **Node Invocations:** Invoke Node scripts on Windows via Antigravity IDE's Electron runtime, piping `cmd /c "... 2>&1" | Write-Output` from PowerShell so GUI-subsystem stdout/stderr is captured cleanly:
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, `/papers` Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.4` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.6` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
    - **Deploy & IndexNow:** Always run `scripts/deploy-vercel.js`, wait for `=== Production Deployment READY! ===` + `[IndexNow] Submitted ... canonical URLs`, and verify live deployment on `https://www.conceptualist.uk`.
 
-Enjoy working with this independent 13,939-file (10,146-unique-record) Edexcel study archive!
+Enjoy working with this independent 19,938-file (16,077-unique-record) Edexcel study archive!

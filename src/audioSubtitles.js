@@ -283,8 +283,11 @@ async function getWhisperTranscriber(onStatus) {
 
 export function inferWhisperLanguage(subject) {
   const s = String(subject || '').toLowerCase();
+  if (s.includes('chinese')) return 'chinese';
+  if (s.includes('swahili')) return 'swahili';
   if (s.includes('german')) return 'german';
   if (s.includes('spanish')) return 'spanish';
+  if (s.includes('english') || s.includes('esl')) return 'english';
   return 'french';
 }
 
