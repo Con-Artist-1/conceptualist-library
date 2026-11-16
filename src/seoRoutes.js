@@ -464,7 +464,8 @@ export function buildRoutePath({
   searchQuery = '',
   previewFile = null,
   pendingPaperParam = '',
-  previewMode = ''
+  previewMode = '',
+  forceShowTable = false
 }) {
   if (currentTab === 'about') return '/about';
   if (currentTab === 'changelog') return '/changelog';
@@ -501,6 +502,8 @@ export function buildRoutePath({
     } else if (currSlug) {
       pathname = `/${currSlug}`;
     }
+  } else if (forceShowTable) {
+    pathname = '/papers';
   }
 
   const params = new URLSearchParams();
@@ -638,6 +641,10 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null)
     result.currentTab = 'changelog';
     return result;
   }
+  if (cleanPath === '/papers') {
+    result.forceShowTable = true;
+    return result;
+  }
   if (cleanPath === '/data-files') {
     result.filterDocType = 'DF';
     result.forceShowTable = true;
@@ -737,6 +744,7 @@ export function getSeoMetadata({
   filterDocType = null,
   searchQuery = '',
   paperParam = '',
+  forceShowTable = false,
   notFound = false,
   meta = null
 }) {
@@ -770,7 +778,8 @@ export function getSeoMetadata({
     filterSubject,
     filterUnit,
     filterYear: '',
-    filterDocType: isCanonicalDocTypeFilter ? filterDocType : null
+    filterDocType: isCanonicalDocTypeFilter ? filterDocType : null,
+    forceShowTable
   });
   const canonicalUrl = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`;
   const robots = hasFacetedQuery ? 'noindex, follow' : 'index, follow';
@@ -778,12 +787,12 @@ export function getSeoMetadata({
   if (currentTab === 'about') {
     return {
       title: 'About Conceptualist Systems | Edexcel IAL & IGCSE Archive',
-      description: fitDescription(`Learn about Conceptualist Systems, indexing ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE papers, mark schemes, reports & books (${totalFiles.toLocaleString()} archived files).`),
+      description: fitDescription(`Learn about Conceptualist Systems, an independent study index of ${uniqueFiles.toLocaleString()}+ Edexcel IAL & IGCSE papers, mark schemes, reports & books (${totalFiles.toLocaleString()} archived files).`),
       keywords: 'Conceptualist Systems, Edexcel past papers, IAL past papers, IGCSE past papers, academic repository, Diavlon, Naz',
       canonicalUrl,
       robots: 'index, follow',
       h1: 'About Conceptualist Systems',
-      subtitle: `Open, high-speed access to ${uniqueFiles.toLocaleString()}+ unique Pearson Edexcel IAL and IGCSE resources (${totalFiles.toLocaleString()} total archived files).`
+      subtitle: `Independent study access to ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL and IGCSE resources (${totalFiles.toLocaleString()} total archived files).`
     };
   }
 
@@ -802,19 +811,19 @@ export function getSeoMetadata({
   if (filterDocType === 'DF' && !filterCurriculum && !filterSubject) {
     return {
       title: 'Edexcel IAL & IGCSE IT & CS Data Files (.zip) | Conceptualist',
-      description: 'Download 34 official Pearson Edexcel IAL IT (WIT12, WIT14) and IGCSE ICT & Computer Science (4IT1, 4CP0) practical exam data files free.',
+      description: 'Download 34 archived Edexcel IAL IT (WIT12, WIT14) and IGCSE ICT & Computer Science (4IT1, 4CP0) practical exam data files free.',
       keywords: 'Edexcel IAL IT data files, WIT12 data files, WIT14 data files, Edexcel IGCSE ICT 4IT1 data files, Computer Science 4CP0 data files',
       canonicalUrl,
       robots,
       h1: 'Edexcel IAL IT & IGCSE Practical Data Files',
-      subtitle: 'Official practical examination source data archives covering IAL Information Technology (WIT12, WIT14), IGCSE ICT (4IT1), and Computer Science (4CP0).'
+      subtitle: 'Archived practical examination source data archives covering IAL Information Technology (WIT12, WIT14), IGCSE ICT (4IT1), and Computer Science (4CP0).'
     };
   }
 
   if (filterDocType === 'AUD' && !filterCurriculum && !filterSubject) {
     return {
       title: 'Edexcel IAL Language Listening Audio MP3s | Conceptualist',
-      description: 'Stream and download 96 official Pearson Edexcel IAL French (WFR01–02), German (WGN01–02) & Spanish (WSP01–02) past exam listening audio MP3 tracks.',
+      description: 'Stream and download 96 archived Edexcel IAL French (WFR01–02), German (WGN01–02) & Spanish (WSP01–02) past exam listening audio MP3 tracks.',
       keywords: 'Edexcel IAL French listening audio, Edexcel IAL German listening mp3, Edexcel IAL Spanish listening audio, WFR02 mp3, WGN02 mp3, WSP02 mp3',
       canonicalUrl,
       robots,
@@ -824,7 +833,7 @@ export function getSeoMetadata({
   }
 
   const subjDisplay = formatSubjectName(filterSubject);
-  const currShort = filterCurriculum === 'Edexcel IGCSE' ? 'Edexcel IGCSE' : filterCurriculum === 'Edexcel IAL' ? 'Edexcel IAL' : 'Pearson Edexcel';
+  const currShort = filterCurriculum === 'Edexcel IGCSE' ? 'Edexcel IGCSE' : filterCurriculum === 'Edexcel IAL' ? 'Edexcel IAL' : 'Edexcel';
 
   if (filterDocType === 'Book' && !filterUnit) {
     if (filterSubject) {
@@ -836,8 +845,8 @@ export function getSeoMetadata({
         `${curr.replace('Edexcel ', '')} ${subjDisplay} Books & Solutions | Conceptualist`
       ], 65);
       const description = pickTitleVariant([
-        `Read and download official ${curr} ${subjDisplay} student textbooks${isIalMath ? ', P1–P4, M1–M3, S1–S2 & FP1–FP3 Solution Banks' : ', revision guides & answer books'} free on Conceptualist.`,
-        `Free official ${curr} ${subjDisplay} student books${isIalMath ? ' & Solution Banks' : ' & answers'} in fast in-app WebPDF reader.`
+        `Read and download ${curr} ${subjDisplay} student textbooks${isIalMath ? ', P1–P4, M1–M3, S1–S2 & FP1–FP3 Solution Banks' : ', revision guides & answer books'} on Conceptualist.`,
+        `Study ${curr} ${subjDisplay} student books${isIalMath ? ' & Solution Banks' : ' & answers'} in fast in-app WebPDF reader.`
       ], 158);
       return {
         title,
@@ -851,7 +860,7 @@ export function getSeoMetadata({
         canonicalUrl,
         robots,
         h1: `${curr} ${subjDisplay} Textbooks${isIalMath ? ' & Solution Banks' : ' & Study Books'}`,
-        subtitle: `Official Pearson Edexcel ${subjDisplay} textbooks, answers, and worked solutions organized cleanly for fast browser viewing with zero ads or paywalls.`
+        subtitle: `Archived Edexcel ${subjDisplay} textbooks, answers, and worked solutions organized cleanly for fast browser viewing with zero ads or paywalls.`
       };
     }
     if (filterCurriculum) {
@@ -859,23 +868,23 @@ export function getSeoMetadata({
       return {
         title: `${filterCurriculum} Textbooks${isIal ? ' & Solution Banks' : ' (9–1) PDF'} | Conceptualist`,
         description: isIal
-          ? 'Browse 60 official Pearson Edexcel IAL student textbooks & Maths Solution Banks across 9 subjects free in our high-speed WebPDF reader.'
-          : 'Browse 11 official Pearson Edexcel IGCSE (9–1) student textbooks across Sciences, Mathematics, Business & IT free online.',
+          ? 'Browse 60 Edexcel IAL student textbooks & Maths Solution Banks across 9 subjects in our high-speed WebPDF reader.'
+          : 'Browse 11 Edexcel IGCSE (9–1) student textbooks across Sciences, Mathematics, Business & IT free online.',
         keywords: `${filterCurriculum} textbooks pdf, ${isIal ? 'Edexcel IAL solution banks, IAL Maths solution bank' : 'Edexcel IGCSE 9-1 textbooks pdf'}`,
         canonicalUrl,
         robots,
-        h1: `${filterCurriculum} Official Textbooks${isIal ? ' & Worked Solution Banks' : ' (9–1)'}`,
+        h1: `${filterCurriculum} Textbooks${isIal ? ' & Worked Solution Banks' : ' (9–1)'}`,
         subtitle: `Read ${filterCurriculum} student textbooks, lab guides, and answers online with instant search and Dark/OLED reading modes.`
       };
     }
     return {
       title: 'Edexcel IAL & IGCSE Textbooks & Solutions PDF | Conceptualist',
-      description: fitDescription('Read 71 official Pearson Edexcel IAL and IGCSE (9–1) student textbooks, lab books, and worked solution banks free online in WebPDF reader.'),
+      description: fitDescription('Read 71 Edexcel IAL and IGCSE (9–1) student textbooks, lab books, and worked solution banks free online in WebPDF reader.'),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
       robots,
-      h1: 'Pearson Edexcel IAL & IGCSE Textbooks & Solution Banks',
-      subtitle: '71 official course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Economics, Accounting, Psychology, and IT.'
+      h1: 'Edexcel IAL & IGCSE Textbooks & Solution Banks',
+      subtitle: '71 course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Economics, Accounting, Psychology, and IT.'
     };
   }
 
@@ -1004,7 +1013,7 @@ export function getSeoMetadata({
       keywords: 'Edexcel IAL past papers, International A Level past papers, Edexcel IAL mark schemes, WMA11, WCH11, WPH11, WBI11, WEC11, WBS11, Edexcel IAL textbooks',
       canonicalUrl,
       robots,
-      h1: 'Pearson Edexcel International A-Level (IAL) Past Papers & Textbooks',
+      h1: 'Edexcel International A-Level (IAL) Past Papers & Textbooks',
       subtitle: `Complete archive across ${ialSubjCount} IAL subjects (${meta?.coverage || 'January 2003 – June 2026'}) with instant side-by-side Question Paper and Mark Scheme Split View.`
     };
   }
@@ -1018,8 +1027,20 @@ export function getSeoMetadata({
       keywords: 'Edexcel IGCSE past papers, International GCSE Edexcel past papers, 4MA1, 4PH1, 4CH1, 4BI1, Edexcel IGCSE Modular past papers, Regional 1R 2R past papers',
       canonicalUrl,
       robots,
-      h1: 'Pearson Edexcel International GCSE (IGCSE 9–1) Past Papers & Textbooks',
+      h1: 'Edexcel International GCSE (IGCSE 9–1) Past Papers & Textbooks',
       subtitle: `Complete archive across ${igcseSubjCount} IGCSE subjects including Foundation, Higher, Regional (R), and Modular series with instant Split View.`
+    };
+  }
+
+  if (forceShowTable && !filterCurriculum && !filterSubject && !filterUnit && !filterDocType) {
+    return {
+      title: 'All Edexcel IAL & IGCSE Past Papers Archive | Conceptualist',
+      description: fitDescription(`Browse all ${uniqueFiles.toLocaleString()}+ Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.coverage || '2003–2026'}) in Split View.`),
+      keywords: 'Edexcel past papers archive, Edexcel IAL past papers, Edexcel IGCSE past papers, mark schemes, examiner reports, split view',
+      canonicalUrl,
+      robots,
+      h1: 'All Edexcel IAL & IGCSE Past Exam Papers',
+      subtitle: `Independent study catalog indexing ${uniqueFiles.toLocaleString()}+ unique papers, mark schemes, examiner reports, textbooks, and audio across ${totalFiles.toLocaleString()} archived files.`
     };
   }
 
@@ -1030,7 +1051,7 @@ export function getSeoMetadata({
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Conceptualist Systems, WMA11, WCH11, WPH11, WBI11, 4MA1, mark schemes, examiner reports, Edexcel textbooks pdf',
     canonicalUrl: `${SITE_URL}/`,
     robots,
-    h1: 'Pearson Edexcel IAL & IGCSE Past Exam Papers & Textbooks',
+    h1: 'Edexcel IAL & IGCSE Past Exam Papers & Textbooks',
     subtitle: `${uniqueFiles.toLocaleString()}+ unique Question Papers, Mark Schemes, Examiner Reports, and Textbooks across ${totalFiles.toLocaleString()} archived files (${meta?.coverage || 'January 2003 – June 2026'}).`
   };
 }
@@ -1041,6 +1062,7 @@ export function buildJsonLd({
   filterSubject = '',
   filterUnit = '',
   filterDocType = null,
+  forceShowTable = false,
   seo,
   meta = null
 }) {
@@ -1062,6 +1084,8 @@ export function buildJsonLd({
     breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'IT & CS Data Files', item: `${SITE_URL}/data-files` });
   } else if (filterDocType === 'AUD' && !filterCurriculum && !filterSubject) {
     breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Listening Audio MP3s', item: `${SITE_URL}/audio` });
+  } else if (forceShowTable && !filterCurriculum && !filterSubject && !filterDocType) {
+    breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'All Past Papers', item: `${SITE_URL}/papers` });
   } else if (filterDocType === 'Book' && !filterUnit) {
     breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Textbooks & Solutions', item: `${SITE_URL}/textbooks` });
     if (filterCurriculum) {
@@ -1122,7 +1146,7 @@ export function buildJsonLd({
       url: `${SITE_URL}/`,
       name: 'Conceptualist Systems — Edexcel Past Papers & Textbooks Library',
       alternateName: ['Conceptualist Systems', 'Conceptualist Edexcel Library'],
-      description: `High-speed academic repository indexing ${uniqueFiles.toLocaleString()}+ unique Pearson Edexcel IAL and IGCSE past exam papers, mark schemes, examiner reports, and textbooks (${totalFiles.toLocaleString()} archived files).`,
+      description: `Independent academic study repository indexing ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL and IGCSE past exam papers, mark schemes, examiner reports, and textbooks (${totalFiles.toLocaleString()} archived files).`,
       potentialAction: {
         '@type': 'SearchAction',
         target: {

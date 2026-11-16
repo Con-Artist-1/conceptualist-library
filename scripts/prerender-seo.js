@@ -157,6 +157,14 @@ function collectAllRoutes(meta, indexLookup) {
   });
 
   addRoute({
+    path: '/papers',
+    priority: '0.95',
+    changefreq: 'daily',
+    includeInSitemap: true,
+    state: { currentTab: 'library', forceShowTable: true }
+  });
+
+  addRoute({
     path: '/ial',
     priority: '0.95',
     changefreq: 'weekly',
@@ -486,6 +494,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       ${legacyNote ? `<p><strong>Specification &amp; Legacy Codes:</strong> ${escapeHtml(legacyNote)}</p>` : ''}
       <nav aria-label="Archive Navigation">
         <p>
+          <a href="/papers">All Past Papers</a> |
           <a href="/ial">Edexcel IAL Past Papers</a> |
           <a href="/igcse">Edexcel IGCSE Past Papers</a> |
           <a href="/textbooks">Textbooks &amp; Solution Banks</a> |

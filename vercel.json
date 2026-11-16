@@ -32,7 +32,7 @@
       ]
     },
     {
-      "source": "/(ial|igcse|textbooks|data-files|audio|about|changelog)",
+      "source": "/(ial|igcse|papers|textbooks|data-files|audio|about|changelog)",
       "headers": [
         {
           "key": "Cache-Control",

@@ -1,5 +1,6 @@
 /* global __APP_BUILD_TIME__ */
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useDeferredValue, useRef, lazy, Suspense } from 'react';
+import { flushSync } from 'react-dom';
 import './index.css';
 import {
   buildRoutePath,
@@ -60,249 +61,224 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.0';
+const APP_VERSION = 'v6.1';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.0',
+    version: 'v6.1',
     date: BUILD_TIMESTAMP,
-    title: 'Synchronized Audio Subtitles (CC) & 3-Tier Hybrid Transcript Engine',
-    summary: 'Added live synchronized subtitles (CC) and interactive clickable transcripts to both the docked listening bar and standalone audio players, powered by pre-indexed transcripts, shared MongoDB cloud caching, and on-demand browser VAD + Whisper AI fallback.',
+    title: 'Cleaner Layout, Audio Showcase & S-Curve Theme Wipes',
+    summary: 'Freed up screen room on laptops, showcased in-browser audio + subtitles on Home, made /papers a real route, updated disclaimers, and added fast S-curve theme wipes.',
     changes: [
-      'Synchronized CC bar & interactive transcript drawer: Displays real-time highlighted captions with upcoming line preview and click-any-segment audio seeking across Light, Dark, and Pure OLED themes.',
-      'Pre-generated static subtitle index (audio-subtitles.json): Ships instant 0ms timestamped subtitles extracted from official Edexcel Transcript PDFs and pre-generated Whisper AI tracks, incrementally preserved by generate-index.js.',
-      'Shared MongoDB cloud cache & live VAD + Whisper fallback: Automatically transcribes un-indexed or newly added audio tracks in browser via RMS voice activity detection + Whisper WASM and caches completed transcripts to MongoDB Atlas for all subsequent visitors.'
+      'Compact layout & filter drawer: Slimmed the header/search bar, kept the footer in normal page flow instead of locking it over small screens, moved filters into a drawer, and dropped the extra search banner.',
+      'Audio + CC showcase on Home: Highlighted Past Papers, Textbooks, and Listening Audio with synced subtitles side by side, plus a one-click sample track + CC preview.',
+      'Real /papers link & cleaner copy: Made Browse All Papers a proper route with working Back/Forward navigation, trimmed "(AUD)" on desktop buttons, and replaced "Official" wording with independent study disclaimers.',
+      'Fast S-curve animations: Added a 260ms directional Light/Dark/OLED wipe (top-to-bottom body, left-to-right header and footer) plus crisp hover/open motion that respects reduced-motion settings.'
+    ]
+  },
+  {
+    version: 'v6.0',
+    date: '2026-11-15T22:37:46.000Z',
+    title: 'Live Audio Subtitles (CC) & Clickable Transcripts',
+    summary: 'Added synced closed captions and interactive transcripts to listening audio tracks, backed by static Transcript PDF timings, shared MongoDB caching, and optional browser Whisper AI.',
+    changes: [
+      'Synced CC bar & transcript drawer: Highlights the active line with a next-line preview and lets you click any line to jump straight to that timestamp across all themes.',
+      'Instant static index: Ships pre-loaded timings from Edexcel Transcript PDFs and Whisper tracks in audio-subtitles.json so supported exams need zero setup.',
+      'Shared cache & opt-in AI captions: Prompts before running VAD + Whisper WASM in your browser on uncached audio and saves finished captions to MongoDB for future visitors.'
     ]
   },
   {
     version: 'v5.9',
-    date: BUILD_TIMESTAMP,
-    title: 'In-Browser Zero-Backend ZIP Audio Player & Multi-Track Listening Dock',
-    summary: 'Added client-side DecompressionStream ZIP audio extraction so zipped listening archives play directly on-site without backend unzipping, with multi-track question selectors and dual track/archive downloads.',
+    date: '2026-11-15T10:46:27.000Z',
+    title: 'In-Browser ZIP Audio Player',
+    summary: 'Unpacks zipped listening archives right in the browser with multi-track controls and individual track downloads.',
     changes: [
-      'Client-side ZIP audio engine: Unpacks STORE and DEFLATE (.zip and nested .zip) listening packages directly in browser memory via DecompressionStream with zero backend extraction.',
-      'Multi-track docked & standalone players: Added Track 1–4 / Unit 2–4 question selectors, auto-advance playback, and dual download controls (individual MP3/WAV track + full ZIP archive) across docked QP/MS views and standalone resource cards.',
-      'Modern Languages archive linking: Linked combined Audio U2U4.zip packages and paired Tracked ZIP archives across French, German, and Spanish sittings with full Light, Dark, and Pure OLED parity.'
+      'Zero-backend ZIP unpacking: Extracts STORE and deflate .zip (and nested .zip) listening packs in memory using DecompressionStream.',
+      'Multi-track playback: Added Track 1–4 / Unit 2–4 selectors, auto-advance, and per-MP3 or full-ZIP download controls across docked and standalone players.'
     ]
   },
   {
     version: 'v5.8',
-    date: BUILD_TIMESTAMP,
-    title: 'Zero Theme Layout Shift, Decluttered Centered Layout & Smooth WebPDF',
-    summary: 'Eliminated horizontal and vertical layout shifts across Light, Dark, and Pure OLED themes, removed the redundant left sidebar for a centered layout, restored Dark Mode subject unit cards, placed Recently Viewed counters alongside bottom actions, and stabilized WebPDF loading and scrolling.',
+    date: '2026-11-15T09:50:29.000Z',
+    title: 'Zero Theme Shift & Centered Catalog',
+    summary: 'Stopped elements jumping on theme switches, dropped the extra sidebar to center the catalog, and steadied WebPDF startup.',
     changes: [
-      'Zero theme-switch movement: Standardized 8px custom scrollbars, 2px/1px header/search/footer/modal borders, input border & font-weight, subject count badge borders, and theme button minimum widths across Light, Dark, and Pure OLED.',
-      'Decluttered layout & Dark Mode unit cards: Removed the redundant Repository Categories sidebar to center the catalog and search controls at 1280px, and restored high-contrast unit cards and group headings in Dark Mode Subject selection.',
-      'Recently Viewed & WebPDF reliability: Moved the view counter onto the bottom card action bar beside Split View, eliminated initial WebPDF canvas resize jumps by resolving Page 1 dimensions and resetting scroll before mount, and deferred idle index hydration on the home page.'
+      'Zero theme movement: Standardized borders, input font weights, button widths, and 8px scrollbars across Light, Dark, and OLED.',
+      'Centered layout & Dark Mode contrast: Removed the redundant left sidebar and fixed Dark Mode unit card shading.',
+      'Steadier WebPDF & view badges: Sized Page 1 before mount to stop startup jumps and placed view counts beside bottom card actions.'
     ]
   },
   {
     version: 'v5.7',
-    date: BUILD_TIMESTAMP,
-    title: 'WebPDF Zero-Overflow Upgrade, Persistent Audio Dock & Unified Palette',
-    summary: 'Eliminated horizontal scrollbars and white scroll-corners in WebPDF FIT mode, added double-buffered rendering, 90° page rotation, Split pane swapping, a docked MP3 player above QP papers, Session filter and Most Viewed sorting, Sidebar subject-to-unit linking, and unified Charcoal & Gold QP/MS styling across all 3 themes.',
+    date: '2026-11-15T09:03:49.000Z',
+    title: 'WebPDF Fixes, Persistent Audio Dock & Charcoal/Gold Palette',
+    summary: 'Fixed FIT-mode scrollbars, added 90° rotation and Split pane swapping, docked audio above listening Question Papers, and unified QP/MS colors.',
     changes: [
-      'WebPDF Reader overhaul: Fixed FIT mode scrollbar calculation via inner viewport clientWidth tracking, suppressed horizontal overflow in fit modes, double-buffered page redraws to prevent zoom flicker, added 90° page rotation and live download progress, preserved QP focus in Split View with Swap Panes support, and fixed Dark/OLED scroll corners plus mobile Page 1 badge headroom.',
-      'Docked Audio & Standalone Audio UX: Added a persistent Audio Track dock above Question Papers for listening sittings (e.g., WFR02 2023 MP3s), labeled ZIP audio packages accurately as Audio Archive, and fixed mobile/desktop audio pill accessibility.',
-      'Catalog filtering, Sidebar & Navigation: Added Exam Session filter (January / June / October) alongside Most Viewed sorting, routed sidebar subject and textbook clicks through canonical filter state to unlock Unit/Paper dropdowns, removed duplicate View buttons on Past Papers and Textbooks, and exposed a mobile theme toggle on subject routes.',
-      'Palette & Backend Performance: Unified QP/MS accents to Charcoal/Obsidian Slate & Gold/Brass across Light, Dark, and Pure OLED themes, fixed /api/views local JSON persistence and added a 15-second hydration cache, and optimized Damerau-Levenshtein search matching.'
+      'WebPDF overhaul: Fixed FIT horizontal overflow, added double-buffered zoom redraws, 90° page rotation, live download progress, and Split pane swapping.',
+      'Audio dock & filters: Pinned MP3 tracks above listening Question Papers, added Exam Session filters and Most Viewed sorting, and added mobile theme toggles on subject pages.',
+      'Charcoal/Gold palette & API cache: Unified QP/MS accents across all three themes and added a 15s cache to /api/views.'
     ]
   },
   {
     version: 'v5.6',
-    date: BUILD_TIMESTAMP,
-    title: 'Team Roster Update & Documentation Synchronization',
-    summary: 'Welcomed Gemin Fauré Hidrojen to the Conceptualist Systems team on the About page and brought README and AI developer guides up to date with the current v5 architecture.',
+    date: '2026-11-12T22:26:53.000Z',
+    title: 'Team Update & Docs Sync',
+    summary: 'Added Gemin Fauré Hidrojen to Conceptualist Systems on About Us and synced docs with the v5 setup.',
     changes: [
-      'About Us & Team: Added Gemin Fauré Hidrojen (Intern, Optimizer) alongside the core 5-member Conceptualist Systems roster in the responsive 6-card grid.',
-      'Repository documentation sync: Updated AI_INSTRUCTIONS_APP.md, AI_INSTRUCTIONS_LIBRARY.md, and README.md with verified 13,939-file / 10,146-unique-record stats, 40 route shards, 318 pre-rendered static HTML routes, 3-theme Anti-FOUC specs, WebPDF v4.10.38 details, and MongoDB/Vercel telemetry configuration.'
+      'Team roster: Added Gemin Fauré Hidrojen (Intern, Optimizer) to the 6-card grid on /about.',
+      'Docs refresh: Updated README and AI instructions with route shard, WebPDF, and MongoDB/Vercel details.'
     ]
   },
   {
     version: 'v5.5',
-    date: BUILD_TIMESTAMP,
-    title: 'Instant PDF Theme Switching & Mobile Footer Navigation Grid',
-    summary: 'Eliminated Light, Dark, and Pure OLED theme-switch lag spikes inside the WebPDF reader and formatted mobile footer links into a balanced 3x3 button grid.',
+    date: '2026-11-12T22:16:19.000Z',
+    title: 'Instant PDF Theme Swaps & 3×3 Mobile Footer',
+    summary: 'Cut Light/Dark/OLED lag inside the PDF reader down to a single frame and turned mobile footer links into a 3×3 grid.',
     changes: [
-      'Instant PDF view theme toggles: Suppressed cross-DOM CSS transition cascades during theme swaps, froze covered background shell repaints while the full-screen modal is open, GPU-promoted PDF canvas filters, and memoized PdfViewerPane to cut theme-switch frame latency from ~800ms down to single-frame responsiveness.',
-      'Mobile footer button grid: Styled the 9 footer navigation links into a clean 3x3 tactile button layout on mobile viewports across Light, Dark, and Pure OLED themes while keeping desktop footer styling unchanged.'
+      'Instant PDF theme switches: Froze hidden background panes while the reader is open and bypassed slow cross-DOM transitions during toggles.',
+      'Mobile 3×3 footer: Grouped the mobile footer links into a balanced touch grid without changing desktop layout.'
     ]
   },
   {
     version: 'v5.4',
-    date: BUILD_TIMESTAMP,
-    title: 'Header Uniformity, Complete Mobile UI Audit & Touch Performance Overhaul',
-    summary: 'Aligned desktop and mobile header button dimensions pixel-for-pixel, fixed mobile footer link clipping and deep breadcrumb wrapping, styled in-modal audio/ZIP resource cards, prevented iOS Safari auto-zoom on all mobile inputs, and added mobile canvas/list memory optimizations.',
+    date: '2026-11-12T21:57:10.000Z',
+    title: 'Header Alignment & Mobile Touch Polish',
+    summary: 'Matched desktop header button heights, fixed mobile breadcrumb and footer wrapping, and stopped iOS zoom on inputs.',
     changes: [
-      'Desktop header pixel uniformity: Normalized height (34px), line-height, and border-box sizing across the date range badge, Light/Dark/OLED theme button, and About/Library navigation button.',
-      'Mobile footer & breadcrumbs: Wrapped global footer navigation cleanly without horizontal clipping, displayed full active breadcrumb filter pills on narrow viewports with concise mobile labels, and symmetrical full-width view toggles.',
-      'Resource modal & WebPDF mobile polish: Styled audio and ZIP archive cards across Light, Dark, and Pure OLED themes, added safe-area viewport inset support and adaptive zoomed canvas DPR capping, and eliminated iOS Safari focus zoom on search, filter, and page-number fields.'
+      'Even header sizing: Normalized height (34px) and alignment across desktop header controls.',
+      'Mobile polish: Wrapped breadcrumbs without clipping, capped zoomed PDF DPR to save memory, and kept mobile inputs at 16px+.'
     ]
   },
   {
     version: 'v5.3',
-    date: BUILD_TIMESTAMP,
-    title: 'Instant Route Shards, Textbook & Resource Routes & Vercel Telemetry',
-    summary: 'Cut cold route load size by up to 96% with per-route JSON shards, launched canonical textbook, IT/CS data-file, and listening audio routes, enriched SSR HTML & OpenGraph previews, and enabled Vercel Web Analytics & Speed Insights.',
+    date: '2026-11-12T21:28:22.000Z',
+    title: 'Route Shards, Textbook/Audio Pages & Telemetry',
+    summary: 'Split cold route loads into compact JSON shards, launched dedicated textbook/data/audio pages, and enabled Vercel telemetry.',
     changes: [
-      'Route-sharded catalog streaming: Build generates 40 compact subject, textbook, data-file, and audio shards loaded in parallel with /meta.json on cold landings and seamlessly upgraded to the full index when searching globally.',
-      'Dedicated SEO resource routes: Added /textbooks/ial, /textbooks/igcse, 19 per-subject /textbooks/<curriculum>/<subject> pages, /data-files (34 IT & CS archives), and /audio (96 language listening MP3s) across sitemap and SSR pre-rendering.',
-      'Crawler & OpenGraph richness: Pre-rendered real exam sitting timelines, textbooks, legacy spec equivalents (WPH01–WPH07, C12/C34, 6PH01, 4WBI1/4WCH1/4WPH1), and 1200x630 og-card.png previews.',
-      'Production observability: Integrated Vercel Web Analytics and Speed Insights with zero impact on initial render performance.'
+      'Fast route shards: Deep pages load a small route shard in parallel with meta.json before upgrading the full catalog.',
+      'New resource pages & OG card: Added /textbooks/ial, /textbooks/igcse, /data-files, /audio, plus a 1200×630 social preview image.'
     ]
   },
   {
     version: 'v5.2',
-    date: BUILD_TIMESTAMP,
-    title: 'Index Consolidation, WebPDF Streaming & Accessibility Architecture Overhaul',
-    summary: 'Eliminated index duplication, merged Physics WPH07 into WPH13, fixed filename parser regexes, tightened SEO titles and metadata across 170+ routes, restored code-split WebPDF lazy loading, scoped Split View keyboard controls, and hardened mobile modal geometry and API concurrency.',
+    date: '2026-11-12T20:42:55.000Z',
+    title: 'Smaller Index, Range Streaming & Accessibility',
+    summary: 'Shrank catalog payloads with shared unit parsing, tightened SEO metadata, restored lazy WebPDF loading, and hardened mobile accessibility.',
     changes: [
-      'Shared unit parser & smaller index: Consolidated unit normalization into a shared module, fixed snake_case date, CamelCase audio, and Unit1A History parsing, merged WPH07 into Unit 3 (WPH13), and deduplicated index.json at build time with compact tree inflation (slashing payload sizes by 17–58%).',
-      'WebPDF range & mobile optimization: Removed upfront multi-page getPage() burst fan-out on long textbooks, fixed mobile canvas gutter width alignment, scoped Split View keyboard shortcuts to the focused pane, and restored Suspense lazy-loading of the reader bundle.',
-      'SEO & routing accuracy: Tightened titles and descriptions under SERP truncation limits across all curriculum, subject, and unit pages, added 404 route recovery and noindex handling for filtered search permutations, and rendered semantic archive H1 headings.',
-      'Accessibility & mobile polish: Added 100dvh flex modal sizing, enlarged mobile touch targets, keyboard-operable split divider separators, focus-visible rings on filter selects, reduced-motion support, and atomic MongoDB view cooldown updates.'
+      'Leaner index & fixed parsing: Merged WPH07 into WPH13, fixed tricky filename regexes, and deduplicated records at build time.',
+      'Better PDF streaming: Removed upfront burst page loads on long textbooks and scoped Split View keyboard shortcuts per pane.',
+      'SEO & accessibility: Added 404 route recovery, 100dvh mobile modals, focus outlines, and atomic MongoDB view updates.'
     ]
   },
   {
     version: 'v5.1',
     date: '2026-11-11T14:00:00.000Z',
-    title: 'Uniform Card Grid Architecture & Ultra-Subtle Table Contrast Refinement',
-    summary: 'Streamlined subject cards to uniform surfaces to eliminate false grid hierarchy, refined resource table zebra striping to an ultra-subtle warm tint (#FAF8F6), unified inner metadata pills with solid white backgrounds, and softened divider borders (#EEEAE6).',
+    title: 'Uniform Subject Grid & Subtle Table Shading',
+    summary: 'Made subject cards consistent, toned down table zebra striping, and replaced nested beige badges with clean white pills.',
     changes: [
-      'Uniform subject card grid: Dropped card alternation to restore equal visual weight across all columns, maintaining crisp white cards (#FFFFFF) and consistent borders with authoritative McMaster Crimson and collegiate blue left accent bars.',
-      'Refined resource table zebra tint: Lightened even table rows to an ultra-subtle warm tint (#FAF8F6 in Light, #1A1D23 in Dark, #08090B in OLED) to guide horizontal scanning without heavy visual weight.',
-      'Unified inner metadata pills: Elevated folder path subtext, file count tags, and view counter badges to solid white backgrounds (#FFFFFF) with crisp hairline borders (#E2DDD5), completely eliminating muddy nested beige-on-beige contrast.',
-      'Softened table divider lines: Lightened horizontal divider lines to a delicate #EEEAE6 (#1E2127 in Dark, #141414 in OLED), eliminating double-framing and busy layout borders.'
+      'Uniform subject cards: Kept every subject card crisp white (#FFFFFF) with consistent crimson and blue accent bars.',
+      'Lighter table striping & dividers: Softened row contrast and hairline borders across Light, Dark, and OLED.'
     ]
   },
   {
     version: 'v5.0',
     date: '2026-11-11T08:00:00.000Z',
-    title: 'Alternating Row & Card Contrast Patterns Across All Themes',
-    summary: 'Introduced rhythmically alternating contrast patterns (zebra striping and 2D checkerboard weaving) across table rows, subject category cards, wizard unit buttons, and recent history cards in White, Dark, and OLED modes for effortless visual scanning.',
+    title: 'Alternating Row & Card Contrast',
+    summary: 'Added subtle zebra striping on tables and alternating card shading across Light, Dark, and OLED themes.',
     changes: [
-      'Table row zebra striping: Implemented rhythmic odd/even row contrast across examination sitting tables in White (#FFFFFF / #F8F7F4), Academic Dark (#16181D / #1E2229), and Pure OLED (#000000 / #0F1115) with smooth interactive hover feedback.',
-      'Subject card checkerboard pattern: Configured alternating tonal shading for subject cards and button tabs with a 2D checkerboard pattern on desktop and responsive alternation on mobile/tablet viewports.',
-      'Interactive unit & history buttons: Propagated alternating card styles to wizard unit selectors and recently viewed paper cards across all themes.',
-      'Mobile card parity: Preserved alternating card separation and responsive borders on mobile touch viewports.'
+      'Table zebra striping: Added alternating row contrast across exam sitting tables for easier scanning.',
+      'Card alternation: Brought alternating tonal shading to subject cards, wizard units, and recent paper cards.'
     ]
   },
   {
     version: 'v4.9',
     date: '2026-11-10T22:00:00.000Z',
-    title: 'Brand Header Navigation Restoration & URL Sub-Route Home Synchronization',
-    summary: 'Resolved header brand logo navigation issue to ensure clicking the logo reliably returns to the root homepage ("/") from any deep sub-route, clearing active filters and resetting path hydration without re-triggering unit re-resolution.',
+    title: 'Header Home Link & Route Sync',
+    summary: 'Made clicking the header logo reliably return home cleanly from deep sub-routes without leaving stale filters behind.',
     changes: [
-      'Reliable root navigation: Converted brand logo header into a semantic, accessible anchor link that clears curriculum, subject, and unit filters, resets preview modals and search queries, and transitions directly to root ("/") using window.history.pushState.',
-      'Cold-visit hydration loop fix: Guarded unit slug re-resolution effect with an initial-mount ref so clearing unit filters never re-parses stale route segments from window.location.pathname.',
-      'Breadcrumb & footer synchronization: Updated breadcrumb "← Library Home" and footer "Library Home" links to use the unified navigateToHome handler for seamless single-page transitions.',
-      'Focus & interaction polish: Replaced harsh default rectangular focus rings with subtle collegiate gold focus-visible outlines on the header brand section.'
+      'Reliable Home navigation: Turned the header brand into a real link that resets filters and pushes cleanly back to "/".',
+      'Cold-visit loop fix: Stopped the unit-slug effect from re-reading old path segments after clearing filters.'
     ]
   },
   {
     version: 'v4.8',
     date: '2026-11-10T18:00:00.000Z',
-    title: 'Refined Document Action Colors & Desktop Button Label Optimization',
-    summary: 'Streamlined desktop action buttons to "Question Paper" and "Mark Scheme" (reserving concise "QP" and "MS" exclusively for mobile viewports) and replaced disjointed blue and green with refined brand-coherent Academic Slate Charcoal and Antique Collegiate Gold.',
+    title: 'Cleaner Button Labels & Charcoal/Gold Palette',
+    summary: 'Dropped redundant "(QP)"/"(MS)" suffixes on desktop buttons and switched buttons to Slate Charcoal and Collegiate Gold.',
     changes: [
-      'Desktop label cleanup: Removed redundant "(QP)", "(MS)", and "(ER)" parenthetical acronyms from desktop button text across all table rows, displaying clean "Question Paper", "Mark Scheme", and "Examiner Report".',
-      'Preserved mobile compactness: Maintained concise "QP", "MS", and "ER" labels on small mobile touch viewports to prevent line-wrapping.',
-      'Color theory harmony: Replaced disjointed blue and green fills with Deep Academic Slate Charcoal (#2B303A) for Question Papers and Antique Collegiate Gold (#8C651E / #A88226) for Mark Schemes, achieving seamless triad harmony with McMaster Crimson (#6F1D2B / #8C1D2F).',
-      'Universal button consistency: Propagated the refined charcoal and gold color scheme across table rows, recently viewed history cards, sibling pills, and reader modal controls across Light, Dark, and OLED themes.'
+      'Cleaner desktop buttons: Show full "Question Paper", "Mark Scheme", and "Examiner Report" labels on desktop while keeping short tags on phones.',
+      'Palette harmony: Switched primary paper actions to Slate Charcoal (#2B303A) and Collegiate Gold (#8C651E / #A88226).'
     ]
   },
   {
     version: 'v4.7',
     date: '2026-11-10T15:00:00.000Z',
-    title: 'Exhaustive Dark Mode Coverage Across Changelog, About, Tables & Modals',
-    summary: 'Resolved all remaining dark mode UI contrast issues: eliminated white background bleeds on changelog cards, ensured 100% theme parity with OLED across all 293 UI elements, and harmonized typography and borders.',
+    title: 'Full Dark Mode Coverage',
+    summary: 'Fixed leftover white backgrounds in Dark Mode across Changelog, About, tables, pagination, and reader toolbars.',
     changes: [
-      'Changelog card fix: Converted hardcoded white backgrounds in changelog and about entries to adaptive theme surfaces, ensuring crisp soft-white text on deep slate charcoal (#1B1E23).',
-      'Full Dark Mode selector parity: Added over 150 missing component overrides to Academic Slate Dark mode matching the OLED structure across tables, pagination, about cards, team members, contact boxes, and modal toolbars.',
-      'Refined contrast & borders: Fine-tuned hairlines (#282C34 / #343A46), badge indicators, and search dropdowns for seamless visual continuity across all view modes and tabs.',
-      'Theme cycler fidelity: Verified instant, flicker-free transitions between Academic Light, Academic Dark, and Pure OLED.'
+      'Changelog & About Dark Mode: Converted hardcoded light surfaces to deep charcoal (#1B1E23) with legible text.',
+      'Component parity: Added 150+ missing Dark Mode overrides across tables, dropdowns, modals, and footers.'
     ]
   },
   {
     version: 'v4.6',
     date: '2026-11-10T12:00:00.000Z',
-    title: 'Ivy League Academic Color Theory Redesign & Heritage Branding Restoration',
-    summary: 'Harmonized color theory across both Light and Dark themes, restoring authentic McMaster Heritage Crimson (#6F1D2B / #8C1D2F), refined collegiate gold (#C9A45C / #D4AF37), and Oxford navy accents while preserving 100% Pure OLED dark mode.',
+    title: 'Academic Light & Slate Dark Palette Refresh',
+    summary: 'Refreshed Light and Dark themes around Heritage Crimson, warm alabaster, and deep slate charcoal while keeping Pure OLED intact.',
     changes: [
-      'Academic Light Mode ("Light"): Restored luminous warm alabaster canvas (#F4F3EF), crisp pure white surfaces (#FFFFFF), authoritative McMaster Crimson header (#6F1D2B), antique collegiate gold (#C9A45C), and deep charcoal ink typography (#1A1D20).',
-      'Academic Dark Mode ("Dark"): Redesigned dark mode to an authentic deep slate charcoal ground (#121417) and elevated slate card surfaces (#1B1E23) with vivid McMaster Crimson (#8C1D2F) and collegiate gold accents, completely eliminating murky olive-green casts.',
-      'High-Contrast Action Badges: Maintained bold identity badges for Question Papers (Oxford Navy), Mark Schemes (Ivy Green), and Examiner Reports (Warm Amber) with AAA readability.',
-      'Anti-FOUC & Pure OLED Preserved: Kept true pitch black (#000000) OLED dark mode intact with zero reload flickers across all pre-rendered routes.'
+      'Academic Light & Slate Dark: Restored warm #F4F3EF canvas on Light and switched Dark mode to #121417 slate charcoal.',
+      'Anti-FOUC & OLED kept: Preserved pitch-black #000000 OLED mode with zero flash on page reload.'
     ]
   },
   {
     version: 'v4.5',
     date: '2026-11-10T09:00:00.000Z',
-    title: 'Zerui Chen Warm Rust & Terminal Themes + Pure OLED Dark Mode',
-    summary: 'Adopted zeruic.me warm Rust aesthetic for White/Light mode and tactile Terminal styling for Dark mode, while preserving dedicated 100% true black OLED dark mode as a selectable 3rd option.',
+    title: '3-Way Theme Cycler (Light, Dark & OLED)',
+    summary: 'Added a seamless three-way theme cycler across main navigation and the PDF reader modal.',
     changes: [
-      'Zerui Chen Light Mode ("Rust"): Transformed light mode to zeruic.me warm palette with terracotta rust header (#a4552f), brass antique accents (#b98b3e), deep espresso ink (#413c33), and parchment background (#ddd5c5).',
-      'Zerui Chen Dark Mode ("Terminal"): Introduced warm tactical dark theme inspired by zeruic.me Terminal style (#1f211c ground, #272a24 card surface, #cfc9b2 linen text, #b98b3e brass accents).',
-      'Preserved Pure OLED Mode: Kept 100% pitch black (#000000) true OLED dark mode as a dedicated third theme option with high-contrast borders and full diagram color preservation.',
-      'Three-Way Theme Cycler: Seamless cycle through White (Light) -> Dark (Terminal) -> OLED -> White in both main navigation and PDF reader modal with geometric SVG icons and zero reload flicker.'
+      'Warm light & terminal dark variants: Explored warm parchment light and tactile dark styling alongside true black OLED.',
+      'Single-click cycling: Switched seamlessly between all three modes with geometric SVG icons.'
     ]
   },
   {
     version: 'v4.4',
     date: '2026-11-09T21:00:00.000Z',
-    title: 'Engine Memory Virtualization, SEO Canonical Fix & Filter Optimization',
-    summary: 'Resolved SEO canonical and Open Graph metadata injection across 296 pre-rendered routes, implemented bounded canvas memory release and keyboard navigation in WebPDF, locked modal background scroll, and optimized paper filtering to a single pass.',
+    title: 'PDF Memory Virtualization & Single-Pass Filters',
+    summary: 'Fixed SEO canonical tags on pre-rendered pages, bounded WebPDF canvas memory, locked modal scroll, and sped up filtering.',
     changes: [
-      'Pre-rendered SEO & Open Graph fix: Ensured all 296 pre-rendered HTML routes and the homepage reliably inject canonical URLs and Open Graph/Twitter sharing cards.',
-      'WebPDF memory virtualization: Implemented sliding-window canvas memory release and explicit PDF.js worker destruction on unmount, preventing GPU memory exhaustion on mobile browsers.',
-      'Document keyboard navigation: Added Arrow Left/Right, PageUp/PageDown, Home/End, and Zoom +/- shortcuts when browsing past papers in the reader.',
-      'Page input reliability: Decoupled scroll-driven page indicators from the page input box while typing, preventing active user inputs from being overwritten.',
-      'Zero background scroll bleed: Locked body overflow when the reader modal is open to eliminate background page jumping on touch devices.',
-      'Single-pass filter optimization: Consolidated 5 sequential filter steps into a single combined predicate loop, slashing memory allocations during search.',
-      'Offline local development: Connected Vite library-files middleware in dev mode so local testing streams papers directly from disk with 0ms latency.',
-      'Cleaned starter assets: Pruned unused template CSS and image assets, keeping search-app/src strictly minimal and unbloated.'
+      'Canvas memory cleanup & shortcuts: Added sliding-window page release, worker teardown, and keyboard page/zoom shortcuts.',
+      'Single-pass filters & SEO: Combined search predicates into one loop and fixed canonical/Open Graph tags on pre-rendered routes.'
     ]
   },
   {
     version: 'v4.3',
     date: '2026-11-09T18:00:00.000Z',
-    title: 'Anti-FOUC Architecture & Codebase Cleanup',
-    summary: 'Eliminated page reload flicker with critical inline styles and noscript SEO shells, fixed React hook ordering, and pruned redundant legacy scripts.',
+    title: 'Zero-Flicker Boot & Repo Cleanup',
+    summary: 'Stopped reload theme flashes using critical inline styles and noscript SEO shells, fixed hook order, and tidied scripts.',
     changes: [
-      'Zero reload flicker: Injected critical inline theme CSS directly in document head so pages never flash raw HTML on refresh.',
-      'Noscript SEO shell: Wrapped pre-rendered route content in noscript tags so browsers render directly without temporary unstyled text while retaining full Google indexing.',
-      'Dark-mode refresh fix: Guaranteed instant #000000 background paint before first render, eliminating white flashes.',
-      'React hook reliability: Corrected conditional useMemo order in the reader modal to ensure stable render behavior.',
-      'Clean repository: Purged legacy one-off helper scripts and consolidated the script suite to 7 core Node utilities.'
+      'No reload flash: Injected critical inline theme CSS in head before first paint.',
+      'Noscript SEO shells & cleanup: Kept crawlers happy while rendering clean SPAs and pruned legacy scripts down to 7 core tools.'
     ]
   },
   {
     version: 'v4.2',
     date: '2026-11-09T12:00:00.000Z',
-    title: 'UI Polish, History Cards & Restored Team Navigation',
-    summary: 'Streamlined the PDF reader header, refined the recently viewed paper history cards, restored the full team on the About page, and added canonical footer navigation.',
+    title: 'Reader Header Cleanup & Team Restoration',
+    summary: 'Simplified the Split View header, made history action pills always visible, and updated footer and About links.',
     changes: [
-      'Cleaner PDF reader header: Removed duplicate file titles and extra subtitle rows in split view, and themed the view counter cleanly for both light and dark modes.',
-      'Always-visible history buttons: Question Paper (QP), Mark Scheme (MS), and View buttons now stay visible with bold high-contrast colors instead of hiding on hover.',
-      'Desktop filter cleanup: Hid the mobile-only "Done & View Results" drawer button on desktop screens.',
-      'Full team restored: Reinstated all 5 core team members (Diavlon, Naz, Jemison Flaren, Gemin Arghen, Claudis Oppen) on the About page.',
-      'Canonical footer links: Restored direct navigation shortcuts for Library Home, Edexcel IAL, Edexcel IGCSE, Textbooks, Changelog, About Us, and Contact.',
-      'Crisp SVG arrows: Replaced odd text arrows with sharp SVG chevrons on top navigation and return buttons.'
+      'Cleaner PDF header & history cards: Removed duplicate titles and kept QP/MS/View buttons visible without hover.',
+      'Footer & icons: Added direct canonical footer links and switched odd text arrows to crisp SVG chevrons.'
     ]
   },
   {
     version: 'v4.1',
     date: '2026-11-09T11:00:00.000Z',
-    title: 'Unified Codebase Merge: Remote Features + Local Engine',
-    summary: 'Merged remote GitHub additions from Nazmul (SEO paths, sitemap, view counter, history, and skeleton loader) with all local engine features (Pure OLED dark mode, in-house WebPDF reader, zero-clipping mobile layout, and high-contrast buttons).',
+    title: 'SEO Routes, View Counters & Recent History',
+    summary: 'Added clean subject/unit URLs with a sitemap, live view counters, recently viewed cards, and direct deep-link skeletons.',
     changes: [
-      'Canonical SEO URLs: Added clean path-based routing (/ial/mathematics/wma11-pure-mathematics-1) with auto-generated sitemap (170 URLs) and dynamic metadata.',
-      'Paper view counters: Integrated real-time view counts across table rows, mobile cards, and the reader modal.',
-      'Recently viewed history: Added persistent browser history on the homepage for fast access to recent papers.',
-      'Direct-link skeleton loading: Deep links to specific papers now open instantly with animated placeholders while data hydrates.',
-      'Preserved OLED Dark Mode & WebPDF: Retained true #000000 dark mode and our progressive dual/single canvas virtualized reader.',
-      'Header bounds protection: Ensured top navigation buttons never get cut off on laptop and tablet screen sizes.'
+      'Canonical URLs & telemetry: Launched clean /ial and /igcse paths, live view counts, and homepage Recent History cards.',
+      'Instant deep links & header safety: Added skeleton loading states and protected header buttons on narrower screens.'
     ]
   },
   {
@@ -1915,7 +1891,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
     if (!subtitlesEnabled || !activeAudioContext) return null;
     const isOfficial = subtitleEntry?.source === 'official-transcript-pdf';
     const sourceBadgeText = isOfficial
-      ? 'Official Transcript'
+      ? 'Transcript PDF'
       : subtitleEntry?.tier === 'static' || subtitleEntry?.tier === 'cloud'
       ? 'Synchronized Subtitles'
       : subtitleUncached && subtitleSegments.length === 0
@@ -2921,6 +2897,13 @@ const AboutPage = ({ onGoHome }) => {
         </div>
 
         <div className="about-section">
+          <h2>Non-Affiliation &amp; Educational Notice</h2>
+          <p>
+            Conceptualist Systems is an independent student study index and reader and is not affiliated with, endorsed by, sponsored by, or officially connected to Pearson plc or Edexcel. All trademarks and examination materials remain the property of their respective copyright holders and are provided strictly for personal revision and educational reference. Rights holders may contact us below for prompt removal.
+          </p>
+        </div>
+
+        <div className="about-section">
           <h2>Contact & Inquiries</h2>
           <p>
             For resource submissions, feedback, or general inquiries, please contact us directly:
@@ -2957,12 +2940,24 @@ const WelcomePage = ({
   getOnSitePaperUrl,
   onSubjectSelect,
   onViewAll,
-  onCurriculumSelect,
+  onBrowseTextbooks,
+  onBrowseAudio,
+  onTrySampleAudio,
   onSelectFinalFilter
 }) => {
   const [selectedSubject, setSelectedSubject] = useState(null); // { name, curriculum }
   const [selectedUnit, setSelectedUnit] = useState(null); // string | null
   const hasHistory = Array.isArray(recentHistory) && recentHistory.length > 0;
+  const bookCount = useMemo(() => (
+    Array.isArray(data.unifiedFiles) && data.unifiedFiles.length > 0
+      ? data.unifiedFiles.filter((f) => f.category === 'Books' || f.category === 'IAL Books' || f.category === 'IGCSE Books').length
+      : 71
+  ), [data.unifiedFiles]);
+  const audioCount = useMemo(() => (
+    Array.isArray(data.flatFiles) && data.flatFiles.length > 0
+      ? data.flatFiles.filter((f) => f.docType === 'AUD').length
+      : 96
+  ), [data.flatFiles]);
 
   const ialSubjects = data.meta?.ialSubjects || data.meta?.subjects || [];
   const igcseSubjects = data.meta?.igcseSubjects || [
@@ -3066,9 +3061,9 @@ const WelcomePage = ({
       <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
         <div className="welcome-hero-top">
           <div>
-            <h1>Past Exam Papers & Course Resources</h1>
+            <h1>Past Exam Papers &amp; Course Resources</h1>
             <p>
-              Welcome to Conceptualist Systems online repository. Select a qualification or subject below to interactively filter by unit, module, and examination year.
+              Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
             </p>
           </div>
           <div className="hero-stats-row">
@@ -3082,18 +3077,111 @@ const WelcomePage = ({
             </div>
           </div>
         </div>
-        <div className="welcome-hero-actions">
-          <button className="search-button" onClick={onViewAll}>
-            Browse All Documents →
-          </button>
-          <button className="filter-btn hero-action-btn" onClick={() => onCurriculumSelect('Edexcel IAL')}>
-            Edexcel IAL Collection
-          </button>
-          <button className="filter-btn hero-action-btn igcse" onClick={() => onCurriculumSelect('Edexcel IGCSE')}>
-            Edexcel IGCSE Collection
-          </button>
-        </div>
       </div>
+
+      {!selectedSubject && (
+        <section className="home-pillars-grid" aria-label="Core archive collections">
+          <div className="pillar-card">
+            <div className="pillar-card-head">
+              <div className="pillar-title-row">
+                <svg className="pillar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                <h2>Past Exam Papers</h2>
+              </div>
+              <span className="pillar-badge">2003–2026</span>
+            </div>
+            <p className="pillar-desc">
+              Paired Question Papers, Mark Schemes &amp; Examiner Reports with instant side-by-side Split View.
+            </p>
+            <div className="pillar-actions">
+              <a
+                href="/papers"
+                className="pillar-btn"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                  e.preventDefault();
+                  onViewAll();
+                }}
+              >
+                Browse All Papers →
+              </a>
+            </div>
+          </div>
+
+          <div className="pillar-card pillar-books">
+            <div className="pillar-card-head">
+              <div className="pillar-title-row">
+                <svg className="pillar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+                <h2>Textbooks &amp; Solutions</h2>
+              </div>
+              <span className="pillar-badge pillar-badge-books">{bookCount} Resources</span>
+            </div>
+            <p className="pillar-desc">
+              Complete Edexcel IAL &amp; IGCSE student books, revision guides, and step-by-step Solution Banks.
+            </p>
+            <div className="pillar-actions">
+              <a
+                href="/textbooks"
+                className="pillar-btn"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                  e.preventDefault();
+                  onBrowseTextbooks();
+                }}
+              >
+                Browse Textbooks →
+              </a>
+            </div>
+          </div>
+
+          <div className="pillar-card pillar-audio">
+            <div className="pillar-card-head">
+              <div className="pillar-title-row">
+                <svg className="pillar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                  <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                </svg>
+                <h2>Listening Audio &amp; Subtitles</h2>
+              </div>
+              <span className="pillar-badge pillar-badge-audio">Live CC · In-Browser</span>
+            </div>
+            <p className="pillar-desc">
+              Play {audioCount} French, German &amp; Spanish MP3s and ZIP archives above Question Papers with clickable synced transcripts.
+            </p>
+            <div className="pillar-actions">
+              <a
+                href="/?paper=IAL%7CFrench%7CWFR02%7C%7CJune%202021&view=AUD"
+                className="pillar-btn primary"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                  e.preventDefault();
+                  onTrySampleAudio();
+                }}
+              >
+                Try Sample Track + CC
+              </a>
+              <a
+                href="/audio"
+                className="pillar-btn"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                  e.preventDefault();
+                  onBrowseAudio();
+                }}
+              >
+                All Audio →
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* RECENTLY VIEWED PAST PAPERS HISTORY SECTION (Shown once user has opened a paper) */}
       {hasHistory && !selectedSubject && (
@@ -3491,6 +3579,7 @@ function App() {
   });
 
   const themeSwitchRafRef = useRef(null);
+  const activeThemeTransitionRef = useRef(null);
   const didMountThemeRef = useRef(false);
 
   const isPreviewOpen = Boolean(previewFile);
@@ -3505,8 +3594,9 @@ function App() {
       const root = document.documentElement;
       const isThemeChange = didMountThemeRef.current;
       didMountThemeRef.current = true;
+      const isViewTransitionActive = root.classList.contains('theme-vt');
 
-      if (isThemeChange) {
+      if (isThemeChange && !isViewTransitionActive) {
         root.classList.add('theme-switching');
       }
       if (root.getAttribute('data-theme') !== theme) {
@@ -3518,7 +3608,7 @@ function App() {
         metaTheme.setAttribute('content', metaColor);
       }
 
-      if (isThemeChange) {
+      if (isThemeChange && !isViewTransitionActive) {
         if (themeSwitchRafRef.current) {
           cancelAnimationFrame(themeSwitchRafRef.current);
         }
@@ -3538,7 +3628,15 @@ function App() {
         cancelAnimationFrame(themeSwitchRafRef.current);
         themeSwitchRafRef.current = null;
       }
-      document.documentElement.classList.remove('theme-switching');
+      if (activeThemeTransitionRef.current) {
+        try {
+          activeThemeTransitionRef.current.skipTransition();
+        } catch {
+          // Ignore stale transition cleanup
+        }
+        activeThemeTransitionRef.current = null;
+      }
+      document.documentElement.classList.remove('theme-vt', 'theme-switching');
     };
   }, []);
 
@@ -3550,12 +3648,51 @@ function App() {
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme(prev => {
-      if (prev === 'light') return 'dark';
-      if (prev === 'dark') return 'oled';
-      return 'light';
-    });
-  }, []);
+    const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'oled' : 'light';
+    const root = typeof document !== 'undefined' ? document.documentElement : null;
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (!root || prefersReduced || typeof document.startViewTransition !== 'function') {
+      setTheme(nextTheme);
+      return;
+    }
+
+    if (activeThemeTransitionRef.current) {
+      try {
+        activeThemeTransitionRef.current.skipTransition();
+      } catch {
+        // Ignore stale transition state
+      }
+      activeThemeTransitionRef.current = null;
+    }
+
+    root.classList.add('theme-vt', 'theme-switching');
+    try {
+      const vt = document.startViewTransition(() => {
+        flushSync(() => {
+          setTheme(nextTheme);
+        });
+        root.setAttribute('data-theme', nextTheme);
+        const metaTheme = document.getElementById('meta-theme-color');
+        const metaColor = nextTheme === 'oled' ? '#000000' : (nextTheme === 'dark' ? '#121417' : '#6F1D2B');
+        if (metaTheme) metaTheme.setAttribute('content', metaColor);
+      });
+      activeThemeTransitionRef.current = vt;
+      vt.finished.finally(() => {
+        if (activeThemeTransitionRef.current === vt) {
+          activeThemeTransitionRef.current = null;
+          root.classList.remove('theme-vt', 'theme-switching');
+        }
+      });
+    } catch {
+      activeThemeTransitionRef.current = null;
+      root.classList.remove('theme-vt', 'theme-switching');
+      setTheme(nextTheme);
+    }
+  }, [theme]);
 
   // Filters initialized directly from URL route
   const [filterCurriculum, setFilterCurriculum] = useState(initialRoute.filterCurriculum || ''); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
@@ -3566,7 +3703,7 @@ function App() {
   const [filterSession, setFilterSession] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // Default to newest first so recent 2026/2025 papers appear at top
   const [forceShowTable, setForceShowTable] = useState(Boolean(initialRoute.forceShowTable));
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const searchInputRef = useRef(null);
   const isPopStateRef = useRef(false);
@@ -3796,6 +3933,7 @@ function App() {
     filterDocType,
     searchQuery: deferredSearchQuery,
     paperParam: previewFile ? (previewFile.id || previewFile.path) : pendingPaperParam,
+    forceShowTable,
     notFound: currentTab === 'library' && isNotFound,
     meta: data.meta
   }), [
@@ -3808,6 +3946,7 @@ function App() {
     deferredSearchQuery,
     previewFile,
     pendingPaperParam,
+    forceShowTable,
     isNotFound,
     data.meta
   ]);
@@ -3831,7 +3970,8 @@ function App() {
         searchQuery: deferredSearchQuery,
         previewFile,
         pendingPaperParam,
-        previewMode: previewInitialView
+        previewMode: previewInitialView,
+        forceShowTable
       });
       const currentUrl = `${window.location.pathname}${window.location.search}`;
       if (currentUrl !== nextUrl) {
@@ -3892,6 +4032,7 @@ function App() {
       filterSubject,
       filterUnit,
       filterDocType,
+      forceShowTable,
       seo: seoMeta,
       meta: data.meta
     });
@@ -3908,6 +4049,7 @@ function App() {
     previewFile,
     pendingPaperParam,
     previewInitialView,
+    forceShowTable,
     seoMeta,
     data.meta
   ]);
@@ -3922,9 +4064,10 @@ function App() {
       filterDocType,
       searchQuery: deferredSearchQuery,
       previewFile: fileObj,
-      previewMode: preferredView
+      previewMode: preferredView,
+      forceShowTable
     });
-  }, [filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, deferredSearchQuery]);
+  }, [filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, deferredSearchQuery, forceShowTable]);
 
   // Global keyboard shortcut: '/' or Ctrl+K / Cmd+K focuses search input
   useEffect(() => {
@@ -4543,10 +4686,48 @@ function App() {
 
   const handleViewAll = useCallback(() => {
     setCurrentTab('library');
-    setIsNotFound(false);
-    setSortBy('newest');
+    clearFilters({ pushUrl: false });
     setForceShowTable(true);
-  }, []);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [clearFilters]);
+
+  const handleBrowseTextbooks = useCallback(() => {
+    setCurrentTab('library');
+    clearFilters({ pushUrl: false });
+    setFilterDocType('Book');
+    setForceShowTable(true);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [clearFilters]);
+
+  const handleBrowseAudio = useCallback(() => {
+    setCurrentTab('library');
+    clearFilters({ pushUrl: false });
+    setFilterDocType('AUD');
+    setForceShowTable(true);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [clearFilters]);
+
+  const handleTrySampleAudio = useCallback(() => {
+    const SAMPLE_AUDIO_ID = 'IAL|French|WFR02||June 2021';
+    const sample =
+      data.unifiedFiles.find((f) => f.id === SAMPLE_AUDIO_ID && f.docs?.AUD) ||
+      data.unifiedFiles.find((f) => f.docs?.AUD && f.docs?.QP) ||
+      data.unifiedFiles.find((f) => f.docs?.AUD);
+    if (sample) {
+      openOnSiteReader(sample, 'AUD');
+      return;
+    }
+    ensureFullIndexRef.current?.({ showLoader: false });
+    setPreviewInitialView('AUD');
+    setPendingPaperParam(SAMPLE_AUDIO_ID);
+    setPreviewFile(buildPendingPaperPlaceholder(SAMPLE_AUDIO_ID, 'AUD'));
+  }, [data.unifiedFiles, openOnSiteReader]);
 
   const retryLoadIndex = useCallback(() => {
     setFilesLoading(true);
@@ -4804,17 +4985,17 @@ function App() {
   const isRoot = selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
-  const activeDateText = useMemo(() => {
-    if (filterSubject) {
-      const cov = filterCurriculum === 'Edexcel IGCSE'
-        ? data.meta?.igcseSubjectCoverage?.[filterSubject]
-        : (filterCurriculum === 'Edexcel IAL'
-            ? data.meta?.ialSubjectCoverage?.[filterSubject]
-            : data.meta?.subjectCoverage?.[filterSubject]);
-      if (cov) return `${formatSubjectDisplay(filterSubject)}: ${cov}`;
-    }
-    return data.meta?.coverage || 'January 2003 – June 2026';
-  }, [filterSubject, filterCurriculum, data.meta]);
+  const activeDrawerFilterCount = useMemo(() => {
+    let count = 0;
+    if (filterDocType) count += 1;
+    if (filterSubject) count += 1;
+    if (filterUnit) count += 1;
+    if (filterYear) count += 1;
+    if (filterSession) count += 1;
+    if (sortBy !== 'newest') count += 1;
+    if (viewMode !== 'unified') count += 1;
+    return count;
+  }, [filterDocType, filterSubject, filterUnit, filterYear, filterSession, sortBy, viewMode]);
 
   // Upgrade from a route shard to the full catalog index whenever global search, deep links, or cross-route navigation requires it
   useEffect(() => {
@@ -5003,11 +5184,11 @@ function App() {
 
     let note = 'Every sitting pairs Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for instant on-site Split View inspection.';
     if (filterDocType === 'Book') {
-      note = `Official Pearson Edexcel student books${filterCurriculum === 'Edexcel IAL' || filterSubject === 'Math' ? ' and worked Solution Banks' : ''} with range-streamed WebPDF viewing.`;
+      note = `Archived Edexcel student books${filterCurriculum === 'Edexcel IAL' || filterSubject === 'Math' ? ' and worked Solution Banks' : ''} with range-streamed WebPDF viewing.`;
     } else if (filterDocType === 'DF') {
-      note = 'Official Edexcel practical examination source archives (.zip) for IT and Computer Science coding, spreadsheet, database, and web tasks.';
+      note = 'Practical examination source archives (.zip) for IT and Computer Science coding, spreadsheet, database, and web tasks.';
     } else if (filterDocType === 'AUD') {
-      note = 'Official Edexcel IAL Modern Languages listening examination audio tracks (MP3) with in-app playback alongside question papers.';
+      note = 'Edexcel IAL Modern Languages listening examination audio tracks (MP3) with in-app playback alongside question papers.';
     }
 
     if (!legacyInfo && links.length === 0 && !filterCurriculum && !filterSubject) return null;
@@ -5169,9 +5350,6 @@ function App() {
           </a>
 
           <div className="header-right-group">
-            <div className="header-coverage-badge">
-              <strong>{activeDateText}</strong>
-            </div>
             <button
               type="button"
               className="header-theme-btn"
@@ -5299,239 +5477,288 @@ function App() {
               )}
             </div>
             <div className="search-button-group">
-              <button
-                type="button"
-                className={`mobile-filter-toggle ${showMobileFilters ? 'active' : ''}`}
-                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                aria-label="Toggle Filters"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Filter Controls Section */}
-          <div className={`filter-controls-container ${!showMobileFilters ? 'mobile-hidden' : ''}`}>
-            {/* Row 1: Curriculum & Document Type */}
-            <div className="filter-row">
-              <span className="filter-group-label">Curriculum:</span>
-              <div className="filter-pills" role="group" aria-label="Filter by curriculum">
+              <div className="quick-curriculum-pills" role="group" aria-label="Filter by curriculum">
                 <button
                   type="button"
-                  className={`filter-btn ${filterCurriculum === '' ? 'active' : ''}`}
+                  className={`quick-curr-btn ${filterCurriculum === '' ? 'active' : ''}`}
                   onClick={() => { setIsNotFound(false); setFilterCurriculum(''); }}
                 >
                   All
                 </button>
                 <button
                   type="button"
-                  className={`filter-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
+                  className={`quick-curr-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
                   onClick={() => {
                     setIsNotFound(false);
                     setFilterCurriculum(filterCurriculum === 'Edexcel IAL' ? '' : 'Edexcel IAL');
                     setForceShowTable(true);
                   }}
                 >
-                  Edexcel IAL
+                  IAL
                 </button>
                 <button
                   type="button"
-                  className={`filter-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
+                  className={`quick-curr-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
                   onClick={() => {
                     setIsNotFound(false);
                     setFilterCurriculum(filterCurriculum === 'Edexcel IGCSE' ? '' : 'Edexcel IGCSE');
                     setForceShowTable(true);
                   }}
                 >
-                  Edexcel IGCSE
+                  IGCSE
                 </button>
               </div>
-
-              <span className="filter-group-label" style={{ marginLeft: '8px' }}>Type:</span>
-              <div className="filter-pills" role="group" aria-label="Filter by document type">
-                <button
-                  type="button"
-                  className={`filter-btn ${filterDocType === null ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterDocType(null); }}
-                >
-                  All Types
-                </button>
-                <button
-                  type="button"
-                  className={`filter-btn ${filterDocType === 'QP' ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'QP' ? null : 'QP'); setForceShowTable(true); }}
-                >
-                  Question Papers
-                </button>
-                <button
-                  type="button"
-                  className={`filter-btn ${filterDocType === 'MS' ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'MS' ? null : 'MS'); setForceShowTable(true); }}
-                >
-                  Mark Schemes
-                </button>
-                <button
-                  type="button"
-                  className={`filter-btn ${filterDocType === 'ER' ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'ER' ? null : 'ER'); setForceShowTable(true); }}
-                >
-                  Examiner Reports
-                </button>
-                <button
-                  type="button"
-                  className={`filter-btn ${filterDocType === 'Book' ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Book' ? null : 'Book'); setForceShowTable(true); }}
-                >
-                  Textbooks
-                </button>
-                <button
-                  type="button"
-                  className={`filter-btn ${filterDocType === 'Extra' ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Extra' ? null : 'Extra'); setForceShowTable(true); }}
-                >
-                  Audio / Data / SAMs
-                </button>
-              </div>
-            </div>
-
-            {/* Row 2: Subject, Unit, Year & Sort Dropdowns */}
-            <div className="filter-row" style={{ marginTop: '2px' }}>
-              <label htmlFor="subject-select" className="filter-group-label">Subject:</label>
-              <select
-                id="subject-select"
-                aria-label="Filter documents by subject"
-                className="filter-select"
-                value={filterSubject}
-                onChange={(e) => {
-                  setIsNotFound(false);
-                  setFilterSubject(e.target.value);
-                  setFilterUnit('');
-                  if (e.target.value) setForceShowTable(true);
-                }}
+              <button
+                type="button"
+                className={`filter-drawer-toggle ${showFilters ? 'active' : ''}`}
+                onClick={() => setShowFilters(prev => !prev)}
+                aria-expanded={showFilters}
+                aria-controls="catalog-filter-drawer"
+                aria-label="Toggle Filters"
               >
-                <option value="">All Subjects</option>
-                {availableSubjectsForFilter.map(s => (
-                  <option key={s} value={s}>{formatSubjectDisplay(s)}</option>
-                ))}
-              </select>
-
-              {availableUnitsForFilter.length > 0 && (
-                <>
-                  <label htmlFor="unit-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Unit/Paper:</label>
-                  <select
-                    id="unit-select"
-                    aria-label="Filter documents by unit or paper"
-                    className="filter-select"
-                    value={filterUnit}
-                    onChange={(e) => {
-                      setIsNotFound(false);
-                      setFilterUnit(e.target.value);
-                      setForceShowTable(true);
-                    }}
-                  >
-                    <option value="">All Units & Papers</option>
-                    {availableUnitsForFilter.map(u => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
-                </>
-              )}
-
-              <label htmlFor="year-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Year:</label>
-              <select
-                id="year-select"
-                aria-label="Filter documents by examination year"
-                className="filter-select"
-                value={filterYear}
-                onChange={(e) => {
-                  setIsNotFound(false);
-                  setFilterYear(e.target.value);
-                  if (e.target.value) setForceShowTable(true);
-                }}
-              >
-                <option value="">All Years</option>
-                {availableYearsForFilter.map(y => (
-                  <option key={y} value={String(y)}>{y}</option>
-                ))}
-              </select>
-
-              {filterDocType !== 'Book' && (
-                <>
-                  <label htmlFor="session-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Session:</label>
-                  <select
-                    id="session-select"
-                    aria-label="Filter documents by examination session"
-                    className="filter-select"
-                    value={filterSession}
-                    onChange={(e) => {
-                      setIsNotFound(false);
-                      setFilterSession(e.target.value);
-                      if (e.target.value) setForceShowTable(true);
-                    }}
-                  >
-                    <option value="">All Sessions</option>
-                    <option value="January">January</option>
-                    <option value="June">June</option>
-                    <option value="October">October</option>
-                  </select>
-                </>
-              )}
-
-              <label htmlFor="sort-select" className="filter-group-label" style={{ marginLeft: '4px' }}>Sort:</label>
-              <select
-                id="sort-select"
-                aria-label="Sort documents"
-                className="filter-select"
-                value={sortBy}
-                onChange={(e) => { setSortBy(e.target.value); setForceShowTable(true); }}
-              >
-                <option value="newest">Newest First</option>
-                <option value="popular">Most Viewed</option>
-                <option value="oldest">Oldest First</option>
-                <option value="name_asc">Name (A–Z)</option>
-                <option value="name_desc">Name (Z–A)</option>
-                <option value="size_desc">File Size (Largest)</option>
-              </select>
-
-              <span className="filter-group-label" style={{ marginLeft: '4px' }}>View:</span>
-              <div className="view-mode-toggle" role="group" aria-label="Toggle Unified Sittings vs Individual Files">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+                <span className="filter-toggle-label">Filters</span>
+                {activeDrawerFilterCount > 0 && (
+                  <span className="filter-count-badge">{activeDrawerFilterCount}</span>
+                )}
+              </button>
+              {hasActiveFilters && !showFilters && (
                 <button
                   type="button"
-                  className={`view-mode-btn ${viewMode === 'unified' ? 'active' : ''}`}
-                  onClick={() => setViewMode('unified')}
-                  title="Combine QP, MS, and ER from the same sitting into one row"
+                  className="search-reset-inline"
+                  onClick={clearFilters}
+                  title="Clear all active filters and return to Library Home"
                 >
-                  Unified Sittings
-                </button>
-                <button
-                  type="button"
-                  className={`view-mode-btn ${viewMode === 'separate' ? 'active' : ''}`}
-                  onClick={() => setViewMode('separate')}
-                  title="Show every file as a separate row"
-                >
-                  Individual Files
-                </button>
-              </div>
-
-              {hasActiveFilters && (
-                <button type="button" className="filter-reset-btn" onClick={clearFilters}>
-                  Reset All
-                </button>
-              )}
-
-              {showMobileFilters && (
-                <button
-                  type="button"
-                  className="filter-apply-btn mobile-only"
-                  onClick={() => setShowMobileFilters(false)}
-                >
-                  Done &amp; View Results ({allMatchedFiles.length.toLocaleString()})
+                  Reset
                 </button>
               )}
             </div>
           </div>
+
+          {/* Collapsible Filter Controls Drawer */}
+          {showFilters && (
+            <div id="catalog-filter-drawer" className="filter-controls-container">
+              {/* Row 1: Curriculum (narrow/mobile) & Document Type */}
+              <div className="filter-row">
+                <div className="drawer-curriculum-group">
+                  <span className="filter-group-label">Curriculum:</span>
+                  <div className="filter-pills" role="group" aria-label="Filter by curriculum">
+                    <button
+                      type="button"
+                      className={`filter-btn ${filterCurriculum === '' ? 'active' : ''}`}
+                      onClick={() => { setIsNotFound(false); setFilterCurriculum(''); }}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
+                      onClick={() => {
+                        setIsNotFound(false);
+                        setFilterCurriculum(filterCurriculum === 'Edexcel IAL' ? '' : 'Edexcel IAL');
+                        setForceShowTable(true);
+                      }}
+                    >
+                      Edexcel IAL
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
+                      onClick={() => {
+                        setIsNotFound(false);
+                        setFilterCurriculum(filterCurriculum === 'Edexcel IGCSE' ? '' : 'Edexcel IGCSE');
+                        setForceShowTable(true);
+                      }}
+                    >
+                      Edexcel IGCSE
+                    </button>
+                  </div>
+                </div>
+
+                <span className="filter-group-label">Type:</span>
+                <div className="filter-pills" role="group" aria-label="Filter by document type">
+                  <button
+                    type="button"
+                    className={`filter-btn ${filterDocType === null ? 'active' : ''}`}
+                    onClick={() => { setIsNotFound(false); setFilterDocType(null); }}
+                  >
+                    All Types
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${filterDocType === 'QP' ? 'active' : ''}`}
+                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'QP' ? null : 'QP'); setForceShowTable(true); }}
+                  >
+                    Question Papers
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${filterDocType === 'MS' ? 'active' : ''}`}
+                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'MS' ? null : 'MS'); setForceShowTable(true); }}
+                  >
+                    Mark Schemes
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${filterDocType === 'ER' ? 'active' : ''}`}
+                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'ER' ? null : 'ER'); setForceShowTable(true); }}
+                  >
+                    Examiner Reports
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${filterDocType === 'Book' ? 'active' : ''}`}
+                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Book' ? null : 'Book'); setForceShowTable(true); }}
+                  >
+                    Textbooks
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-btn ${filterDocType === 'Extra' ? 'active' : ''}`}
+                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Extra' ? null : 'Extra'); setForceShowTable(true); }}
+                  >
+                    Audio / Data / SAMs
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Subject, Unit, Year & Sort Dropdowns */}
+              <div className="filter-row filter-row-selects">
+                <label htmlFor="subject-select" className="filter-group-label">Subject:</label>
+                <select
+                  id="subject-select"
+                  aria-label="Filter documents by subject"
+                  className="filter-select"
+                  value={filterSubject}
+                  onChange={(e) => {
+                    setIsNotFound(false);
+                    setFilterSubject(e.target.value);
+                    setFilterUnit('');
+                    if (e.target.value) setForceShowTable(true);
+                  }}
+                >
+                  <option value="">All Subjects</option>
+                  {availableSubjectsForFilter.map(s => (
+                    <option key={s} value={s}>{formatSubjectDisplay(s)}</option>
+                  ))}
+                </select>
+
+                {availableUnitsForFilter.length > 0 && (
+                  <>
+                    <label htmlFor="unit-select" className="filter-group-label">Unit:</label>
+                    <select
+                      id="unit-select"
+                      aria-label="Filter documents by unit or paper"
+                      className="filter-select"
+                      value={filterUnit}
+                      onChange={(e) => {
+                        setIsNotFound(false);
+                        setFilterUnit(e.target.value);
+                        setForceShowTable(true);
+                      }}
+                    >
+                      <option value="">All Units & Papers</option>
+                      {availableUnitsForFilter.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+
+                <label htmlFor="year-select" className="filter-group-label">Year:</label>
+                <select
+                  id="year-select"
+                  aria-label="Filter documents by examination year"
+                  className="filter-select"
+                  value={filterYear}
+                  onChange={(e) => {
+                    setIsNotFound(false);
+                    setFilterYear(e.target.value);
+                    if (e.target.value) setForceShowTable(true);
+                  }}
+                >
+                  <option value="">All Years</option>
+                  {availableYearsForFilter.map(y => (
+                    <option key={y} value={String(y)}>{y}</option>
+                  ))}
+                </select>
+
+                {filterDocType !== 'Book' && (
+                  <>
+                    <label htmlFor="session-select" className="filter-group-label">Session:</label>
+                    <select
+                      id="session-select"
+                      aria-label="Filter documents by examination session"
+                      className="filter-select"
+                      value={filterSession}
+                      onChange={(e) => {
+                        setIsNotFound(false);
+                        setFilterSession(e.target.value);
+                        if (e.target.value) setForceShowTable(true);
+                      }}
+                    >
+                      <option value="">All Sessions</option>
+                      <option value="January">January</option>
+                      <option value="June">June</option>
+                      <option value="October">October</option>
+                    </select>
+                  </>
+                )}
+
+                <label htmlFor="sort-select" className="filter-group-label">Sort:</label>
+                <select
+                  id="sort-select"
+                  aria-label="Sort documents"
+                  className="filter-select"
+                  value={sortBy}
+                  onChange={(e) => { setSortBy(e.target.value); setForceShowTable(true); }}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="popular">Most Viewed</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="name_asc">Name (A–Z)</option>
+                  <option value="name_desc">Name (Z–A)</option>
+                  <option value="size_desc">File Size (Largest)</option>
+                </select>
+
+                <span className="filter-group-label">View:</span>
+                <div className="view-mode-toggle" role="group" aria-label="Toggle Unified Sittings vs Individual Files">
+                  <button
+                    type="button"
+                    className={`view-mode-btn ${viewMode === 'unified' ? 'active' : ''}`}
+                    onClick={() => setViewMode('unified')}
+                    title="Combine QP, MS, and ER from the same sitting into one row"
+                  >
+                    Unified Sittings
+                  </button>
+                  <button
+                    type="button"
+                    className={`view-mode-btn ${viewMode === 'separate' ? 'active' : ''}`}
+                    onClick={() => setViewMode('separate')}
+                    title="Show every file as a separate row"
+                  >
+                    Individual Files
+                  </button>
+                </div>
+
+                {hasActiveFilters && (
+                  <button type="button" className="filter-reset-btn" onClick={clearFilters}>
+                    Reset All
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="filter-apply-btn mobile-only"
+                  onClick={() => setShowFilters(false)}
+                >
+                  Done &amp; View Results ({allMatchedFiles.length.toLocaleString()})
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -5624,21 +5851,49 @@ function App() {
               getOnSitePaperUrl={getOnSitePaperUrl}
               onSubjectSelect={handleSubjectSelect}
               onViewAll={handleViewAll}
-              onCurriculumSelect={(c) => { setIsNotFound(false); setFilterCurriculum(c); setForceShowTable(true); }}
+              onBrowseTextbooks={handleBrowseTextbooks}
+              onBrowseAudio={handleBrowseAudio}
+              onTrySampleAudio={handleTrySampleAudio}
               onSelectFinalFilter={handleSelectFinalFilter}
             />
-          ) : (
+          ) : (() => {
+            const isSearchActive = Boolean(searchQuery && searchQuery.trim());
+            return (
             <>
-              {/* Desktop Breadcrumb Bar */}
-              {!isMobile && renderBreadcrumbs('desktop-breadcrumb')}
-
-              {/* Semantic Route Heading */}
-              <div className="archive-title-header">
-                <h1 className="archive-page-h1">{seoMeta.h1}</h1>
-                {seoMeta.subtitle && (
-                  <p className="archive-page-subtitle">{seoMeta.subtitle}</p>
-                )}
-              </div>
+              {/* Unified Context Header: Breadcrumb Trail + Archive Title (suppressed during live search) */}
+              {isSearchActive ? (
+                <>
+                  <h1 className="sr-only">{seoMeta.h1}</h1>
+                  {!isMobile && !(filesLoading && visibleFiles.length === 0) && allMatchedFiles.length > 0 && (
+                    <div className="search-results-bar">
+                      <span className="search-results-count">
+                        {allMatchedFiles.length > visibleFiles.length ? (
+                          <>Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong> {viewMode === 'unified' ? 'matching exam sittings' : 'matching documents'}</>
+                        ) : (
+                          <><strong>{allMatchedFiles.length.toLocaleString()}</strong> {allMatchedFiles.length === 1 ? (viewMode === 'unified' ? 'matching exam sitting' : 'matching document') : (viewMode === 'unified' ? 'matching exam sittings' : 'matching documents')}</>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : !isMobile ? (
+                <div className="archive-context-header">
+                  {renderBreadcrumbs('desktop-breadcrumb')}
+                  <div className="archive-title-block">
+                    <h1 className="archive-page-h1">{seoMeta.h1}</h1>
+                    {seoMeta.subtitle && (
+                      <p className="archive-page-subtitle">{seoMeta.subtitle}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="archive-title-header">
+                  <h1 className="archive-page-h1">{seoMeta.h1}</h1>
+                  {seoMeta.subtitle && (
+                    <p className="archive-page-subtitle">{seoMeta.subtitle}</p>
+                  )}
+                </div>
+              )}
 
               {/* Document List / Data Table */}
               {filesLoading && visibleFiles.length === 0 ? (
@@ -5648,15 +5903,15 @@ function App() {
                   <table className="file-table">
                     <thead>
                       <tr>
-                        <th style={{ width: viewMode === 'unified' ? '42%' : '50%' }}>
+                        <th className="col-sitting" style={{ width: viewMode === 'unified' ? '46%' : '50%' }}>
                           {filterDocType === 'Book'
                             ? 'Textbook / Solution Resource'
                             : viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
                         </th>
-                        <th style={{ width: viewMode === 'unified' ? '23%' : '28%' }}>
-                          {filterDocType === 'Book' ? 'Course & Category' : 'Course & Session'}
+                        <th className="col-series" style={{ width: viewMode === 'unified' ? '20%' : '26%' }}>
+                          {filterDocType === 'Book' ? 'Course & Category' : viewMode === 'unified' ? 'Series' : 'Course & Session'}
                         </th>
-                        <th style={{ width: viewMode === 'unified' ? '35%' : '22%' }}>
+                        <th className="col-actions" style={{ width: viewMode === 'unified' ? '34%' : '24%' }}>
                           {filterDocType === 'Book'
                             ? 'Open Textbook / Resource'
                             : viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
@@ -5707,19 +5962,23 @@ function App() {
                                     </a>
                                   </div>
                                   <div className="file-meta-subrow">
-                                    <span className="file-path-subtext file-location" title={isUnified ? file.folderPath : file.path}>
-                                      {isUnified ? file.folderPath : file.path}
-                                    </span>
                                     {isUnified ? (
-                                      <span className="unified-count-tag">
-                                        {file.fileCount} {file.fileCount === 1 ? 'file' : 'files'} ({file.docTypes.join(' • ')})
-                                        {file.totalSize ? ` • ${formatBytes(file.totalSize)}` : ''}
+                                      <span className="unified-meta-subline" title={file.folderPath}>
+                                        {file.fileCount} {file.fileCount === 1 ? 'file' : 'files'} · {file.docTypes.join(' · ')}
+                                        {file.totalSize ? ` · ${formatBytes(file.totalSize)}` : ''}
                                       </span>
-                                    ) : file.size ? (
-                                      <span className="file-size-tag">
-                                        {formatBytes(file.size)} • {(file.ext || 'PDF').toUpperCase()}
-                                      </span>
-                                    ) : null}
+                                    ) : (
+                                      <>
+                                        <span className="file-path-subtext file-location" title={file.path}>
+                                          {file.path}
+                                        </span>
+                                        {file.size ? (
+                                          <span className="file-size-tag">
+                                            {formatBytes(file.size)} · {(file.ext || 'PDF').toUpperCase()}
+                                          </span>
+                                        ) : null}
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                                 {eligibleForViews && (
@@ -5728,16 +5987,21 @@ function App() {
                               </div>
                             </td>
                             <td>
-                              <div className="details-primary">
-                                {formatSubjectDisplay(file.subject)}
-                                {!(file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') && shortUnit
-                                  ? ` — ${shortUnit}`
-                                  : ''}
-                              </div>
+                              {!isUnified && (
+                                <div className="details-primary">
+                                  {formatSubjectDisplay(file.subject)}
+                                  {!(file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') && shortUnit
+                                    ? ` — ${shortUnit}`
+                                    : ''}
+                                </div>
+                              )}
                               <div className="details-secondary">
                                 <span className={`curr-mini-badge ${file.curriculum === 'Edexcel IGCSE' ? 'igcse' : 'ial'}`}>
                                   {file.curriculum ? file.curriculum.replace('Edexcel ', '') : 'IAL'}
                                 </span>
+                                {isUnified && file.unitCode && (
+                                  <span className="unit-code-chip">{file.unitCode}</span>
+                                )}
                                 {file.session ? (
                                   <span className="session-pill-tag">{file.session}</span>
                                 ) : file.year ? (
@@ -5747,7 +6011,7 @@ function App() {
                                 )}
                                 {Boolean(file.variant === 'R' || file.variant === 'A' || (file.variant && file.variant.includes('R'))) && (
                                   <span className="curr-mini-badge regional" title="Regional examination series">
-                                    {file.variant === 'A' ? 'Regional (Alt A)' : 'Regional'}
+                                    {file.variant === 'A' ? 'Alt A' : 'Regional'}
                                   </span>
                                 )}
                               </div>
@@ -5818,7 +6082,7 @@ function App() {
                                         className={`unified-doc-btn ${extraType === 'AUD' ? 'aud' : 'extra'}`}
                                         title={`Open ${DOC_TYPE_INFO[extraType]?.fullLabel || extraType} on-site — ${extraDoc.name}`}
                                       >
-                                        <span className="btn-desktop-text">{labelMap[extraType] || extraType} ({extraType})</span>
+                                        <span className="btn-desktop-text">{labelMap[extraType] || extraType}</span>
                                         <span className="btn-mobile-text" aria-hidden="true">{extraType}</span>
                                       </a>
                                     );
@@ -6013,14 +6277,15 @@ function App() {
                 </section>
               )}
             </>
-          )}
+            );
+          })()}
         </main>
       </div>
 
       {/* In-App PDF Preview Modal */}
       {previewFile && (
         <PreviewModal
-          key={previewFile.id || previewFile.path}
+          key={`${previewFile.isPendingSkeleton ? 'pending-' : ''}${previewFile.id || previewFile.path}`}
           file={previewFile}
           initialView={previewInitialView}
           onViewModeChange={(nextMode) => setPreviewInitialView(nextMode)}
@@ -6043,7 +6308,7 @@ function App() {
       {/* Global Footer at the Very Bottom */}
       <footer className="footer-bottom">
         <div className="footer-left-col">
-          <div>© 2026 <strong>Conceptualist Systems</strong> — All Rights Reserved</div>
+          <div>© 2026 <strong>Conceptualist Systems</strong> — Independent Study Archive</div>
           <div
             className="footer-update-micro"
             onClick={() => { setIsNotFound(false); setCurrentTab('changelog'); }}
@@ -6052,18 +6317,10 @@ function App() {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsNotFound(false); setCurrentTab('changelog'); } }}
             title="Click to view full site changelog & version history"
           >
-            Last updated {formatUpdateTimestamp(BUILD_TIMESTAMP)} ({CHANGELOG_HISTORY[0].version}): {CHANGELOG_HISTORY[0].summary}
+            {CHANGELOG_HISTORY[0].version} · Updated {formatUpdateTimestamp(BUILD_TIMESTAMP)} · Not affiliated with Pearson or Edexcel
           </div>
         </div>
         <div className="footer-links">
-          <a
-            href="/"
-            className="footer-link"
-            onClick={navigateToHome}
-          >
-            Library Home
-          </a>
-          <span className="footer-sep">•</span>
           <a
             href="/ial"
             className="footer-link"
@@ -6104,34 +6361,6 @@ function App() {
             }}
           >
             Textbooks
-          </a>
-          <span className="footer-sep">•</span>
-          <a
-            href="/data-files"
-            className="footer-link"
-            onClick={(e) => {
-              e.preventDefault();
-              setCurrentTab('library');
-              clearFilters({ pushUrl: false });
-              setFilterDocType('DF');
-              setForceShowTable(true);
-            }}
-          >
-            Data Files
-          </a>
-          <span className="footer-sep">•</span>
-          <a
-            href="/audio"
-            className="footer-link"
-            onClick={(e) => {
-              e.preventDefault();
-              setCurrentTab('library');
-              clearFilters({ pushUrl: false });
-              setFilterDocType('AUD');
-              setForceShowTable(true);
-            }}
-          >
-            Audio Archive
           </a>
           <span className="footer-sep">•</span>
           <a
