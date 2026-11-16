@@ -28,7 +28,7 @@ The naming conventions depend on the source batch:
 
 - **Canonical Edexcel Format**: `[Subject]_[UnitCode]_[Year]-[Session]_[DocType].pdf` (e.g., `Math_WMA11_2024-Jan_QP.pdf`, `Biology_U3_2022-Jan_QP.pdf`).
 - **AutomatePapers Format**: Retains clean standard names inside `Year\Session` folders (e.g., `QP U1.pdf`, `MS U2.pdf`, `QP Paper1R.pdf`).
-- **Shared Unit Normalization (`src/unitParser.js`)**: Automatically resolves legacy equivalents (including merging Physics `WPH07` cleanly into `Unit 3 (WPH13)`), snake_case dates, CamelCase audio filenames, and duplicate file paths (`altPaths`).
+- **Search & Unit Normalization (`src/searchEngine.js`, `src/unitParser.js`)**: Indexes structured whole-token/phrase fields per sitting (`buildFileSearchData`, `finalizeUnifiedSearchData`) alongside legacy unit normalization (merging Physics `WPH07` into `Unit 3 (WPH13)`), cover-code patterns (`WMA11/01`, `4MA1/2HR`), bidirectional session aliases (`May`/`June`/`Summer`, `Oct`/`Nov`), typo suggestions (`Did you mean`), `"quoted phrases"`, `-exclusions`, and partial-match fallback.
 
 **Critical Rule:** All raw scraper timestamp suffixes (e.g., `_1700000000.pdf`) have been strictly stripped from the repository. `generate-index.js` also excludes known third-party `toaz.info-*` watermark artifacts. **Do not introduce files with raw timestamp suffixes or watermarks.**
 
@@ -138,7 +138,7 @@ Core Conceptualist Systems contributors listed on `/about`:
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, `/papers` Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.2` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.3` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.

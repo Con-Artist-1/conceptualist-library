@@ -14,6 +14,13 @@ import {
   getSubjectSlug
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
+import {
+  buildFileSearchData,
+  finalizeUnifiedSearchData,
+  buildCatalogVocab,
+  parseSearchQuery,
+  executeSmartSearch
+} from './searchEngine.js';
 import { initTelemetryTracker, setActivePaperTelemetry } from './telemetry.js';
 import { extractZipAudioTracks } from './zipAudioExtractor.js';
 import {
@@ -61,13 +68,24 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.2';
+const APP_VERSION = 'v6.3';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.2',
+    version: 'v6.3',
     date: BUILD_TIMESTAMP,
+    title: 'Smarter Search, Large PDF Streaming & Device Theme Sync',
+    summary: 'Upgraded catalog search with precision/partial matching, added on-demand byte-range streaming for large textbooks (>= 5 MB), and synced initial light/dark themes to your device.',
+    changes: [
+      'Precision & aliases: Stopped short tokens like cs, it, p1, and m1 from matching inside unrelated words, paired May/June/Summer and Oct/Nov/Autumn sessions, and mapped IGCSE subject codes (e.g. 4MA1, 4PH1).',
+      'Fuzzy & partial recovery: Built dynamic vocabulary from the live catalog, preserved digits inside paper codes during typo correction, added -exclusion filters, and surfaced closest partial matches + "Did you mean" hints.',
+      'Large PDF streaming & theme sync: Textbooks and PDFs >= 5 MB stream 128 KB byte ranges on demand with Page-1 isolation + idle HiDPI sharpening and clean MB progress, large archive PDFs were packed with compact object streams for single-digit initial requests, and first visits follow device light/dark mode until overridden.'
+    ]
+  },
+  {
+    version: 'v6.2',
+    date: '2026-11-16T00:51:30.000Z',
     title: 'Single-Row Action Buttons & Real Team Names',
     summary: 'Fixed multi-button rows wrapping onto two lines on recent cards and sitting tables, removed the card view badge, and updated founder names.',
     changes: [
@@ -500,239 +518,6 @@ function hasDataFilesForCourse(curriculum, subject) {
   if (subject === 'Information Technology') return true;
   if (subject === 'Computer Science' && curriculum !== 'Edexcel IAL') return true;
   return false;
-}
-
-const QUERY_SYNONYMS = {
-  'math': 'math mathematics maths',
-  'maths': 'math mathematics maths',
-  'mathematics': 'math mathematics maths',
-  'it': 'information technology it ict',
-  'ict': 'information technology it ict',
-  'cs': 'computer science',
-  'compsci': 'computer science',
-  'bio': 'biology',
-  'humanbio': 'human biology',
-  'chem': 'chemistry',
-  'phys': 'physics',
-  'phy': 'physics',
-  'econ': 'economics',
-  'bus': 'business',
-  'acc': 'accounting',
-  'psych': 'psychology',
-  'geog': 'geography',
-  'geo': 'geography',
-  'eng': 'english',
-  'lit': 'literature',
-  'comm': 'commerce',
-  'qp': 'qp question paper',
-  'questionpaper': 'qp question paper',
-  'questionpapers': 'qp question paper',
-  'pastpaper': 'qp question paper',
-  'pastpapers': 'qp question paper',
-  'ms': 'ms mark scheme markscheme',
-  'markscheme': 'ms mark scheme markscheme',
-  'markschemes': 'ms mark scheme markscheme',
-  'er': 'er examiner report pef',
-  'examinerreport': 'er examiner report pef',
-  'examinerreports': 'er examiner report pef',
-  'pef': 'er examiner report pef',
-  'book': 'book books textbook',
-  'textbook': 'book books textbook',
-  'textbooks': 'book books textbook',
-  'sol': 'sol solution solutions solutionbank textbook',
-  'solution': 'sol solution solutions solutionbank textbook',
-  'solutions': 'sol solution solutions solutionbank textbook',
-  'solutionbank': 'sol solution solutions solutionbank textbook',
-  'df': 'df data datafile datafiles zip',
-  'datafile': 'df data datafile datafiles zip',
-  'datafiles': 'df data datafile datafiles zip',
-  'aud': 'aud audio listening mp3',
-  'audio': 'aud audio listening mp3',
-  'listening': 'aud audio listening mp3',
-  'mp3': 'aud audio listening mp3',
-  'u1': 'u1 unit 1 wma11 wbi11 wch11 wph11 wac11 wec11 wbs11 6bi01',
-  'u2': 'u2 unit 2 wma12 wbi12 wch12 wph12 wac12 wec12 wbs12 6bi02',
-  'u3': 'u3 unit 3 wma13 wbi13 wch13 wph13 wec13 wbs13 6bi03',
-  'u4': 'u4 unit 4 wma14 wbi14 wch14 wph14 wec14 wbs14 6bi04',
-  'u5': 'u5 unit 5 wbi15 wch15 wph15 6bi05',
-  'u6': 'u6 unit 6 wbi16 wch16 wph16 6bi06',
-  'p1': 'p1 wma11 pure mathematics 1 paper 1',
-  'p2': 'p2 wma12 pure mathematics 2 paper 2',
-  'p3': 'p3 wma13 pure mathematics 3 paper 3',
-  'p4': 'p4 wma14 pure mathematics 4 paper 4',
-  '1r': '1r p1r paper 1r regional',
-  '2r': '2r p2r paper 2r regional',
-  'p1r': '1r p1r paper 1r regional',
-  'p2r': '2r p2r paper 2r regional',
-  'm1': 'm1 wme01 mechanics 1',
-  'm2': 'm2 wme02 mechanics 2',
-  'm3': 'm3 wme03 mechanics 3',
-  's1': 's1 wst01 statistics 1',
-  's2': 's2 wst02 statistics 2',
-  's3': 's3 wst03 statistics 3',
-  'fp1': 'fp1 wfm01 further pure 1',
-  'fp2': 'fp2 wfm02 further pure 2',
-  'fp3': 'fp3 wfm03 further pure 3',
-  'd1': 'd1 wdm11 wdm01 decision 1',
-  'c12': 'c12 wma01 core mathematics 12',
-  'c34': 'c34 wma02 core mathematics 34',
-  'may': 'june may',
-  'jun': 'june may',
-  'june': 'june may',
-  'summer': 'june may',
-  'oct': 'october november oct nov',
-  'nov': 'october november oct nov',
-  'october': 'october november oct nov',
-  'november': 'october november oct nov',
-  'jan': 'january jan',
-  'january': 'january jan',
-  'alt': 'alt alta regional variant',
-  'alta': 'alt alta regional variant',
-  'regional': 'regional reg alt alta r',
-  'reg': 'regional reg alt alta r'
-};
-
-// Canonical academic vocabulary for <0.05ms Damerau-Levenshtein typo tolerance & prefix matching
-const SEARCH_VOCAB = [
-  'accounting', 'arabic', 'bangla', 'biology', 'business', 'chemistry', 'commerce',
-  'computer', 'science', 'economics', 'english', 'language', 'literature', 'french',
-  'further', 'pure', 'mathematics', 'geography', 'german', 'greek', 'history',
-  'human', 'information', 'technology', 'law', 'physics', 'psychology', 'spanish',
-  'mechanics', 'statistics', 'decision', 'core', 'unit', 'paper', 'regional',
-  'foundation', 'higher', 'question', 'mark', 'scheme', 'examiner', 'report',
-  'textbook', 'book', 'solutions', 'solutionbank', 'worked', 'specimen', 'listening', 'audio', 'mp3',
-  'datafile', 'datafiles', 'modular', 'c12', 'c34',
-  'january', 'june', 'october', 'november', 'summer', 'edexcel', 'igcse', 'ial',
-  'wph01', 'wph02', 'wph03', 'wph04', 'wph05', 'wph06', 'wph07',
-  '6ph01', '6ph02', '6ph03', '6ph04', '6ph05', '6ph06',
-  '6bi01', '6bi02', '6bi03', '6bi04', '6bi05', '6bi06',
-  '6ch01', '6ch02', '6ch03', '6ch04', '6ch05', '6ch06',
-  '4ma0', '4ph0', '4ch0', '4bi0',
-  'wma11', 'wma12', 'wma13', 'wma14', 'wma01', 'wma02', 'wfm01', 'wfm02', 'wfm03',
-  'wme01', 'wme02', 'wme03', 'wst01', 'wst02', 'wst03', 'wdm11', 'wdm01',
-  'wbi11', 'wbi12', 'wbi13', 'wbi14', 'wbi15', 'wbi16',
-  'wch11', 'wch12', 'wch13', 'wch14', 'wch15', 'wch16',
-  'wph11', 'wph12', 'wph13', 'wph14', 'wph15', 'wph16',
-  'wac11', 'wac12', 'wec11', 'wec12', 'wec13', 'wec14',
-  'wbs11', 'wbs12', 'wbs13', 'wbs14',
-  'wps01', 'wps02', 'wps03', 'wps04', 'whi01', 'whi02', 'whi03', 'whi04',
-  'wge01', 'wge02', 'wge03', 'wge04', 'wit11', 'wit12', 'wit13', 'wit14',
-  'wen01', 'wen02', 'wen03', 'wen04', 'wet01', 'wet02', 'wet03', 'wet04',
-  'waa01', 'waa02', 'wfr01', 'wfr02', 'wfr03', 'wfr04',
-  'wgn01', 'wgn02', 'wgn03', 'wgn04', 'wgk01', 'wgk02',
-  'wsp01', 'wsp02', 'wsp03', 'wsp04', 'yla1', 'yla2',
-  '4ma1', '4mb1', '4pm1', '4ph1', '4ch1', '4bi1', '4hb1', '4ec1', '4bs1',
-  '4ac1', '4cm1', '4cp0', '4it1', '4ea1', '4eb1', '4et1', '4ge1', '4ba0',
-  '4wbi1', '4wch1', '4wph1'
-];
-
-const _dlPrevPrev = new Int32Array(64);
-const _dlPrev = new Int32Array(64);
-const _dlCurr = new Int32Array(64);
-
-// Fast bounded Damerau-Levenshtein distance using reusable typed rows
-function damerauLevenshtein(a, b, maxDist = 2) {
-  const lenA = a.length;
-  const lenB = b.length;
-  if (Math.abs(lenA - lenB) > maxDist) return maxDist + 1;
-  if (lenA === 0) return lenB <= maxDist ? lenB : maxDist + 1;
-  if (lenB === 0) return lenA <= maxDist ? lenA : maxDist + 1;
-  const need = lenB + 1;
-  let prevPrev = need <= _dlPrevPrev.length ? _dlPrevPrev : new Int32Array(need);
-  let prev = need <= _dlPrev.length ? _dlPrev : new Int32Array(need);
-  let curr = need <= _dlCurr.length ? _dlCurr : new Int32Array(need);
-
-  for (let j = 0; j <= lenB; j++) prev[j] = j;
-
-  for (let i = 1; i <= lenA; i++) {
-    curr[0] = i;
-    let rowMin = maxDist + 1;
-    const chA = a.charCodeAt(i - 1);
-    const chAPrev = i > 1 ? a.charCodeAt(i - 2) : -1;
-    for (let j = 1; j <= lenB; j++) {
-      const chB = b.charCodeAt(j - 1);
-      const cost = chA === chB ? 0 : 1;
-      let val = prev[j] + 1;
-      const ins = curr[j - 1] + 1;
-      if (ins < val) val = ins;
-      const sub = prev[j - 1] + cost;
-      if (sub < val) val = sub;
-      if (i > 1 && j > 1 && chA === b.charCodeAt(j - 2) && chAPrev === chB) {
-        const trans = prevPrev[j - 2] + 1;
-        if (trans < val) val = trans;
-      }
-      curr[j] = val;
-      if (val < rowMin) rowMin = val;
-    }
-    if (rowMin > maxDist) return maxDist + 1;
-    const tmp = prevPrev;
-    prevPrev = prev;
-    prev = curr;
-    curr = tmp;
-  }
-  return prev[lenB];
-}
-
-// Parse user search query into expanded synonym + typo-tolerant token groups (<0.05ms per query)
-function parseSearchQuery(rawQuery) {
-  if (!rawQuery) return [];
-  const normalized = rawQuery
-    .toLowerCase()
-    .replace(/['’]/g, '')
-    .replace(/\bunit\s*([1-6])\b/g, 'u$1')
-    .replace(/\bpaper\s*([1-4]r?)\b/g, 'p$1')
-    .replace(/\b(jan(?:uary)?|feb|mar|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?)[-_\s]*(\d{2}|\d{4})\b/g, '$1 $2')
-    .replace(/[,/;•—–-]+/g, ' ')
-    .trim();
-
-  if (!normalized) return [];
-  const rawTokens = normalized.split(/\s+/).filter(Boolean);
-  const groups = [];
-
-  for (let i = 0; i < rawTokens.length; i++) {
-    let tok = rawTokens[i];
-    // Expand 2-digit years ("25" -> "2025", "19" -> "2019", "04" -> "2004")
-    if (/^\d{2}$/.test(tok)) {
-      const yrNum = parseInt(tok, 10);
-      if (yrNum >= 3 && yrNum <= 29) {
-        tok = String(2000 + yrNum);
-      }
-    }
-
-    const alts = new Set([tok]);
-    if (QUERY_SYNONYMS[tok]) {
-      QUERY_SYNONYMS[tok].split(/\s+/).forEach(w => alts.add(w));
-    }
-
-    // Typo tolerance & prefix expansion for words >= 4 chars
-    if (tok.length >= 4 && !/^\d+$/.test(tok)) {
-      const maxEdits = tok.length >= 7 ? 2 : 1;
-      for (let v = 0; v < SEARCH_VOCAB.length; v++) {
-        const word = SEARCH_VOCAB[v];
-        if (word === tok) continue;
-        if (word.startsWith(tok)) {
-          alts.add(word);
-          if (QUERY_SYNONYMS[word]) {
-            QUERY_SYNONYMS[word].split(/\s+/).forEach(w => alts.add(w));
-          }
-        } else if (Math.abs(word.length - tok.length) <= maxEdits) {
-          // Require matching first character or transposed first two characters for high precision
-          if (word[0] === tok[0] || (word[0] === tok[1] && word[1] === tok[0])) {
-            const dist = damerauLevenshtein(tok, word, maxEdits);
-            if (dist <= maxEdits) {
-              alts.add(word);
-              if (QUERY_SYNONYMS[word]) {
-                QUERY_SYNONYMS[word].split(/\s+/).forEach(w => alts.add(w));
-              }
-            }
-          }
-        }
-      }
-    }
-
-    groups.push({ primary: tok, alts: Array.from(alts) });
-  }
-  return groups;
 }
 
 function getDocTypeBadge(docType, category) {
@@ -1888,6 +1673,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
           url={getHfUrl(targetSib.path)}
           title={targetSib.name || labelText}
           docType={docTypeKey}
+          fileSize={targetSib.size || 0}
           isMobile={isMobile}
           initialPage={1}
           onDownload={true}
@@ -2614,6 +2400,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     url={singleUrl}
                     title={singleTitle}
                     docType={currentDoc.docType || 'DOC'}
+                    fileSize={currentDoc.size || 0}
                     isMobile={isMobile}
                     initialPage={1}
                     onDownload={true}
@@ -3597,16 +3384,29 @@ function App() {
   const [pendingPaperParam, setPendingPaperParam] = useState(initialRoute.paperParam || '');
   const [viewMode, setViewMode] = useState('unified'); // 'unified' | 'separate'
 
-  // Theme Management (Default: Light Mode; Persistent across Sessions & Cookies; Supports 'light' | 'dark' | 'oled')
-  const [theme, setTheme] = useState(() => {
+  // Theme Management (Default: follows device prefers-color-scheme until explicitly cached; Supports 'light' | 'dark' | 'oled')
+  const readSavedTheme = () => {
     try {
       const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )cs_theme=([^;]*)/) : null;
       const cookieTheme = match ? decodeURIComponent(match[1]) : null;
-      const saved = cookieTheme || (typeof localStorage !== 'undefined' ? localStorage.getItem('cs_theme') : null);
-      if (saved === 'dark' || saved === 'light' || saved === 'oled') return saved;
+      if (cookieTheme === 'dark' || cookieTheme === 'light' || cookieTheme === 'oled') return cookieTheme;
+      const localTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('cs_theme') : null;
+      if (localTheme === 'dark' || localTheme === 'light' || localTheme === 'oled') return localTheme;
     } catch {}
-    return 'light'; // Light Mode is strictly default
-  });
+    return null;
+  };
+
+  const getSystemTheme = () => {
+    try {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+    } catch {}
+    return 'light';
+  };
+
+  const [theme, setTheme] = useState(() => readSavedTheme() || getSystemTheme());
+  const hasExplicitThemeRef = useRef(Boolean(readSavedTheme()));
 
   const themeSwitchRafRef = useRef(null);
   const activeThemeTransitionRef = useRef(null);
@@ -3671,13 +3471,33 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasExplicitThemeRef.current) return;
     try {
       localStorage.setItem('cs_theme', theme);
       document.cookie = `cs_theme=${theme}; max-age=31536000; path=/; SameSite=Lax`;
     } catch {}
   }, [theme]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e) => {
+      if (hasExplicitThemeRef.current) return;
+      setTheme(e.matches ? 'dark' : 'light');
+    };
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', handleSystemThemeChange);
+      return () => mql.removeEventListener('change', handleSystemThemeChange);
+    }
+    if (typeof mql.addListener === 'function') {
+      mql.addListener(handleSystemThemeChange);
+      return () => mql.removeListener(handleSystemThemeChange);
+    }
+    return undefined;
+  }, []);
+
   const toggleTheme = useCallback(() => {
+    hasExplicitThemeRef.current = true;
     const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'oled' : 'light';
     const root = typeof document !== 'undefined' ? document.documentElement : null;
     const prefersReduced =
@@ -4219,44 +4039,7 @@ function App() {
                 fileObj.sortKey = (fileObj.year || 2000) * 100 + sessionVal;
               }
 
-              const v = fileObj.variant || '';
-              const isReg = v === 'R' || v === 'A' || v.includes('R');
-              const s = fileObj.session || '';
-              const dt = fileObj.docType || '';
-
-              fileObj.searchTerms = (
-                (fileObj.name || '') + ' ' +
-                (fileObj.path || '') + ' ' +
-                (fileObj.subject || '') + ' ' +
-                (fileObj.subject === 'Math' ? 'mathematics maths ' : fileObj.subject === 'Information Technology' ? 'it ict ' : '') +
-                (fileObj.unitCode || '') + ' ' +
-                (fileObj.unitName || '') + ' ' +
-                (fileObj.cleanUnitLabel || '') + ' ' +
-                (isReg ? 'regional reg r ' : '') +
-                (v === 'A' ? 'alt alta variant ' : '') +
-                s + ' ' +
-                (s.includes('June') ? 'may summer ' : s.includes('October') ? 'november nov ' : '') +
-                (fileObj.year || '') + ' ' +
-                dt + ' ' +
-                (dt === 'QP'
-                  ? 'question paper '
-                  : dt === 'MS'
-                  ? 'mark scheme markscheme '
-                  : dt === 'ER'
-                  ? 'examiner report '
-                  : dt === 'SOL'
-                  ? 'solution bank worked solutions '
-                  : dt === 'DF'
-                  ? 'data file datafiles practical zip '
-                  : dt === 'AUD'
-                  ? 'listening audio mp3 '
-                  : dt === 'Book'
-                  ? 'textbook student book '
-                  : '') +
-                fileObj.curriculum + ' ' +
-                (fileObj.category || '')
-              ).toLowerCase();
-
+              fileObj._search = buildFileSearchData(fileObj);
               flatFiles[i] = fileObj;
             }
 
@@ -4402,7 +4185,7 @@ function App() {
               sortKey: f.sortKey,
               docs: {},
               paths: [],
-              searchChunks: [],
+              _childFiles: [],
               totalSize: 0
             };
             sittingMap.set(sittingKey, group);
@@ -4420,7 +4203,7 @@ function App() {
           if (Array.isArray(f.altPaths) && f.altPaths.length > 0) {
             group.paths.push(...f.altPaths);
           }
-          group.searchChunks.push(f.searchTerms);
+          group._childFiles.push(f);
           group.totalSize += (f.size || 0);
         }
 
@@ -4456,8 +4239,11 @@ function App() {
           item.size = item.totalSize;
           item.docType = primary.docType;
           item.siblings = primary.siblings;
-          item.searchTerms = item.searchChunks.join(' ');
-          delete item.searchChunks;
+          const searchSources = item.docs.AUD && !item._childFiles.includes(item.docs.AUD)
+            ? [...item._childFiles, item.docs.AUD]
+            : item._childFiles;
+          finalizeUnifiedSearchData(item, searchSources);
+          delete item._childFiles;
         }
 
             if (cancelled || (!isFull && isFullIndexLoadedRef.current)) return;
@@ -4816,7 +4602,9 @@ function App() {
     return years;
   }, [filterSubject, filterCurriculum, filterUnit, data.meta]);
 
-  const allMatchedFiles = useMemo(() => {
+  const catalogVocab = useMemo(() => buildCatalogVocab(data.flatFiles), [data.flatFiles]);
+
+  const searchResults = useMemo(() => {
     const isSpecificFolder = Boolean(selectedPath && selectedPath !== '');
     const useUnified = viewMode === 'unified';
 
@@ -4888,51 +4676,24 @@ function App() {
       files = filtered;
     }
 
-    const termGroups = parseSearchQuery(deferredSearchQuery);
-    const hasSearch = termGroups.length > 0;
-    const relevanceMap = hasSearch ? new WeakMap() : null;
+    const parsedSearch = parseSearchQuery(deferredSearchQuery, catalogVocab);
+    const searchExec = parsedSearch.hasQuery
+      ? executeSmartSearch(files, parsedSearch, { isUnified: useUnified })
+      : {
+          files,
+          relevanceMap: null,
+          isPartialFallback: false,
+          missingTerms: [],
+          appliedCorrections: [],
+          didYouMean: ''
+        };
 
-    if (hasSearch) {
-      const matched = [];
-      for (let k = 0; k < files.length; k++) {
-        const f = files[k];
-        const st = f.searchTerms;
-        if (!st) continue;
-        let allMatched = true;
-        let score = 0;
-
-        for (let i = 0; i < termGroups.length; i++) {
-          const { primary, alts } = termGroups[i];
-          let matchedOne = false;
-          for (let j = 0; j < alts.length; j++) {
-            const alt = alts[j];
-            if (st.includes(alt)) {
-              matchedOne = true;
-              // Boost exact primary token or exact unitCode / subject / year match
-              if (alt === primary) score += 4;
-              else score += 2;
-              if (f.unitCode && f.unitCode.toLowerCase() === alt) score += 10;
-              if (f.subject && f.subject.toLowerCase() === alt) score += 6;
-              if (f.year && String(f.year) === alt) score += 5;
-              break;
-            }
-          }
-          if (!matchedOne) {
-            allMatched = false;
-            break;
-          }
-        }
-        if (allMatched) {
-          relevanceMap.set(f, score);
-          matched.push(f);
-        }
-      }
-      files = matched;
-    }
+    const matchedFiles = searchExec.files;
+    const relevanceMap = searchExec.relevanceMap;
 
     // Sort logic (when searching, rank by relevance score first, then newest session first)
     const docOrder = { QP: 1, MS: 2, ER: 3, SC: 4, DF: 5, AUD: 6, SAM: 7, SOL: 8 };
-    const sorted = [...files];
+    const sorted = [...matchedFiles];
     if (sortBy === 'newest' || sortBy === '') {
       sorted.sort((a, b) => {
         if (relevanceMap) {
@@ -4979,13 +4740,14 @@ function App() {
       sorted.sort((a, b) => (b.size || 0) - (a.size || 0));
     }
 
-    return sorted;
+    return { files: sorted, meta: searchExec };
   }, [
     data.flatFiles,
     data.dedupedFiles,
     data.unifiedFiles,
     selectedPath,
     deferredSearchQuery,
+    catalogVocab,
     filterCurriculum,
     filterDocType,
     filterSubject,
@@ -4996,6 +4758,9 @@ function App() {
     viewMode,
     viewsMap
   ]);
+
+  const allMatchedFiles = searchResults.files;
+  const searchMeta = searchResults.meta;
 
   const visibleFiles = useMemo(
     () => allMatchedFiles.slice(0, visibleCount),
@@ -5893,13 +5658,38 @@ function App() {
               {isSearchActive ? (
                 <>
                   <h1 className="sr-only">{seoMeta.h1}</h1>
-                  {!isMobile && !(filesLoading && visibleFiles.length === 0) && allMatchedFiles.length > 0 && (
+                  {!(filesLoading && visibleFiles.length === 0) && allMatchedFiles.length > 0 && (!isMobile || searchMeta.didYouMean) && (
                     <div className="search-results-bar">
-                      <span className="search-results-count">
-                        {allMatchedFiles.length > visibleFiles.length ? (
-                          <>Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong> {viewMode === 'unified' ? 'matching exam sittings' : 'matching documents'}</>
-                        ) : (
-                          <><strong>{allMatchedFiles.length.toLocaleString()}</strong> {allMatchedFiles.length === 1 ? (viewMode === 'unified' ? 'matching exam sitting' : 'matching document') : (viewMode === 'unified' ? 'matching exam sittings' : 'matching documents')}</>
+                      {!isMobile && (
+                        <span className="search-results-count">
+                          {allMatchedFiles.length > visibleFiles.length ? (
+                            <>Showing <strong>{visibleFiles.length}</strong> of <strong>{allMatchedFiles.length.toLocaleString()}</strong> {viewMode === 'unified' ? 'matching exam sittings' : 'matching documents'}</>
+                          ) : (
+                            <><strong>{allMatchedFiles.length.toLocaleString()}</strong> {allMatchedFiles.length === 1 ? (viewMode === 'unified' ? 'matching exam sitting' : 'matching document') : (viewMode === 'unified' ? 'matching exam sittings' : 'matching documents')}</>
+                          )}
+                        </span>
+                      )}
+                      {searchMeta.didYouMean && (
+                        <span className="search-did-you-mean">
+                          Did you mean{' '}
+                          <button
+                            type="button"
+                            className="search-did-you-mean-btn"
+                            onClick={() => setSearchQuery(searchMeta.didYouMean)}
+                          >
+                            {searchMeta.didYouMean}
+                          </button>
+                          ?
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {!(filesLoading && visibleFiles.length === 0) && searchMeta.isPartialFallback && allMatchedFiles.length > 0 && (
+                    <div className="search-fallback-banner" role="status">
+                      <span>
+                        No exact match for all terms — showing closest partial matches
+                        {searchMeta.missingTerms?.length > 0 && (
+                          <> (missing: <strong>{searchMeta.missingTerms.join(', ')}</strong>)</>
                         )}
                       </span>
                     </div>
@@ -6260,6 +6050,19 @@ function App() {
                     <>
                       <h3>No matching documents found</h3>
                       <p>Try refining your search terms or resetting an active filter above.</p>
+                      {searchMeta.didYouMean && (
+                        <p className="search-did-you-mean search-did-you-mean-empty">
+                          Did you mean{' '}
+                          <button
+                            type="button"
+                            className="search-did-you-mean-btn"
+                            onClick={() => setSearchQuery(searchMeta.didYouMean)}
+                          >
+                            {searchMeta.didYouMean}
+                          </button>
+                          ?
+                        </p>
+                      )}
                       {hasActiveFilters && (
                         <button
                           type="button"

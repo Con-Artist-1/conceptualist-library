@@ -33,27 +33,32 @@
     <link rel="preload" href="/meta.json" as="fetch" crossorigin />
     <script>
       (function() {
+        function isValidTheme(v) {
+          return v === 'light' || v === 'dark' || v === 'oled';
+        }
         try {
           var match = document.cookie.match(/(?:^|; )cs_theme=([^;]*)/);
           var cookieTheme = match ? decodeURIComponent(match[1]) : null;
           var localTheme = localStorage.getItem('cs_theme');
-          var t = cookieTheme || localTheme;
+          var t = isValidTheme(cookieTheme)
+            ? cookieTheme
+            : (isValidTheme(localTheme)
+                ? localTheme
+                : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
           // Theme support: 'light' (Academic Light), 'dark' (Academic Dark), 'oled' (Pure OLED)
-          if (t === 'oled') {
-            document.documentElement.setAttribute('data-theme', 'oled');
-            var metaTc = document.getElementById('meta-theme-color');
-            if (metaTc) metaTc.setAttribute('content', '#000000');
-          } else if (t === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            var metaTc = document.getElementById('meta-theme-color');
-            if (metaTc) metaTc.setAttribute('content', '#121417');
-          } else {
-            document.documentElement.setAttribute('data-theme', 'light');
-            var metaTc = document.getElementById('meta-theme-color');
-            if (metaTc) metaTc.setAttribute('content', '#6F1D2B');
+          document.documentElement.setAttribute('data-theme', t);
+          var metaTc = document.getElementById('meta-theme-color');
+          if (metaTc) {
+            metaTc.setAttribute('content', t === 'oled' ? '#000000' : (t === 'dark' ? '#121417' : '#6F1D2B'));
           }
         } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'light');
+          var fallback = 'light';
+          try {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+              fallback = 'dark';
+            }
+          } catch (err) {}
+          document.documentElement.setAttribute('data-theme', fallback);
         }
       })();
       window.addEventListener('vite:preloadError', function () {
@@ -67,6 +72,17 @@
 
     <!-- Critical Anti-FOUC Baseline Theme & Surface Styles -->
     <style id="critical-anti-fouc">
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme]) {
+          --bg-page: #121417;
+          --bg-surface: #1B1E23;
+          --text-primary: #F0F2F5;
+          --mcmaster-maroon: #8C1D2F;
+          --mcmaster-gold: #D4AF37;
+          background-color: #121417;
+          color: #F0F2F5;
+        }
+      }
       :root, [data-theme='light'] {
         --bg-page: #F4F3EF;
         --bg-surface: #FFFFFF;

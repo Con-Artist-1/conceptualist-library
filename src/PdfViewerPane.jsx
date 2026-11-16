@@ -6,6 +6,10 @@ const mountedPaneIds = new Set();
 let activePaneId = null;
 let nextPaneSeq = 1;
 
+const LARGE_PDF_STREAM_THRESHOLD = 5 * 1024 * 1024; // Stream byte ranges only for >= 5 MB PDFs
+const STREAM_BOOTSTRAP_BYTES = 65536; // 64 KB initial header + single-hop CDN URL resolution
+const STREAM_CHUNK_SIZE = 131072; // 128 KB HTTP/2 range chunks for fast startup & page jumps
+
 function loadPdfJs() {
   if (!pdfjsPromise) {
     const base = typeof window !== 'undefined' ? window.location.origin : '';
@@ -21,6 +25,124 @@ function loadPdfJs() {
       });
   }
   return pdfjsPromise;
+}
+
+// Resolve redirects once and stream byte ranges on demand for large PDFs (>= 5 MB)
+async function createLargePdfRangeTransport(pdfjsLib, url, signal, onBytesProgress, onInitialRangeError) {
+  const bootRes = await fetch(url, {
+    headers: { Range: `bytes=0-${STREAM_BOOTSTRAP_BYTES - 1}` },
+    signal
+  });
+  if (!bootRes.ok && bootRes.status !== 206) {
+    throw new Error(`HTTP ${bootRes.status}`);
+  }
+  if (bootRes.status !== 206) {
+    try { await bootRes.body?.cancel?.(); } catch { }
+    return null;
+  }
+
+  const cr = bootRes.headers.get('content-range') || '';
+  const crMatch = /\/(\d+)$/.exec(cr);
+  const totalLength = crMatch ? parseInt(crMatch[1], 10) : 0;
+  if (!totalLength || totalLength <= STREAM_CHUNK_SIZE * 2) {
+    try { await bootRes.body?.cancel?.(); } catch { }
+    return null;
+  }
+
+  const resolvedCdnUrl = bootRes.url || url;
+  const initialData = new Uint8Array(await bootRes.arrayBuffer());
+  if (initialData.byteLength === 0) {
+    return null;
+  }
+
+  onBytesProgress?.(initialData.byteLength, totalLength);
+
+  class DirectRangeTransport extends pdfjsLib.PDFDataRangeTransport {
+    constructor() {
+      super(totalLength, initialData);
+      this.cdnUrl = resolvedCdnUrl;
+      this.originalUrl = url;
+      this.activeCtrls = new Set();
+      this.seenRanges = new Set();
+      this.loadedBytes = initialData.byteLength;
+      this.aborted = false;
+      this.docReady = false;
+      this.refreshPromise = null;
+    }
+
+    refreshCdnUrl(abortSignal) {
+      if (!this.refreshPromise) {
+        this.refreshPromise = fetch(this.originalUrl, {
+          headers: { Range: 'bytes=0-0' },
+          signal: abortSignal
+        })
+          .then(async (res) => {
+            if (res.url) this.cdnUrl = res.url;
+            try { await res.body?.cancel?.(); } catch { }
+          })
+          .finally(() => {
+            this.refreshPromise = null;
+          });
+      }
+      return this.refreshPromise;
+    }
+
+    requestDataRange(begin, end) {
+      if (this.aborted) return;
+      const ctrl = new AbortController();
+      this.activeCtrls.add(ctrl);
+
+      const fetchSlice = async (attempt = 0) => {
+        try {
+          const res = await fetch(this.cdnUrl, {
+            headers: { Range: `bytes=${begin}-${end - 1}` },
+            signal: ctrl.signal
+          });
+          if ((res.status === 401 || res.status === 403) && attempt === 0 && this.cdnUrl !== this.originalUrl) {
+            await this.refreshCdnUrl(ctrl.signal);
+            return fetchSlice(1);
+          }
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          const ab = await res.arrayBuffer();
+          if (this.aborted) return;
+          const chunk = new Uint8Array(ab);
+          const rangeKey = `${begin}:${end}`;
+          if (!this.seenRanges.has(rangeKey)) {
+            this.seenRanges.add(rangeKey);
+            this.loadedBytes = Math.min(this.length, this.loadedBytes + chunk.byteLength);
+            onBytesProgress?.(this.loadedBytes, this.length);
+          }
+          this.onDataRange(begin, chunk);
+        } catch (err) {
+          if (this.aborted || err?.name === 'AbortError') return;
+          if (attempt === 0 && this.cdnUrl !== this.originalUrl) {
+            this.cdnUrl = this.originalUrl;
+            return fetchSlice(1);
+          }
+          console.warn(`[WebPDF] Range request failed (${begin}-${end}):`, err);
+          if (!this.docReady && !this.aborted) {
+            onInitialRangeError?.(err);
+          }
+        } finally {
+          this.activeCtrls.delete(ctrl);
+        }
+      };
+
+      fetchSlice(0);
+    }
+
+    abort() {
+      this.aborted = true;
+      for (const ctrl of this.activeCtrls) {
+        try { ctrl.abort(); } catch { }
+      }
+      this.activeCtrls.clear();
+    }
+  }
+
+  return { transport: new DirectRangeTransport(), totalLength };
 }
 
 function computePageTargetWidth(containerWidth, scale, isMobile) {
@@ -41,6 +163,7 @@ const VirtualPdfPage = React.memo(({
   isVisible,
   isNear,
   isMobile,
+  isLargePdf = false,
   defaultAspectRatio,
   onPageRendered
 }) => {
@@ -68,47 +191,44 @@ const VirtualPdfPage = React.memo(({
     }
   }, [shouldMountCanvas]);
 
-  // Render page to an offscreen buffer first to prevent zoom/resize blank flicker
+  // Two-pass progressive offscreen rendering: instant draft canvas first, then idle HiDPI upgrade
   useEffect(() => {
     if (!shouldMountCanvas || !pdfDoc) return;
 
     let active = true;
     let offscreenCanvas = null;
+    let idleHandle = null;
+    let usedIdleCallback = false;
 
-    pdfDoc.getPage(pageNum).then((page) => {
-      if (!active || !canvasRef.current) return;
-
-      const totalRotation = ((page.rotate || 0) + rotation) % 360;
-      const unscaledViewport = page.getViewport({ scale: 1, rotation: totalRotation });
-      if (unscaledViewport && unscaledViewport.width > 0) {
-        const ratio = unscaledViewport.height / unscaledViewport.width;
-        setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
+    const cancelScheduledIdle = () => {
+      if (idleHandle === null) return;
+      if (usedIdleCallback && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleHandle);
+      } else {
+        clearTimeout(idleHandle);
       }
+      idleHandle = null;
+    };
 
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
+    const drawPass = (page, unscaledViewport, totalRotation, dprValue, notifyPainted) => {
+      if (!active || !canvasRef.current) return Promise.resolve(false);
       const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
       const computedScale = targetWidth / unscaledViewport.width;
       const viewport = page.getViewport({ scale: computedScale, rotation: totalRotation });
 
-      // High-DPI scaling capped adaptively on zoomed mobile to preserve GPU memory
-      const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : 2.5;
-      const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-      const pixelW = Math.max(1, Math.floor(viewport.width * dpr));
-      const pixelH = Math.max(1, Math.floor(viewport.height * dpr));
+      const pixelW = Math.max(1, Math.floor(viewport.width * dprValue));
+      const pixelH = Math.max(1, Math.floor(viewport.height * dprValue));
 
       offscreenCanvas = document.createElement('canvas');
       offscreenCanvas.width = pixelW;
       offscreenCanvas.height = pixelH;
       const offscreenCtx = offscreenCanvas.getContext('2d');
-      if (!offscreenCtx) return;
+      if (!offscreenCtx) return Promise.resolve(false);
 
       offscreenCtx.fillStyle = '#FFFFFF';
       offscreenCtx.fillRect(0, 0, pixelW, pixelH);
 
-      const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
+      const transform = dprValue !== 1 ? [dprValue, 0, 0, dprValue, 0, 0] : null;
 
       if (renderTaskRef.current) {
         try { renderTaskRef.current.cancel(); } catch { /* noop */ }
@@ -122,11 +242,11 @@ const VirtualPdfPage = React.memo(({
       });
       renderTaskRef.current = renderTask;
 
-      renderTask.promise.then(() => {
-        if (!active || !canvasRef.current) return;
+      return renderTask.promise.then(() => {
+        if (!active || !canvasRef.current) return false;
         const targetCanvas = canvasRef.current;
         const targetCtx = targetCanvas.getContext('2d');
-        if (!targetCtx) return;
+        if (!targetCtx) return false;
 
         targetCanvas.width = pixelW;
         targetCanvas.height = pixelH;
@@ -138,8 +258,11 @@ const VirtualPdfPage = React.memo(({
         offscreenCanvas.height = 0;
         offscreenCanvas = null;
 
-        setRendered(true);
-        if (onPageRendered) onPageRendered(pageNum);
+        if (notifyPainted) {
+          setRendered(true);
+          if (onPageRendered) onPageRendered(pageNum);
+        }
+        return true;
       }).catch((err) => {
         if (offscreenCanvas) {
           offscreenCanvas.width = 0;
@@ -149,6 +272,40 @@ const VirtualPdfPage = React.memo(({
         if (err?.name !== 'RenderingCancelledException') {
           console.warn(`[WebPDF] Render error on page ${pageNum}:`, err);
         }
+        return false;
+      });
+    };
+
+    pdfDoc.getPage(pageNum).then((page) => {
+      if (!active || !canvasRef.current) return;
+
+      const totalRotation = ((page.rotate || 0) + rotation) % 360;
+      const unscaledViewport = page.getViewport({ scale: 1, rotation: totalRotation });
+      if (unscaledViewport && unscaledViewport.width > 0) {
+        const ratio = unscaledViewport.height / unscaledViewport.width;
+        setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
+      }
+
+      // High-DPI scaling capped adaptively on zoomed mobile to preserve GPU memory
+      const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : 2.5;
+      const fullDpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+      const useTwoPass = isLargePdf || fullDpr > 1.05;
+      const fastDpr = fullDpr > 1.05 ? 1 : 0.72;
+      const firstPassDpr = useTwoPass ? fastDpr : fullDpr;
+
+      drawPass(page, unscaledViewport, totalRotation, firstPassDpr, true).then((painted) => {
+        if (!painted || !active || !useTwoPass || Math.abs(fullDpr - firstPassDpr) <= 0.05) return;
+        const startHiRes = () => {
+          idleHandle = null;
+          if (!active || !canvasRef.current) return;
+          drawPass(page, unscaledViewport, totalRotation, fullDpr, false);
+        };
+        if (typeof window.requestIdleCallback === 'function') {
+          usedIdleCallback = true;
+          idleHandle = window.requestIdleCallback(startHiRes, { timeout: 600 });
+        } else {
+          idleHandle = setTimeout(startHiRes, 140);
+        }
       });
     }).catch((err) => {
       console.warn(`[WebPDF] GetPage failed on page ${pageNum}:`, err);
@@ -156,6 +313,7 @@ const VirtualPdfPage = React.memo(({
 
     return () => {
       active = false;
+      cancelScheduledIdle();
       if (renderTaskRef.current) {
         try { renderTaskRef.current.cancel(); } catch { /* noop */ }
       }
@@ -165,7 +323,7 @@ const VirtualPdfPage = React.memo(({
         offscreenCanvas = null;
       }
     };
-  }, [pdfDoc, pageNum, scale, rotation, containerWidth, shouldMountCanvas, onPageRendered, isMobile]);
+  }, [pdfDoc, pageNum, scale, rotation, containerWidth, shouldMountCanvas, onPageRendered, isMobile, isLargePdf]);
 
   const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
   const exactWidth = Math.max(1, Math.floor(targetWidth));
@@ -208,6 +366,7 @@ export const PdfViewerPane = ({
   url,
   title,
   docType = 'QP',
+  fileSize = 0,
   isMobile = false,
   initialPage = 1,
   onDownload = true,
@@ -227,6 +386,7 @@ export const PdfViewerPane = ({
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [streamStats, setStreamStats] = useState(null);
   const [firstPagePainted, setFirstPagePainted] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [containerWidth, setContainerWidth] = useState(() => (
@@ -387,15 +547,19 @@ export const PdfViewerPane = ({
     return () => el.removeEventListener('wheel', handleWheel);
   }, [recordZoomAnchor]);
 
-  // Fetch and parse document with PDF.js (with strict worker and document destruction on unmount)
+  // Fetch and parse document with PDF.js (byte-range streaming for >= 5 MB PDFs; single-pass for smaller papers)
   const loadDocument = useCallback(() => {
     if (!url) return;
     let active = true;
     let loadingTask = null;
     let loadedDoc = null;
+    let activeTransport = null;
+    const bootCtrl = new AbortController();
+    const shouldStreamLargePdf = Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
 
     setLoading(true);
     setDownloadProgress(null);
+    setStreamStats(shouldStreamLargePdf ? { loadedBytes: 0, totalBytes: Number(fileSize) } : null);
     setFirstPagePainted(false);
     setRotation(0);
     setLoadError(null);
@@ -405,34 +569,90 @@ export const PdfViewerPane = ({
     }
     setPdfDoc((prev) => {
       if (prev) {
-        try { prev.destroy(); } catch {}
+        try { prev.destroy(); } catch { }
       }
       return null;
     });
 
-    loadPdfJs().then((pdfjsLib) => {
+    loadPdfJs().then(async (pdfjsLib) => {
       if (!active) return;
-      loadingTask = pdfjsLib.getDocument({
-        url,
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
-        cMapPacked: true,
-        enableXfa: false,
-        disableAutoFetch: false,
-        rangeChunkSize: 262144
-      });
 
-      loadingTask.onProgress = (progressData) => {
-        if (!active || !progressData) return;
-        if (typeof progressData.total === 'number' && progressData.total > 0) {
-          const pct = Math.min(99, Math.max(0, Math.round((progressData.loaded / progressData.total) * 100)));
-          setDownloadProgress(pct);
+      if (shouldStreamLargePdf) {
+        try {
+          const streamSetup = await createLargePdfRangeTransport(
+            pdfjsLib,
+            url,
+            bootCtrl.signal,
+            (loadedBytes, totalBytes) => {
+              if (!active) return;
+              setStreamStats({ loadedBytes, totalBytes });
+            },
+            (rangeErr) => {
+              if (!active) return;
+              console.error('[WebPDF] Streaming failure for URL', url, rangeErr);
+              try { activeTransport?.abort(); } catch { }
+              try { loadingTask?.destroy(); } catch { }
+              setLoadError(rangeErr?.message || 'Failed to stream PDF preview');
+              setLoading(false);
+            }
+          );
+          if (!active) {
+            try { streamSetup?.transport?.abort(); } catch { }
+            return;
+          }
+          if (streamSetup?.transport) {
+            activeTransport = streamSetup.transport;
+          } else {
+            setStreamStats(null);
+          }
+        } catch (bootErr) {
+          if (!active || bootErr?.name === 'AbortError') return;
+          console.warn('[WebPDF] Range bootstrap fell back to standard load:', bootErr);
+          setStreamStats(null);
         }
-      };
+      }
+
+      if (!active) return;
+
+      loadingTask = pdfjsLib.getDocument(
+        activeTransport
+          ? {
+            range: activeTransport,
+            length: activeTransport.length,
+            rangeChunkSize: STREAM_CHUNK_SIZE,
+            disableAutoFetch: true,
+            disableStream: true,
+            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+            cMapPacked: true,
+            enableXfa: false
+          }
+          : {
+            url,
+            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+            cMapPacked: true,
+            enableXfa: false,
+            disableAutoFetch: false,
+            rangeChunkSize: 262144
+          }
+      );
+
+      if (!activeTransport) {
+        loadingTask.onProgress = (progressData) => {
+          if (!active || !progressData) return;
+          if (typeof progressData.total === 'number' && progressData.total > 0) {
+            const pct = Math.min(99, Math.max(0, Math.round((progressData.loaded / progressData.total) * 100)));
+            setDownloadProgress(pct);
+          }
+        };
+      }
 
       loadingTask.promise.then(async (doc) => {
         if (!active) {
-          try { doc.destroy(); } catch {}
+          try { doc.destroy(); } catch { }
           return;
+        }
+        if (activeTransport) {
+          activeTransport.docReady = true;
         }
         loadedDoc = doc;
 
@@ -441,7 +661,7 @@ export const PdfViewerPane = ({
         try {
           const p1 = await doc.getPage(1);
           if (!active) {
-            try { doc.destroy(); } catch {}
+            try { doc.destroy(); } catch { }
             return;
           }
           const vp = p1.getViewport({ scale: 1 });
@@ -456,8 +676,6 @@ export const PdfViewerPane = ({
         const requestedStart = Number(initialPageRef.current) || 1;
         const startPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
         const initialWindow = new Set([startPage]);
-        if (startPage + 1 <= doc.numPages) initialWindow.add(startPage + 1);
-        if (startPage - 1 >= 1) initialWindow.add(startPage - 1);
 
         pendingInitialJumpRef.current = startPage > 1 ? startPage : null;
         if (measuredRatio) {
@@ -489,14 +707,18 @@ export const PdfViewerPane = ({
 
     return () => {
       active = false;
+      try { bootCtrl.abort(); } catch { }
+      if (activeTransport) {
+        try { activeTransport.abort(); } catch { }
+      }
       if (loadingTask) {
-        try { loadingTask.destroy(); } catch {}
+        try { loadingTask.destroy(); } catch { }
       }
       if (loadedDoc) {
-        try { loadedDoc.destroy(); } catch {}
+        try { loadedDoc.destroy(); } catch { }
       }
     };
-  }, [url]);
+  }, [url, fileSize]);
 
   useEffect(() => {
     const cleanup = loadDocument();
@@ -608,12 +830,22 @@ export const PdfViewerPane = ({
     };
   }, [numPages]);
 
-  // Reliable Jump to Page (smooth programmatic scrolling with locking)
+  // Reliable Jump to Page (smooth nearby stepping; instant jump across distant pages so streaming skips intermediate pages)
   const scrollToPage = useCallback((pageNum, smooth = true) => {
+    const prevPage = currentPageRef.current;
     const clamped = Math.max(1, Math.min(pageNum, numPages || 1));
+    const isFarJump = Math.abs(clamped - prevPage) > 4;
     currentPageRef.current = clamped;
     setCurrentPage(clamped);
     setInputPage(String(clamped));
+    if (isFarJump) {
+      setVisiblePages(() => {
+        const next = new Set([clamped]);
+        if (clamped + 1 <= (numPages || clamped)) next.add(clamped + 1);
+        if (clamped - 1 >= 1) next.add(clamped - 1);
+        return next;
+      });
+    }
 
     if (!scrollAreaRef.current) return;
     const targetEl = scrollAreaRef.current.querySelector(`[data-page-number="${clamped}"]`);
@@ -624,12 +856,12 @@ export const PdfViewerPane = ({
       const targetTop = Math.max(0, targetEl.offsetTop - 12);
       scrollAreaRef.current.scrollTo({
         top: targetTop,
-        behavior: smooth ? 'smooth' : 'auto'
+        behavior: smooth && !isFarJump ? 'smooth' : 'auto'
       });
 
       scrollTimeoutRef.current = setTimeout(() => {
         isProgrammaticScrollRef.current = false;
-      }, 600);
+      }, isFarJump ? 150 : 600);
     }
   }, [numPages]);
 
@@ -873,7 +1105,9 @@ export const PdfViewerPane = ({
           <div className="pdf-loading-overlay">
             <div className="pdf-loading-card">
               <div className="pdf-loading-bar-track">
-                {typeof downloadProgress === 'number' ? (
+                {streamStats ? (
+                  <div className="pdf-loading-bar-fill" />
+                ) : typeof downloadProgress === 'number' ? (
                   <div
                     className="pdf-loading-bar-fill determinate"
                     style={{ width: `${Math.max(8, downloadProgress)}%` }}
@@ -883,11 +1117,17 @@ export const PdfViewerPane = ({
                 )}
               </div>
               <div className="pdf-loading-title">
-                {typeof downloadProgress === 'number' && downloadProgress < 100
-                  ? `Downloading Document (${downloadProgress}%)`
-                  : 'Rendering Document'}
+                {streamStats
+                  ? (loading ? 'Streaming Pages...' : 'Rendering Document')
+                  : typeof downloadProgress === 'number' && downloadProgress < 100
+                    ? `Downloading Document (${downloadProgress}%)`
+                    : 'Rendering Document'}
               </div>
-              <div className="pdf-loading-subtext">{title || 'Preparing vector pages...'}</div>
+              <div className="pdf-loading-subtext">
+                {streamStats && streamStats.loadedBytes > 0
+                  ? `Streaming ${(streamStats.loadedBytes / 1048576).toFixed(1)} MB...`
+                  : (title || 'Preparing vector pages...')}
+              </div>
             </div>
           </div>
         )}
@@ -926,9 +1166,10 @@ export const PdfViewerPane = ({
                 scale={scale}
                 rotation={rotation}
                 containerWidth={containerWidth}
-                isVisible={visiblePages.has(pageNum)}
-                isNear={Math.abs(pageNum - currentPage) <= 2}
+                isVisible={visiblePages.has(pageNum) && (firstPagePainted || pageNum === currentPage)}
+                isNear={firstPagePainted && Math.abs(pageNum - currentPage) <= 2}
                 isMobile={isMobile}
+                isLargePdf={Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD}
                 defaultAspectRatio={defaultAspectRatio}
                 onPageRendered={handlePageRendered}
               />
