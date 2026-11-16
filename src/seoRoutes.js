@@ -735,7 +735,138 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null)
   return result;
 }
 
-export function getSeoMetadata({
+const DOC_TYPE_SEO_LABELS = {
+  QP: { plural: 'Question Papers', singular: 'Question Paper' },
+  MS: { plural: 'Mark Schemes', singular: 'Mark Scheme' },
+  ER: { plural: 'Examiner Reports', singular: 'Examiner Report' },
+  SOL: { plural: 'Worked Solutions', singular: 'Solution Bank' },
+  SC: { plural: 'Source Booklets', singular: 'Source Booklet' },
+  SAM: { plural: 'Sample Assessment Materials', singular: 'Sample Assessment' },
+  Book: { plural: 'Textbooks & Solutions', singular: 'Textbook PDF' },
+  DF: { plural: 'Practical Data Files', singular: 'Data File' },
+  AUD: { plural: 'Listening Audio Tracks', singular: 'Listening Audio' }
+};
+
+function parsePaperParamForSeo(paperParam) {
+  const raw = String(paperParam || '').trim();
+  if (!raw) return null;
+
+  if (raw.includes('|')) {
+    const [spec = 'IAL', subject = '', unitCode = '', variant = '', session = ''] = raw.split('|');
+    const curr = spec.toUpperCase() === 'IGCSE' ? 'Edexcel IGCSE' : 'Edexcel IAL';
+    const currShort = curr.replace('Edexcel ', '');
+    const subjDisplay = formatSubjectName(subject);
+    const codeLabel = variant ? `${unitCode} (${variant})` : unitCode;
+    const fullTitle = [curr, subjDisplay, codeLabel, session].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const compactTitle = [curr, subjDisplay, unitCode || variant, session].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const shortTitle = [currShort, subjDisplay, unitCode || variant, session].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const keywords = [
+      fullTitle,
+      unitCode && session ? `${unitCode} ${session} question paper` : '',
+      unitCode && session ? `${unitCode} ${session} mark scheme` : '',
+      unitCode ? `${unitCode} past papers` : '',
+      `${curr} ${subjDisplay} past papers`
+    ].filter(Boolean);
+    return { fullTitle, compactTitle, shortTitle, keywords: [...new Set(keywords)].join(', ') };
+  }
+
+  const baseName = raw.split('/').pop()?.replace(/\.[a-z0-9]+$/i, '').replace(/[_]+/g, ' ').trim() || raw;
+  return {
+    fullTitle: `Edexcel ${baseName}`,
+    compactTitle: `Edexcel ${baseName}`,
+    shortTitle: baseName,
+    keywords: `${baseName}, Edexcel past papers, Edexcel question paper, Edexcel mark scheme`
+  };
+}
+
+function enrichSeoForQueryParams(baseSeo, {
+  filterCurriculum = '',
+  filterSubject = '',
+  filterUnit = '',
+  filterYear = '',
+  filterDocType = null,
+  searchQuery = '',
+  paperParam = ''
+}) {
+  if (paperParam) {
+    const parsedPaper = parsePaperParamForSeo(paperParam);
+    if (parsedPaper) {
+      return {
+        ...baseSeo,
+        title: pickTitleVariant([
+          `${parsedPaper.fullTitle} Paper & MS | Conceptualist`,
+          `${parsedPaper.compactTitle} Past Paper | Conceptualist`,
+          `${parsedPaper.shortTitle} Paper & MS | Conceptualist`,
+          `${parsedPaper.shortTitle} | Conceptualist`
+        ], 65),
+        description: fitDescription(
+          `Study ${parsedPaper.fullTitle} Question Paper, Mark Scheme & Examiner Report side-by-side in Split View free on Conceptualist.`
+        ),
+        keywords: parsedPaper.keywords,
+        robots: 'index, follow',
+        h1: `${parsedPaper.fullTitle} — Question Paper & Mark Scheme`
+      };
+    }
+  }
+
+  const isCanonicalDocTypeFilter =
+    (filterDocType === 'Book' && !filterUnit) ||
+    (filterDocType === 'DF' && !filterCurriculum && !filterSubject && !filterUnit) ||
+    (filterDocType === 'AUD' && !filterCurriculum && !filterSubject && !filterUnit);
+  const cleanYear = String(filterYear || '').trim();
+  const cleanSearch = String(searchQuery || '').trim();
+  const nonCanonicalDocInfo = filterDocType && !isCanonicalDocTypeFilter ? DOC_TYPE_SEO_LABELS[filterDocType] : null;
+
+  if (!cleanYear && !cleanSearch && !nonCanonicalDocInfo) {
+    return { ...baseSeo, robots: 'index, follow' };
+  }
+
+  const qualifiers = [];
+  if (cleanYear) qualifiers.push(cleanYear);
+  if (nonCanonicalDocInfo) qualifiers.push(nonCanonicalDocInfo.plural);
+
+  const baseHead = baseSeo.title.replace(/\s*\|\s*Conceptualist.*$/i, '').trim();
+  let nextTitle = baseSeo.title;
+  if (cleanSearch) {
+    nextTitle = pickTitleVariant([
+      `${cleanSearch} — ${baseHead} | Conceptualist`,
+      `${cleanSearch} Edexcel Papers | Conceptualist`
+    ], 65);
+  } else if (qualifiers.length > 0) {
+    const qualStr = qualifiers.join(' ');
+    nextTitle = pickTitleVariant([
+      `${baseHead} (${qualStr}) | Conceptualist`,
+      `${baseHead} ${qualStr} | Conceptualist`,
+      `${qualStr} — ${baseHead}`
+    ], 65);
+  }
+
+  const qualDesc = [cleanYear, nonCanonicalDocInfo?.plural, cleanSearch ? `"${cleanSearch}"` : ''].filter(Boolean).join(' ');
+  const extraKeywords = [
+    cleanYear ? `${baseSeo.h1} ${cleanYear}` : '',
+    nonCanonicalDocInfo ? `${baseHead} ${nonCanonicalDocInfo.plural}` : '',
+    cleanSearch ? `${cleanSearch} Edexcel past papers` : ''
+  ].filter(Boolean);
+
+  return {
+    ...baseSeo,
+    title: nextTitle,
+    description: fitDescription(`${qualDesc}: ${baseSeo.description}`),
+    keywords: extraKeywords.length > 0 ? `${extraKeywords.join(', ')}, ${baseSeo.keywords}` : baseSeo.keywords,
+    robots: 'index, follow',
+    h1: cleanSearch
+      ? `Search "${cleanSearch}" — ${baseSeo.h1}`
+      : `${baseSeo.h1} (${qualifiers.join(' · ')})`
+  };
+}
+
+export function getSeoMetadata(params = {}) {
+  const baseSeo = computeBaseSeoMetadata(params);
+  if (params.notFound) return baseSeo;
+  return enrichSeoForQueryParams(baseSeo, params);
+}
+
+function computeBaseSeoMetadata({
   currentTab = 'library',
   filterCurriculum = '',
   filterSubject = '',
@@ -749,16 +880,6 @@ export function getSeoMetadata({
   meta = null
 }) {
   const { uniqueFiles, totalFiles } = getArchiveCounts(meta);
-  const isCanonicalDocTypeFilter =
-    (filterDocType === 'Book' && !filterUnit) ||
-    (filterDocType === 'DF' && !filterCurriculum && !filterSubject && !filterUnit) ||
-    (filterDocType === 'AUD' && !filterCurriculum && !filterSubject && !filterUnit);
-  const hasFacetedQuery = Boolean(
-    filterYear ||
-    searchQuery ||
-    paperParam ||
-    (filterDocType && !isCanonicalDocTypeFilter)
-  );
 
   if (notFound) {
     return {
@@ -777,12 +898,14 @@ export function getSeoMetadata({
     filterCurriculum,
     filterSubject,
     filterUnit,
-    filterYear: '',
-    filterDocType: isCanonicalDocTypeFilter ? filterDocType : null,
+    filterYear,
+    filterDocType,
+    searchQuery,
+    pendingPaperParam: paperParam,
     forceShowTable
   });
   const canonicalUrl = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`;
-  const robots = hasFacetedQuery ? 'noindex, follow' : 'index, follow';
+  const robots = 'index, follow';
 
   if (currentTab === 'about') {
     return {
@@ -1049,7 +1172,7 @@ export function getSeoMetadata({
     title: 'Conceptualist Systems | Edexcel IAL & IGCSE Past Papers',
     description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.coverage || '2003–2026'}) side-by-side in Split View.`),
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Conceptualist Systems, WMA11, WCH11, WPH11, WBI11, 4MA1, mark schemes, examiner reports, Edexcel textbooks pdf',
-    canonicalUrl: `${SITE_URL}/`,
+    canonicalUrl,
     robots,
     h1: 'Edexcel IAL & IGCSE Past Exam Papers & Textbooks',
     subtitle: `${uniqueFiles.toLocaleString()}+ unique Question Papers, Mark Schemes, Examiner Reports, and Textbooks across ${totalFiles.toLocaleString()} archived files (${meta?.coverage || 'January 2003 – June 2026'}).`

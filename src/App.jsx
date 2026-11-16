@@ -11,7 +11,8 @@ import {
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
   getCurriculumSlug,
-  getSubjectSlug
+  getSubjectSlug,
+  getUnitSlug
 } from './seoRoutes.js';
 import { extractVariant, getCleanUnitLabel } from './unitParser.js';
 import {
@@ -3152,28 +3153,62 @@ const WelcomePage = ({
     });
   };
 
-  return (
-    <div className="welcome-container">
-      <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
-        <div className="welcome-hero-top">
-          <div>
-            <h1>Past Exam Papers &amp; Course Resources</h1>
-            <p>
-              Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
-            </p>
+    const renderSubjectCard = (subject, curriculum) => {
+      const isIgcse = curriculum === 'Edexcel IGCSE';
+      const subjWizard = wizardMeta?.[curriculum]?.[subject];
+      const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
+      const docCount = subjWizard?.totalFiles || 0;
+      const coverageMap = isIgcse ? igcseSubjectCoverage : ialSubjectCoverage;
+      const href = `/${getCurriculumSlug(curriculum)}/${getSubjectSlug(subject)}`;
+
+      return (
+        <a
+          key={`${isIgcse ? 'igcse' : 'ial'}-${subject}`}
+          href={href}
+          className={`subject-card${isIgcse ? ' igcse' : ''}`}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+            e.preventDefault();
+            handleSubjectClick(subject, curriculum);
+          }}
+        >
+          <div className="subject-card-top">
+            <div className="subject-card-title">{isIgcse ? subject : formatSubjectDisplay(subject)}</div>
+            {docCount > 0 && <span className={`subject-card-count${isIgcse ? ' igcse' : ''}`}>{docCount} docs</span>}
           </div>
-          <div className="hero-stats-row">
-            <div className="hero-stat-pill">
-              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 10146).toLocaleString()}</strong>
-              <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
+          <div className="subject-card-subtitle">
+            {coverageMap[subject] || (isIgcse ? 'International GCSE Collection' : 'Edexcel IAL Collection')}
+            {!isIgcse && unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
+          </div>
+        </a>
+      );
+    };
+
+    const selectedCurrSlug = selectedSubject ? getCurriculumSlug(selectedSubject.curriculum) : '';
+    const selectedSubjSlug = selectedSubject ? getSubjectSlug(selectedSubject.name) : '';
+
+    return (
+      <div className="welcome-container">
+        <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
+          <div className="welcome-hero-top">
+            <div>
+              <h1>Past Exam Papers &amp; Course Resources</h1>
+              <p>
+                Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
+              </p>
             </div>
-            <div className="hero-stat-pill">
-              <strong>{ialSubjects.length + igcseSubjects.length}</strong>
-              <span>Subjects</span>
+            <div className="hero-stats-row">
+              <div className="hero-stat-pill">
+                <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 10146).toLocaleString()}</strong>
+                <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
+              </div>
+              <div className="hero-stat-pill">
+                <strong>{ialSubjects.length + igcseSubjects.length}</strong>
+                <span>Subjects</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
       {!selectedSubject && (
         <section className="home-pillars-grid" aria-label="Core archive collections">
@@ -3457,13 +3492,18 @@ const WelcomePage = ({
             <div className="wizard-step">
               <h2>Select {formatSubjectDisplay(selectedSubject.name)} Unit or Paper:</h2>
               <div style={{ marginBottom: '24px' }}>
-                <button
+                <a
+                  href={`/${selectedCurrSlug}/${selectedSubjSlug}`}
                   className="wizard-option-btn primary"
-                  onClick={() => onSubjectSelect(selectedSubject.name, selectedSubject.curriculum)}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                    e.preventDefault();
+                    onSubjectSelect(selectedSubject.name, selectedSubject.curriculum);
+                  }}
                   style={{ width: '100%', marginBottom: '20px' }}
                 >
-                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers & Textbooks →</span>
-                </button>
+                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers &amp; Textbooks →</span>
+                </a>
                 {Object.entries(groupedUnits).map(([groupName, units]) => (
                   <div key={groupName} style={{ marginBottom: '20px' }}>
                     {Object.keys(groupedUnits).length > 1 && (
@@ -3474,15 +3514,21 @@ const WelcomePage = ({
                     <div className="wizard-button-grid">
                       {units.map(unitName => {
                         const unitCount = availableUnitsMap[unitName]?.count;
+                        const unitHref = `/${selectedCurrSlug}/${selectedSubjSlug}/${getUnitSlug(unitName)}`;
                         return (
-                          <button
+                          <a
                             key={unitName}
+                            href={unitHref}
                             className="wizard-option-btn"
-                            onClick={() => handleUnitClick(unitName)}
+                            onClick={(e) => {
+                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                              e.preventDefault();
+                              handleUnitClick(unitName);
+                            }}
                           >
                             <span>{unitName}</span>
                             {unitCount ? <span className="wizard-unit-count">{unitCount}</span> : null}
-                          </button>
+                          </a>
                         );
                       })}
                     </div>
@@ -3495,23 +3541,33 @@ const WelcomePage = ({
             <div className="wizard-step">
               <h2>Select Examination Year for {selectedUnit}:</h2>
               <div style={{ marginBottom: '20px' }}>
-                <button
+                <a
+                  href={`/${selectedCurrSlug}/${selectedSubjSlug}/${getUnitSlug(selectedUnit)}`}
                   className="wizard-option-btn primary"
-                  onClick={() => handleYearClick('')}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                    e.preventDefault();
+                    handleYearClick('');
+                  }}
                   style={{ width: '100%' }}
                 >
                   <span>All Examination Years for {selectedUnit} →</span>
-                </button>
+                </a>
               </div>
               <div className="wizard-button-grid-years">
                 {availableYears.map(year => (
-                  <button
+                  <a
                     key={year}
+                    href={`/${selectedCurrSlug}/${selectedSubjSlug}/${getUnitSlug(selectedUnit)}?year=${year}`}
                     className="wizard-option-btn year"
-                    onClick={() => handleYearClick(year)}
+                    onClick={(e) => {
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+                      e.preventDefault();
+                      handleYearClick(year);
+                    }}
                   >
                     {year}
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -3525,30 +3581,7 @@ const WelcomePage = ({
             <span className="section-count-badge">{ialSubjects.length} Subjects</span>
           </div>
           <div className="subject-grid" style={{ marginBottom: '32px' }}>
-            {ialSubjects.map(subject => {
-              const subjWizard = wizardMeta?.['Edexcel IAL']?.[subject];
-              const unitCount = subjWizard ? Object.keys(subjWizard.units || {}).length : 0;
-              const docCount = subjWizard?.totalFiles || 0;
-              return (
-                <div
-                  key={`ial-${subject}`}
-                  className="subject-card"
-                  onClick={() => handleSubjectClick(subject, 'Edexcel IAL')}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IAL'); } }}
-                >
-                  <div className="subject-card-top">
-                    <div className="subject-card-title">{formatSubjectDisplay(subject)}</div>
-                    {docCount > 0 && <span className="subject-card-count">{docCount} docs</span>}
-                  </div>
-                  <div className="subject-card-subtitle">
-                    {ialSubjectCoverage[subject] || 'Edexcel IAL Collection'}
-                    {unitCount > 0 ? ` • ${unitCount} ${unitCount === 1 ? 'Unit' : 'Units'}` : ''}
-                  </div>
-                </div>
-              );
-            })}
+            {ialSubjects.map(subject => renderSubjectCard(subject, 'Edexcel IAL'))}
           </div>
 
           <div className="section-header-row">
@@ -3556,28 +3589,7 @@ const WelcomePage = ({
             <span className="section-count-badge igcse">{igcseSubjects.length} Subjects</span>
           </div>
           <div className="subject-grid" style={{ marginBottom: '32px' }}>
-            {igcseSubjects.map(subject => {
-              const subjWizard = wizardMeta?.['Edexcel IGCSE']?.[subject];
-              const docCount = subjWizard?.totalFiles || 0;
-              return (
-                <div
-                  key={`igcse-${subject}`}
-                  className="subject-card igcse"
-                  onClick={() => handleSubjectClick(subject, 'Edexcel IGCSE')}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSubjectClick(subject, 'Edexcel IGCSE'); } }}
-                >
-                  <div className="subject-card-top">
-                    <div className="subject-card-title">{subject}</div>
-                    {docCount > 0 && <span className="subject-card-count igcse">{docCount} docs</span>}
-                  </div>
-                  <div className="subject-card-subtitle">
-                    {igcseSubjectCoverage[subject] || 'International GCSE Collection'}
-                  </div>
-                </div>
-              );
-            })}
+            {igcseSubjects.map(subject => renderSubjectCard(subject, 'Edexcel IGCSE'))}
           </div>
         </>
       )}
@@ -4160,6 +4172,8 @@ function App() {
     setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
     setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
     setMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
+    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', pageTitle);
+    setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', seoMeta.description);
 
     let canonicalEl = document.querySelector('link[rel="canonical"]');
     if (!canonicalEl) {
