@@ -53,7 +53,7 @@ The scripts directory contains strictly **8 essential utilities**. Keep all temp
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output
    ```
-3. **SEO Sitemap, Route Shards & Static HTML Pre-rendering (`298` sitemap URLs including `/papers`, `65` shards, `298` canonical HTML routes + `404.html` + `422` permanent `308` redirects in `vercel.json`):**
+3. **SEO Sitemap, Route Shards & Static HTML Pre-rendering (`299` sitemap URLs including `/papers`, `65` shards, `299` canonical HTML routes + `404.html` + `422` permanent `308` redirects in `vercel.json`):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\prerender-seo.js`" 2>&1" | Write-Output
    ```

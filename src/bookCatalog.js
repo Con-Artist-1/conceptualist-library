@@ -1,4 +1,4 @@
-// Verified Bibliographic Metadata Catalog for all 71 IAL & IGCSE Textbooks, Lab Books, Answers & Solution Banks.
+// Verified Bibliographic Metadata Catalog for all 73 IAL & IGCSE Textbooks, Lab Books, Answers & Solution Banks.
 // Every title, author list, publisher, publication year, and ISBN was verified directly from each PDF cover & copyright page.
 // Keeping physical storage paths unchanged preserves Hugging Face CDN URLs and MongoDB paper_views counters.
 
@@ -443,6 +443,13 @@ export const BOOK_CATALOG_BY_PATH = {
     year: 2017,
     isbn: '978-0-435-18516-9'
   },
+  'IGCSE Books/Commerce/Pearson Edexcel International GCSE (9-1) Commerce Student Book.pdf': {
+    title: 'Pearson Edexcel International GCSE (9-1) Commerce Student Book — Rob Jones (2020)',
+    authors: 'Rob Jones',
+    publisher: 'Pearson Education Limited',
+    year: 2020,
+    isbn: '978-1-292-31020-6'
+  },
   'IGCSE Books/Economics/(9-1) Economics.pdf': {
     title: 'Pearson Edexcel International GCSE (9-1) Economics Student Book — Rob Jones (2017)',
     authors: 'Rob Jones',
@@ -483,6 +490,13 @@ export const BOOK_CATALOG_BY_PATH = {
     publisher: 'Pearson Education Limited',
     year: 2016,
     isbn: '978-0-435-18144-4'
+  },
+  'IGCSE Books/Maths/Pearson Edexcel International GCSE (9-1) Mathematics A Student Book 2.pdf': {
+    title: 'Pearson Edexcel International GCSE (9-1) Mathematics A Student Book 2 — David Turner, Ian Potts (2017)',
+    authors: 'David Turner, Ian Potts',
+    publisher: 'Pearson Education Limited',
+    year: 2017,
+    isbn: '978-0-435-18305-9'
   },
   'IGCSE Books/Physics/(9-1) Physics  (1).pdf': {
     title: 'Pearson Edexcel International GCSE (9-1) Physics Student Book — Brian Arnold, Penny Johnson, Steve Woolley (2017)',

@@ -994,7 +994,7 @@ export function getSeoMetadata({
         title: `${filterCurriculum} Textbooks${isIal ? ' & Solution Banks' : ' (9–1) PDF'} | Conceptualist`,
         description: isIal
           ? 'Browse 60 Edexcel IAL student textbooks & Maths Solution Banks across 9 subjects in our high-speed WebPDF reader.'
-          : 'Browse 11 Edexcel IGCSE (9–1) student textbooks across Sciences, Mathematics, Business & IT free online.',
+          : 'Browse 13 Edexcel IGCSE (9–1) student textbooks across Sciences, Mathematics, Business, Commerce & IT free online.',
         keywords: `${filterCurriculum} textbooks pdf, ${isIal ? 'Edexcel IAL solution banks, IAL Maths solution bank' : 'Edexcel IGCSE 9-1 textbooks pdf'}`,
         canonicalUrl,
         robots,
@@ -1004,12 +1004,12 @@ export function getSeoMetadata({
     }
     return {
       title: 'Edexcel IAL & IGCSE Textbooks & Solutions PDF | Conceptualist',
-      description: fitDescription('Read 71 Edexcel IAL and IGCSE (9–1) student textbooks, lab books, and worked solution banks free online in WebPDF reader.'),
+      description: fitDescription('Read 73 Edexcel IAL and IGCSE (9–1) student textbooks, lab books, and worked solution banks free online in WebPDF reader.'),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
       robots,
       h1: 'Edexcel IAL & IGCSE Textbooks & Solution Banks',
-      subtitle: '71 course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Economics, Accounting, Psychology, and IT.'
+      subtitle: '73 course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Commerce, Economics, Accounting, Psychology, and IT.'
     };
   }
 

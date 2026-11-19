@@ -78,13 +78,23 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.1';
+const APP_VERSION = 'v6.9.2';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.1',
+    version: 'v6.9.2',
     date: BUILD_TIMESTAMP,
+    title: 'Added IGCSE Commerce & Mathematics A Student Book 2 (73 Textbooks)',
+    summary: 'Expanded the verified IGCSE (9-1) textbook collection with Commerce Student Book (Rob Jones, 2020) and Mathematics A Student Book 2 (David Turner & Ian Potts, 2017), adding /textbooks/igcse/commerce.',
+    changes: [
+      'New linearized IGCSE (9-1) textbooks: Added Pearson Edexcel International GCSE (9-1) Commerce Student Book (Rob Jones, 2020, 426 pp) and Mathematics A Student Book 2 (David Turner & Ian Potts, 2017, 561 pp) with verified cover/copyright metadata.',
+      'Canonical SEO & catalog counts: Added /textbooks/igcse/commerce (299 canonical sitemap URLs, 73 total textbooks & worked solution banks).'
+    ]
+  },
+  {
+    version: 'v6.9.1',
+    date: '2026-11-20T00:15:00+06:00',
     title: 'Subject Wizard Sub-URLs & Browser Back/Forward Navigation',
     summary: 'Synced subject and unit wizard steps with canonical sub-URLs (/ial/<subject>, /igcse/<subject>, and unit routes) so browser Back/Forward and mouse Back buttons step smoothly through Subjects → Units → Years → Papers instead of leaving the site.',
     changes: [
@@ -595,7 +605,7 @@ const DOC_TYPE_INFO = {
 
 const SUBJECTS_WITH_BOOKS = {
   'Edexcel IAL': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Information Technology', 'Math', 'Physics', 'Psychology']),
-  'Edexcel IGCSE': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Further Pure Mathematics', 'Human Biology', 'Information Technology', 'Mathematics A', 'Physics'])
+  'Edexcel IGCSE': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Commerce', 'Economics', 'Further Pure Mathematics', 'Human Biology', 'Information Technology', 'Mathematics A', 'Physics'])
 };
 
 const IAL_AUDIO_SUBJECTS = new Set(['French', 'German', 'Spanish']);
@@ -3170,7 +3180,7 @@ const WelcomePage = ({
   const bookCount = useMemo(() => (
     Array.isArray(data.unifiedFiles) && data.unifiedFiles.length > 0
       ? data.unifiedFiles.filter((f) => f.category === 'Books' || f.category === 'IAL Books' || f.category === 'IGCSE Books').length
-      : 71
+      : 73
   ), [data.unifiedFiles]);
   const audioCount = useMemo(() => (
     Array.isArray(data.flatFiles) && data.flatFiles.length > 0
@@ -3811,8 +3821,8 @@ async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
-  totalFiles: 19938,
-  uniqueFiles: 16077,
+  totalFiles: 19940,
+  uniqueFiles: 16079,
   subjects: DEFAULT_ALL_SUBJECTS,
   ialSubjects: IAL_SUBJECTS_DEFAULT,
   igcseSubjects: IGCSE_SUBJECTS_DEFAULT,
