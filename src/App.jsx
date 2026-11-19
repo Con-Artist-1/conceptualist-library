@@ -12,10 +12,13 @@ import {
   inferCurriculumForSubject,
   getCurriculumSlug,
   getSubjectSlug,
+  getUnitSlug,
+  DEFAULT_UNIT_LABELS,
   IAL_SUBJECTS_DEFAULT,
   IGCSE_SUBJECTS_DEFAULT
 } from './seoRoutes.js';
-import { extractVariant, getCleanUnitLabel } from './unitParser.js';
+import { extractVariant, getCleanUnitLabel, compareUnitLabels, isLegacyIalUnitLabel } from './unitParser.js';
+import { getBookMetadata, formatFallbackBookTitle } from './bookCatalog.js';
 import {
   buildFileSearchData,
   finalizeUnifiedSearchData,
@@ -75,13 +78,26 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.8';
+const APP_VERSION = 'v6.9';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.8',
+    version: 'v6.9',
     date: BUILD_TIMESTAMP,
+    title: 'Verified Textbook Titles, Unit Grouping & Order, and Search Console SEO Fix',
+    summary: 'Standardized all 71 textbook and solution bank titles with verified authors and years, fixed subject unit grouping/ordering across Physics, Business, Chemistry, Biology, Economics & Maths, resolved Search Console indexing traps, and tightened search accuracy.',
+    changes: [
+      'Subject unit ordering & naming: Scoped Maths branch grouping strictly to Maths (fixing Physics Units 1 & 4 under "Mechanics" and Business Unit 3 under "Decision Mathematics"), ordered all units 1–6 naturally, separated Current vs. Legacy (Pre-2018) specs with full verified Pearson unit titles (WPH01–06, WBI01–06, WCH01–07, WBS01–04, WEC01–04, 6ECA1–3), and merged the WET12 typo into WET02.',
+      'Complete textbook catalog naming: Replaced cryptic and copy-suffixed textbook names ("P1 .pdf", "(1)", "New ...", ALL-CAPS answer files) with full bibliographic titles, verified authors, publishers, and publication years across all 71 IAL & IGCSE books and worked solution banks.',
+      'Google Search indexing & crawl budget: Moved paper-modal deep links to hash fragments (#paper=...) to eliminate 30,000+ ?paper= crawl traps while keeping legacy ?paper= links and middle-click support intact, removed conflicting noindex directives on parameterized canonical routes, linked all unit and textbook sub-pages inside hydrated DOM reference bars, added shorthand & legacy unit 308 redirects, and enabled true HTTP 404s for invalid subpaths.',
+      'Search & parser accuracy: Added plural document-type matching ("wit12 data files", "wma11 examiner reports"), blocked P1/WMA11 phrase collisions with Further Pure Mathematics 1, isolated Higher vs Foundation (2HR vs 2FR) queries, stripped duplicate copy suffixes from search path tokens, and recovered 5 unconventional Pearson filenames.',
+      'Visual UI & OLED contrast polish: Fixed missing Pure OLED overrides for breadcrumbs, wizard back buttons, and IGCSE blue accents; eliminated Dark/OLED double-border clipping in mobile header breadcrumbs; replaced hardcoded "Scientific Article" tabs with context-aware document labels (Transcript, Equations List, Extract Booklet, Exemplars, Speaking / Grid); refined 1366px modal header spacing; and balanced the 404 recovery action row.'
+    ]
+  },
+  {
+    version: 'v6.8',
+    date: '2026-11-17T04:17:16+06:00',
     title: 'PDF Streaming Reliability, Search Console SEO & Multi-Resolution UI Polish',
     summary: 'Eliminated non-linearized large PDF range stalls, fixed search & unit indexing edge cases, resolved Google Search Console noindex/canonical duplicates, and refined Dark/OLED, tablet, and mobile layouts.',
     changes: [
@@ -581,6 +597,19 @@ function hasDataFilesForCourse(curriculum, subject) {
   return false;
 }
 
+function getScDocumentLabel(doc) {
+  const name = String(doc?.name || doc?.path || '').toLowerCase();
+  const subj = String(doc?.subject || '').toLowerCase();
+  if (name.includes('transcript')) return ['Transcript', 'Transcript'];
+  if (/scientific[\s_-]*article/.test(name) || subj === 'biology') return ['Scientific Article', 'Article'];
+  if (/equations?[\s_-]*list/.test(name)) return ['Equations List', 'Equations'];
+  if (name.includes('extract')) return ['Extract Booklet', 'Extract'];
+  if (/exemplar|exp-and-com/.test(name)) return ['Exemplars', 'Exemplars'];
+  if (/speaking|randomis|rand[\s_-]*grid|grid/.test(name)) return ['Speaking / Grid', 'Speaking'];
+  if (/guidance|handbook/.test(name)) return ['Guidance', 'Guide'];
+  return ['Source Booklet', 'Source'];
+}
+
 function getDocTypeBadge(docType, category) {
   if (category === 'Books' || category === 'IAL Books' || category === 'IGCSE Books') {
     if (docType === 'SOL') return DOC_TYPE_INFO.SOL;
@@ -666,6 +695,16 @@ function getShortUnitDisplay(file) {
 
 // Generate clean, unambiguous human-readable title without duplicate subject names
 function getDisplayTitle(file) {
+  if (
+    file.category === 'Books' ||
+    file.category === 'IAL Books' ||
+    file.category === 'IGCSE Books'
+  ) {
+    const bookMeta = getBookMetadata(file);
+    if (bookMeta?.title) return bookMeta.title;
+    return formatFallbackBookTitle(file.name);
+  }
+
   let cleanName = (file.name || '')
     .replace(/\.(pdf|zip|rar|mp3|wav|docx)$/i, '')
     .replace(/_\d{10,14}/g, '')
@@ -673,12 +712,7 @@ function getDisplayTitle(file) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (
-    file.category === 'Books' ||
-    file.category === 'IAL Books' ||
-    file.category === 'IGCSE Books' ||
-    (!file.session && !file.unitName && !file.unitCode)
-  ) {
+  if (!file.session && !file.unitName && !file.unitCode) {
     return cleanName;
   }
 
@@ -2075,7 +2109,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     QP: ['Question Paper', 'QP'],
                     MS: ['Mark Scheme', 'MS'],
                     ER: ['Examiner Report', 'ER'],
-                    SC: ['Scientific Article', 'SC'],
+                    SC: getScDocumentLabel(sib),
                     AUD: ['Listening Audio', 'Audio'],
                     DF: ['Data / Formulae', 'Data'],
                     SOL: ['Worked Solution', 'SOL'],
@@ -3158,34 +3192,72 @@ const WelcomePage = ({
       }
     });
     const out = {};
-    Object.keys(map).sort((a, b) => a.localeCompare(b)).forEach(k => {
+    Object.keys(map).sort((a, b) => compareUnitLabels(a, b, name)).forEach(k => {
       out[k] = { count: map[k].count, years: Array.from(map[k].years).sort((a, b) => b - a) };
     });
     return out;
   }, [wizardMeta, data.flatFiles, selectedSubject]);
 
-  const availableUnits = useMemo(() => Object.keys(availableUnitsMap), [availableUnitsMap]);
+  const availableUnits = useMemo(() => (
+    Object.keys(availableUnitsMap).sort((a, b) => compareUnitLabels(a, b, selectedSubject?.name || ''))
+  ), [availableUnitsMap, selectedSubject]);
 
-  // Group available units logically by their prefix/type
+  // Group available units cleanly: Math branches apply strictly to Math; subjects with legacy specs split Current vs Legacy in 1..N order
   const groupedUnits = useMemo(() => {
     if (!availableUnits.length) return {};
-    const groups = {};
-    availableUnits.forEach(unit => {
-      let groupName = 'Course Units';
-      if (unit.includes('Further Pure')) groupName = 'Further Pure Mathematics';
-      else if (unit.includes('Pure')) groupName = 'Pure Mathematics';
-      else if (unit.includes('Core')) groupName = 'Core Mathematics';
-      else if (unit.includes('Mechanics')) groupName = 'Mechanics';
-      else if (unit.includes('Statistics')) groupName = 'Statistics';
-      else if (unit.includes('Decision')) groupName = 'Decision Mathematics';
-      else if (unit.includes('Unit')) groupName = 'Course Units';
-      else if (unit.includes('Paper')) groupName = 'Examination Papers';
+    const subjName = selectedSubject?.name || '';
+    const isIalMath = subjName === 'Math' && selectedSubject?.curriculum !== 'Edexcel IGCSE';
 
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(unit);
+    if (isIalMath) {
+      const mathGroupOrder = [
+        'Pure Mathematics',
+        'Mechanics',
+        'Statistics',
+        'Decision Mathematics',
+        'Further Pure Mathematics',
+        'Legacy Core Mathematics'
+      ];
+      const buckets = {};
+      availableUnits.forEach(unit => {
+        let groupName = 'Course Units';
+        if (unit.includes('Further Pure')) groupName = 'Further Pure Mathematics';
+        else if (unit.includes('Pure')) groupName = 'Pure Mathematics';
+        else if (unit.includes('Mechanics')) groupName = 'Mechanics';
+        else if (unit.includes('Statistics')) groupName = 'Statistics';
+        else if (unit.includes('Decision')) groupName = 'Decision Mathematics';
+        else if (unit.includes('Core')) groupName = 'Legacy Core Mathematics';
+        if (!buckets[groupName]) buckets[groupName] = [];
+        buckets[groupName].push(unit);
+      });
+      const ordered = {};
+      mathGroupOrder.forEach(g => {
+        if (buckets[g]?.length) ordered[g] = buckets[g];
+      });
+      Object.keys(buckets).forEach(g => {
+        if (!ordered[g] && buckets[g]?.length) ordered[g] = buckets[g];
+      });
+      return ordered;
+    }
+
+    const currentUnits = [];
+    const legacyUnits = [];
+    availableUnits.forEach(unit => {
+      if (isLegacyIalUnitLabel(unit)) legacyUnits.push(unit);
+      else currentUnits.push(unit);
     });
-    return groups;
-  }, [availableUnits]);
+
+    if (currentUnits.length > 0 && legacyUnits.length > 0) {
+      return {
+        'Current Specification': currentUnits,
+        'Legacy Specification (Pre-2018)': legacyUnits
+      };
+    }
+
+    const singleLabel = availableUnits.every(u => u.includes('Paper'))
+      ? 'Examination Papers'
+      : 'Course Units';
+    return { [singleLabel]: availableUnits };
+  }, [availableUnits, selectedSubject]);
 
   // Extract available years for currently selected subject + curriculum + unit
   const availableYears = useMemo(() => {
@@ -3327,7 +3399,7 @@ const WelcomePage = ({
             </p>
             <div className="pillar-actions">
               <a
-                href="/?paper=IAL%7CFrench%7CWFR02%7C%7CJune%202021&view=AUD"
+                href="/#paper=IAL%7CFrench%7CWFR02%7C%7CJune%202021&view=AUD"
                 rel="nofollow"
                 className="pillar-btn primary"
                 onClick={(e) => {
@@ -3563,15 +3635,21 @@ const WelcomePage = ({
                     <div className="wizard-button-grid">
                       {units.map(unitName => {
                         const unitCount = availableUnitsMap[unitName]?.count;
+                        const unitHref = `/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(unitName)}`;
                         return (
-                          <button
+                          <a
                             key={unitName}
+                            href={unitHref}
                             className="wizard-option-btn"
-                            onClick={() => handleUnitClick(unitName)}
+                            onClick={(e) => {
+                              if (!shouldHandleClientNavigation(e)) return;
+                              e.preventDefault();
+                              handleUnitClick(unitName);
+                            }}
                           >
                             <span>{unitName}</span>
                             {unitCount ? <span className="wizard-unit-count">{unitCount}</span> : null}
-                          </button>
+                          </a>
                         );
                       })}
                     </div>
@@ -3731,7 +3809,7 @@ function App() {
   const initialCache = useMemo(() => getInitialCachedMeta(), []);
   const initialRoute = useMemo(() => (
     typeof window !== 'undefined'
-      ? parseRouteFromLocation(window.location.pathname, window.location.search, initialCache?.meta || DEFAULT_META)
+      ? parseRouteFromLocation(window.location.pathname, window.location.search, initialCache?.meta || DEFAULT_META, window.location.hash)
       : {}
   ), [initialCache]);
 
@@ -4070,11 +4148,11 @@ function App() {
     recordPaperInteraction(fileObj, preferredView);
   }, [recordPaperInteraction]);
 
-  // Handle browser Back/Forward navigation across all routes and modals
+  // Handle browser Back/Forward & hash deep-link navigation across all routes and modals
   useEffect(() => {
     const handlePopState = () => {
       isPopStateRef.current = true;
-      const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
+      const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta, window.location.hash);
       setCurrentTab(parsed.currentTab || 'library');
       setIsNotFound(Boolean(parsed.notFound));
       setFilterCurriculum(parsed.filterCurriculum || '');
@@ -4103,7 +4181,11 @@ function App() {
       }
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
   }, [data.meta, data.unifiedFiles, data.flatFiles]);
 
   // Re-resolve unit slug and route validity once wizard metadata finishes hydrating on cold visits
@@ -4114,7 +4196,7 @@ function App() {
     initialUnitHydratedRef.current = true;
     const segments = (window.location.pathname || '/').split('/').filter(Boolean);
     if (segments.length >= 1) {
-      const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta);
+      const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta, window.location.hash);
       setIsNotFound(Boolean(parsed.notFound));
       if (parsed.filterUnit) {
         setFilterCurriculum(parsed.filterCurriculum);
@@ -4203,13 +4285,15 @@ function App() {
         previewFile,
         pendingPaperParam,
         previewMode: previewInitialView,
-        forceShowTable
+        forceShowTable,
+        useHashForPaper: true
       });
-      const currentUrl = `${window.location.pathname}${window.location.search}`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       if (currentUrl !== nextUrl) {
+        const isLegacyPaperMigration = window.location.search.includes('paper=') && nextUrl.includes('#paper=');
         if (isPopStateRef.current) {
           isPopStateRef.current = false;
-        } else if (deferredSearchQuery) {
+        } else if (deferredSearchQuery || isLegacyPaperMigration) {
           window.history.replaceState(null, '', nextUrl);
         } else {
           window.history.pushState(null, '', nextUrl);
@@ -4956,7 +5040,7 @@ function App() {
         const unitsObj = wizard[c]?.[filterSubject]?.units;
         if (unitsObj) Object.keys(unitsObj).forEach(u => set.add(u));
       });
-      if (set.size > 0) return Array.from(set).sort((a, b) => a.localeCompare(b));
+      if (set.size > 0) return Array.from(set).sort((a, b) => compareUnitLabels(a, b, filterSubject));
     }
     const set = new Set();
     data.dedupedFiles.forEach(f => {
@@ -4964,7 +5048,7 @@ function App() {
         set.add(f.cleanUnitLabel);
       }
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    return Array.from(set).sort((a, b) => compareUnitLabels(a, b, filterSubject));
   }, [filterSubject, filterCurriculum, data.meta, data.dedupedFiles]);
 
   // Dynamic year list for filter bar
@@ -5247,9 +5331,16 @@ function App() {
     const subjDisplay = filterSubject ? formatSubjectDisplay(filterSubject) : '';
 
     const links = [];
+    const seenHrefs = new Set();
+    const pushLink = (item) => {
+      if (!item?.href || seenHrefs.has(item.href)) return;
+      seenHrefs.add(item.href);
+      links.push(item);
+    };
+
     if (filterSubject && currSlug && subjSlug) {
       if (filterUnit) {
-        links.push({
+        pushLink({
           href: `/${currSlug}/${subjSlug}`,
           label: `All ${subjDisplay} Units & Papers`,
           onClick: () => { setIsNotFound(false); setFilterUnit(''); setForceShowTable(true); }
@@ -5258,7 +5349,7 @@ function App() {
       const hasBooks = Boolean(SUBJECTS_WITH_BOOKS[effCurr]?.has(filterSubject));
       if (hasBooks && filterDocType !== 'Book') {
         const isMath = effCurr === 'Edexcel IAL' && filterSubject === 'Math';
-        links.push({
+        pushLink({
           href: `/textbooks/${currSlug}/${subjSlug}`,
           label: `${subjDisplay} Textbooks${isMath ? ' & Solution Banks' : ''}`,
           onClick: () => {
@@ -5271,7 +5362,7 @@ function App() {
           }
         });
       } else if (filterDocType === 'Book') {
-        links.push({
+        pushLink({
           href: `/${currSlug}/${subjSlug}`,
           label: `${subjDisplay} Past Papers & Mark Schemes`,
           onClick: () => {
@@ -5282,7 +5373,7 @@ function App() {
         });
       }
       if (hasDataFilesForCourse(effCurr, filterSubject) && filterDocType !== 'DF') {
-        links.push({
+        pushLink({
           href: '/data-files',
           label: 'IT & CS Data Files (.zip)',
           onClick: () => {
@@ -5297,7 +5388,7 @@ function App() {
         ((effCurr === 'Edexcel IAL' && IAL_AUDIO_SUBJECTS.has(filterSubject)) ||
           (effCurr === 'Edexcel IGCSE' && IGCSE_AUDIO_SUBJECTS.has(filterSubject)))
       ) {
-        links.push({
+        pushLink({
           href: '/audio',
           label: `${effCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} Listening Audio (MP3)`,
           onClick: () => {
@@ -5307,75 +5398,141 @@ function App() {
           }
         });
       }
+
+      // Surface semantic <a href> links to every unit/paper of this subject in the hydrated DOM
+      // so both students and search crawlers can navigate directly to all 201 unit pages.
+      if (filterDocType !== 'Book') {
+        const unitsObj = data.meta?.wizard?.[effCurr]?.[filterSubject]?.units;
+        const unitList = (unitsObj
+          ? Object.keys(unitsObj)
+          : (DEFAULT_UNIT_LABELS[effCurr]?.[filterSubject] || [])
+        ).slice().sort((a, b) => compareUnitLabels(a, b, filterSubject));
+        for (const uLabel of unitList) {
+          if (uLabel === filterUnit) continue;
+          const uSlug = getUnitSlug(uLabel);
+          if (!uSlug) continue;
+          pushLink({
+            href: `/${currSlug}/${subjSlug}/${uSlug}`,
+            label: uLabel,
+            onClick: () => {
+              setIsNotFound(false);
+              setFilterCurriculum(effCurr);
+              setFilterSubject(filterSubject);
+              setFilterUnit(uLabel);
+              setFilterDocType(null);
+              setForceShowTable(true);
+            }
+          });
+        }
+      }
     } else if (filterDocType === 'Book') {
       if (filterCurriculum !== 'Edexcel IAL') {
-        links.push({
+        pushLink({
           href: '/textbooks/ial',
           label: 'Edexcel IAL Textbooks & Solution Banks',
           onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IAL'); setFilterDocType('Book'); setForceShowTable(true); }
         });
       }
       if (filterCurriculum !== 'Edexcel IGCSE') {
-        links.push({
+        pushLink({
           href: '/textbooks/igcse',
           label: 'Edexcel IGCSE (9-1) Textbooks',
           onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IGCSE'); setFilterDocType('Book'); setForceShowTable(true); }
         });
       }
+      const bookCurrs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
+      for (const bCurr of bookCurrs) {
+        const bCurrSlug = getCurriculumSlug(bCurr);
+        const bSubjects = Array.from(SUBJECTS_WITH_BOOKS[bCurr] || []).sort();
+        for (const bSubj of bSubjects) {
+          pushLink({
+            href: `/textbooks/${bCurrSlug}/${getSubjectSlug(bSubj)}`,
+            label: `${bCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} ${formatSubjectDisplay(bSubj)} Books`,
+            onClick: () => {
+              setIsNotFound(false);
+              setFilterCurriculum(bCurr);
+              setFilterSubject(bSubj);
+              setFilterUnit('');
+              setFilterYear('');
+              setFilterDocType('Book');
+              setForceShowTable(true);
+            }
+          });
+        }
+      }
     } else if (filterDocType === 'DF') {
-      links.push(
-        {
-          href: '/ial/information-technology',
-          label: 'IAL Information Technology',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Information Technology'); setForceShowTable(true); }
-        },
-        {
-          href: '/igcse/computer-science',
-          label: 'IGCSE Computer Science',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Computer Science'); setForceShowTable(true); }
-        },
-        {
-          href: '/igcse/information-technology',
-          label: 'IGCSE Information Technology',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Information Technology'); setForceShowTable(true); }
-        }
-      );
+      pushLink({
+        href: '/ial/information-technology',
+        label: 'IAL Information Technology',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Information Technology'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/igcse/computer-science',
+        label: 'IGCSE Computer Science',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Computer Science'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/igcse/information-technology',
+        label: 'IGCSE Information Technology',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Information Technology'); setForceShowTable(true); }
+      });
     } else if (filterDocType === 'AUD') {
-      links.push(
-        {
-          href: '/ial/french',
-          label: 'IAL French Papers',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('French'); setForceShowTable(true); }
-        },
-        {
-          href: '/ial/german',
-          label: 'IAL German Papers',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('German'); setForceShowTable(true); }
-        },
-        {
-          href: '/ial/spanish',
-          label: 'IAL Spanish Papers',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Spanish'); setForceShowTable(true); }
-        }
-      );
+      pushLink({
+        href: '/ial/french',
+        label: 'IAL French Papers',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('French'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/ial/german',
+        label: 'IAL German Papers',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('German'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/ial/spanish',
+        label: 'IAL Spanish Papers',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Spanish'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/igcse/english-as-a-second-language',
+        label: 'IGCSE ESL Papers',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('English as a Second Language'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/igcse/french',
+        label: 'IGCSE French Papers',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('French'); setForceShowTable(true); }
+      });
     } else if (filterCurriculum) {
-      links.push(
-        {
-          href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
-          label: `${filterCurriculum} Textbooks`,
-          onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
-        },
-        {
-          href: '/data-files',
-          label: 'IT & CS Data Files',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
-        }
-      );
-      if (filterCurriculum === 'Edexcel IAL') {
-        links.push({
-          href: '/audio',
-          label: 'Listening Audio Archive',
-          onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
+      pushLink({
+        href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
+        label: `${filterCurriculum} Textbooks`,
+        onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/data-files',
+        label: 'IT & CS Data Files',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/audio',
+        label: 'Listening Audio Archive',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
+      });
+      const subjPool = filterCurriculum === 'Edexcel IGCSE'
+        ? (data.meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT)
+        : (data.meta?.ialSubjects || IAL_SUBJECTS_DEFAULT);
+      for (const sName of subjPool) {
+        pushLink({
+          href: `/${currSlug}/${getSubjectSlug(sName)}`,
+          label: formatSubjectDisplay(sName),
+          onClick: () => {
+            setIsNotFound(false);
+            setFilterCurriculum(filterCurriculum);
+            setFilterSubject(sName);
+            setFilterUnit('');
+            setFilterDocType(null);
+            setForceShowTable(true);
+          }
         });
       }
     }
@@ -5386,7 +5543,7 @@ function App() {
     } else if (filterDocType === 'DF') {
       note = 'Practical examination source archives (.zip) for IT and Computer Science coding, spreadsheet, database, and web tasks.';
     } else if (filterDocType === 'AUD') {
-      note = 'Edexcel IAL Modern Languages listening examination audio tracks (MP3) with in-app playback alongside question papers.';
+      note = 'Edexcel IAL & IGCSE listening examination audio tracks (MP3/ZIP) with synchronized transcripts and in-app playback alongside question papers.';
     }
 
     if (!legacyInfo && links.length === 0 && !filterCurriculum && !filterSubject) return null;
@@ -5400,11 +5557,11 @@ function App() {
           : filterDocType === 'DF'
             ? 'Practical Examination Source Files (.zip)'
             : filterDocType === 'AUD'
-              ? 'Modern Languages Listening Tracks (.mp3)'
+              ? 'IAL & IGCSE Listening Audio Tracks (.mp3)'
               : `${filterCurriculum || 'Edexcel Archive'} Resource Guide`;
 
     return { heading, legacyInfo, note, links };
-  }, [currentTab, isNotFound, showWelcome, filterCurriculum, filterSubject, filterUnit, filterDocType, clearFilters]);
+  }, [currentTab, isNotFound, showWelcome, filterCurriculum, filterSubject, filterUnit, filterDocType, clearFilters, data.meta]);
 
   if (loading) {
     return (
@@ -6201,9 +6358,17 @@ function App() {
                                       </span>
                                     ) : (
                                       <>
-                                        <span className="file-path-subtext file-location" title={file.path}>
-                                          {file.path}
-                                        </span>
+                                        {(() => {
+                                          const bookMeta = getBookMetadata(file);
+                                          const sublineText = bookMeta
+                                            ? [bookMeta.authors, bookMeta.publisher, bookMeta.year].filter(Boolean).join(' · ')
+                                            : file.path;
+                                          return (
+                                            <span className="file-path-subtext file-location" title={sublineText}>
+                                              {sublineText}
+                                            </span>
+                                          );
+                                        })()}
                                         {file.size ? (
                                           <span className="file-size-tag">
                                             {formatBytes(file.size)} · {(file.ext || 'PDF').toUpperCase()}
@@ -6302,9 +6467,10 @@ function App() {
                                   {['AUD', 'SC', 'DF', 'SOL', 'SAM'].map((extraType) => {
                                     const extraDoc = docs[extraType];
                                     if (!extraDoc) return null;
+                                    const [scFullLabel, scShortLabel] = extraType === 'SC' ? getScDocumentLabel(extraDoc) : [null, null];
                                     const labelMap = {
                                       AUD: 'Audio',
-                                      SC: 'Source',
+                                      SC: scFullLabel || 'Source',
                                       DF: 'Data Files',
                                       SOL: 'Solutions',
                                       SAM: 'Specimen'
@@ -6320,10 +6486,10 @@ function App() {
                                           openOnSiteReader(file, extraType);
                                         }}
                                         className={`unified-doc-btn ${extraType === 'AUD' ? 'aud' : 'extra'}`}
-                                        title={`Open ${DOC_TYPE_INFO[extraType]?.fullLabel || extraType} on-site — ${extraDoc.name}`}
+                                        title={`Open ${extraType === 'SC' ? scFullLabel : (DOC_TYPE_INFO[extraType]?.fullLabel || extraType)} on-site — ${extraDoc.name}`}
                                       >
                                         <span className="btn-desktop-text">{labelMap[extraType] || extraType}</span>
-                                        <span className="btn-mobile-text" aria-hidden="true">{extraType}</span>
+                                        <span className="btn-mobile-text" aria-hidden="true">{extraType === 'SC' ? scShortLabel : extraType}</span>
                                       </a>
                                     );
                                   })}

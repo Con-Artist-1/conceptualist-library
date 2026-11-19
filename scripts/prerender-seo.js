@@ -13,6 +13,7 @@ import {
   getSeoMetadata,
   buildJsonLd
 } from '../src/seoRoutes.js';
+import { compareUnitLabels, isLegacyIalUnitLabel } from '../src/unitParser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -150,6 +151,60 @@ function collectAllRoutes(meta, indexLookup) {
     routes.push(routeObj);
   };
 
+  const addRedirect = (source, destination) => {
+    if (!source || !destination || source === destination || seenRedirects.has(source)) return;
+    seenRedirects.add(source);
+    aliasRedirects.push({
+      source,
+      destination,
+      permanent: true
+    });
+  };
+
+  // Curriculum & subject shorthand aliases supported by seoRoutes.js
+  addRedirect('/edexcel-ial', '/ial');
+  addRedirect('/edexcel-igcse', '/igcse');
+  addRedirect('/textbooks/edexcel-ial', '/textbooks/ial');
+  addRedirect('/textbooks/edexcel-igcse', '/textbooks/igcse');
+  const subjectAliasPairs = [
+    ['/ial/math', '/ial/mathematics'],
+    ['/ial/maths', '/ial/mathematics'],
+    ['/ial/it', '/ial/information-technology'],
+    ['/ial/ict', '/ial/information-technology'],
+    ['/igcse/math', '/igcse/mathematics-a'],
+    ['/igcse/maths', '/igcse/mathematics-a'],
+    ['/igcse/it', '/igcse/information-technology'],
+    ['/igcse/ict', '/igcse/information-technology'],
+    ['/igcse/cs', '/igcse/computer-science'],
+    ['/igcse/compsci', '/igcse/computer-science'],
+    ['/textbooks/ial/math', '/textbooks/ial/mathematics'],
+    ['/textbooks/ial/maths', '/textbooks/ial/mathematics'],
+    ['/textbooks/ial/it', '/textbooks/ial/information-technology'],
+    ['/textbooks/ial/ict', '/textbooks/ial/information-technology'],
+    ['/textbooks/igcse/math', '/textbooks/igcse/mathematics-a'],
+    ['/textbooks/igcse/maths', '/textbooks/igcse/mathematics-a'],
+    ['/textbooks/igcse/it', '/textbooks/igcse/information-technology'],
+    ['/textbooks/igcse/ict', '/textbooks/igcse/information-technology']
+  ];
+  for (const [src, dst] of subjectAliasPairs) {
+    addRedirect(src, dst);
+  }
+
+  // Legacy renamed practical unit slugs indexed historically in Google Search Console
+  const legacyUnitRedirects = [
+    ['/ial/physics/practical-physics-i-wph13', '/ial/physics/unit-3-practical-physics-i-wph13'],
+    ['/ial/physics/practical-physics-ii-wph16', '/ial/physics/unit-6-practical-physics-ii-wph16'],
+    ['/ial/biology/practical-biology-i-wbi13', '/ial/biology/unit-3-practical-biology-i-wbi13'],
+    ['/ial/biology/practical-biology-ii-wbi16', '/ial/biology/unit-6-practical-biology-ii-wbi16'],
+    ['/ial/chemistry/practical-chemistry-i-wch13', '/ial/chemistry/unit-3-practical-chemistry-i-wch13'],
+    ['/ial/chemistry/practical-chemistry-ii-wch16', '/ial/chemistry/unit-6-practical-chemistry-ii-wch16'],
+    ['/ial/english-literature/unit-wet12', '/ial/english-literature/english-literature-unit-2-wet02'],
+    ['/ial/english-literature/wet12', '/ial/english-literature/english-literature-unit-2-wet02']
+  ];
+  for (const [src, dst] of legacyUnitRedirects) {
+    addRedirect(src, dst);
+  }
+
   // 1. Core Top-Level Routes
   addRoute({
     path: '/',
@@ -286,15 +341,16 @@ function collectAllRoutes(meta, indexLookup) {
       });
 
       const unitsMap = subjectsMap[subj]?.units || {};
-      const unitNames = Object.keys(unitsMap);
+      const unitNames = Object.keys(unitsMap).sort((a, b) => compareUnitLabels(a, b, subj));
 
       for (const unitLabel of unitNames) {
         const unitSlug = getUnitSlug(unitLabel);
         const unitPath = `/${currSlug}/${subjSlug}/${unitSlug}`;
+        const isLegacy = isLegacyIalUnitLabel(unitLabel);
 
         addRoute({
           path: unitPath,
-          priority: '0.85',
+          priority: isLegacy ? '0.75' : '0.85',
           changefreq: 'weekly',
           includeInSitemap: true,
           state: {
@@ -305,18 +361,25 @@ function collectAllRoutes(meta, indexLookup) {
           }
         });
 
-        // Map direct unit-code alias paths (e.g., /ial/mathematics/wma11, /ial/mathematics/p1) to permanent 308 redirects
+        // Map direct unit-code & shorthand alias paths (e.g., /ial/mathematics/wma11, /ial/mathematics/p1, /ial/physics/u1) to permanent 308 redirects
         const unitCode = getUnitCodeFromLabel(unitLabel);
         if (unitCode) {
           const codeSlug = unitCode.toLowerCase();
-          const aliasPath = `/${currSlug}/${subjSlug}/${codeSlug}`;
-          if (aliasPath !== unitPath && !seenRedirects.has(aliasPath)) {
-            seenRedirects.add(aliasPath);
-            aliasRedirects.push({
-              source: aliasPath,
-              destination: unitPath,
-              permanent: true
-            });
+          addRedirect(`/${currSlug}/${subjSlug}/${codeSlug}`, unitPath);
+          if (isLegacy) {
+            // Preserve old /unit-wph01..06, /unit-wbi01..06, /unit-wch01..07, /unit-wbs01..04, /unit-wec01..04, /unit-6eca1..3 URLs
+            addRedirect(`/${currSlug}/${subjSlug}/unit-${codeSlug}`, unitPath);
+          }
+        }
+        const parenMatch = unitLabel.match(/\(([A-Z0-9]{2,6})\)/i);
+        if (parenMatch) {
+          addRedirect(`/${currSlug}/${subjSlug}/${parenMatch[1].toLowerCase()}`, unitPath);
+        }
+        if (!isLegacy) {
+          const unitNumMatch = unitLabel.match(/\bUnit\s+([1-6])\b/i);
+          if (unitNumMatch) {
+            addRedirect(`/${currSlug}/${subjSlug}/u${unitNumMatch[1]}`, unitPath);
+            addRedirect(`/${currSlug}/${subjSlug}/unit-${unitNumMatch[1]}`, unitPath);
           }
         }
       }
@@ -373,7 +436,8 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     for (const book of bookItems) {
       const label = DOC_TYPE_HUMAN[book.docType] || 'Textbook PDF';
       const subjLabel = `${book.curriculum} ${formatSubjectName(book.subject)}`;
-      itemEntries.push(`<li><strong>${escapeHtml(book.name)}</strong> — ${escapeHtml(subjLabel)} (${escapeHtml(label)})</li>`);
+      const cleanBookTitle = String(book.name || '').replace(/\.(pdf|zip|rar)$/i, '').trim();
+      itemEntries.push(`<li><strong>${escapeHtml(cleanBookTitle)}</strong> — ${escapeHtml(subjLabel)} (${escapeHtml(label)})</li>`);
     }
     if (indexLookup?.booksByCurrSubj) {
       for (const key of [...indexLookup.booksByCurrSubj.keys()].sort()) {
@@ -636,14 +700,15 @@ function run() {
   const { routes, aliasRedirects } = collectAllRoutes(meta, indexLookup);
   const lastmodDate = new Date().toISOString().split('T')[0];
 
-  // Sync permanent 308 alias redirects into vercel.json so shorthand unit URLs redirect cleanly instead of duplicating HTML
+  // Sync permanent 308 alias redirects into vercel.json and remove catch-all rewrites so invalid subpaths return genuine HTTP 404 (dist/404.html)
   if (fs.existsSync(VERCEL_CONFIG_PATH)) {
     try {
       const vercelCfg = JSON.parse(fs.readFileSync(VERCEL_CONFIG_PATH, 'utf8'));
       const sortedRedirects = [...aliasRedirects].sort((a, b) => a.source.localeCompare(b.source));
+      vercelCfg.rewrites = [];
       vercelCfg.redirects = sortedRedirects;
       fs.writeFileSync(VERCEL_CONFIG_PATH, JSON.stringify(vercelCfg, null, 2) + '\n', 'utf8');
-      console.log(`✅ Synced ${sortedRedirects.length} permanent unit alias redirects into vercel.json.`);
+      console.log(`✅ Synced ${sortedRedirects.length} permanent shorthand/unit alias redirects into vercel.json (wildcard Soft-404 rewrites cleared).`);
     } catch (err) {
       console.warn('⚠️ Could not sync vercel.json redirects:', err.message);
     }

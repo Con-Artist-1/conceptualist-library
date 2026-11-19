@@ -124,6 +124,7 @@ export const CODE_ALIAS_MAP = {
   'WB104': 'WBI04',
   'WB105': 'WBI05',
   'WB106': 'WBI06',
+  'WET12': 'WET02',
   'YLA0': 'YLA1',
   '6BI01': 'WBI11',
   '6BI02': 'WBI12',
@@ -311,7 +312,14 @@ const SUBJECT_CLEAN_UNIT_LABELS = {
     ['WCH13', 'UNIT 3', 'Unit 3: Practical Chemistry I (WCH13)'],
     ['WCH14', 'UNIT 4', 'Unit 4: Rates & Organic Chemistry (WCH14)'],
     ['WCH15', 'UNIT 5', 'Unit 5: Transition Metals (WCH15)'],
-    ['WCH16', 'UNIT 6', 'Unit 6: Practical Chemistry II (WCH16)']
+    ['WCH16', 'UNIT 6', 'Unit 6: Practical Chemistry II (WCH16)'],
+    ['WCH01', null, 'Unit 1: The Core Principles of Chemistry (WCH01)'],
+    ['WCH02', null, 'Unit 2: Application of Core Principles of Chemistry (WCH02)'],
+    ['WCH03', null, 'Unit 3: Chemistry Laboratory Skills I (WCH03)'],
+    ['WCH04', null, 'Unit 4: General Principles of Chemistry I (WCH04)'],
+    ['WCH05', null, 'Unit 5: General Principles of Chemistry II (WCH05)'],
+    ['WCH06', null, 'Unit 6: Chemistry Laboratory Skills II (WCH06)'],
+    ['WCH07', null, 'Unit 7: Chemistry Practical Examination (WCH07)']
   ],
   PHYSICS: [
     ['WPH11', 'UNIT 1', 'Unit 1: Mechanics & Materials (WPH11)'],
@@ -320,7 +328,13 @@ const SUBJECT_CLEAN_UNIT_LABELS = {
     ['WPH07', null, 'Unit 3: Practical Physics I (WPH13)'],
     ['WPH14', 'UNIT 4', 'Unit 4: Further Mechanics & Fields (WPH14)'],
     ['WPH15', 'UNIT 5', 'Unit 5: Thermodynamics & Oscillations (WPH15)'],
-    ['WPH16', 'UNIT 6', 'Unit 6: Practical Physics II (WPH16)']
+    ['WPH16', 'UNIT 6', 'Unit 6: Practical Physics II (WPH16)'],
+    ['WPH01', null, 'Unit 1: Physics on the Go (WPH01)'],
+    ['WPH02', null, 'Unit 2: Physics at Work (WPH02)'],
+    ['WPH03', null, 'Unit 3: Exploring Physics (WPH03)'],
+    ['WPH04', null, 'Unit 4: Physics on the Move (WPH04)'],
+    ['WPH05', null, 'Unit 5: Physics from Creation to Collapse (WPH05)'],
+    ['WPH06', null, 'Unit 6: Experimental Physics (WPH06)']
   ],
   BIOLOGY: [
     ['WBI11', 'UNIT 1', 'Unit 1: Lifestyle, Transport & Health (WBI11)'],
@@ -328,7 +342,13 @@ const SUBJECT_CLEAN_UNIT_LABELS = {
     ['WBI13', 'UNIT 3', 'Unit 3: Practical Biology I (WBI13)'],
     ['WBI14', 'UNIT 4', 'Unit 4: Energy, Environment & Immunity (WBI14)'],
     ['WBI15', 'UNIT 5', 'Unit 5: Respiration & Muscles (WBI15)'],
-    ['WBI16', 'UNIT 6', 'Unit 6: Practical Biology II (WBI16)']
+    ['WBI16', 'UNIT 6', 'Unit 6: Practical Biology II (WBI16)'],
+    ['WBI01', null, 'Unit 1: Lifestyle, Transport, Genes & Health (WBI01)'],
+    ['WBI02', null, 'Unit 2: Development, Plants & the Environment (WBI02)'],
+    ['WBI03', null, 'Unit 3: Practical Biology & Research Skills (WBI03)'],
+    ['WBI04', null, 'Unit 4: The Natural Environment & Species Survival (WBI04)'],
+    ['WBI05', null, 'Unit 5: Energy, Exercise & Coordination (WBI05)'],
+    ['WBI06', null, 'Unit 6: Practical Biology & Investigative Skills (WBI06)']
   ],
   ACCOUNTING: [
     ['WAC11', 'UNIT 1', 'Unit 1: The Accounting System & Costing (WAC11)'],
@@ -338,15 +358,87 @@ const SUBJECT_CLEAN_UNIT_LABELS = {
     ['WEC11', 'UNIT 1', 'Unit 1: Markets in Action (WEC11)'],
     ['WEC12', 'UNIT 2', 'Unit 2: Macroeconomic Performance (WEC12)'],
     ['WEC13', 'UNIT 3', 'Unit 3: Business Behaviour (WEC13)'],
-    ['WEC14', 'UNIT 4', 'Unit 4: A Global Perspective (WEC14)']
+    ['WEC14', 'UNIT 4', 'Unit 4: A Global Perspective (WEC14)'],
+    ['WEC01', null, 'Unit 1: Markets in Action (WEC01)'],
+    ['WEC02', null, 'Unit 2: Macroeconomic Performance & Policy (WEC02)'],
+    ['WEC03', null, 'Unit 3: Business Behaviour (WEC03)'],
+    ['WEC04', null, 'Unit 4: Developments in the Global Economy (WEC04)'],
+    ['6ECA1', null, 'Unit 1: Competitive Markets (6ECA1)'],
+    ['6ECA2', null, 'Unit 2: Managing the Economy (6ECA2)'],
+    ['6ECA3', null, 'Unit 3: Business Economics & Efficiency (6ECA3)']
   ],
   BUSINESS: [
     ['WBS11', 'UNIT 1', 'Unit 1: Marketing & People (WBS11)'],
     ['WBS12', 'UNIT 2', 'Unit 2: Managing Business Activities (WBS12)'],
     ['WBS13', 'UNIT 3', 'Unit 3: Business Decisions & Strategy (WBS13)'],
-    ['WBS14', 'UNIT 4', 'Unit 4: Global Business (WBS14)']
+    ['WBS14', 'UNIT 4', 'Unit 4: Global Business (WBS14)'],
+    ['WBS01', null, 'Unit 1: Business Enterprise (WBS01)'],
+    ['WBS02', null, 'Unit 2: Business Structures & Processes (WBS02)'],
+    ['WBS03', null, 'Unit 3: Strategic Business Decisions (WBS03)'],
+    ['WBS04', null, 'Unit 4: Business in a Global Context (WBS04)']
   ]
 };
+
+const LEGACY_UNIT_CODE_RE = /\((W(?:PH|BI|CH|BS|EC)0[1-7]|6ECA[1-3])\)$/i;
+
+export function isLegacyIalUnitLabel(label = '') {
+  return LEGACY_UNIT_CODE_RE.test(String(label || '').trim());
+}
+
+const MATH_UNIT_ORDER = [
+  'Pure Mathematics 1 (P1)',
+  'Pure Mathematics 2 (P2)',
+  'Pure Mathematics 3 (P3)',
+  'Pure Mathematics 4 (P4)',
+  'Mechanics 1 (M1)',
+  'Mechanics 2 (M2)',
+  'Mechanics 3 (M3)',
+  'Statistics 1 (S1)',
+  'Statistics 2 (S2)',
+  'Statistics 3 (S3)',
+  'Decision Mathematics 1 (D1)',
+  'Further Pure 1 (FP1)',
+  'Further Pure 2 (FP2)',
+  'Further Pure 3 (FP3)',
+  'Core Mathematics 12 (C12)',
+  'Core Mathematics 34 (C34)',
+  'Core Mathematics 1 (C1)',
+  'Core Mathematics 2 (C2)',
+  'Core Mathematics 3 (C3)',
+  'Core Mathematics 4 (C4)'
+];
+
+export function compareUnitLabels(a = '', b = '', subject = '') {
+  const strA = String(a || '');
+  const strB = String(b || '');
+  const isMath = subject === 'Math' || subject === 'Mathematics';
+  if (isMath || MATH_UNIT_ORDER.includes(strA) || MATH_UNIT_ORDER.includes(strB)) {
+    const ia = MATH_UNIT_ORDER.indexOf(strA);
+    const ib = MATH_UNIT_ORDER.indexOf(strB);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+  }
+
+  // Group Current Spec (tier 0) -> Legacy IAL W*0x (tier 1) -> Legacy GCE 6ECA* (tier 2)
+  const getTier = (s) => {
+    if (/\(6ECA[1-3]\)$/i.test(s)) return 2;
+    if (/\(W(?:PH|BI|CH|BS|EC)0[1-7]\)$/i.test(s)) return 1;
+    return 0;
+  };
+  const tierDiff = getTier(strA) - getTier(strB);
+  if (tierDiff !== 0) return tierDiff;
+
+  // Natural numeric sort by Unit/Paper number (1..7)
+  const numA = strA.match(/\b(?:Unit|Paper)\s+(\d+)\b/i);
+  const numB = strB.match(/\b(?:Unit|Paper)\s+(\d+)\b/i);
+  if (numA && numB) {
+    const diff = parseInt(numA[1], 10) - parseInt(numB[1], 10);
+    if (diff !== 0) return diff;
+  }
+
+  return strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+}
 
 export function getCurriculum(file) {
   const p = file.path || '';
@@ -613,7 +705,7 @@ export function extractUnitInfo(pathStr, subject, spec) {
         };
       }
     }
-    const explicitCodeMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:4W[A-Z]{1,3}0?([1-6])(?!\d)[A-Z0-9]*|(?:4[A-Z0-9]{2}[01]|4308|4357|4400|7042)[-_. ]0?([1-6])(?!\d)[A-Z]*)(?:[^A-Z0-9]|$)/i);
+    const explicitCodeMatch = pathStr.match(/(?:^|[^A-Z0-9])(?:4W[A-Z]{1,3}0?([1-6])(?!\d)[A-Z0-9]*|(?:4[A-Z0-9]{2,3}[01]|K[A-Z]{2}[01]|4308|4357|4400|7042)[-_. ]+0?([1-6])(?!\d)[A-Z]*)(?:[^A-Z0-9]|$)/i);
     if (explicitCodeMatch) {
       const pNum = explicitCodeMatch[1] || explicitCodeMatch[2];
       return {
@@ -753,13 +845,15 @@ export function getCleanUnitLabel(file) {
   for (const [subjKey, entries] of Object.entries(SUBJECT_CLEAN_UNIT_LABELS)) {
     const subjMatched = subjKey === 'BIOLOGY' ? subj === 'BIOLOGY' : subj.includes(subjKey);
     if (subjMatched) {
+      // Pass 1: Exact unitCode match so legacy codes (WPH01..WPH06, WBI01..WBI06, etc.) never get shadowed by current-spec folder paths
+      for (const [uCode, , label] of entries) {
+        if (code === uCode || (subjKey === 'BIOLOGY' && uCode.startsWith('WBI1') && code === `6BI0${uCode.slice(-1)}`)) {
+          return label;
+        }
+      }
+      // Pass 2: Fallback to unitName needle or path substring match
       for (const [uCode, unitNeedle, label] of entries) {
-        if (
-          code === uCode ||
-          (subjKey === 'BIOLOGY' && code === `6BI0${uCode.slice(-1)}`) ||
-          (unitNeedle && name.includes(unitNeedle)) ||
-          rawPath.includes(uCode)
-        ) {
+        if ((unitNeedle && name.includes(unitNeedle)) || rawPath.includes(uCode)) {
           return label;
         }
       }

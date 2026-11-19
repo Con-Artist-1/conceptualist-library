@@ -1,67 +1,6 @@
 {
   "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/ial",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/ial/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/edexcel-ial",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/edexcel-ial/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/igcse",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/igcse/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/edexcel-igcse",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/edexcel-igcse/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/textbooks",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/textbooks/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/papers",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/data-files",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/audio",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/about",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/changelog",
-      "destination": "/index.html"
-    }
-  ],
+  "rewrites": [],
   "headers": [
     {
       "source": "/ial/(.*)",
@@ -198,6 +137,36 @@
   ],
   "redirects": [
     {
+      "source": "/edexcel-ial",
+      "destination": "/ial",
+      "permanent": true
+    },
+    {
+      "source": "/edexcel-igcse",
+      "destination": "/igcse",
+      "permanent": true
+    },
+    {
+      "source": "/ial/accounting/u1",
+      "destination": "/ial/accounting/unit-1-the-accounting-system-and-costing-wac11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/accounting/u2",
+      "destination": "/ial/accounting/unit-2-corporate-and-management-accounting-wac12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/accounting/unit-1",
+      "destination": "/ial/accounting/unit-1-the-accounting-system-and-costing-wac11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/accounting/unit-2",
+      "destination": "/ial/accounting/unit-2-corporate-and-management-accounting-wac12",
+      "permanent": true
+    },
+    {
       "source": "/ial/accounting/wac11",
       "destination": "/ial/accounting/unit-1-the-accounting-system-and-costing-wac11",
       "permanent": true
@@ -208,6 +177,26 @@
       "permanent": true
     },
     {
+      "source": "/ial/arabic/u1",
+      "destination": "/ial/arabic/arabic-unit-1-waa01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/arabic/u2",
+      "destination": "/ial/arabic/arabic-unit-2-waa02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/arabic/unit-1",
+      "destination": "/ial/arabic/arabic-unit-1-waa01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/arabic/unit-2",
+      "destination": "/ial/arabic/arabic-unit-2-waa02",
+      "permanent": true
+    },
+    {
       "source": "/ial/arabic/waa01",
       "destination": "/ial/arabic/arabic-unit-1-waa01",
       "permanent": true
@@ -215,6 +204,136 @@
     {
       "source": "/ial/arabic/waa02",
       "destination": "/ial/arabic/arabic-unit-2-waa02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/practical-biology-i-wbi13",
+      "destination": "/ial/biology/unit-3-practical-biology-i-wbi13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/practical-biology-ii-wbi16",
+      "destination": "/ial/biology/unit-6-practical-biology-ii-wbi16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/u1",
+      "destination": "/ial/biology/unit-1-lifestyle-transport-and-health-wbi11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/u2",
+      "destination": "/ial/biology/unit-2-cells-development-and-biodiversity-wbi12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/u3",
+      "destination": "/ial/biology/unit-3-practical-biology-i-wbi13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/u4",
+      "destination": "/ial/biology/unit-4-energy-environment-and-immunity-wbi14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/u5",
+      "destination": "/ial/biology/unit-5-respiration-and-muscles-wbi15",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/u6",
+      "destination": "/ial/biology/unit-6-practical-biology-ii-wbi16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-1",
+      "destination": "/ial/biology/unit-1-lifestyle-transport-and-health-wbi11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-2",
+      "destination": "/ial/biology/unit-2-cells-development-and-biodiversity-wbi12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-3",
+      "destination": "/ial/biology/unit-3-practical-biology-i-wbi13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-4",
+      "destination": "/ial/biology/unit-4-energy-environment-and-immunity-wbi14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-5",
+      "destination": "/ial/biology/unit-5-respiration-and-muscles-wbi15",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-6",
+      "destination": "/ial/biology/unit-6-practical-biology-ii-wbi16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-wbi01",
+      "destination": "/ial/biology/unit-1-lifestyle-transport-genes-and-health-wbi01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-wbi02",
+      "destination": "/ial/biology/unit-2-development-plants-and-the-environment-wbi02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-wbi03",
+      "destination": "/ial/biology/unit-3-practical-biology-and-research-skills-wbi03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-wbi04",
+      "destination": "/ial/biology/unit-4-the-natural-environment-and-species-survival-wbi04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-wbi05",
+      "destination": "/ial/biology/unit-5-energy-exercise-and-coordination-wbi05",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/unit-wbi06",
+      "destination": "/ial/biology/unit-6-practical-biology-and-investigative-skills-wbi06",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/wbi01",
+      "destination": "/ial/biology/unit-1-lifestyle-transport-genes-and-health-wbi01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/wbi02",
+      "destination": "/ial/biology/unit-2-development-plants-and-the-environment-wbi02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/wbi03",
+      "destination": "/ial/biology/unit-3-practical-biology-and-research-skills-wbi03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/wbi04",
+      "destination": "/ial/biology/unit-4-the-natural-environment-and-species-survival-wbi04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/wbi05",
+      "destination": "/ial/biology/unit-5-energy-exercise-and-coordination-wbi05",
+      "permanent": true
+    },
+    {
+      "source": "/ial/biology/wbi06",
+      "destination": "/ial/biology/unit-6-practical-biology-and-investigative-skills-wbi06",
       "permanent": true
     },
     {
@@ -248,6 +367,86 @@
       "permanent": true
     },
     {
+      "source": "/ial/business/u1",
+      "destination": "/ial/business/unit-1-marketing-and-people-wbs11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/u2",
+      "destination": "/ial/business/unit-2-managing-business-activities-wbs12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/u3",
+      "destination": "/ial/business/unit-3-business-decisions-and-strategy-wbs13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/u4",
+      "destination": "/ial/business/unit-4-global-business-wbs14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-1",
+      "destination": "/ial/business/unit-1-marketing-and-people-wbs11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-2",
+      "destination": "/ial/business/unit-2-managing-business-activities-wbs12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-3",
+      "destination": "/ial/business/unit-3-business-decisions-and-strategy-wbs13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-4",
+      "destination": "/ial/business/unit-4-global-business-wbs14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-wbs01",
+      "destination": "/ial/business/unit-1-business-enterprise-wbs01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-wbs02",
+      "destination": "/ial/business/unit-2-business-structures-and-processes-wbs02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-wbs03",
+      "destination": "/ial/business/unit-3-strategic-business-decisions-wbs03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/unit-wbs04",
+      "destination": "/ial/business/unit-4-business-in-a-global-context-wbs04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/wbs01",
+      "destination": "/ial/business/unit-1-business-enterprise-wbs01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/wbs02",
+      "destination": "/ial/business/unit-2-business-structures-and-processes-wbs02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/wbs03",
+      "destination": "/ial/business/unit-3-strategic-business-decisions-wbs03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/business/wbs04",
+      "destination": "/ial/business/unit-4-business-in-a-global-context-wbs04",
+      "permanent": true
+    },
+    {
       "source": "/ial/business/wbs11",
       "destination": "/ial/business/unit-1-marketing-and-people-wbs11",
       "permanent": true
@@ -265,6 +464,146 @@
     {
       "source": "/ial/business/wbs14",
       "destination": "/ial/business/unit-4-global-business-wbs14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/practical-chemistry-i-wch13",
+      "destination": "/ial/chemistry/unit-3-practical-chemistry-i-wch13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/practical-chemistry-ii-wch16",
+      "destination": "/ial/chemistry/unit-6-practical-chemistry-ii-wch16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/u1",
+      "destination": "/ial/chemistry/unit-1-structure-and-bonding-wch11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/u2",
+      "destination": "/ial/chemistry/unit-2-energetics-and-organics-wch12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/u3",
+      "destination": "/ial/chemistry/unit-3-practical-chemistry-i-wch13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/u4",
+      "destination": "/ial/chemistry/unit-4-rates-and-organic-chemistry-wch14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/u5",
+      "destination": "/ial/chemistry/unit-5-transition-metals-wch15",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/u6",
+      "destination": "/ial/chemistry/unit-6-practical-chemistry-ii-wch16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-1",
+      "destination": "/ial/chemistry/unit-1-structure-and-bonding-wch11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-2",
+      "destination": "/ial/chemistry/unit-2-energetics-and-organics-wch12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-3",
+      "destination": "/ial/chemistry/unit-3-practical-chemistry-i-wch13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-4",
+      "destination": "/ial/chemistry/unit-4-rates-and-organic-chemistry-wch14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-5",
+      "destination": "/ial/chemistry/unit-5-transition-metals-wch15",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-6",
+      "destination": "/ial/chemistry/unit-6-practical-chemistry-ii-wch16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch01",
+      "destination": "/ial/chemistry/unit-1-the-core-principles-of-chemistry-wch01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch02",
+      "destination": "/ial/chemistry/unit-2-application-of-core-principles-of-chemistry-wch02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch03",
+      "destination": "/ial/chemistry/unit-3-chemistry-laboratory-skills-i-wch03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch04",
+      "destination": "/ial/chemistry/unit-4-general-principles-of-chemistry-i-wch04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch05",
+      "destination": "/ial/chemistry/unit-5-general-principles-of-chemistry-ii-wch05",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch06",
+      "destination": "/ial/chemistry/unit-6-chemistry-laboratory-skills-ii-wch06",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/unit-wch07",
+      "destination": "/ial/chemistry/unit-7-chemistry-practical-examination-wch07",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch01",
+      "destination": "/ial/chemistry/unit-1-the-core-principles-of-chemistry-wch01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch02",
+      "destination": "/ial/chemistry/unit-2-application-of-core-principles-of-chemistry-wch02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch03",
+      "destination": "/ial/chemistry/unit-3-chemistry-laboratory-skills-i-wch03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch04",
+      "destination": "/ial/chemistry/unit-4-general-principles-of-chemistry-i-wch04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch05",
+      "destination": "/ial/chemistry/unit-5-general-principles-of-chemistry-ii-wch05",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch06",
+      "destination": "/ial/chemistry/unit-6-chemistry-laboratory-skills-ii-wch06",
+      "permanent": true
+    },
+    {
+      "source": "/ial/chemistry/wch07",
+      "destination": "/ial/chemistry/unit-7-chemistry-practical-examination-wch07",
       "permanent": true
     },
     {
@@ -298,6 +637,116 @@
       "permanent": true
     },
     {
+      "source": "/ial/economics/6eca1",
+      "destination": "/ial/economics/unit-1-competitive-markets-6eca1",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/6eca2",
+      "destination": "/ial/economics/unit-2-managing-the-economy-6eca2",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/6eca3",
+      "destination": "/ial/economics/unit-3-business-economics-and-efficiency-6eca3",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/u1",
+      "destination": "/ial/economics/unit-1-markets-in-action-wec11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/u2",
+      "destination": "/ial/economics/unit-2-macroeconomic-performance-wec12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/u3",
+      "destination": "/ial/economics/unit-3-business-behaviour-wec13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/u4",
+      "destination": "/ial/economics/unit-4-a-global-perspective-wec14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-1",
+      "destination": "/ial/economics/unit-1-markets-in-action-wec11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-2",
+      "destination": "/ial/economics/unit-2-macroeconomic-performance-wec12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-3",
+      "destination": "/ial/economics/unit-3-business-behaviour-wec13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-4",
+      "destination": "/ial/economics/unit-4-a-global-perspective-wec14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-6eca1",
+      "destination": "/ial/economics/unit-1-competitive-markets-6eca1",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-6eca2",
+      "destination": "/ial/economics/unit-2-managing-the-economy-6eca2",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-6eca3",
+      "destination": "/ial/economics/unit-3-business-economics-and-efficiency-6eca3",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-wec01",
+      "destination": "/ial/economics/unit-1-markets-in-action-wec01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-wec02",
+      "destination": "/ial/economics/unit-2-macroeconomic-performance-and-policy-wec02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-wec03",
+      "destination": "/ial/economics/unit-3-business-behaviour-wec03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/unit-wec04",
+      "destination": "/ial/economics/unit-4-developments-in-the-global-economy-wec04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/wec01",
+      "destination": "/ial/economics/unit-1-markets-in-action-wec01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/wec02",
+      "destination": "/ial/economics/unit-2-macroeconomic-performance-and-policy-wec02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/wec03",
+      "destination": "/ial/economics/unit-3-business-behaviour-wec03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/economics/wec04",
+      "destination": "/ial/economics/unit-4-developments-in-the-global-economy-wec04",
+      "permanent": true
+    },
+    {
       "source": "/ial/economics/wec11",
       "destination": "/ial/economics/unit-1-markets-in-action-wec11",
       "permanent": true
@@ -315,6 +764,46 @@
     {
       "source": "/ial/economics/wec14",
       "destination": "/ial/economics/unit-4-a-global-perspective-wec14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/u1",
+      "destination": "/ial/english-language/english-language-unit-1-wen01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/u2",
+      "destination": "/ial/english-language/english-language-unit-2-wen02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/u3",
+      "destination": "/ial/english-language/english-language-unit-3-wen03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/u4",
+      "destination": "/ial/english-language/english-language-unit-4-wen04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/unit-1",
+      "destination": "/ial/english-language/english-language-unit-1-wen01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/unit-2",
+      "destination": "/ial/english-language/english-language-unit-2-wen02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/unit-3",
+      "destination": "/ial/english-language/english-language-unit-3-wen03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-language/unit-4",
+      "destination": "/ial/english-language/english-language-unit-4-wen04",
       "permanent": true
     },
     {
@@ -338,6 +827,51 @@
       "permanent": true
     },
     {
+      "source": "/ial/english-literature/u1",
+      "destination": "/ial/english-literature/english-literature-unit-1-wet01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/u2",
+      "destination": "/ial/english-literature/english-literature-unit-2-wet02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/u3",
+      "destination": "/ial/english-literature/english-literature-unit-3-wet03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/u4",
+      "destination": "/ial/english-literature/english-literature-unit-4-wet04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/unit-1",
+      "destination": "/ial/english-literature/english-literature-unit-1-wet01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/unit-2",
+      "destination": "/ial/english-literature/english-literature-unit-2-wet02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/unit-3",
+      "destination": "/ial/english-literature/english-literature-unit-3-wet03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/unit-4",
+      "destination": "/ial/english-literature/english-literature-unit-4-wet04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/unit-wet12",
+      "destination": "/ial/english-literature/english-literature-unit-2-wet02",
+      "permanent": true
+    },
+    {
       "source": "/ial/english-literature/wet01",
       "destination": "/ial/english-literature/english-literature-unit-1-wet01",
       "permanent": true
@@ -355,6 +889,51 @@
     {
       "source": "/ial/english-literature/wet04",
       "destination": "/ial/english-literature/english-literature-unit-4-wet04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/english-literature/wet12",
+      "destination": "/ial/english-literature/english-literature-unit-2-wet02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/u1",
+      "destination": "/ial/french/french-unit-1-wfr01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/u2",
+      "destination": "/ial/french/french-unit-2-wfr02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/u3",
+      "destination": "/ial/french/french-unit-3-wfr03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/u4",
+      "destination": "/ial/french/french-unit-4-wfr04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/unit-1",
+      "destination": "/ial/french/french-unit-1-wfr01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/unit-2",
+      "destination": "/ial/french/french-unit-2-wfr02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/unit-3",
+      "destination": "/ial/french/french-unit-3-wfr03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/french/unit-4",
+      "destination": "/ial/french/french-unit-4-wfr04",
       "permanent": true
     },
     {
@@ -378,6 +957,46 @@
       "permanent": true
     },
     {
+      "source": "/ial/geography/u1",
+      "destination": "/ial/geography/geography-unit-1-wge01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/u2",
+      "destination": "/ial/geography/geography-unit-2-wge02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/u3",
+      "destination": "/ial/geography/geography-unit-3-wge03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/u4",
+      "destination": "/ial/geography/geography-unit-4-wge04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/unit-1",
+      "destination": "/ial/geography/geography-unit-1-wge01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/unit-2",
+      "destination": "/ial/geography/geography-unit-2-wge02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/unit-3",
+      "destination": "/ial/geography/geography-unit-3-wge03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/geography/unit-4",
+      "destination": "/ial/geography/geography-unit-4-wge04",
+      "permanent": true
+    },
+    {
       "source": "/ial/geography/wge01",
       "destination": "/ial/geography/geography-unit-1-wge01",
       "permanent": true
@@ -395,6 +1014,46 @@
     {
       "source": "/ial/geography/wge04",
       "destination": "/ial/geography/geography-unit-4-wge04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/u1",
+      "destination": "/ial/german/german-unit-1-wgn01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/u2",
+      "destination": "/ial/german/german-unit-2-wgn02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/u3",
+      "destination": "/ial/german/german-unit-3-wgn03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/u4",
+      "destination": "/ial/german/german-unit-4-wgn04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/unit-1",
+      "destination": "/ial/german/german-unit-1-wgn01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/unit-2",
+      "destination": "/ial/german/german-unit-2-wgn02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/unit-3",
+      "destination": "/ial/german/german-unit-3-wgn03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/german/unit-4",
+      "destination": "/ial/german/german-unit-4-wgn04",
       "permanent": true
     },
     {
@@ -418,6 +1077,26 @@
       "permanent": true
     },
     {
+      "source": "/ial/greek/u1",
+      "destination": "/ial/greek/greek-unit-1-wgk01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/greek/u2",
+      "destination": "/ial/greek/greek-unit-2-wgk02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/greek/unit-1",
+      "destination": "/ial/greek/greek-unit-1-wgk01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/greek/unit-2",
+      "destination": "/ial/greek/greek-unit-2-wgk02",
+      "permanent": true
+    },
+    {
       "source": "/ial/greek/wgk01",
       "destination": "/ial/greek/greek-unit-1-wgk01",
       "permanent": true
@@ -425,6 +1104,46 @@
     {
       "source": "/ial/greek/wgk02",
       "destination": "/ial/greek/greek-unit-2-wgk02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/u1",
+      "destination": "/ial/history/history-unit-1-whi01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/u2",
+      "destination": "/ial/history/history-unit-2-whi02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/u3",
+      "destination": "/ial/history/history-unit-3-whi03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/u4",
+      "destination": "/ial/history/history-unit-4-whi04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/unit-1",
+      "destination": "/ial/history/history-unit-1-whi01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/unit-2",
+      "destination": "/ial/history/history-unit-2-whi02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/unit-3",
+      "destination": "/ial/history/history-unit-3-whi03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/history/unit-4",
+      "destination": "/ial/history/history-unit-4-whi04",
       "permanent": true
     },
     {
@@ -448,6 +1167,51 @@
       "permanent": true
     },
     {
+      "source": "/ial/ict",
+      "destination": "/ial/information-technology",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/u1",
+      "destination": "/ial/information-technology/it-unit-1-wit11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/u2",
+      "destination": "/ial/information-technology/it-unit-2-wit12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/u3",
+      "destination": "/ial/information-technology/it-unit-3-wit13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/u4",
+      "destination": "/ial/information-technology/it-unit-4-wit14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/unit-1",
+      "destination": "/ial/information-technology/it-unit-1-wit11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/unit-2",
+      "destination": "/ial/information-technology/it-unit-2-wit12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/unit-3",
+      "destination": "/ial/information-technology/it-unit-3-wit13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/information-technology/unit-4",
+      "destination": "/ial/information-technology/it-unit-4-wit14",
+      "permanent": true
+    },
+    {
       "source": "/ial/information-technology/wit11",
       "destination": "/ial/information-technology/it-unit-1-wit11",
       "permanent": true
@@ -468,6 +1232,11 @@
       "permanent": true
     },
     {
+      "source": "/ial/it",
+      "destination": "/ial/information-technology",
+      "permanent": true
+    },
+    {
       "source": "/ial/law/yla1",
       "destination": "/ial/law/law-paper-1-yla1",
       "permanent": true
@@ -475,6 +1244,11 @@
     {
       "source": "/ial/law/yla2",
       "destination": "/ial/law/law-paper-2-yla2",
+      "permanent": true
+    },
+    {
+      "source": "/ial/math",
+      "destination": "/ial/mathematics",
       "permanent": true
     },
     {
@@ -495,6 +1269,106 @@
     {
       "source": "/ial/mathematics/6666",
       "destination": "/ial/mathematics/core-mathematics-4-c4-6666",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/c1",
+      "destination": "/ial/mathematics/core-mathematics-1-c1-6663",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/c12",
+      "destination": "/ial/mathematics/core-mathematics-12-c12-wma01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/c2",
+      "destination": "/ial/mathematics/core-mathematics-2-c2-6664",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/c3",
+      "destination": "/ial/mathematics/core-mathematics-3-c3-6665",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/c34",
+      "destination": "/ial/mathematics/core-mathematics-34-c34-wma02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/c4",
+      "destination": "/ial/mathematics/core-mathematics-4-c4-6666",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/d1",
+      "destination": "/ial/mathematics/decision-mathematics-1-d1-wdm11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/fp1",
+      "destination": "/ial/mathematics/further-pure-1-fp1-wfm01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/fp2",
+      "destination": "/ial/mathematics/further-pure-2-fp2-wfm02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/fp3",
+      "destination": "/ial/mathematics/further-pure-3-fp3-wfm03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/m1",
+      "destination": "/ial/mathematics/mechanics-1-m1-wme01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/m2",
+      "destination": "/ial/mathematics/mechanics-2-m2-wme02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/m3",
+      "destination": "/ial/mathematics/mechanics-3-m3-wme03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/p1",
+      "destination": "/ial/mathematics/pure-mathematics-1-p1-wma11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/p2",
+      "destination": "/ial/mathematics/pure-mathematics-2-p2-wma12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/p3",
+      "destination": "/ial/mathematics/pure-mathematics-3-p3-wma13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/p4",
+      "destination": "/ial/mathematics/pure-mathematics-4-p4-wma14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/s1",
+      "destination": "/ial/mathematics/statistics-1-s1-wst01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/s2",
+      "destination": "/ial/mathematics/statistics-2-s2-wst02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/mathematics/s3",
+      "destination": "/ial/mathematics/statistics-3-s3-wst03",
       "permanent": true
     },
     {
@@ -578,6 +1452,141 @@
       "permanent": true
     },
     {
+      "source": "/ial/maths",
+      "destination": "/ial/mathematics",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/practical-physics-i-wph13",
+      "destination": "/ial/physics/unit-3-practical-physics-i-wph13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/practical-physics-ii-wph16",
+      "destination": "/ial/physics/unit-6-practical-physics-ii-wph16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/u1",
+      "destination": "/ial/physics/unit-1-mechanics-and-materials-wph11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/u2",
+      "destination": "/ial/physics/unit-2-waves-and-electricity-wph12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/u3",
+      "destination": "/ial/physics/unit-3-practical-physics-i-wph13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/u4",
+      "destination": "/ial/physics/unit-4-further-mechanics-and-fields-wph14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/u5",
+      "destination": "/ial/physics/unit-5-thermodynamics-and-oscillations-wph15",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/u6",
+      "destination": "/ial/physics/unit-6-practical-physics-ii-wph16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-1",
+      "destination": "/ial/physics/unit-1-mechanics-and-materials-wph11",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-2",
+      "destination": "/ial/physics/unit-2-waves-and-electricity-wph12",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-3",
+      "destination": "/ial/physics/unit-3-practical-physics-i-wph13",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-4",
+      "destination": "/ial/physics/unit-4-further-mechanics-and-fields-wph14",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-5",
+      "destination": "/ial/physics/unit-5-thermodynamics-and-oscillations-wph15",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-6",
+      "destination": "/ial/physics/unit-6-practical-physics-ii-wph16",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-wph01",
+      "destination": "/ial/physics/unit-1-physics-on-the-go-wph01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-wph02",
+      "destination": "/ial/physics/unit-2-physics-at-work-wph02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-wph03",
+      "destination": "/ial/physics/unit-3-exploring-physics-wph03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-wph04",
+      "destination": "/ial/physics/unit-4-physics-on-the-move-wph04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-wph05",
+      "destination": "/ial/physics/unit-5-physics-from-creation-to-collapse-wph05",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/unit-wph06",
+      "destination": "/ial/physics/unit-6-experimental-physics-wph06",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph01",
+      "destination": "/ial/physics/unit-1-physics-on-the-go-wph01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph02",
+      "destination": "/ial/physics/unit-2-physics-at-work-wph02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph03",
+      "destination": "/ial/physics/unit-3-exploring-physics-wph03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph04",
+      "destination": "/ial/physics/unit-4-physics-on-the-move-wph04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph05",
+      "destination": "/ial/physics/unit-5-physics-from-creation-to-collapse-wph05",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph06",
+      "destination": "/ial/physics/unit-6-experimental-physics-wph06",
+      "permanent": true
+    },
+    {
       "source": "/ial/physics/wph11",
       "destination": "/ial/physics/unit-1-mechanics-and-materials-wph11",
       "permanent": true
@@ -608,6 +1617,46 @@
       "permanent": true
     },
     {
+      "source": "/ial/psychology/u1",
+      "destination": "/ial/psychology/psychology-unit-1-wps01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/u2",
+      "destination": "/ial/psychology/psychology-unit-2-wps02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/u3",
+      "destination": "/ial/psychology/psychology-unit-3-wps03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/u4",
+      "destination": "/ial/psychology/psychology-unit-4-wps04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/unit-1",
+      "destination": "/ial/psychology/psychology-unit-1-wps01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/unit-2",
+      "destination": "/ial/psychology/psychology-unit-2-wps02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/unit-3",
+      "destination": "/ial/psychology/psychology-unit-3-wps03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/psychology/unit-4",
+      "destination": "/ial/psychology/psychology-unit-4-wps04",
+      "permanent": true
+    },
+    {
       "source": "/ial/psychology/wps01",
       "destination": "/ial/psychology/psychology-unit-1-wps01",
       "permanent": true
@@ -625,6 +1674,46 @@
     {
       "source": "/ial/psychology/wps04",
       "destination": "/ial/psychology/psychology-unit-4-wps04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/u1",
+      "destination": "/ial/spanish/spanish-unit-1-wsp01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/u2",
+      "destination": "/ial/spanish/spanish-unit-2-wsp02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/u3",
+      "destination": "/ial/spanish/spanish-unit-3-wsp03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/u4",
+      "destination": "/ial/spanish/spanish-unit-4-wsp04",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/unit-1",
+      "destination": "/ial/spanish/spanish-unit-1-wsp01",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/unit-2",
+      "destination": "/ial/spanish/spanish-unit-2-wsp02",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/unit-3",
+      "destination": "/ial/spanish/spanish-unit-3-wsp03",
+      "permanent": true
+    },
+    {
+      "source": "/ial/spanish/unit-4",
+      "destination": "/ial/spanish/spanish-unit-4-wsp04",
       "permanent": true
     },
     {
@@ -748,6 +1837,11 @@
       "permanent": true
     },
     {
+      "source": "/igcse/compsci",
+      "destination": "/igcse/computer-science",
+      "permanent": true
+    },
+    {
       "source": "/igcse/computer-science/p1",
       "destination": "/igcse/computer-science/paper-1-p1",
       "permanent": true
@@ -755,6 +1849,11 @@
     {
       "source": "/igcse/computer-science/p2",
       "destination": "/igcse/computer-science/paper-2-p2",
+      "permanent": true
+    },
+    {
+      "source": "/igcse/cs",
+      "destination": "/igcse/computer-science",
       "permanent": true
     },
     {
@@ -923,6 +2022,11 @@
       "permanent": true
     },
     {
+      "source": "/igcse/ict",
+      "destination": "/igcse/information-technology",
+      "permanent": true
+    },
+    {
       "source": "/igcse/information-technology/p1",
       "destination": "/igcse/information-technology/paper-1-p1",
       "permanent": true
@@ -943,6 +2047,16 @@
       "permanent": true
     },
     {
+      "source": "/igcse/it",
+      "destination": "/igcse/information-technology",
+      "permanent": true
+    },
+    {
+      "source": "/igcse/math",
+      "destination": "/igcse/mathematics-a",
+      "permanent": true
+    },
+    {
       "source": "/igcse/mathematics-a/p1",
       "destination": "/igcse/mathematics-a/paper-1-p1",
       "permanent": true
@@ -960,6 +2074,11 @@
     {
       "source": "/igcse/mathematics-b/p2",
       "destination": "/igcse/mathematics-b/paper-2-p2",
+      "permanent": true
+    },
+    {
+      "source": "/igcse/maths",
+      "destination": "/igcse/mathematics-a",
       "permanent": true
     },
     {
@@ -1075,6 +2194,56 @@
     {
       "source": "/igcse/urdu/p1",
       "destination": "/igcse/urdu/paper-1-p1",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/edexcel-ial",
+      "destination": "/textbooks/ial",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/edexcel-igcse",
+      "destination": "/textbooks/igcse",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/ial/ict",
+      "destination": "/textbooks/ial/information-technology",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/ial/it",
+      "destination": "/textbooks/ial/information-technology",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/ial/math",
+      "destination": "/textbooks/ial/mathematics",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/ial/maths",
+      "destination": "/textbooks/ial/mathematics",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/igcse/ict",
+      "destination": "/textbooks/igcse/information-technology",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/igcse/it",
+      "destination": "/textbooks/igcse/information-technology",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/igcse/math",
+      "destination": "/textbooks/igcse/mathematics-a",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/igcse/maths",
+      "destination": "/textbooks/igcse/mathematics-a",
       "permanent": true
     }
   ]

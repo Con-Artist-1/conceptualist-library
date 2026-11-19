@@ -8,8 +8,10 @@ import {
   extractSessionDate,
   extractUnitInfo,
   extractVariant,
-  getCleanUnitLabel
+  getCleanUnitLabel,
+  compareUnitLabels
 } from '../src/unitParser.js';
+import { getBookMetadata } from '../src/bookCatalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,15 +79,24 @@ function buildTree(dirPath, rootPath) {
         const { unitCode, unitName } = category === CATEGORY_PAST_PAPERS
           ? extractUnitInfo(relPath, subject, spec)
           : { unitCode: null, unitName: null };
+        const bookMeta = (category === CATEGORY_BOOKS || category === CATEGORY_IGCSE)
+          ? getBookMetadata(relPath)
+          : null;
+        const ext = path.extname(item.name);
+        const displayFileName = bookMeta?.title ? `${bookMeta.title}${ext}` : item.name;
+
+        const fallbackSession = (!sessionDate && category === CATEGORY_PAST_PAPERS && /(?:^|[^a-z0-9])(?:sams?\d*|sb-eams|specimen)(?:[^a-z0-9]|$)/i.test(relPath))
+          ? 'Specimen'
+          : null;
 
         node.children.push({
-          name: item.name,
+          name: displayFileName,
           path: relPath,
           size: fs.statSync(fullPath).size,
           subject,
           docType: detectDocType(item.name, relPath),
-          year: sessionDate ? sessionDate.year : extractYear(relPath),
-          session: sessionDate ? sessionDate.label : null,
+          year: bookMeta?.year || (sessionDate ? sessionDate.year : extractYear(relPath)),
+          session: sessionDate ? sessionDate.label : fallbackSession,
           sortKey: sessionDate ? sessionDate.sortKey : null,
           unitCode,
           unitName,
@@ -206,7 +217,7 @@ function buildWizardMeta(dedupedList) {
       const entry = wizard[curr][subj];
       entry.allYears = Array.from(entry.allYears).sort((a, b) => b - a);
       const cleanUnits = {};
-      for (const u of Object.keys(entry.units).sort((a, b) => a.localeCompare(b))) {
+      for (const u of Object.keys(entry.units).sort((a, b) => compareUnitLabels(a, b, subj))) {
         cleanUnits[u] = {
           count: entry.units[u].count,
           years: Array.from(entry.units[u].years).sort((a, b) => b - a)

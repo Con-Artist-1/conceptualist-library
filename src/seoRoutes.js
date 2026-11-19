@@ -238,22 +238,22 @@ export const DEFAULT_UNIT_LABELS = {
       'Unit 4: Energy, Environment & Immunity (WBI14)',
       'Unit 5: Respiration & Muscles (WBI15)',
       'Unit 6: Practical Biology II (WBI16)',
-      'Unit WBI01',
-      'Unit WBI02',
-      'Unit WBI03',
-      'Unit WBI04',
-      'Unit WBI05',
-      'Unit WBI06'
+      'Unit 1: Lifestyle, Transport, Genes & Health (WBI01)',
+      'Unit 2: Development, Plants & the Environment (WBI02)',
+      'Unit 3: Practical Biology & Research Skills (WBI03)',
+      'Unit 4: The Natural Environment & Species Survival (WBI04)',
+      'Unit 5: Energy, Exercise & Coordination (WBI05)',
+      'Unit 6: Practical Biology & Investigative Skills (WBI06)'
     ],
     'Business': [
       'Unit 1: Marketing & People (WBS11)',
       'Unit 2: Managing Business Activities (WBS12)',
       'Unit 3: Business Decisions & Strategy (WBS13)',
       'Unit 4: Global Business (WBS14)',
-      'Unit WBS01',
-      'Unit WBS02',
-      'Unit WBS03',
-      'Unit WBS04'
+      'Unit 1: Business Enterprise (WBS01)',
+      'Unit 2: Business Structures & Processes (WBS02)',
+      'Unit 3: Strategic Business Decisions (WBS03)',
+      'Unit 4: Business in a Global Context (WBS04)'
     ],
     'Chemistry': [
       'Unit 1: Structure & Bonding (WCH11)',
@@ -262,26 +262,26 @@ export const DEFAULT_UNIT_LABELS = {
       'Unit 4: Rates & Organic Chemistry (WCH14)',
       'Unit 5: Transition Metals (WCH15)',
       'Unit 6: Practical Chemistry II (WCH16)',
-      'Unit WCH01',
-      'Unit WCH02',
-      'Unit WCH03',
-      'Unit WCH04',
-      'Unit WCH05',
-      'Unit WCH06',
-      'Unit WCH07'
+      'Unit 1: The Core Principles of Chemistry (WCH01)',
+      'Unit 2: Application of Core Principles of Chemistry (WCH02)',
+      'Unit 3: Chemistry Laboratory Skills I (WCH03)',
+      'Unit 4: General Principles of Chemistry I (WCH04)',
+      'Unit 5: General Principles of Chemistry II (WCH05)',
+      'Unit 6: Chemistry Laboratory Skills II (WCH06)',
+      'Unit 7: Chemistry Practical Examination (WCH07)'
     ],
     'Economics': [
       'Unit 1: Markets in Action (WEC11)',
       'Unit 2: Macroeconomic Performance (WEC12)',
       'Unit 3: Business Behaviour (WEC13)',
       'Unit 4: A Global Perspective (WEC14)',
-      'Unit 6ECA1',
-      'Unit 6ECA2',
-      'Unit 6ECA3',
-      'Unit WEC01',
-      'Unit WEC02',
-      'Unit WEC03',
-      'Unit WEC04'
+      'Unit 1: Markets in Action (WEC01)',
+      'Unit 2: Macroeconomic Performance & Policy (WEC02)',
+      'Unit 3: Business Behaviour (WEC03)',
+      'Unit 4: Developments in the Global Economy (WEC04)',
+      'Unit 1: Competitive Markets (6ECA1)',
+      'Unit 2: Managing the Economy (6ECA2)',
+      'Unit 3: Business Economics & Efficiency (6ECA3)'
     ],
     'Information Technology': [
       'IT Unit 1 (WIT11)',
@@ -290,26 +290,26 @@ export const DEFAULT_UNIT_LABELS = {
       'IT Unit 4 (WIT14)'
     ],
     'Math': [
-      'Core Mathematics 1 (C1)',
-      'Core Mathematics 12 (C12)',
-      'Core Mathematics 2 (C2)',
-      'Core Mathematics 3 (C3)',
-      'Core Mathematics 34 (C34)',
-      'Core Mathematics 4 (C4)',
-      'Decision Mathematics 1 (D1)',
-      'Further Pure 1 (FP1)',
-      'Further Pure 2 (FP2)',
-      'Further Pure 3 (FP3)',
-      'Mechanics 1 (M1)',
-      'Mechanics 2 (M2)',
-      'Mechanics 3 (M3)',
       'Pure Mathematics 1 (P1)',
       'Pure Mathematics 2 (P2)',
       'Pure Mathematics 3 (P3)',
       'Pure Mathematics 4 (P4)',
+      'Mechanics 1 (M1)',
+      'Mechanics 2 (M2)',
+      'Mechanics 3 (M3)',
       'Statistics 1 (S1)',
       'Statistics 2 (S2)',
-      'Statistics 3 (S3)'
+      'Statistics 3 (S3)',
+      'Decision Mathematics 1 (D1)',
+      'Further Pure 1 (FP1)',
+      'Further Pure 2 (FP2)',
+      'Further Pure 3 (FP3)',
+      'Core Mathematics 12 (C12)',
+      'Core Mathematics 34 (C34)',
+      'Core Mathematics 1 (C1)',
+      'Core Mathematics 2 (C2)',
+      'Core Mathematics 3 (C3)',
+      'Core Mathematics 4 (C4)'
     ],
     'Physics': [
       'Unit 1: Mechanics & Materials (WPH11)',
@@ -318,12 +318,12 @@ export const DEFAULT_UNIT_LABELS = {
       'Unit 4: Further Mechanics & Fields (WPH14)',
       'Unit 5: Thermodynamics & Oscillations (WPH15)',
       'Unit 6: Practical Physics II (WPH16)',
-      'Unit WPH01',
-      'Unit WPH02',
-      'Unit WPH03',
-      'Unit WPH04',
-      'Unit WPH05',
-      'Unit WPH06'
+      'Unit 1: Physics on the Go (WPH01)',
+      'Unit 2: Physics at Work (WPH02)',
+      'Unit 3: Exploring Physics (WPH03)',
+      'Unit 4: Physics on the Move (WPH04)',
+      'Unit 5: Physics from Creation to Collapse (WPH05)',
+      'Unit 6: Experimental Physics (WPH06)'
     ],
     'Psychology': [
       'Psychology Unit 1 (WPS01)',
@@ -342,8 +342,7 @@ export const DEFAULT_UNIT_LABELS = {
       'English Literature Unit 1 (WET01)',
       'English Literature Unit 2 (WET02)',
       'English Literature Unit 3 (WET03)',
-      'English Literature Unit 4 (WET04)',
-      'Unit WET12'
+      'English Literature Unit 4 (WET04)'
     ],
     'French': [
       'French Unit 1 (WFR01)',
@@ -584,7 +583,8 @@ export function buildRoutePath({
   previewFile = null,
   pendingPaperParam = '',
   previewMode = '',
-  forceShowTable = false
+  forceShowTable = false,
+  useHashForPaper = true
 }) {
   if (currentTab === 'about') return '/about';
   if (currentTab === 'changelog') return '/changelog';
@@ -638,13 +638,21 @@ export function buildRoutePath({
     params.set('q', searchQuery.trim());
   }
   const paperKey = previewFile ? (previewFile.id || previewFile.path || '') : (pendingPaperParam || '');
+  let hashStr = '';
   if (paperKey) {
-    params.set('paper', paperKey);
-    if (previewMode) params.set('view', previewMode);
+    if (useHashForPaper) {
+      const hashParams = new URLSearchParams();
+      hashParams.set('paper', paperKey);
+      if (previewMode) hashParams.set('view', previewMode);
+      hashStr = `#${hashParams.toString()}`;
+    } else {
+      params.set('paper', paperKey);
+      if (previewMode) params.set('view', previewMode);
+    }
   }
 
   const qs = params.toString();
-  return qs ? `${pathname}?${qs}` : pathname;
+  return `${qs ? `${pathname}?${qs}` : pathname}${hashStr}`;
 }
 
 const MATH_CODE_PRIORITY = [
@@ -734,9 +742,11 @@ function fitDescription(str, maxLen = 160) {
   return `${(lastSpace > 100 ? trimmed.slice(0, lastSpace) : trimmed).replace(/[.,;:\s-]+$/, '')}.`;
 }
 
-export function parseRouteFromLocation(pathname = '/', search = '', meta = null) {
+export function parseRouteFromLocation(pathname = '/', search = '', meta = null, hash = '') {
   const cleanPath = (pathname || '/').replace(/\/+$/, '') || '/';
   const params = new URLSearchParams(search || '');
+  const cleanHash = String(hash || '').replace(/^#/, '');
+  const hashParams = cleanHash.includes('=') ? new URLSearchParams(cleanHash) : null;
 
   const result = {
     currentTab: 'library',
@@ -746,8 +756,8 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null)
     filterYear: params.get('year') || '',
     filterDocType: params.get('type') || null,
     searchQuery: params.get('q') || '',
-    paperParam: params.get('paper') || '',
-    viewParam: params.get('view') || '',
+    paperParam: (hashParams && hashParams.get('paper')) || params.get('paper') || '',
+    viewParam: (hashParams && hashParams.get('view')) || params.get('view') || '',
     forceShowTable: false,
     notFound: false
   };
@@ -859,10 +869,8 @@ export function getSeoMetadata({
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
-  filterYear = '',
   filterDocType = null,
   searchQuery = '',
-  paperParam = '',
   forceShowTable = false,
   notFound = false,
   meta = null
@@ -872,12 +880,10 @@ export function getSeoMetadata({
     (filterDocType === 'Book' && !filterUnit) ||
     (filterDocType === 'DF' && !filterCurriculum && !filterSubject && !filterUnit) ||
     (filterDocType === 'AUD' && !filterCurriculum && !filterSubject && !filterUnit);
-  const hasFacetedQuery = Boolean(
-    filterYear ||
-    searchQuery ||
-    paperParam ||
-    (filterDocType && !isCanonicalDocTypeFilter)
-  );
+  // Keep parameterized views (?paper=, ?year=, ?type=) indexable with rel="canonical" pointing to the clean parent URL
+  // so Google Search Console consolidates signals cleanly instead of failing validation with "Excluded by 'noindex' tag".
+  // Only free-text internal search queries (?q=...) and genuine 404s emit noindex.
+  const hasSearchQuery = Boolean(searchQuery && String(searchQuery).trim());
 
   if (notFound) {
     return {
@@ -901,7 +907,7 @@ export function getSeoMetadata({
     forceShowTable
   });
   const canonicalUrl = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`;
-  const robots = hasFacetedQuery ? 'noindex, follow' : 'index, follow';
+  const robots = hasSearchQuery ? 'noindex, follow' : 'index, follow';
 
   if (currentTab === 'about') {
     return {

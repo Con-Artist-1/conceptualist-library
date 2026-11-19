@@ -13,11 +13,13 @@ const STATIC_SEARCH_VOCAB = [
   'tamil', 'turkish', 'urdu',
   // Units, paper tiers & formats
   'mechanics', 'mech', 'statistics', 'stat', 'stats', 'decision', 'core', 'solomon',
-  'unit', 'paper', 'regional', 'foundation', 'higher', 'modular',
-  'question', 'mark', 'scheme', 'markscheme', 'examiner', 'report', 'pef',
-  'textbook', 'book', 'books', 'solutions', 'solution', 'solutionbank', 'worked',
-  'specimen', 'syllabus', 'listening', 'audio', 'mp3', 'subtitles', 'transcript',
-  'datafile', 'datafiles', 'practical', 'source', 'student', 'workbook', 'revision', 'guide',
+  'unit', 'paper', 'papers', 'regional', 'foundation', 'higher', 'modular',
+  'question', 'questions', 'mark', 'scheme', 'schemes', 'markscheme', 'markschemes',
+  'examiner', 'examiners', 'report', 'reports', 'pef',
+  'textbook', 'textbooks', 'book', 'books', 'solutions', 'solution', 'solutionbank', 'worked',
+  'specimen', 'specimens', 'syllabus', 'syllabuses', 'sample', 'samples',
+  'listening', 'audio', 'mp3', 'recording', 'recordings', 'track', 'tracks', 'subtitles', 'captions', 'transcript', 'transcripts',
+  'file', 'files', 'datafile', 'datafiles', 'practical', 'source', 'sources', 'student', 'workbook', 'revision', 'guide', 'lab', 'answers', 'answer',
   'c12', 'c34', 'fp1', 'fp2', 'fp3',
   // Sessions & curricula
   'january', 'jan', 'february', 'feb', 'june', 'jun', 'may', 'summer',
@@ -202,14 +204,14 @@ const RAW_ATOMIC_SYNONYMS = {
   '2r': ['2r', 'p2r', 'paper 2r', '2hr', '2fr'],
   p1r: ['1r', 'p1r', 'paper 1r', '1hr', '1fr'],
   p2r: ['2r', 'p2r', 'paper 2r', '2hr', '2fr'],
-  '1h': ['1h', 'p1', 'paper 1', '1p'],
-  '2h': ['2h', 'p2', 'paper 2', '2p'],
-  '1hr': ['1hr', 'p1r', '1r', 'paper 1r'],
-  '2hr': ['2hr', 'p2r', '2r', 'paper 2r'],
-  '1f': ['1f', 'p1', 'paper 1', '1p'],
-  '2f': ['2f', 'p2', 'paper 2', '2p'],
-  '1fr': ['1fr', 'p1r', '1r', 'paper 1r'],
-  '2fr': ['2fr', 'p2r', '2r', 'paper 2r'],
+  '1h': ['1h', 'paper 1h', '1ph'],
+  '2h': ['2h', 'paper 2h', '2ph'],
+  '1hr': ['1hr', 'paper 1hr'],
+  '2hr': ['2hr', 'paper 2hr'],
+  '1f': ['1f', 'paper 1f', '1pf'],
+  '2f': ['2f', 'paper 2f', '2pf'],
+  '1fr': ['1fr', 'paper 1fr'],
+  '2fr': ['2fr', 'paper 2fr'],
 
   m1: ['m1', 'm1a', 'm1r', 'wme01', 'mechanics 1'],
   m2: ['m2', 'm2a', 'm2r', 'wme02', 'mechanics 2'],
@@ -403,15 +405,15 @@ const IGCSE_SUBJECT_BY_CODE = Object.entries(IGCSE_CODE_BY_SUBJECT).reduce((acc,
 }, {});
 
 const DOC_TYPE_TOKENS = {
-  QP: ['qp', 'question', 'paper', 'past'],
-  MS: ['ms', 'mark', 'scheme', 'markscheme', 'answers'],
-  ER: ['er', 'examiner', 'report', 'pef'],
+  QP: ['qp', 'question', 'questions', 'paper', 'papers', 'past'],
+  MS: ['ms', 'mark', 'scheme', 'schemes', 'markscheme', 'markschemes', 'answer', 'answers'],
+  ER: ['er', 'examiner', 'examiners', 'report', 'reports', 'pef'],
   SOL: ['sol', 'solution', 'solutions', 'solutionbank', 'bank', 'worked', 'answers'],
-  DF: ['df', 'data', 'datafile', 'datafiles', 'practical', 'zip'],
-  AUD: ['aud', 'audio', 'listening', 'mp3', 'subtitles', 'transcript'],
-  SC: ['sc', 'source', 'transcript', 'insert'],
-  SAM: ['sam', 'specimen', 'syllabus', 'sample'],
-  Book: ['book', 'books', 'textbook', 'textbooks', 'studentbook']
+  DF: ['df', 'data', 'file', 'files', 'datafile', 'datafiles', 'practical', 'zip'],
+  AUD: ['aud', 'audio', 'listening', 'mp3', 'recording', 'recordings', 'track', 'tracks', 'subtitles', 'captions', 'cc', 'transcript', 'transcripts'],
+  SC: ['sc', 'source', 'sources', 'transcript', 'transcripts', 'insert', 'inserts', 'booklet'],
+  SAM: ['sam', 'specimen', 'specimens', 'syllabus', 'syllabuses', 'specification', 'specifications', 'sample', 'samples'],
+  Book: ['book', 'books', 'textbook', 'textbooks', 'studentbook', 'coursebook', 'guide']
 };
 
 const DOC_TYPE_PHRASES = {
@@ -433,7 +435,8 @@ const SESSION_SYNONYMS_BY_MONTH = {
 
 const GENERIC_QUERY_WORDS = new Set([
   'qp', 'ms', 'er', 'aud', 'df', 'sc', 'sol', 'sam', 'book', 'books',
-  'question', 'paper', 'papers', 'mark', 'scheme', 'examiner', 'report',
+  'question', 'questions', 'paper', 'papers', 'mark', 'scheme', 'schemes',
+  'examiner', 'examiners', 'report', 'reports', 'file', 'files',
   'textbook', 'textbooks', 'solutions', 'ial', 'igcse', 'edexcel',
   'r', 'regional', 'reg', 'alt', 'alta', 'higher', 'foundation'
 ]);
@@ -640,10 +643,28 @@ export function buildFileSearchData(fileObj) {
   if (v.includes('H')) {
     metaSet.add('higher');
     tokenSet.add('higher');
+    if (paperNumMatch) {
+      const pDigit = paperNumMatch[1].replace(/r$/i, '');
+      highSet.add(`${pDigit}h`);
+      tokenSet.add(`${pDigit}h`);
+      if (isReg) {
+        highSet.add(`${pDigit}hr`);
+        tokenSet.add(`${pDigit}hr`);
+      }
+    }
   }
   if (v.includes('F')) {
     metaSet.add('foundation');
     tokenSet.add('foundation');
+    if (paperNumMatch) {
+      const pDigit = paperNumMatch[1].replace(/r$/i, '');
+      highSet.add(`${pDigit}f`);
+      tokenSet.add(`${pDigit}f`);
+      if (isReg) {
+        highSet.add(`${pDigit}fr`);
+        tokenSet.add(`${pDigit}fr`);
+      }
+    }
   }
 
   const dt = fileObj.docType || '';
@@ -661,9 +682,10 @@ export function buildFileSearchData(fileObj) {
     });
   }
 
-  // Path & Filename tokens
+  // Path & Filename tokens (strip browser duplicate-copy suffixes like " (1).pdf" so Book 2 doesn't index token "1")
+  const sanitizedPathForTokens = String(fileObj.path || '').replace(/\s*\(\d+\)(\.[a-z0-9]+)$/i, '$1');
   addTokensTo(fileObj.name, tokenSet, true);
-  addTokensTo(fileObj.path, tokenSet, true);
+  addTokensTo(sanitizedPathForTokens, tokenSet, true);
 
   const highPhraseBase = [
     fileObj.cleanUnitLabel,
@@ -680,7 +702,7 @@ export function buildFileSearchData(fileObj) {
   const allPhraseBase = [
     highPhraseBase,
     fileObj.name,
-    fileObj.path,
+    sanitizedPathForTokens,
     fileObj.curriculum,
     fileObj.category,
     fileObj.session,
@@ -1045,11 +1067,25 @@ export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
   };
 }
 
+function phraseContainsWithoutFurtherPrefix(haystack, phraseVal) {
+  const needle = ` ${phraseVal} `;
+  if (!phraseVal.startsWith('pure mathematics ')) {
+    return haystack.includes(needle);
+  }
+  let idx = haystack.indexOf(needle);
+  while (idx !== -1) {
+    // Reject "... further pure mathematics 1 ..." when searching strictly for "pure mathematics 1" (P1/WMA11)
+    const before = haystack.slice(Math.max(0, idx - 8), idx);
+    if (!before.endsWith(' further')) return true;
+    idx = haystack.indexOf(needle, idx + 1);
+  }
+  return false;
+}
+
 function itemMatchesAlt(searchData, alt, allowPrefix = false) {
   if (alt.type === 'phrase') {
-    const needle = ` ${alt.val} `;
-    if (searchData.highStr.includes(needle)) return 'high_exact';
-    if (searchData.phraseStr.includes(needle)) return 'body_exact';
+    if (phraseContainsWithoutFurtherPrefix(searchData.highStr, alt.val)) return 'high_exact';
+    if (phraseContainsWithoutFurtherPrefix(searchData.phraseStr, alt.val)) return 'body_exact';
     return null;
   }
 

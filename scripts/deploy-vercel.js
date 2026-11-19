@@ -232,6 +232,8 @@ async function main() {
     projectSettings: {
       framework: 'vite'
     },
+    trailingSlash: vercelConfig.trailingSlash,
+    redirects: vercelConfig.redirects,
     rewrites: vercelConfig.rewrites,
     headers: vercelConfig.headers
   };

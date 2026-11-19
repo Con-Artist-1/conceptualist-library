@@ -183,6 +183,8 @@
   --mcmaster-maroon-hover: #A8253B;
   --mcmaster-gold: #FFD33D;
   --mcmaster-gold-hover: #FFE380;
+  --igcse-blue: #58A6FF;
+  --igcse-blue-hover: #79B8FF;
 
   /* Vivid High-Contrast Badges */
   --badge-qp-bg: #0A2540;
@@ -1274,6 +1276,7 @@ a.breadcrumb-link:hover {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
+  text-decoration: none;
   text-align: left;
   cursor: pointer;
   display: flex;
@@ -5110,6 +5113,14 @@ html[data-theme='dark'] body {
   color: #E8C15A !important;
 }
 
+[data-theme='dark'] .wizard-trail-text .highlight {
+  color: #79B8FF !important;
+}
+
+[data-theme='dark'] .history-title-group svg {
+  color: #FF758F !important;
+}
+
 [data-theme='dark'] .wizard-option-btn {
   background: #14171D !important;
   border: 1px solid #2E3440 !important;
@@ -6778,8 +6789,65 @@ html[data-theme='oled'] body {
   font-weight: 600 !important;
 }
 
+[data-theme='oled'] .breadcrumb-container {
+  background: #080808 !important;
+  border: 1px solid #222222 !important;
+}
+
+[data-theme='oled'] .breadcrumb-trail {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='oled'] .breadcrumb-link,
+[data-theme='oled'] a.breadcrumb-link {
+  background-color: #111111 !important;
+  border: 1px solid #333333 !important;
+  color: #E2E8F0 !important;
+  text-decoration: none !important;
+}
+
+[data-theme='oled'] .breadcrumb-link.home,
+[data-theme='oled'] a.breadcrumb-link.home {
+  background-color: #2A0E15 !important;
+  border-color: #8C1D2F !important;
+  color: #FF758F !important;
+  text-decoration: none !important;
+}
+
+[data-theme='oled'] .breadcrumb-link:hover,
+[data-theme='oled'] a.breadcrumb-link:hover {
+  background-color: #8C1D2F !important;
+  border-color: #FF5370 !important;
+  color: #FFFFFF !important;
+  text-decoration: none !important;
+}
+
+[data-theme='oled'] .breadcrumb-separator {
+  color: #94A3B8 !important;
+}
+
+[data-theme='oled'] .result-summary {
+  color: #94A3B8 !important;
+}
+
+[data-theme='oled'] .result-summary strong {
+  color: #FFFFFF !important;
+}
+
 [data-theme='oled'] .wizard-breadcrumb {
   border-bottom: 1px solid #202020 !important;
+}
+
+[data-theme='oled'] .wizard-back-btn {
+  background: #111111 !important;
+  border: 1px solid #333333 !important;
+  color: #E2E8F0 !important;
+}
+
+[data-theme='oled'] .wizard-back-btn:hover {
+  background: #8C1D2F !important;
+  border-color: #FF5370 !important;
+  color: #FFFFFF !important;
 }
 
 [data-theme='oled'] .wizard-breadcrumb-item {
@@ -6799,6 +6867,14 @@ html[data-theme='oled'] body {
 
 [data-theme='oled'] .wizard-trail-text strong {
   color: #FFD33D !important;
+}
+
+[data-theme='oled'] .wizard-trail-text .highlight {
+  color: #79B8FF !important;
+}
+
+[data-theme='oled'] .history-title-group svg {
+  color: #FF758F !important;
 }
 
 [data-theme='oled'] .wizard-option-btn {
@@ -7898,14 +7974,16 @@ html[data-theme='oled'] body {
     max-width: 100%;
     min-width: 0;
     margin-top: 0;
-    padding: 6px 12px;
+    padding: 7px 12px;
     border-top: none;
     background: rgba(0, 0, 0, 0.15);
     box-sizing: border-box;
     overflow: hidden;
   }
 
-  .mobile-header-breadcrumb-content {
+  .mobile-header-breadcrumb-content,
+  [data-theme='dark'] .mobile-header-breadcrumb-content,
+  [data-theme='oled'] .mobile-header-breadcrumb-content {
     flex: 1;
     min-width: 0;
     background: transparent !important;
@@ -7917,7 +7995,7 @@ html[data-theme='oled'] body {
     flex-direction: column !important;
     align-items: stretch !important;
     font-size: 11px !important;
-    gap: 4px !important;
+    gap: 5px !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
@@ -9835,7 +9913,7 @@ html[data-theme='oled'] body {
   border-top: 4px solid var(--mcmaster-maroon);
   border-radius: var(--radius-md);
   padding: 36px 28px;
-  max-width: 680px;
+  max-width: 800px;
   margin: 24px auto;
   box-shadow: var(--shadow-sm);
 }
@@ -10062,9 +10140,14 @@ html[data-theme='oled'] body {
     font-size: 14px;
   }
 
+  .archive-context-links {
+    gap: 6px;
+  }
+
   .archive-context-link {
-    width: 100%;
-    justify-content: space-between;
+    font-size: 11.5px;
+    padding: 6px 10px;
+    max-width: 100%;
   }
 }
 
@@ -10243,6 +10326,43 @@ html[data-theme='oled'] body {
 [data-theme='oled'] .view-mode-btn.active {
   background: #8C1D2F !important;
   color: #FFFFFF !important;
+}
+
+/* Compact modal header spacing on 1366px / scaled laptop screens so paper title stays readable */
+@media (min-width: 769px) and (max-width: 1420px) {
+  .modal-header {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
+  .modal-title-group {
+    min-width: 130px;
+  }
+
+  .modal-header-controls-bar {
+    gap: 4px;
+  }
+
+  .modal-btn {
+    padding: 0 9px;
+    font-size: 11.5px;
+  }
+
+  .modal-theme-toggle-btn {
+    min-width: 72px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1260px) {
+  .modal-view-tabs .modal-btn .btn-desktop-text,
+  .modal-view-extras .modal-btn .btn-desktop-text {
+    display: none;
+  }
+
+  .modal-view-tabs .modal-btn .btn-mobile-text,
+  .modal-view-extras .modal-btn .btn-mobile-text {
+    display: inline;
+  }
 }
 
 /* Short laptop viewports (e.g. 1080p @ 150% DPI or 1366x768) */
