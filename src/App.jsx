@@ -78,13 +78,23 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9';
+const APP_VERSION = 'v6.9.1';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9',
+    version: 'v6.9.1',
     date: BUILD_TIMESTAMP,
+    title: 'Subject Wizard Sub-URLs & Browser Back/Forward Navigation',
+    summary: 'Synced subject and unit wizard steps with canonical sub-URLs (/ial/<subject>, /igcse/<subject>, and unit routes) so browser Back/Forward and mouse Back buttons step smoothly through Subjects → Units → Years → Papers instead of leaving the site.',
+    changes: [
+      'Wizard route & history sync: Selecting a subject or unit on the homepage now pushes its canonical sub-URL (e.g. /ial/accounting, /ial/accounting/unit-1-the-accounting-system-and-costing-wac11) with full popstate Back/Forward support and refresh preservation.',
+      'Semantic links & scroll polish: Converted primary wizard "View All" actions into real <a href> links with middle-click support and auto-scrolled to top when drilling into subjects lower on the page.'
+    ]
+  },
+  {
+    version: 'v6.9',
+    date: '2026-11-19T23:58:00+06:00',
     title: 'Verified Textbook Titles, Unit Grouping & Order, and Search Console SEO Fix',
     summary: 'Standardized all 71 textbook and solution bank titles with verified authors and years, fixed subject unit grouping/ordering across Physics, Business, Chemistry, Biology, Economics & Maths, resolved Search Console indexing traps, and tightened search accuracy.',
     changes: [
@@ -3142,6 +3152,10 @@ const AboutPage = ({ onGoHome }) => {
 const WelcomePage = ({
   data,
   recentHistory = [],
+  selectedSubject = null,
+  selectedUnit = null,
+  onWizardSubjectChange,
+  onWizardUnitChange,
   onOpenPaper,
   onClearHistory,
   getOnSitePaperUrl,
@@ -3152,8 +3166,6 @@ const WelcomePage = ({
   onTrySampleAudio,
   onSelectFinalFilter
 }) => {
-  const [selectedSubject, setSelectedSubject] = useState(null); // { name, curriculum }
-  const [selectedUnit, setSelectedUnit] = useState(null); // string | null
   const hasHistory = Array.isArray(recentHistory) && recentHistory.length > 0;
   const bookCount = useMemo(() => (
     Array.isArray(data.unifiedFiles) && data.unifiedFiles.length > 0
@@ -3279,12 +3291,18 @@ const WelcomePage = ({
   }, [wizardMeta, availableUnitsMap, data.flatFiles, selectedSubject, selectedUnit]);
 
   const handleSubjectClick = (subjectName, curriculum) => {
-    setSelectedSubject({ name: subjectName, curriculum });
-    setSelectedUnit(null);
+    onWizardSubjectChange({ name: subjectName, curriculum });
+    onWizardUnitChange(null);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
   };
 
   const handleUnitClick = (unitName) => {
-    setSelectedUnit(unitName);
+    onWizardUnitChange(unitName);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
   };
 
   const handleYearClick = (yearVal) => {
@@ -3603,7 +3621,10 @@ const WelcomePage = ({
             <button
               type="button"
               className="wizard-back-btn"
-              onClick={() => { if (selectedUnit) setSelectedUnit(null); else setSelectedSubject(null); }}
+              onClick={() => {
+                if (selectedUnit) onWizardUnitChange(null);
+                else onWizardSubjectChange(null);
+              }}
             >
               ← {selectedUnit ? 'Back to Units' : 'Back to All Subjects'}
             </button>
@@ -3618,13 +3639,18 @@ const WelcomePage = ({
             <div className="wizard-step">
               <h2>Select {formatSubjectDisplay(selectedSubject.name)} Unit or Paper:</h2>
               <div style={{ marginBottom: '24px' }}>
-                <button
+                <a
+                  href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}`}
                   className="wizard-option-btn primary"
-                  onClick={() => onSubjectSelect(selectedSubject.name, selectedSubject.curriculum)}
+                  onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
+                    e.preventDefault();
+                    onSubjectSelect(selectedSubject.name, selectedSubject.curriculum);
+                  }}
                   style={{ width: '100%', marginBottom: '20px' }}
                 >
-                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers & Textbooks →</span>
-                </button>
+                  <span>View All {formatSubjectDisplay(selectedSubject.name)} Units, Papers &amp; Textbooks →</span>
+                </a>
                 {Object.entries(groupedUnits).map(([groupName, units]) => (
                   <div key={groupName} style={{ marginBottom: '20px' }}>
                     {Object.keys(groupedUnits).length > 1 && (
@@ -3662,13 +3688,18 @@ const WelcomePage = ({
             <div className="wizard-step">
               <h2>Select Examination Year for {selectedUnit}:</h2>
               <div style={{ marginBottom: '20px' }}>
-                <button
+                <a
+                  href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(selectedUnit)}`}
                   className="wizard-option-btn primary"
-                  onClick={() => handleYearClick('')}
+                  onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
+                    e.preventDefault();
+                    handleYearClick('');
+                  }}
                   style={{ width: '100%' }}
                 >
                   <span>All Examination Years for {selectedUnit} →</span>
-                </button>
+                </a>
               </div>
               <div className="wizard-button-grid-years">
                 {availableYears.map(year => (
@@ -3807,13 +3838,30 @@ function getInitialCachedMeta() {
 function App() {
   const isMobile = useIsMobile();
   const initialCache = useMemo(() => getInitialCachedMeta(), []);
+  const initialHistoryState = useMemo(() => {
+    try {
+      const st = typeof window !== 'undefined' ? window.history.state : null;
+      if (st && (st.wizardStep === 'unit' || st.wizardStep === 'year') && st.subject && st.curriculum) {
+        return st;
+      }
+    } catch {
+      // Ignore history access errors
+    }
+    return null;
+  }, []);
   const initialRoute = useMemo(() => (
     typeof window !== 'undefined'
       ? parseRouteFromLocation(window.location.pathname, window.location.search, initialCache?.meta || DEFAULT_META, window.location.hash)
       : {}
   ), [initialCache]);
 
-  const [isNotFound, setIsNotFound] = useState(Boolean(initialRoute.notFound));
+  const [isNotFound, setIsNotFound] = useState(Boolean(!initialHistoryState && initialRoute.notFound));
+  const [wizardSubject, setWizardSubject] = useState(() => (
+    initialHistoryState ? { name: initialHistoryState.subject, curriculum: initialHistoryState.curriculum } : null
+  ));
+  const [wizardUnit, setWizardUnit] = useState(() => (
+    initialHistoryState?.wizardStep === 'year' ? (initialHistoryState.unit || null) : null
+  ));
   const [viewsMap, setViewsMap] = useState(() => readLocalViewsCache() || {});
   const [recentHistory, setRecentHistory] = useState(() => getInitialRecentHistory());
 
@@ -4004,15 +4052,15 @@ function App() {
     }
   }, [theme]);
 
-  // Filters initialized directly from URL route
-  const [filterCurriculum, setFilterCurriculum] = useState(initialRoute.filterCurriculum || ''); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
-  const [filterDocType, setFilterDocType] = useState(initialRoute.filterDocType || null); // 'QP' | 'MS' | 'ER' | 'Book' | 'Extra' | null
-  const [filterSubject, setFilterSubject] = useState(initialRoute.filterSubject || '');
-  const [filterUnit, setFilterUnit] = useState(initialRoute.filterUnit || '');
-  const [filterYear, setFilterYear] = useState(initialRoute.filterYear || '');
+  // Filters initialized directly from URL route (kept empty when restoring a wizard step from history.state)
+  const [filterCurriculum, setFilterCurriculum] = useState(initialHistoryState ? '' : (initialRoute.filterCurriculum || '')); // '' | 'Edexcel IAL' | 'Edexcel IGCSE'
+  const [filterDocType, setFilterDocType] = useState(initialHistoryState ? null : (initialRoute.filterDocType || null)); // 'QP' | 'MS' | 'ER' | 'Book' | 'Extra' | null
+  const [filterSubject, setFilterSubject] = useState(initialHistoryState ? '' : (initialRoute.filterSubject || ''));
+  const [filterUnit, setFilterUnit] = useState(initialHistoryState ? '' : (initialRoute.filterUnit || ''));
+  const [filterYear, setFilterYear] = useState(initialHistoryState ? '' : (initialRoute.filterYear || ''));
   const [filterSession, setFilterSession] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // Default to newest first so recent 2026/2025 papers appear at top
-  const [forceShowTable, setForceShowTable] = useState(Boolean(initialRoute.forceShowTable));
+  const [forceShowTable, setForceShowTable] = useState(Boolean(!initialHistoryState && initialRoute.forceShowTable));
   const [showFilters, setShowFilters] = useState(false);
 
   const searchInputRef = useRef(null);
@@ -4148,21 +4196,42 @@ function App() {
     recordPaperInteraction(fileObj, preferredView);
   }, [recordPaperInteraction]);
 
-  // Handle browser Back/Forward & hash deep-link navigation across all routes and modals
+  // Handle browser Back/Forward & hash deep-link navigation across all routes, wizard steps, and modals
   useEffect(() => {
-    const handlePopState = () => {
+    const handlePopState = (event) => {
       isPopStateRef.current = true;
+      const navState = (event && event.state) || window.history.state || null;
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta, window.location.hash);
-      setCurrentTab(parsed.currentTab || 'library');
-      setIsNotFound(Boolean(parsed.notFound));
-      setFilterCurriculum(parsed.filterCurriculum || '');
-      setFilterSubject(parsed.filterSubject || '');
-      setFilterUnit(parsed.filterUnit || '');
-      setFilterYear(parsed.filterYear || '');
-      setFilterSession('');
-      setFilterDocType(parsed.filterDocType || null);
-      setSearchQuery(parsed.searchQuery || '');
-      setForceShowTable(Boolean(parsed.forceShowTable));
+
+      if ((navState?.wizardStep === 'unit' || navState?.wizardStep === 'year') && navState.subject && navState.curriculum) {
+        setCurrentTab('library');
+        setIsNotFound(false);
+        setFilterCurriculum('');
+        setFilterSubject('');
+        setFilterUnit('');
+        setFilterYear('');
+        setFilterSession('');
+        setFilterDocType(null);
+        setSearchQuery('');
+        setSelectedPath('');
+        setForceShowTable(false);
+        setWizardSubject({ name: navState.subject, curriculum: navState.curriculum });
+        setWizardUnit(navState.wizardStep === 'year' ? (navState.unit || null) : null);
+      } else {
+        setWizardSubject(null);
+        setWizardUnit(null);
+        setCurrentTab(parsed.currentTab || 'library');
+        setIsNotFound(Boolean(parsed.notFound));
+        setFilterCurriculum(parsed.filterCurriculum || '');
+        setFilterSubject(parsed.filterSubject || '');
+        setFilterUnit(parsed.filterUnit || '');
+        setFilterYear(parsed.filterYear || '');
+        setFilterSession('');
+        setFilterDocType(parsed.filterDocType || null);
+        setSearchQuery(parsed.searchQuery || '');
+        setForceShowTable(Boolean(parsed.forceShowTable));
+      }
+
       setPreviewInitialView(parsed.viewParam || '');
       if (parsed.paperParam) {
         const found =
@@ -4194,6 +4263,8 @@ function App() {
     if (initialUnitHydratedRef.current) return;
     if (!data.meta?.wizard) return;
     initialUnitHydratedRef.current = true;
+    const activeWiz = window.history.state?.wizardStep;
+    if (activeWiz === 'unit' || activeWiz === 'year') return;
     const segments = (window.location.pathname || '/').split('/').filter(Boolean);
     if (segments.length >= 1) {
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, data.meta, window.location.hash);
@@ -4237,12 +4308,29 @@ function App() {
     setPendingPaperParam('');
   }, [pendingPaperParam, data.unifiedFiles, data.flatFiles, previewInitialView, recordPaperInteraction]);
 
+  const isWizardRouteActive = Boolean(
+    currentTab === 'library' &&
+    !isNotFound &&
+    selectedPath === '' &&
+    !filterCurriculum &&
+    !filterDocType &&
+    !filterSubject &&
+    !filterUnit &&
+    !filterYear &&
+    !filterSession &&
+    !searchQuery &&
+    !forceShowTable
+  );
+  const effectiveRouteCurriculum = isWizardRouteActive && wizardSubject ? wizardSubject.curriculum : filterCurriculum;
+  const effectiveRouteSubject = isWizardRouteActive && wizardSubject ? wizardSubject.name : filterSubject;
+  const effectiveRouteUnit = isWizardRouteActive && wizardSubject && wizardUnit ? wizardUnit : filterUnit;
+
   // Synchronize current route state to browser URL and dynamic SEO <head> + Schema.org JSON-LD
   const seoMeta = useMemo(() => getSeoMetadata({
     currentTab,
-    filterCurriculum,
-    filterSubject,
-    filterUnit,
+    filterCurriculum: effectiveRouteCurriculum,
+    filterSubject: effectiveRouteSubject,
+    filterUnit: effectiveRouteUnit,
     filterYear,
     filterDocType,
     searchQuery: deferredSearchQuery,
@@ -4252,9 +4340,9 @@ function App() {
     meta: data.meta
   }), [
     currentTab,
-    filterCurriculum,
-    filterSubject,
-    filterUnit,
+    effectiveRouteCurriculum,
+    effectiveRouteSubject,
+    effectiveRouteUnit,
     filterYear,
     filterDocType,
     deferredSearchQuery,
@@ -4270,15 +4358,15 @@ function App() {
 
     // Wait for wizard metadata before overwriting a 3-segment unit URL on a cold cache visit
     const pathSegments = (window.location.pathname || '/').split('/').filter(Boolean);
-    const waitingForUnitHydration = pathSegments.length >= 3 && pathSegments[0] !== 'textbooks' && !filterUnit && !data.meta?.wizard;
+    const waitingForUnitHydration = pathSegments.length >= 3 && pathSegments[0] !== 'textbooks' && !filterUnit && !wizardUnit && !data.meta?.wizard;
     const activeNotFound = currentTab === 'library' && isNotFound;
 
     if (!waitingForUnitHydration && !activeNotFound) {
       const nextUrl = buildRoutePath({
         currentTab,
-        filterCurriculum,
-        filterSubject,
-        filterUnit,
+        filterCurriculum: effectiveRouteCurriculum,
+        filterSubject: effectiveRouteSubject,
+        filterUnit: effectiveRouteUnit,
         filterYear,
         filterDocType,
         searchQuery: deferredSearchQuery,
@@ -4288,15 +4376,32 @@ function App() {
         forceShowTable,
         useHashForPaper: true
       });
+      const nextHistoryState = (isWizardRouteActive && wizardSubject)
+        ? {
+            wizardStep: wizardUnit ? 'year' : 'unit',
+            curriculum: wizardSubject.curriculum,
+            subject: wizardSubject.name,
+            unit: wizardUnit || null
+          }
+        : { wizardStep: isWizardRouteActive ? 'home' : 'table' };
       const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      if (currentUrl !== nextUrl) {
+      const prevState = window.history.state;
+      const prevWizardStep = prevState?.wizardStep || null;
+      const stateChanged =
+        prevWizardStep !== nextHistoryState.wizardStep ||
+        (prevState?.subject || '') !== (nextHistoryState.subject || '') ||
+        (prevState?.curriculum || '') !== (nextHistoryState.curriculum || '') ||
+        (prevState?.unit || '') !== (nextHistoryState.unit || '');
+
+      if (currentUrl !== nextUrl || stateChanged) {
         const isLegacyPaperMigration = window.location.search.includes('paper=') && nextUrl.includes('#paper=');
+        const isInitialColdStateTag = currentUrl === nextUrl && prevState === null;
         if (isPopStateRef.current) {
           isPopStateRef.current = false;
-        } else if (deferredSearchQuery || isLegacyPaperMigration) {
-          window.history.replaceState(null, '', nextUrl);
+        } else if (deferredSearchQuery || isLegacyPaperMigration || isInitialColdStateTag) {
+          window.history.replaceState(nextHistoryState, '', nextUrl);
         } else {
-          window.history.pushState(null, '', nextUrl);
+          window.history.pushState(nextHistoryState, '', nextUrl);
         }
       } else {
         isPopStateRef.current = false;
@@ -4349,9 +4454,9 @@ function App() {
     }
     const jsonLdObj = buildJsonLd({
       currentTab,
-      filterCurriculum,
-      filterSubject,
-      filterUnit,
+      filterCurriculum: effectiveRouteCurriculum,
+      filterSubject: effectiveRouteSubject,
+      filterUnit: effectiveRouteUnit,
       filterDocType,
       forceShowTable,
       seo: seoMeta,
@@ -4361,6 +4466,12 @@ function App() {
   }, [
     currentTab,
     isNotFound,
+    isWizardRouteActive,
+    wizardSubject,
+    wizardUnit,
+    effectiveRouteCurriculum,
+    effectiveRouteSubject,
+    effectiveRouteUnit,
     filterCurriculum,
     filterSubject,
     filterUnit,
@@ -4895,6 +5006,8 @@ function App() {
   const handleSubjectSelect = useCallback((subject, curriculum = '') => {
     setCurrentTab('library');
     setIsNotFound(false);
+    setWizardSubject(null);
+    setWizardUnit(null);
     if (curriculum) setFilterCurriculum(curriculum);
     setFilterSubject(subject);
     setFilterUnit('');
@@ -4908,6 +5021,8 @@ function App() {
   const handleSelectFinalFilter = useCallback(({ subject, curriculum, unit, year }) => {
     setCurrentTab('library');
     setIsNotFound(false);
+    setWizardSubject(null);
+    setWizardUnit(null);
     if (curriculum) setFilterCurriculum(curriculum);
     if (subject) setFilterSubject(subject);
     setFilterUnit(unit || '');
@@ -4920,6 +5035,8 @@ function App() {
 
   const clearFilters = useCallback(({ pushUrl = true } = {}) => {
     setIsNotFound(false);
+    setWizardSubject(null);
+    setWizardUnit(null);
     setFilterCurriculum('');
     setFilterDocType(null);
     setFilterSubject('');
@@ -4930,8 +5047,8 @@ function App() {
     setSortBy('newest');
     setForceShowTable(false);
     setSelectedPath('');
-    if (pushUrl && typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '')) {
-      window.history.pushState(null, '', '/');
+    if (pushUrl && typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '' || window.location.hash !== '')) {
+      window.history.pushState({ wizardStep: 'home' }, '', '/');
     }
   }, []);
 
@@ -4946,6 +5063,8 @@ function App() {
     }
     setCurrentTab('library');
     setIsNotFound(false);
+    setWizardSubject(null);
+    setWizardUnit(null);
     setPreviewFile(null);
     setPendingPaperParam('');
     try {
@@ -4964,8 +5083,8 @@ function App() {
     setForceShowTable(false);
     setSelectedPath('');
     if (typeof window !== 'undefined') {
-      if (window.location.pathname !== '/' || window.location.search !== '') {
-        window.history.pushState(null, '', '/');
+      if (window.location.pathname !== '/' || window.location.search !== '' || window.location.hash !== '') {
+        window.history.pushState({ wizardStep: 'home' }, '', '/');
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -5251,17 +5370,27 @@ function App() {
   const isRoot = selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
+  // Clear stale homepage wizard selection whenever user activates search or table filters
+  useEffect(() => {
+    if (!showWelcome && (wizardSubject || wizardUnit)) {
+      setWizardSubject(null);
+      setWizardUnit(null);
+    }
+  }, [showWelcome, wizardSubject, wizardUnit]);
+
   const activeDateText = useMemo(() => {
-    if (filterSubject) {
-      const cov = filterCurriculum === 'Edexcel IGCSE'
-        ? data.meta?.igcseSubjectCoverage?.[filterSubject]
-        : (filterCurriculum === 'Edexcel IAL'
-            ? data.meta?.ialSubjectCoverage?.[filterSubject]
-            : data.meta?.subjectCoverage?.[filterSubject]);
-      if (cov) return `${formatSubjectDisplay(filterSubject)}: ${cov}`;
+    const activeSubj = filterSubject || (showWelcome ? wizardSubject?.name : '');
+    const activeCurr = filterCurriculum || (showWelcome ? wizardSubject?.curriculum : '');
+    if (activeSubj) {
+      const cov = activeCurr === 'Edexcel IGCSE'
+        ? data.meta?.igcseSubjectCoverage?.[activeSubj]
+        : (activeCurr === 'Edexcel IAL'
+            ? data.meta?.ialSubjectCoverage?.[activeSubj]
+            : data.meta?.subjectCoverage?.[activeSubj]);
+      if (cov) return `${formatSubjectDisplay(activeSubj)}: ${cov}`;
     }
     return data.meta?.coverage || 'January 2003 – June 2026';
-  }, [filterSubject, filterCurriculum, data.meta]);
+  }, [filterSubject, filterCurriculum, showWelcome, wizardSubject, data.meta]);
 
   const activeDrawerFilterCount = useMemo(() => {
     let count = 0;
@@ -6208,6 +6337,10 @@ function App() {
             <WelcomePage
               data={data}
               recentHistory={recentHistory}
+              selectedSubject={wizardSubject}
+              selectedUnit={wizardUnit}
+              onWizardSubjectChange={setWizardSubject}
+              onWizardUnitChange={setWizardUnit}
               onOpenPaper={openOnSiteReader}
               onClearHistory={handleClearHistory}
               getOnSitePaperUrl={getOnSitePaperUrl}
