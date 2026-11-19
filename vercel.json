@@ -43,7 +43,7 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=300, s-maxage=86400, stale-while-revalidate=2592000"
+          "value": "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400"
         }
       ]
     },
@@ -97,11 +97,20 @@
       ]
     },
     {
-      "source": "/(index\\.json|meta\\.json|audio-subtitles\\.json)",
+      "source": "/meta.json",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=300, s-maxage=86400, stale-while-revalidate=2592000"
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(index\\.json|audio-subtitles\\.json)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400"
         }
       ]
     },

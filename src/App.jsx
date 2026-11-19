@@ -78,13 +78,25 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.2';
+const APP_VERSION = 'v6.9.3';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
+const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.2',
+    version: 'v6.9.3',
     date: BUILD_TIMESTAMP,
+    title: 'Instant Cache Freshness, Daily Auto-Reload & Full Large-PDF Linearization',
+    summary: 'Eliminated stale browser catalog caching after updates with version-busted fetches, automatic 24-hour / new-deploy soft reloads (never interrupting open readers), and linearized all remaining >= 5 MB PDFs for Fast Web View streaming.',
+    changes: [
+      'Instant update freshness & daily auto-reload: Made /meta.json always revalidate (max-age=0), prioritized build-busted ?v= URLs for /index.json and /shards/*.json, added a 24-hour local cache TTL, and introduced safe automatic full reloads when a tab is >= 24h old or a newer catalog deploys (deferred automatically while reading a PDF or listening to audio).',
+      '100% Fast Web View large PDFs: Linearized all remaining >= 5 MB textbooks and past papers with qpdf (/Linearized + /ObjStm) and synced them to Hugging Face so Page 1 streams immediately in ~1–2 byte-range chunks.'
+    ]
+  },
+  {
+    version: 'v6.9.2',
+    date: '2026-11-20T00:50:00+06:00',
     title: 'Added IGCSE Commerce & Mathematics A Student Book 2 (73 Textbooks)',
     summary: 'Expanded the verified IGCSE (9-1) textbook collection with Commerce Student Book (Rob Jones, 2020) and Mathematics A Student Book 2 (David Turner & Ian Potts, 2017), adding /textbooks/igcse/commerce.',
     changes: [
@@ -2881,6 +2893,30 @@ function forcePurgeCacheAndReload() {
   });
 }
 
+// Gentle cache-clearing reload that keeps the user's current route, theme, history & viewer ID intact
+function softReloadKeepingUrl() {
+  try {
+    const lastReload = Number(sessionStorage.getItem('cs_auto_reload_at') || 0);
+    if (lastReload && Date.now() - lastReload < AUTO_RELOAD_COOLDOWN_MS) return;
+    sessionStorage.setItem('cs_auto_reload_at', String(Date.now()));
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('cs_library_meta_')) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  const tasks = [];
+  if (typeof window !== 'undefined' && 'caches' in window) {
+    tasks.push(caches.delete('cs_index_cache').catch(() => {}));
+  }
+  Promise.all(tasks).finally(() => {
+    window.location.reload();
+  });
+}
+
 // ─── Institutional Crash / Stale Cache Recovery Screen ───────────
 const CrashRecoveryScreen = ({ errorMsg }) => {
   useEffect(() => {
@@ -3829,13 +3865,17 @@ const DEFAULT_META = {
   coverage: 'January 2003 – June 2026'
 };
 
-// Read cached meta synchronously so repeat visits render in 0ms before fetch even begins
+// Read cached meta synchronously so repeat visits render in 0ms before fetch even begins (expires after 24h)
 function getInitialCachedMeta() {
   try {
     const raw = localStorage.getItem(META_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.meta) {
+      if (parsed.savedAt && Date.now() - Number(parsed.savedAt) > DAILY_CACHE_TTL_MS) {
+        localStorage.removeItem(META_CACHE_KEY);
+        return null;
+      }
       return { meta: parsed.meta };
     }
   } catch {
@@ -4079,6 +4119,13 @@ function App() {
   const isHydratedRef = useRef(false);
   const hydratedShardPathRef = useRef(null);
   const latestLoadedGenAtRef = useRef('');
+  const dataMetaRef = useRef(data.meta);
+  dataMetaRef.current = data.meta;
+  const previewFileRef = useRef(previewFile);
+  previewFileRef.current = previewFile;
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+  const pendingAutoReloadRef = useRef(false);
   const fullIndexPromiseRef = useRef(null);
   const ensureFullIndexRef = useRef(null);
   const viewsInflightRef = useRef(null);
@@ -4552,8 +4599,8 @@ function App() {
     let shardFailed = false;
 
     const candidateIndexUrls = [
-      '/index.json',
       `/index.json?v=${buildQuery}`,
+      '/index.json',
       'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index.json'
     ];
 
@@ -4931,7 +4978,7 @@ function App() {
           return;
         }
 
-        const res = await fetch(initialShardRoute);
+        const res = await fetch(`${initialShardRoute}?v=${buildQuery}`);
         const contentType = res.headers.get('content-type') || '';
         if (!res.ok || !contentType.includes('application/json')) {
           throw new Error(`Shard unavailable (${res.status})`);
@@ -4956,8 +5003,8 @@ function App() {
       hydrateInitialShard();
     }
 
-    // Always validate against /meta.json in parallel with shard hydration
-    resilientFetch(['/meta.json', `/meta.json?v=${buildQuery}`], {}, 25000)
+    // Always validate against fresh /meta.json in parallel with shard hydration
+    resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { cache: 'no-cache' }, 25000)
       .then(res => res.json())
       .then(json => {
         if (cancelled) return;
@@ -4971,7 +5018,8 @@ function App() {
         }
         try {
           localStorage.setItem(META_CACHE_KEY, JSON.stringify({
-            meta: json.meta
+            meta: json.meta,
+            savedAt: Date.now()
           }));
         } catch {
           // Ignore quota errors
@@ -5007,6 +5055,85 @@ function App() {
       fullIndexPromiseRef.current = null;
     };
   }, [initialCache, initialRoute, retryCount]);
+
+  // Automatic 24-hour full reload + live new-catalog detection (defers safely while reading a PDF/audio or searching)
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const pageBootAt = Date.now();
+    let lastProbeAt = pageBootAt;
+    const PROBE_INTERVAL_MS = 10 * 60 * 1000;
+
+    const triggerOrDeferReload = () => {
+      if (previewFileRef.current || (searchQueryRef.current && searchQueryRef.current.trim())) {
+        pendingAutoReloadRef.current = true;
+        return;
+      }
+      softReloadKeepingUrl();
+    };
+
+    const checkFreshness = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+      const now = Date.now();
+      // 1. Force a clean daily refresh if this browser tab has been alive >= 24 hours
+      if (now - pageBootAt >= DAILY_CACHE_TTL_MS) {
+        triggerOrDeferReload();
+        return;
+      }
+
+      // 2. Periodically probe /meta.json (no-store) so newly deployed textbooks/papers appear without Ctrl+R
+      if (now - lastProbeAt < PROBE_INTERVAL_MS) return;
+      lastProbeAt = now;
+      try {
+        const res = await fetch(`/meta.json?t=${now}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const remoteMeta = json?.meta;
+        if (!remoteMeta) return;
+        const loadedGenAt = latestLoadedGenAtRef.current || dataMetaRef.current?.generatedAt || '';
+        const loadedUnique = dataMetaRef.current?.uniqueFiles || 0;
+        const hasNewCatalog = Boolean(
+          (loadedGenAt && remoteMeta.generatedAt && remoteMeta.generatedAt !== loadedGenAt) ||
+          (loadedUnique && remoteMeta.uniqueFiles && remoteMeta.uniqueFiles !== loadedUnique)
+        );
+        if (hasNewCatalog) {
+          triggerOrDeferReload();
+        }
+      } catch {
+        // Ignore transient offline errors
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void checkFreshness();
+      }
+    };
+    const handleFocus = () => {
+      void checkFreshness();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    const intervalId = window.setInterval(() => {
+      void checkFreshness();
+    }, 30 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  // Execute any deferred daily/new-deploy refresh right after the user closes the PDF/Audio reader
+  useEffect(() => {
+    if (!previewFile && pendingAutoReloadRef.current && !(searchQuery && searchQuery.trim())) {
+      pendingAutoReloadRef.current = false;
+      softReloadKeepingUrl();
+    }
+  }, [previewFile, searchQuery]);
 
   // Reset pagination when filters/search change
   useEffect(() => {
