@@ -4429,11 +4429,42 @@ a.breadcrumb-link:hover {
   font-size: 12px;
 }
 
+.pdf-tool-btn.pdf-two-page-btn {
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.25px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.pdf-tool-btn.pdf-two-page-btn.active {
+  background: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon);
+  color: #FFFFFF;
+}
+
+.pdf-tool-btn.pdf-two-page-btn.active:hover:not(:disabled) {
+  background: #61002F;
+  border-color: #61002F;
+  color: #FFFFFF;
+}
+
 .pdf-pane-tools {
   display: flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.custom-pdf-pane.is-resizing-spread {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.custom-pdf-pane.is-resizing-spread .pdf-canvas {
+  pointer-events: none;
 }
 
 .pdf-scroll-stage {
@@ -4446,6 +4477,10 @@ a.breadcrumb-link:hover {
   display: block;
   background: #EAE8E2;
   position: relative;
+}
+
+.pdf-scroll-stage.two-page-stage {
+  padding: 0;
 }
 
 .pdf-scroll-stage.fit-mode {
@@ -4465,6 +4500,151 @@ a.breadcrumb-link:hover {
   align-items: center;
   padding: 0 16px;
   box-sizing: border-box;
+}
+
+/* Two-Page Side-by-Side Book Spread with Resizable Split Divider */
+.pdf-spread-layout {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.pdf-spread-rows {
+  padding: 24px 0 20px 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pdf-spread-row {
+  display: grid;
+  grid-template-columns: calc(var(--spread-split-pct, 50%) - 4px) 8px calc(100% - var(--spread-split-pct, 50%) - 4px);
+  width: 100%;
+  align-items: start;
+  margin-bottom: 24px;
+  box-sizing: border-box;
+}
+
+.pdf-spread-row:last-child {
+  margin-bottom: 0;
+}
+
+.pdf-spread-cell {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 14px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.pdf-spread-gutter {
+  width: 8px;
+  pointer-events: none;
+}
+
+.pdf-spread-empty-slot {
+  width: 100%;
+  min-height: 1px;
+}
+
+.pdf-page-container.spread-page-container {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.pdf-page-container.spread-page-container .pdf-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pdf-spread-cell.left .pdf-page-number-indicator {
+  left: 4px;
+  right: auto;
+}
+
+.pdf-spread-cell.right .pdf-page-number-indicator {
+  right: 4px;
+  left: auto;
+}
+
+.pdf-spread-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--spread-split-pct, 50%) - 4px);
+  width: 8px;
+  background: #E2DFD9;
+  border-left: 1px solid var(--border-medium);
+  border-right: 1px solid var(--border-medium);
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: 15;
+  box-sizing: border-box;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.pdf-spread-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+}
+
+.pdf-spread-resizer:hover,
+.pdf-spread-resizer.dragging,
+.pdf-spread-resizer:focus-visible {
+  background: var(--mcmaster-maroon);
+  border-color: var(--mcmaster-maroon);
+  outline: none;
+}
+
+.pdf-spread-resizer:hover .resizer-handle-grip,
+.pdf-spread-resizer.dragging .resizer-handle-grip,
+.pdf-spread-resizer:focus-visible .resizer-handle-grip {
+  background: #FFFFFF;
+}
+
+.pdf-spread-resizer-sticky {
+  position: sticky;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pdf-spread-ratio-pill {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.pdf-spread-resizer.dragging .pdf-spread-ratio-pill {
+  opacity: 1;
 }
 
 .pdf-page-container {
@@ -6225,9 +6405,40 @@ html[data-theme='dark'] body {
   font-weight: 800 !important;
 }
 
-[data-theme='dark'] .pdf-tool-btn.text-btn.active {
+[data-theme='dark'] .pdf-tool-btn.text-btn.active,
+[data-theme='dark'] .pdf-tool-btn.pdf-two-page-btn.active {
   background: #8C1D2F !important;
   border-color: #A8253B !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .pdf-tool-btn.pdf-two-page-btn.active:hover:not(:disabled) {
+  background: #A8253B !important;
+  border-color: #C22D46 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .pdf-spread-resizer {
+  background: #1E222B !important;
+  border-color: #343A46 !important;
+}
+
+[data-theme='dark'] .pdf-spread-resizer:hover,
+[data-theme='dark'] .pdf-spread-resizer.dragging,
+[data-theme='dark'] .pdf-spread-resizer:focus-visible {
+  background: #8C1D2F !important;
+  border-color: #8C1D2F !important;
+}
+
+[data-theme='dark'] .pdf-spread-resizer:hover .resizer-handle-grip,
+[data-theme='dark'] .pdf-spread-resizer.dragging .resizer-handle-grip,
+[data-theme='dark'] .pdf-spread-resizer:focus-visible .resizer-handle-grip {
+  background: #FFFFFF !important;
+}
+
+[data-theme='dark'] .pdf-spread-ratio-pill {
+  background: #8C1D2F !important;
+  border: 1px solid #A8253B;
   color: #FFFFFF !important;
 }
 
@@ -7824,9 +8035,40 @@ html[data-theme='oled'] body {
   font-weight: 800 !important;
 }
 
-[data-theme='oled'] .pdf-tool-btn.text-btn.active {
+[data-theme='oled'] .pdf-tool-btn.text-btn.active,
+[data-theme='oled'] .pdf-tool-btn.pdf-two-page-btn.active {
   background: #8C1D2F !important;
   border-color: #FF5370 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .pdf-tool-btn.pdf-two-page-btn.active:hover:not(:disabled) {
+  background: #A8253B !important;
+  border-color: #FF5370 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .pdf-spread-resizer {
+  background: #121212 !important;
+  border-color: #2A2A2A !important;
+}
+
+[data-theme='oled'] .pdf-spread-resizer:hover,
+[data-theme='oled'] .pdf-spread-resizer.dragging,
+[data-theme='oled'] .pdf-spread-resizer:focus-visible {
+  background: #8C1D2F !important;
+  border-color: #FF5370 !important;
+}
+
+[data-theme='oled'] .pdf-spread-resizer:hover .resizer-handle-grip,
+[data-theme='oled'] .pdf-spread-resizer.dragging .resizer-handle-grip,
+[data-theme='oled'] .pdf-spread-resizer:focus-visible .resizer-handle-grip {
+  background: #FFFFFF !important;
+}
+
+[data-theme='oled'] .pdf-spread-ratio-pill {
+  background: #8C1D2F !important;
+  border: 1px solid #FF5370;
   color: #FFFFFF !important;
 }
 
@@ -9053,6 +9295,23 @@ html[data-theme='oled'] body {
     padding: 20px 0 8px 0;
     display: block;
     background: #EAE8E2;
+  }
+
+  .custom-pdf-pane.mobile-mode .pdf-scroll-stage.two-page-stage {
+    padding: 0;
+  }
+
+  .custom-pdf-pane.mobile-mode .pdf-spread-cell {
+    padding: 0 5px;
+  }
+
+  .custom-pdf-pane.mobile-mode .pdf-two-page-btn {
+    padding: 0 6px;
+    margin-right: 0;
+  }
+
+  .custom-pdf-pane.mobile-mode .pdf-two-page-label {
+    display: none;
   }
 
   .custom-pdf-pane.mobile-mode .pdf-pages-list {

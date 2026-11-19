@@ -78,15 +78,25 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.3';
+const APP_VERSION = 'v6.9.4';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.3',
+    version: 'v6.9.4',
     date: BUILD_TIMESTAMP,
+    title: 'Resizable Two-Page Side-by-Side PDF Reader Mode',
+    summary: 'Added a side-by-side Two-Page spread reader with a draggable split-screen style resizer for textbooks and all standalone PDFs (QP, MS, ER, Worked Solutions).',
+    changes: [
+      'Two-Page Side-by-Side Mode: Textbooks open in 2-Page book-spread mode by default on desktop/tablet, while standalone past papers (QP, MS, ER, SC, SAM) and worked solutions open in single-page mode with a one-click "2-Page" toolbar toggle.',
+      'Resizable Left & Right Sides: Drag the center divider (or use Left/Right Arrow keys; double-click or press Home to reset 50/50) to smoothly resize the left and right pages independently at 60fps with crisp HiDPI re-rendering on release.'
+    ]
+  },
+  {
+    version: 'v6.9.3',
+    date: '2026-11-20T01:15:00+06:00',
     title: 'Instant Cache Freshness, Daily Auto-Reload & Full Large-PDF Linearization',
     summary: 'Eliminated stale browser catalog caching after updates with version-busted fetches, automatic 24-hour / new-deploy soft reloads (never interrupting open readers), and linearized all remaining >= 5 MB PDFs for Fast Web View streaming.',
     changes: [
@@ -1431,6 +1441,17 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const isSplit = activeView === 'split' && canSplit;
   const singleExt = (currentDoc.ext || (currentDoc.path ? currentDoc.path.split('.').pop() : 'pdf') || 'pdf').toLowerCase();
   const isSinglePdf = singleExt === 'pdf';
+  const isTextbookDoc = Boolean(
+    currentDoc.category === 'Books' ||
+    currentDoc.category === 'IAL Books' ||
+    currentDoc.category === 'IGCSE Books' ||
+    currentDoc.docType === 'Book' ||
+    file?.category === 'Books' ||
+    file?.category === 'IAL Books' ||
+    file?.category === 'IGCSE Books' ||
+    file?.docType === 'Book' ||
+    /^(?:IAL|IGCSE)\s+Books\//i.test(currentDoc.path || file?.path || '')
+  );
   const isSingleAudio = singleExt === 'mp3' || singleExt === 'wav' || singleExt === 'm4a' || singleExt === 'ogg';
   const isSingleAudioZip =
     singleExt === 'zip' &&
@@ -2693,6 +2714,8 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                         initialPage={1}
                         onDownload={true}
                         autoFocus={true}
+                        allowTwoPage={true}
+                        defaultTwoPage={false}
                       />
                     </Suspense>
                   ) : null}
@@ -2842,12 +2865,14 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     key={currentDoc.path}
                     url={singleUrl}
                     title={singleTitle}
-                    docType={currentDoc.docType || 'DOC'}
+                    docType={currentDoc.docType || (isTextbookDoc ? 'Book' : 'DOC')}
                     fileSize={currentDoc.size || 0}
                     isMobile={isMobile}
                     initialPage={1}
                     onDownload={true}
                     autoFocus={true}
+                    allowTwoPage={true}
+                    defaultTwoPage={!isMobile && isTextbookDoc}
                   />
                 </Suspense>
               )}

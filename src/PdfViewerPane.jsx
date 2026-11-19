@@ -189,12 +189,58 @@ async function createLargePdfRangeTransport(pdfjsLib, url, signal, onBytesProgre
   return { transport: new DirectRangeTransport(), totalLength };
 }
 
+const SPREAD_RESIZER_WIDTH = 8;
+const SPREAD_MIN_PCT = 22;
+const SPREAD_MAX_PCT = 78;
+
+function getSpreadStartPage(pageNum) {
+  const p = Math.max(1, Number(pageNum) || 1);
+  return p % 2 === 1 ? p : p - 1;
+}
+
 function computePageTargetWidth(containerWidth, scale, isMobile) {
   const safeWidth = Math.max(containerWidth - (isMobile ? 16 : 36), 200);
   if (scale === 'fit-width') return safeWidth;
   if (scale === 'fit-page') return Math.min(safeWidth, 640);
   if (typeof scale === 'number') return Math.max(safeWidth * scale, 200);
   return safeWidth;
+}
+
+function computeSpreadLayout(containerWidth, containerHeight, scale, spreadSplitRatio, defaultAspectRatio, isMobile) {
+  const safeContainerW = Math.max(containerWidth, 320);
+  const colPadding = isMobile ? 10 : 28;
+  const isZoomedIn = typeof scale === 'number' && scale > 1;
+  const stageWidth = isZoomedIn ? Math.round(safeContainerW * scale) : safeContainerW;
+  const innerTotal = Math.max(240, stageWidth - SPREAD_RESIZER_WIDTH);
+
+  const clampedRatio = Math.max(SPREAD_MIN_PCT, Math.min(SPREAD_MAX_PCT, spreadSplitRatio));
+  const leftSlotW = Math.max(110, Math.round(innerTotal * (clampedRatio / 100)));
+  const rightSlotW = Math.max(110, innerTotal - leftSlotW);
+  const leftSafeW = Math.max(96, leftSlotW - colPadding);
+  const rightSafeW = Math.max(96, rightSlotW - colPadding);
+
+  let leftTargetWidth = leftSafeW;
+  let rightTargetWidth = rightSafeW;
+
+  if (scale === 'fit-page') {
+    const ratio = defaultAspectRatio || 1.414;
+    const availH = Math.max(220, (containerHeight || 680) - 56);
+    const baseFitW = Math.max(120, Math.floor(availH / ratio));
+    leftTargetWidth = Math.min(leftSafeW, Math.max(96, Math.floor(baseFitW * (clampedRatio / 50))));
+    rightTargetWidth = Math.min(rightSafeW, Math.max(96, Math.floor(baseFitW * ((100 - clampedRatio) / 50))));
+  } else if (typeof scale === 'number' && scale <= 1) {
+    leftTargetWidth = Math.max(96, Math.floor(leftSafeW * scale));
+    rightTargetWidth = Math.max(96, Math.floor(rightSafeW * scale));
+  }
+
+  return {
+    stageWidth,
+    isZoomedIn,
+    leftTargetWidth,
+    rightTargetWidth,
+    leftWidthFraction: Math.min(1, leftTargetWidth / Math.max(1, leftSafeW)),
+    rightWidthFraction: Math.min(1, rightTargetWidth / Math.max(1, rightSafeW))
+  };
 }
 
 // Single Page Canvas Renderer Component with IntersectionObserver virtualization
@@ -204,6 +250,8 @@ const VirtualPdfPage = React.memo(({
   scale,
   rotation = 0,
   containerWidth,
+  targetWidthOverride = null,
+  fluidWidthFraction = null,
   isVisible,
   isNear,
   isMobile,
@@ -216,6 +264,7 @@ const VirtualPdfPage = React.memo(({
   const [aspectRatio, setAspectRatio] = useState(null);
   const [rendered, setRendered] = useState(false);
 
+  const isFluidSpread = typeof fluidWidthFraction === 'number';
   const shouldMountCanvas = isVisible || isNear;
   const effectiveAspectRatio = useMemo(() => {
     const base = aspectRatio || defaultAspectRatio || 1.414;
@@ -256,7 +305,10 @@ const VirtualPdfPage = React.memo(({
 
     const drawPass = (page, unscaledViewport, totalRotation, dprValue, notifyPainted) => {
       if (!active || !canvasRef.current) return Promise.resolve(false);
-      const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
+      const targetWidth =
+        typeof targetWidthOverride === 'number' && targetWidthOverride > 0
+          ? targetWidthOverride
+          : computePageTargetWidth(containerWidth, scale, isMobile);
       const computedScale = targetWidth / unscaledViewport.width;
       const viewport = page.getViewport({ scale: computedScale, rotation: totalRotation });
 
@@ -294,8 +346,13 @@ const VirtualPdfPage = React.memo(({
 
         targetCanvas.width = pixelW;
         targetCanvas.height = pixelH;
-        targetCanvas.style.width = `${Math.floor(viewport.width)}px`;
-        targetCanvas.style.height = `${Math.floor(viewport.height)}px`;
+        if (isFluidSpread) {
+          targetCanvas.style.width = '100%';
+          targetCanvas.style.height = '100%';
+        } else {
+          targetCanvas.style.width = `${Math.floor(viewport.width)}px`;
+          targetCanvas.style.height = `${Math.floor(viewport.height)}px`;
+        }
         targetCtx.drawImage(offscreenCanvas, 0, 0);
 
         offscreenCanvas.width = 0;
@@ -367,34 +424,53 @@ const VirtualPdfPage = React.memo(({
         offscreenCanvas = null;
       }
     };
-  }, [pdfDoc, pageNum, scale, rotation, containerWidth, shouldMountCanvas, onPageRendered, isMobile, isLargePdf]);
+  }, [pdfDoc, pageNum, scale, rotation, containerWidth, targetWidthOverride, isFluidSpread, shouldMountCanvas, onPageRendered, isMobile, isLargePdf]);
 
-  const targetWidth = computePageTargetWidth(containerWidth, scale, isMobile);
+  const targetWidth =
+    typeof targetWidthOverride === 'number' && targetWidthOverride > 0
+      ? targetWidthOverride
+      : computePageTargetWidth(containerWidth, scale, isMobile);
   const exactWidth = Math.max(1, Math.floor(targetWidth));
   const exactHeight = Math.max(1, Math.floor(targetWidth * effectiveAspectRatio));
 
-  return (
-    <div
-      className={`pdf-page-container ${rendered ? 'rendered' : 'loading-placeholder'}`}
-      data-page-number={pageNum}
-      style={{
+  const containerStyle = isFluidSpread
+    ? {
+        width: `${(Math.max(0.15, Math.min(1, fluidWidthFraction)) * 100).toFixed(3)}%`,
+        aspectRatio: `${(1 / effectiveAspectRatio).toFixed(5)}`,
+        position: 'relative'
+      }
+    : {
         width: `${exactWidth}px`,
         height: `${exactHeight}px`,
         minHeight: `${exactHeight}px`,
         margin: '0 auto 16px auto',
         position: 'relative'
-      }}
+      };
+
+  const canvasStyle = isFluidSpread
+    ? {
+        width: '100%',
+        height: '100%',
+        opacity: rendered ? 1 : 0
+      }
+    : {
+        width: `${exactWidth}px`,
+        height: `${exactHeight}px`,
+        opacity: rendered ? 1 : 0
+      };
+
+  return (
+    <div
+      className={`pdf-page-container ${isFluidSpread ? 'spread-page-container' : ''} ${rendered ? 'rendered' : 'loading-placeholder'}`}
+      data-page-number={pageNum}
+      style={containerStyle}
     >
       <div className="pdf-page-number-indicator">Page {pageNum}</div>
       {shouldMountCanvas && (
         <canvas
           ref={canvasRef}
           className="pdf-canvas"
-          style={{
-            width: `${exactWidth}px`,
-            height: `${exactHeight}px`,
-            opacity: rendered ? 1 : 0
-          }}
+          style={canvasStyle}
         />
       )}
       {!rendered && (
@@ -417,7 +493,9 @@ export const PdfViewerPane = ({
   isMobile = false,
   initialPage = 1,
   onDownload = true,
-  autoFocus = false
+  autoFocus = false,
+  allowTwoPage = false,
+  defaultTwoPage = false
 }) => {
   const downloadUrl = downloadHref || (url ? (url.includes('?') ? `${url}&download=true` : `${url}?download=true`) : '');
   const paneIdRef = useRef(null);
@@ -439,7 +517,15 @@ export const PdfViewerPane = ({
   const [containerWidth, setContainerWidth] = useState(() => (
     typeof window !== 'undefined' ? (isMobile ? Math.min(window.innerWidth, 390) : 640) : 640
   ));
+  const [containerHeight, setContainerHeight] = useState(() => (
+    typeof window !== 'undefined' ? Math.max(360, window.innerHeight - 100) : 680
+  ));
   const [visiblePages, setVisiblePages] = useState(new Set([1, 2]));
+  const [twoPageMode, setTwoPageMode] = useState(() => Boolean(allowTwoPage && defaultTwoPage));
+  const [spreadSplitRatio, setSpreadSplitRatio] = useState(50);
+  const [isDraggingSpread, setIsDraggingSpread] = useState(false);
+
+  const isTwoPageActive = Boolean(allowTwoPage && twoPageMode && numPages > 1);
 
   useEffect(() => {
     const id = paneIdRef.current;
@@ -467,15 +553,25 @@ export const PdfViewerPane = ({
 
   const containerRef = useRef(null);
   const scrollAreaRef = useRef(null);
+  const spreadLayoutRef = useRef(null);
+  const dragBadgeRef = useRef(null);
+  const activeDragCleanupRef = useRef(null);
   const observerRef = useRef(null);
 
   const currentPageRef = useRef(currentPage);
   const initialPageRef = useRef(initialPage);
   const pendingInitialJumpRef = useRef(null);
+  const pendingLayoutJumpRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
   const pendingZoomAnchorRef = useRef(null);
   const pageInputRef = useRef(null);
+  const userToggledTwoPageRef = useRef(false);
+  const allowTwoPageRef = useRef(allowTwoPage);
+  const defaultTwoPageRef = useRef(defaultTwoPage);
+  const twoPageModeRef = useRef(Boolean(allowTwoPage && twoPageMode));
+  const isTwoPageActiveRef = useRef(isTwoPageActive);
+  const spreadRatioRef = useRef(spreadSplitRatio);
 
   useEffect(() => {
     initialPageRef.current = initialPage;
@@ -485,12 +581,55 @@ export const PdfViewerPane = ({
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
-  // Synchronously measure initial scroll stage width before first paint to avoid resize jump
+  useEffect(() => {
+    allowTwoPageRef.current = allowTwoPage;
+    defaultTwoPageRef.current = defaultTwoPage;
+  }, [allowTwoPage, defaultTwoPage]);
+
+  useEffect(() => {
+    twoPageModeRef.current = Boolean(allowTwoPage && twoPageMode);
+    isTwoPageActiveRef.current = isTwoPageActive;
+  }, [allowTwoPage, twoPageMode, isTwoPageActive]);
+
+  useEffect(() => {
+    spreadRatioRef.current = spreadSplitRatio;
+  }, [spreadSplitRatio]);
+
+  // Reset two-page & split state cleanly when switching documents
+  useEffect(() => {
+    userToggledTwoPageRef.current = false;
+    setTwoPageMode(Boolean(allowTwoPageRef.current && defaultTwoPageRef.current));
+    setSpreadSplitRatio(50);
+    spreadRatioRef.current = 50;
+  }, [url, pdfData]);
+
+  // Sync if allowTwoPage or defaultTwoPage changes before user manually toggles
+  useEffect(() => {
+    if (!allowTwoPage) {
+      setTwoPageMode(false);
+    } else if (!userToggledTwoPageRef.current) {
+      setTwoPageMode(Boolean(defaultTwoPage));
+    }
+  }, [allowTwoPage, defaultTwoPage]);
+
+  // Cleanup any active drag listeners on unmount
+  useEffect(() => () => {
+    if (activeDragCleanupRef.current) {
+      activeDragCleanupRef.current();
+      activeDragCleanupRef.current = null;
+    }
+  }, []);
+
+  // Synchronously measure initial scroll stage dimensions before first paint to avoid resize jump
   useLayoutEffect(() => {
     const el = scrollAreaRef.current || containerRef.current;
     if (el && el.clientWidth > 80) {
       const nextW = el.clientWidth;
+      const nextH = el.clientHeight;
       setContainerWidth((prev) => (Math.abs(prev - nextW) >= 1 ? nextW : prev));
+      if (nextH > 120) {
+        setContainerHeight((prev) => (Math.abs(prev - nextH) >= 1 ? nextH : prev));
+      }
     }
   }, []);
 
@@ -501,23 +640,27 @@ export const PdfViewerPane = ({
     let timerId = null;
     let hasMeasured = false;
 
-    const applyWidth = () => {
+    const applyDimensions = () => {
       const el = scrollAreaRef.current || containerRef.current;
       if (el && el.clientWidth > 0) {
         const nextW = el.clientWidth;
+        const nextH = el.clientHeight;
         setContainerWidth((prev) => (Math.abs(prev - nextW) >= 1 ? nextW : prev));
+        if (nextH > 120) {
+          setContainerHeight((prev) => (Math.abs(prev - nextH) >= 1 ? nextH : prev));
+        }
         hasMeasured = true;
       }
     };
 
-    applyWidth();
+    applyDimensions();
     const observer = new ResizeObserver(() => {
       if (!hasMeasured) {
-        applyWidth();
+        applyDimensions();
         return;
       }
       if (timerId) clearTimeout(timerId);
-      timerId = setTimeout(applyWidth, 80);
+      timerId = setTimeout(applyDimensions, 80);
     });
     observer.observe(target);
     return () => {
@@ -526,7 +669,7 @@ export const PdfViewerPane = ({
     };
   }, []);
 
-  // Record anchor coordinates so zoom scales directly into focal point (mouse or screen center)
+  // Record anchor coordinates so zoom & split resize preserve focal reading position
   const recordZoomAnchor = useCallback((customAnchorX, customAnchorY) => {
     const el = scrollAreaRef.current;
     if (!el) return;
@@ -563,16 +706,125 @@ export const PdfViewerPane = ({
 
     el.scrollLeft = targetLeft;
     el.scrollTop = targetTop;
-  }, [scale, containerWidth]);
+  }, [scale, containerWidth, spreadSplitRatio]);
+
+  const spreadLayout = useMemo(() => {
+    if (!isTwoPageActive) return null;
+    return computeSpreadLayout(
+      containerWidth,
+      containerHeight,
+      scale,
+      spreadSplitRatio,
+      defaultAspectRatio,
+      isMobile
+    );
+  }, [isTwoPageActive, containerWidth, containerHeight, scale, spreadSplitRatio, defaultAspectRatio, isMobile]);
 
   const getCurrentBaseScale = useCallback((prevScale) => {
     if (typeof prevScale === 'number') return prevScale;
     if (prevScale === 'fit-page') {
+      if (isTwoPageActive) {
+        const layout = computeSpreadLayout(
+          containerWidth,
+          containerHeight,
+          'fit-page',
+          spreadSplitRatio,
+          defaultAspectRatio,
+          isMobile
+        );
+        return Math.max(0.4, Math.min(1.0, Number(layout.leftWidthFraction.toFixed(2))));
+      }
       const safeW = Math.max(containerWidth - (isMobile ? 16 : 36), 200);
       return Math.max(0.4, Math.min(1.0, Number((Math.min(safeW, 640) / safeW).toFixed(2))));
     }
     return 1.0;
-  }, [containerWidth, isMobile]);
+  }, [containerWidth, containerHeight, isMobile, isTwoPageActive, spreadSplitRatio, defaultAspectRatio]);
+
+  // High-performance two-page split divider drag (updates CSS directly at 60fps, commits sharp canvas redraw on release)
+  const handleSpreadDragStart = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingSpread(true);
+
+    if (dragBadgeRef.current) {
+      const r = Math.round(spreadRatioRef.current);
+      dragBadgeRef.current.textContent = `${r}% / ${100 - r}%`;
+    }
+
+    const onMove = (moveEvent) => {
+      if (!spreadLayoutRef.current) return;
+      if (moveEvent.cancelable) moveEvent.preventDefault();
+      const rect = spreadLayoutRef.current.getBoundingClientRect();
+      if (!rect.width) return;
+      const clientX =
+        moveEvent.touches && moveEvent.touches.length > 0
+          ? moveEvent.touches[0].clientX
+          : moveEvent.clientX;
+      const pct = Math.max(
+        SPREAD_MIN_PCT,
+        Math.min(SPREAD_MAX_PCT, ((clientX - rect.left) / rect.width) * 100)
+      );
+      spreadRatioRef.current = pct;
+      spreadLayoutRef.current.style.setProperty('--spread-split-pct', `${pct}%`);
+      if (dragBadgeRef.current) {
+        const rounded = Math.round(pct);
+        dragBadgeRef.current.textContent = `${rounded}% / ${100 - rounded}%`;
+      }
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+      window.removeEventListener('touchcancel', onEnd);
+      activeDragCleanupRef.current = null;
+    };
+
+    const onEnd = () => {
+      cleanup();
+      recordZoomAnchor();
+      setIsDraggingSpread(false);
+      setSpreadSplitRatio(Number(spreadRatioRef.current.toFixed(2)));
+    };
+
+    activeDragCleanupRef.current = cleanup;
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
+  }, [recordZoomAnchor]);
+
+  const handleResetSpreadSplit = useCallback(() => {
+    recordZoomAnchor();
+    spreadRatioRef.current = 50;
+    if (spreadLayoutRef.current) {
+      spreadLayoutRef.current.style.setProperty('--spread-split-pct', '50%');
+    }
+    setSpreadSplitRatio(50);
+  }, [recordZoomAnchor]);
+
+  const handleSpreadResizerKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Home' || e.key === 'End') {
+        handleResetSpreadSplit();
+        return;
+      }
+      const delta = e.key === 'ArrowLeft' ? -5 : 5;
+      recordZoomAnchor();
+      setSpreadSplitRatio((prev) => {
+        const next = Math.max(SPREAD_MIN_PCT, Math.min(SPREAD_MAX_PCT, Math.round(prev + delta)));
+        spreadRatioRef.current = next;
+        if (spreadLayoutRef.current) {
+          spreadLayoutRef.current.style.setProperty('--spread-split-pct', `${next}%`);
+        }
+        return next;
+      });
+    }
+  }, [handleResetSpreadSplit, recordZoomAnchor]);
 
   // Ctrl + MouseWheel / Trackpad pinch zoom centered on mouse hover position
   useEffect(() => {
@@ -734,8 +986,13 @@ export const PdfViewerPane = ({
 
         if (!active) return;
         const requestedStart = Number(initialPageRef.current) || 1;
-        const startPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
+        const rawStartPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
+        const willBeTwoPage = Boolean(twoPageModeRef.current && doc.numPages > 1);
+        const startPage = willBeTwoPage ? getSpreadStartPage(rawStartPage) : rawStartPage;
         const initialWindow = new Set([startPage]);
+        if (willBeTwoPage && startPage + 1 <= doc.numPages) {
+          initialWindow.add(startPage + 1);
+        }
 
         pendingInitialJumpRef.current = startPage > 1 ? startPage : null;
         if (measuredRatio) {
@@ -802,8 +1059,15 @@ export const PdfViewerPane = ({
           if (entry.isIntersecting) {
             next.add(pageNum);
             // Preload neighbors for instant smooth scrolling
-            if (pageNum + 1 <= numPages) next.add(pageNum + 1);
-            if (pageNum - 1 >= 1) next.add(pageNum - 1);
+            if (isTwoPageActive) {
+              for (let d = -2; d <= 3; d++) {
+                const candidate = pageNum + d;
+                if (candidate >= 1 && candidate <= numPages) next.add(candidate);
+              }
+            } else {
+              if (pageNum + 1 <= numPages) next.add(pageNum + 1);
+              if (pageNum - 1 >= 1) next.add(pageNum - 1);
+            }
           } else {
             next.delete(pageNum);
           }
@@ -822,7 +1086,7 @@ export const PdfViewerPane = ({
     return () => {
       if (observerRef.current) observerRef.current.disconnect();
     };
-  }, [pdfDoc, numPages]);
+  }, [pdfDoc, numPages, isTwoPageActive]);
 
   // Precise focal-line scroll listener for current page indicator
   useEffect(() => {
@@ -852,24 +1116,29 @@ export const PdfViewerPane = ({
 
         // Edge case: bottom of document
         if (scrollTop + clientHeight >= scrollHeight - 20) {
-          if (currentPageRef.current !== numPages) {
-            currentPageRef.current = numPages;
-            setCurrentPage(numPages);
+          const bottomPage = isTwoPageActive ? getSpreadStartPage(numPages) : numPages;
+          if (currentPageRef.current !== bottomPage) {
+            currentPageRef.current = bottomPage;
+            setCurrentPage(bottomPage);
             if (document.activeElement !== pageInputRef.current) {
-              setInputPage(String(numPages));
+              setInputPage(String(bottomPage));
             }
           }
           return;
         }
 
-        const focalY = scrollTop + clientHeight * 0.35;
-        const pageEls = scrollEl.querySelectorAll('.pdf-page-container');
-        for (let i = 0; i < pageEls.length; i++) {
-          const el = pageEls[i];
-          const top = el.offsetTop;
-          const bottom = top + el.offsetHeight;
-          if (top <= focalY && bottom >= focalY) {
-            const pageNum = parseInt(el.getAttribute('data-page-number'), 10);
+        const scrollRect = scrollEl.getBoundingClientRect();
+        const focalClientY = scrollRect.top + clientHeight * 0.35;
+        const selector = isTwoPageActive ? '.pdf-spread-row' : '.pdf-page-container';
+        const els = scrollEl.querySelectorAll(selector);
+        for (let i = 0; i < els.length; i++) {
+          const el = els[i];
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= focalClientY && rect.bottom >= focalClientY) {
+            const pageNum = parseInt(
+              el.getAttribute(isTwoPageActive ? 'data-spread-start' : 'data-page-number'),
+              10
+            );
             if (pageNum && pageNum !== currentPageRef.current) {
               currentPageRef.current = pageNum;
               setCurrentPage(pageNum);
@@ -888,13 +1157,14 @@ export const PdfViewerPane = ({
       scrollEl.removeEventListener('scroll', handleScroll);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [numPages]);
+  }, [numPages, isTwoPageActive]);
 
   // Reliable Jump to Page (smooth nearby stepping; instant jump across distant pages so streaming skips intermediate pages)
   const scrollToPage = useCallback((pageNum, smooth = true) => {
     const prevPage = currentPageRef.current;
-    const clamped = Math.max(1, Math.min(pageNum, numPages || 1));
-    const isFarJump = Math.abs(clamped - prevPage) > 4;
+    const rawClamped = Math.max(1, Math.min(pageNum, numPages || 1));
+    const clamped = isTwoPageActiveRef.current ? getSpreadStartPage(rawClamped) : rawClamped;
+    const isFarJump = Math.abs(clamped - prevPage) > (isTwoPageActiveRef.current ? 6 : 4);
     currentPageRef.current = clamped;
     setCurrentPage(clamped);
     setInputPage(String(clamped));
@@ -902,19 +1172,25 @@ export const PdfViewerPane = ({
       setVisiblePages(() => {
         const next = new Set([clamped]);
         if (clamped + 1 <= (numPages || clamped)) next.add(clamped + 1);
+        if (isTwoPageActiveRef.current && clamped + 2 <= (numPages || clamped)) next.add(clamped + 2);
         if (clamped - 1 >= 1) next.add(clamped - 1);
         return next;
       });
     }
 
-    if (!scrollAreaRef.current) return;
-    const targetEl = scrollAreaRef.current.querySelector(`[data-page-number="${clamped}"]`);
+    const scrollEl = scrollAreaRef.current;
+    if (!scrollEl) return;
+    const targetEl = isTwoPageActiveRef.current
+      ? scrollEl.querySelector(`[data-spread-start="${clamped}"]`) || scrollEl.querySelector(`[data-page-number="${rawClamped}"]`)
+      : scrollEl.querySelector(`[data-page-number="${clamped}"]`);
     if (targetEl) {
       isProgrammaticScrollRef.current = true;
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
 
-      const targetTop = Math.max(0, targetEl.offsetTop - 12);
-      scrollAreaRef.current.scrollTo({
+      const scrollRect = scrollEl.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const targetTop = Math.max(0, Math.round(targetRect.top - scrollRect.top + scrollEl.scrollTop - 18));
+      scrollEl.scrollTo({
         top: targetTop,
         behavior: smooth && !isFarJump ? 'smooth' : 'auto'
       });
@@ -924,6 +1200,41 @@ export const PdfViewerPane = ({
       }, isFarJump ? 150 : 600);
     }
   }, [numPages]);
+
+  const handleStepPage = useCallback((direction) => {
+    const step = isTwoPageActiveRef.current ? 2 : 1;
+    const base = isTwoPageActiveRef.current ? getSpreadStartPage(currentPageRef.current) : currentPageRef.current;
+    scrollToPage(base + direction * step);
+  }, [scrollToPage]);
+
+  const handleToggleTwoPage = useCallback(() => {
+    if (!allowTwoPage || numPages <= 1) return;
+    const anchorPage = currentPageRef.current || 1;
+    userToggledTwoPageRef.current = true;
+    setTwoPageMode((prev) => {
+      const next = !prev;
+      const target = next ? getSpreadStartPage(anchorPage) : anchorPage;
+      pendingLayoutJumpRef.current = target;
+      setVisiblePages(() => {
+        const seed = new Set([target]);
+        if (target + 1 <= numPages) seed.add(target + 1);
+        if (next && target + 2 <= numPages) seed.add(target + 2);
+        if (target - 1 >= 1) seed.add(target - 1);
+        return seed;
+      });
+      return next;
+    });
+  }, [allowTwoPage, numPages]);
+
+  // Preserve reading position cleanly when toggling between 1-Page and 2-Page layout
+  useEffect(() => {
+    const target = pendingLayoutJumpRef.current;
+    if (!loading && numPages > 0 && target) {
+      pendingLayoutJumpRef.current = null;
+      const raf = requestAnimationFrame(() => scrollToPage(target, false));
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isTwoPageActive, loading, numPages, scrollToPage]);
 
   const handleInputPageCommit = () => {
     const parsed = parseInt(inputPage, 10);
@@ -995,20 +1306,23 @@ export const PdfViewerPane = ({
     return `${Math.round(scale * 100)}%`;
   }, [scale]);
 
-  // Keyboard navigation shortcuts scoped to the focused/active pane (safe in Split View)
+  // Keyboard navigation shortcuts scoped to the focused/active pane (safe in Split View & Resizer focus)
   useEffect(() => {
     const paneId = paneIdRef.current;
     const handleKeyDown = (e) => {
+      if (e.defaultPrevented) return;
       if (mountedPaneIds.size > 1 && activePaneId !== paneId) return;
-      const tag = document.activeElement?.tagName;
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (activeEl?.getAttribute?.('role') === 'separator') return;
 
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
-        scrollToPage(currentPageRef.current - 1);
+        handleStepPage(-1);
       } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
-        scrollToPage(currentPageRef.current + 1);
+        handleStepPage(1);
       } else if (e.key === 'Home') {
         e.preventDefault();
         scrollToPage(1);
@@ -1026,12 +1340,27 @@ export const PdfViewerPane = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [numPages, scrollToPage, handleZoomIn, handleZoomOut]);
+  }, [numPages, scrollToPage, handleStepPage, handleZoomIn, handleZoomOut]);
 
-  // Page Array
+  // Page Array & Spread Rows
   const pagesList = useMemo(() => {
     return Array.from({ length: numPages }, (_, i) => i + 1);
   }, [numPages]);
+
+  const spreadRows = useMemo(() => {
+    if (!isTwoPageActive || numPages <= 0) return [];
+    const rows = [];
+    for (let p = 1; p <= numPages; p += 2) {
+      rows.push([p, p + 1 <= numPages ? p + 1 : null]);
+    }
+    return rows;
+  }, [isTwoPageActive, numPages]);
+
+  const currentSpreadStart = isTwoPageActive ? getSpreadStartPage(currentPage) : currentPage;
+  const currentSpreadPartner = isTwoPageActive && currentSpreadStart + 1 <= numPages ? currentSpreadStart + 1 : null;
+  const isAtFirstPage = currentSpreadStart <= 1;
+  const isAtLastPage = isTwoPageActive ? currentSpreadStart + 1 >= numPages : currentPage >= numPages;
+  const isLargePdfDoc = !pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
 
   const markPaneActive = () => {
     activePaneId = paneIdRef.current;
@@ -1041,7 +1370,7 @@ export const PdfViewerPane = ({
     <div
       ref={containerRef}
       tabIndex={-1}
-      className={`custom-pdf-pane ${isMobile ? 'mobile-mode' : ''}`}
+      className={`custom-pdf-pane ${isMobile ? 'mobile-mode' : ''} ${isTwoPageActive ? 'two-page-mode' : ''} ${isDraggingSpread ? 'is-resizing-spread' : ''}`}
       onMouseEnter={markPaneActive}
       onPointerDown={markPaneActive}
       onFocus={markPaneActive}
@@ -1060,10 +1389,10 @@ export const PdfViewerPane = ({
           <button
             type="button"
             className="pdf-tool-btn"
-            disabled={currentPage <= 1 || loading}
-            onClick={() => scrollToPage(currentPageRef.current - 1)}
-            title="Previous Page"
-            aria-label="Previous Page"
+            disabled={isAtFirstPage || loading}
+            onClick={() => handleStepPage(-1)}
+            title={isTwoPageActive ? 'Previous Spread (2 Pages)' : 'Previous Page'}
+            aria-label={isTwoPageActive ? 'Previous Spread' : 'Previous Page'}
           >
             ‹
           </button>
@@ -1083,15 +1412,17 @@ export const PdfViewerPane = ({
               }}
               aria-label="Current Page"
             />
-            <span className="pdf-page-total">/ {numPages || '–'}</span>
+            <span className="pdf-page-total">
+              {currentSpreadPartner ? `–${currentSpreadPartner} ` : ''}/ {numPages || '–'}
+            </span>
           </span>
           <button
             type="button"
             className="pdf-tool-btn"
-            disabled={currentPage >= numPages || loading}
-            onClick={() => scrollToPage(currentPageRef.current + 1)}
-            title="Next Page"
-            aria-label="Next Page"
+            disabled={isAtLastPage || loading}
+            onClick={() => handleStepPage(1)}
+            title={isTwoPageActive ? 'Next Spread (2 Pages)' : 'Next Page'}
+            aria-label={isTwoPageActive ? 'Next Spread' : 'Next Page'}
           >
             ›
           </button>
@@ -1099,6 +1430,30 @@ export const PdfViewerPane = ({
 
         {/* Zoom & Action Tools */}
         <div className="pdf-pane-tools">
+          {allowTwoPage && (
+            <button
+              type="button"
+              className={`pdf-tool-btn pdf-two-page-btn ${isTwoPageActive ? 'active' : ''}`}
+              disabled={loading || numPages <= 1}
+              onClick={handleToggleTwoPage}
+              aria-pressed={isTwoPageActive}
+              title={
+                numPages <= 1 && !loading
+                  ? 'Two-page view requires at least 2 pages'
+                  : isTwoPageActive
+                    ? 'Switch to Single Page View (currently 2-Page Side-by-Side)'
+                    : 'Switch to 2-Page Side-by-Side View (with resizable divider)'
+              }
+              aria-label={isTwoPageActive ? 'Switch to Single Page View' : 'Switch to Two-Page View'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="2" y="4" width="8.5" height="16" rx="1.5" />
+                <rect x="13.5" y="4" width="8.5" height="16" rx="1.5" />
+              </svg>
+              <span className="pdf-two-page-label">2-Page</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="pdf-tool-btn"
@@ -1161,7 +1516,7 @@ export const PdfViewerPane = ({
       {/* Main PDF Scrollable Stage */}
       <div
         ref={scrollAreaRef}
-        className={`pdf-scroll-stage ${scale === 'fit-width' || scale === 'fit-page' ? 'fit-mode' : ''}`}
+        className={`pdf-scroll-stage ${scale === 'fit-width' || scale === 'fit-page' || (typeof scale === 'number' && scale <= 1) ? 'fit-mode' : ''} ${isTwoPageActive ? 'two-page-stage' : ''}`}
       >
         {(loading || !firstPagePainted) && !loadError && (
           <div className="pdf-loading-overlay">
@@ -1220,7 +1575,98 @@ export const PdfViewerPane = ({
           </div>
         )}
 
-        {!loading && !loadError && (
+        {!loading && !loadError && isTwoPageActive && spreadLayout ? (
+          <div
+            ref={spreadLayoutRef}
+            className={`pdf-spread-layout ${isDraggingSpread ? 'is-dragging' : ''}`}
+            style={{
+              '--spread-split-pct': `${spreadSplitRatio}%`,
+              width: spreadLayout.isZoomedIn ? `${spreadLayout.stageWidth}px` : '100%'
+            }}
+          >
+            <div className="pdf-spread-rows">
+              {spreadRows.map(([leftPage, rightPage]) => (
+                <div
+                  key={`spread-${leftPage}`}
+                  className="pdf-spread-row"
+                  data-spread-start={leftPage}
+                >
+                  <div className="pdf-spread-cell left">
+                    <VirtualPdfPage
+                      key={leftPage}
+                      pdfDoc={pdfDoc}
+                      pageNum={leftPage}
+                      scale={scale}
+                      rotation={rotation}
+                      containerWidth={containerWidth}
+                      targetWidthOverride={spreadLayout.leftTargetWidth}
+                      fluidWidthFraction={spreadLayout.leftWidthFraction}
+                      isVisible={
+                        visiblePages.has(leftPage) &&
+                        (firstPagePainted || leftPage === currentSpreadStart)
+                      }
+                      isNear={firstPagePainted && Math.abs(leftPage - currentSpreadStart) <= 3}
+                      isMobile={isMobile}
+                      isLargePdf={isLargePdfDoc}
+                      defaultAspectRatio={defaultAspectRatio}
+                      onPageRendered={handlePageRendered}
+                    />
+                  </div>
+                  <div className="pdf-spread-gutter" aria-hidden="true" />
+                  <div className="pdf-spread-cell right">
+                    {rightPage ? (
+                      <VirtualPdfPage
+                        key={rightPage}
+                        pdfDoc={pdfDoc}
+                        pageNum={rightPage}
+                        scale={scale}
+                        rotation={rotation}
+                        containerWidth={containerWidth}
+                        targetWidthOverride={spreadLayout.rightTargetWidth}
+                        fluidWidthFraction={spreadLayout.rightWidthFraction}
+                        isVisible={
+                          visiblePages.has(rightPage) &&
+                          (firstPagePainted || getSpreadStartPage(rightPage) === currentSpreadStart)
+                        }
+                        isNear={firstPagePainted && Math.abs(rightPage - currentSpreadStart) <= 4}
+                        isMobile={isMobile}
+                        isLargePdf={isLargePdfDoc}
+                        defaultAspectRatio={defaultAspectRatio}
+                        onPageRendered={handlePageRendered}
+                      />
+                    ) : (
+                      <div className="pdf-spread-empty-slot" aria-hidden="true" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Full-height Resizable Center Divider between Left & Right Pages */}
+            <div
+              className={`pdf-spread-resizer ${isDraggingSpread ? 'dragging' : ''}`}
+              onMouseDown={handleSpreadDragStart}
+              onTouchStart={handleSpreadDragStart}
+              onDoubleClick={handleResetSpreadSplit}
+              onKeyDown={handleSpreadResizerKeyDown}
+              tabIndex={0}
+              role="separator"
+              aria-label="Resize left and right pages"
+              aria-orientation="vertical"
+              aria-valuenow={Math.round(spreadSplitRatio)}
+              aria-valuemin={SPREAD_MIN_PCT}
+              aria-valuemax={SPREAD_MAX_PCT}
+              title="Drag or use Left/Right Arrow keys to resize left & right pages (Double-click or Home to reset 50/50)"
+            >
+              <div className="pdf-spread-resizer-sticky">
+                <div className="resizer-handle-grip" />
+                <span ref={dragBadgeRef} className="pdf-spread-ratio-pill" aria-hidden="true">
+                  {Math.round(spreadSplitRatio)}% / {Math.round(100 - spreadSplitRatio)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : !loading && !loadError ? (
           <div className="pdf-pages-list">
             {pagesList.map((pageNum) => (
               <VirtualPdfPage
@@ -1233,13 +1679,13 @@ export const PdfViewerPane = ({
                 isVisible={visiblePages.has(pageNum) && (firstPagePainted || pageNum === currentPage)}
                 isNear={firstPagePainted && Math.abs(pageNum - currentPage) <= 2}
                 isMobile={isMobile}
-                isLargePdf={!pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD}
+                isLargePdf={isLargePdfDoc}
                 defaultAspectRatio={defaultAspectRatio}
                 onPageRendered={handlePageRendered}
               />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
