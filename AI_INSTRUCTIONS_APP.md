@@ -1,6 +1,6 @@
 # Conceptualist Systems Library - AI Assistant Guide (App Scope)
 
-Welcome! If you are an AI assistant working inside `e:\The Library\search-app`, read this guide before making changes. This React 19 + Vite 8 application powers `https://www.conceptualist.uk` and serves an independent student study archive indexing **19,842 archived files** (**15,981 deduplicated unique records**) across **19 IAL** and **43 IGCSE** Edexcel subjects covering **January 2003 – June 2026**.
+Welcome! If you are an AI assistant working inside `e:\The Library\search-app`, read this guide before making changes. This React 19 + Vite 8 application powers `https://www.conceptualist.uk` and serves an independent student study archive indexing **19,882 archived files** (**16,021 deduplicated unique records**) across **19 IAL** and **43 IGCSE** Edexcel subjects covering **January 2003 – June 2026**.
 
 ---
 
@@ -19,13 +19,13 @@ Keep `search-app/scripts/` strictly limited to these **8 core utilities** (do no
 5. **`deploy-vercel.js`**: Deploys `search-app` directly to Vercel Production (`prj_aoqCf7hkChGqzoRb3WGb9cf2KAgp`, team `team_34CBzFBsKwAwot7TK9eTAPj8`) and automatically verifies `https://www.conceptualist.uk/<INDEXNOW_KEY>.txt` before submitting canonical `public/sitemap.xml` URLs to **IndexNow** (`--indexnow-only` / `--skip-indexnow` supported; `"indexnow"` npm script alias in `package.json`). Note that pushing `main` on GitHub also triggers Vercel builds.
 6. **`sync-hf.js`**: Syncs library documents to the Hugging Face dataset (`Diavlon/mcmaster-docs-library`).
 7. **`upload-live-index-hf.js`**: Uploads root `live_index.json` to Hugging Face as a resilient client fallback.
-8. **`sync-sources.js`**: Fast multi-source updater (`bsr`, `dp`, `igexams`, `ssc`, `pmt`, `pl`) supporting `--dry-run` (default) / `--apply`, `--sources=`, `--since=YYYY`, `--qpdf=`, incremental `.data/library_sha_cache.json` SHA-256 caching, strict IAL vs UK GCE filtering, `curl.exe` large-file fallback, `Sciences (Double Award)` shared-paper restore, optional `qpdf` `/ObjStm` optimization, and automatic `generate-index.js` re-indexing.
+8. **`sync-sources.js`**: Fast multi-source updater (`bsr`, `dp`, `igexams`, `ssc`, `pmt`, `pl`) supporting `--dry-run` (default) / `--apply`, `--sources=`, `--since=YYYY`, `--qpdf=`, incremental `.data/library_sha_cache.json` SHA-256 caching, strict Edexcel-only & IAL vs UK GCE / IGCSE isolation (blocks non-IAL subjects, `4xxx`/IGCSE/GCSE paper codes, AQA/OCR/CIE boards, and `toaz.info` junk), PDF magic + `%%EOF` trailer + trailing-HTML validation, multi-source fallback retries per deduplication key, `curl.exe` large-file fallback, `Sciences (Double Award)` shared-paper restore, optional `qpdf` `/ObjStm` optimization, and automatic `generate-index.js` re-indexing.
 
 ---
 
 ## 2. Source Layout & Core Architecture
 
-- **`src/App.jsx`**: Main single-page catalog (`APP_VERSION = 'v6.9.7'`) in a centered `1280px` full-width layout (no left sidebar):
+- **`src/App.jsx`**: Main single-page catalog (`APP_VERSION = 'v6.9.8'`) in a centered `1280px` full-width layout (no left sidebar):
   - **Homepage Showcase (`.home-pillars-grid`):** Highlights **Past Exam Papers** (`<a href="/papers">`), **Textbooks & Solutions** (`/textbooks`), and **Listening Audio & Subtitles** (`LIVE CC · IN-BROWSER` badge, `/audio`, plus one-click `Try Sample Track + CC` previewing `WFR02_2021_Jun`). Keep primary browse actions and `.archive-context-strip` unit/subject/textbook navigation as semantic `<a href>` links integrated with `buildRoutePath` / `parseRouteFromLocation` and `popstate` + `hashchange` so browser Back/Forward works cleanly and all 299 canonical pages stay linked in the hydrated DOM. Paper-modal deep links use `#paper=...&view=...` hash fragments (while preserving backwards-compatible parsing of legacy `?paper=...` URLs) so search bots never crawl modal overlay traps, and the reader header includes a 1-click **Share** (`Copy direct study link`) button.
   - **Table & Badge Alignment:** Unified sitting tables use `40% / 19% / 41%` desktop column widths (synced with `TableSkeletonLoader`) with matched `14px` `th`/`td` horizontal padding, `20px` uniform `SERIES` pills (`.curr-mini-badge`, `.unit-code-chip`), and a compact single-line horizontal `.paper-views-counter` (`22px` table / `20px` modal, singular `1 VIEW` / plural `VIEWS`). On mobile (`<= 768px`), modal Share/Download collapse to `30×30` icon buttons and `.modal-header-controls-bar` wraps cleanly (`flex-wrap: wrap`) so multi-tab papers never clip off-screen.
   - **Verified Textbook Metadata (`src/bookCatalog.js`):** Maps all 73 IAL & IGCSE textbooks, lab books, answers, and worked solution banks by physical `path` to verified bibliographic titles (Full Title, Authors, Publisher, Year, ISBN) without moving physical files on disk/HF or disrupting MongoDB `paper_views` keys.
@@ -110,7 +110,7 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
 
 ## 7. Release & Changelog Protocol
 
-1. Increment `APP_VERSION` (`'v6.9.7'`) in `src/App.jsx` for feature/minor releases, and keep `CHANGELOG_HISTORY` concise, accurate, and conversational (with real timestamps rather than overwriting every older entry with `BUILD_TIMESTAMP`).
+1. Increment `APP_VERSION` (`'v6.9.8'`) in `src/App.jsx` for feature/minor releases, and keep `CHANGELOG_HISTORY` concise, accurate, and conversational (with real timestamps rather than overwriting every older entry with `BUILD_TIMESTAMP`).
 2. Lint `src api scripts` (`oxlint`, `0` warnings/errors), regenerate the index (`scripts/generate-index.js` when library files/subtitles change), and build + pre-render:
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output

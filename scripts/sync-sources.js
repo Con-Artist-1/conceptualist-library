@@ -278,15 +278,18 @@ function parseSessionKey(txt) {
 }
 
 function isStrictTrueIal(subj, fullPath, sessKey) {
+  if (!IAL_LAUNCH_YEAR[subj]) return false;
   const low = fullPath.toLowerCase();
-  if (/(?:^|[^a-z0-9])(?:6(?:bi|ch|ph|ec|bs|ac|ps|ge|hi|en|et|fr|gn|sp)\d{2}|600[12]|8[a-z]{2}\d|9[a-z]{2}\d)(?:[^a-z0-9]|$)/.test(low)) return false;
+  if (/(?:^|[^a-z0-9])(?:aqa|ocr|cie|cambridge|wjec|eduqas|i?gcse|int[-_\s]?gcse|ig[-_.]?edx)(?:[^a-z0-9]|$)/.test(low)) return false;
+  if (/(?:^|[^a-z0-9])(?:4w?[a-z]{2}\d|6(?:bi|ch|ph|ec|bs|ac|ps|ge|hi|en|et|fr|gn|sp)\d{2}|600[12]|8[a-z]{2}\d|9[a-z]{2}\d)(?:[^a-z0-9]|$)/.test(low)) return false;
+  if (/(?:^|[^a-z0-9])(?:paper\s*)?(?:[12][bcp]r?|[1-4][hf]r?)(?:[^a-z0-9]|$)/.test(low)) return false;
   if (/(?:^|[^0-9])66[6-9]\d[a-z]?(?:[^a-z0-9]|$)/.test(low)) return false;
   if (subj === 'Math' && /\bc[1-4](?:jan|jun|may)/i.test(low) && !/c12|c34|wma/i.test(low)) return false;
   if ((subj === 'English Language' || subj === 'English Literature') && /\bwps0?\d\b/i.test(low)) return false;
   if (/\bgce\b|(?<!international[-_\s])a[-_\s]?level/i.test(low) && !/international[-_\s]a[-_\s]?level/i.test(low)) return false;
   const yr = Number((sessKey || '').slice(0, 4) || 0);
   if (!yr || sessKey === 'Specimen') return false;
-  const minYear = IAL_LAUNCH_YEAR[subj] || 2014;
+  const minYear = IAL_LAUNCH_YEAR[subj];
   return yr >= minYear;
 }
 
@@ -608,7 +611,7 @@ async function crawlPaperlords() {
 
 function planItems(rawItems, state, sinceYear) {
   const planned = [];
-  const seenKeys = new Set();
+  const seenByKey = new Map();
 
   for (const item of rawItems) {
     const name = sanitizeFileName(item.name || '');
@@ -618,7 +621,7 @@ function planItems(rawItems, state, sinceYear) {
     const folderPath = decodeHtml(item.folderPath || '');
     const fullPath = folderPath ? `${folderPath}/${name}` : name;
 
-    if (/grade[-_\s]?bound|grade[-_\s]?charact|syllabus|spec(?:ification)?\b|formula|timetabl|coursework|teacher[-_\s]*guide|revision|\bnotes?\b|4IT1_02_DATA_FILES_2311\//i.test(fullPath)) {
+    if (/grade[-_\s]?bound|grade[-_\s]?charact|syllabus|spec(?:ification)?\b|formula|timetabl|coursework|teacher[-_\s]*guide|revision|\bnotes?\b|toaz\.info|4IT1_02_DATA_FILES_2311\/|(?:^|[^a-z0-9])(?:aqa|ocr|cie|cambridge|wjec|eduqas)(?:[^a-z0-9]|$)/i.test(fullPath)) {
       continue;
     }
     if (item.spec === 'IGCSE' && /(?:^|[^a-z0-9])1[a-z]{2}\d(?:[^a-z0-9]|$)/i.test(fullPath)) {
@@ -646,7 +649,13 @@ function planItems(rawItems, state, sinceYear) {
 
     if (isAlreadyCovered(state, item.spec, subj, u, v, sessKey, dt)) continue;
     const dedupKey = `${item.spec}|${subj}|${(u || '').toUpperCase()}|${normVarKey(item.spec, subj, v)}|${sessKey}|${dt}`;
-    if (seenKeys.has(dedupKey)) continue;
+    if (seenByKey.has(dedupKey)) {
+      const prev = seenByKey.get(dedupKey);
+      if (prev.url !== item.url && !prev.fallbacks.some(f => f.url === item.url)) {
+        prev.fallbacks.push({ url: item.url, cookie: item.cookie, id: item.id, source: item.source });
+      }
+      continue;
+    }
 
     const base = name.slice(0, -(ext.length + 1));
     const parsedOwn = {
@@ -664,17 +673,19 @@ function planItems(rawItems, state, sinceYear) {
       relDest = `Past Papers/${item.spec}/${subj}/${yrStr}/${moFolder}/${subFolder}/${base}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
     }
 
-    seenKeys.add(dedupKey);
-    state.usedPaths.add(relDest.toLowerCase());
-    planned.push({
+    const entry = {
       ...item,
       subj,
       yrStr,
       moCode,
       dt,
       relDest,
-      absDest: path.join(LIBRARY_ROOT, relDest.replace(/\//g, '\\'))
-    });
+      absDest: path.join(LIBRARY_ROOT, relDest.replace(/\//g, '\\')),
+      fallbacks: []
+    };
+    seenByKey.set(dedupKey, entry);
+    state.usedPaths.add(relDest.toLowerCase());
+    planned.push(entry);
   }
   return planned;
 }
@@ -683,7 +694,17 @@ function validateMagic(buf, ext) {
   if (!buf || buf.length < 512) return 'TOO_SMALL';
   const head = buf.slice(0, 64).toString('latin1');
   if (/^\s*<(?:!doctype|html|\?xml|head|body)/i.test(head)) return 'HTML_RESPONSE';
-  if (ext === 'pdf') return buf.slice(0, 16).toString('latin1').includes('%PDF-') ? null : 'BAD_PDF';
+  if (ext === 'pdf') {
+    if (!buf.slice(0, 16).toString('latin1').includes('%PDF-')) return 'BAD_PDF';
+    const tail = buf.slice(Math.max(0, buf.length - 8192)).toString('latin1');
+    const eofIdx = tail.lastIndexOf('%%EOF');
+    if (eofIdx === -1) return 'TRUNCATED_PDF';
+    const afterEof = tail.slice(eofIdx + 5).trim();
+    if (afterEof.length > 32 && /<(?:!doctype|html|head|body|script|title|meta)/i.test(afterEof)) {
+      return 'TRAILING_HTML';
+    }
+    return null;
+  }
   if (ext === 'zip' || ext === 'docx') return (buf[0] === 0x50 && buf[1] === 0x4b) ? null : 'BAD_ZIP';
   if (ext === 'rar') return head.startsWith('Rar!') ? null : 'BAD_RAR';
   if (ext === 'mp3') return (buf.length >= 4096 && (head.startsWith('ID3') || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0))) ? null : 'BAD_MP3';
@@ -793,12 +814,13 @@ async function run() {
   const tmpFile = path.join(DATA_DIR, 'sync_curl.tmp');
   const tmpPack = path.join(DATA_DIR, 'sync_qpdf.pdf');
   const retryCurl = [];
+  const failReasons = {};
   let saved = 0, skippedDup = 0, copiedShared = 0, failed = 0;
 
   const commitBuffer = (item, buf) => {
     const ext = item.relDest.split('.').pop().toLowerCase();
     const merr = validateMagic(buf, ext);
-    if (merr) return false;
+    if (merr) return { ok: false, reason: merr };
     const sha = crypto.createHash('sha256').update(buf).digest('hex');
     const existingList = shaToPaths.get(sha);
     if (existingList?.length) {
@@ -808,41 +830,67 @@ async function run() {
         fs.copyFileSync(existingList[0], item.absDest);
         existingList.push(item.absDest);
         copiedShared++;
-        return true;
+        return { ok: true };
       }
       skippedDup++;
-      return true;
+      return { ok: true };
     }
     fs.mkdirSync(path.dirname(item.absDest), { recursive: true });
     fs.writeFileSync(item.absDest, buf);
     shaToPaths.set(sha, [item.absDest]);
     if (qpdfExe) packLargePdf(qpdfExe, item.absDest, tmpPack);
     saved++;
-    return true;
+    return { ok: true };
   };
 
   let cursor = 0;
   await Promise.all(Array.from({ length: 10 }, async () => {
     while (cursor < planned.length) {
       const item = planned[cursor++];
-      try {
-        const res = await downloadBuffer(item);
-        if (!res.buf || !commitBuffer(item, res.buf)) retryCurl.push(item);
-      } catch {
-        retryCurl.push(item);
+      const sourcesToTry = [item, ...(item.fallbacks || []).map(fb => ({ ...item, ...fb }))];
+      let done = false;
+      let lastReason = 'FETCH_ERR';
+      for (const candidate of sourcesToTry) {
+        try {
+          const res = await downloadBuffer(candidate);
+          if (res.buf) {
+            const c = commitBuffer(item, res.buf);
+            if (c.ok) { done = true; break; }
+            lastReason = c.reason;
+          } else {
+            lastReason = res.err || 'EMPTY';
+          }
+        } catch {
+          lastReason = 'FETCH_TIMEOUT';
+        }
       }
+      if (!done) retryCurl.push({ item, lastReason });
     }
   }));
 
-  for (const item of retryCurl) {
-    try {
-      const buf = downloadViaCurl(item, tmpFile);
-      if (!commitBuffer(item, buf)) failed++;
-    } catch { failed++; }
+  for (const { item, lastReason } of retryCurl) {
+    let reason = lastReason;
+    let done = false;
+    const sourcesToTry = [item, ...(item.fallbacks || []).map(fb => ({ ...item, ...fb }))];
+    for (const candidate of sourcesToTry) {
+      try {
+        const buf = downloadViaCurl(candidate, tmpFile);
+        const c = commitBuffer(item, buf);
+        if (c.ok) { done = true; break; }
+        reason = c.reason;
+      } catch {
+        reason = 'CURL_ERR';
+      }
+    }
+    if (!done) {
+      failed++;
+      failReasons[reason] = (failReasons[reason] || 0) + 1;
+    }
   }
   for (const f of [tmpFile, tmpPack]) if (fs.existsSync(f)) fs.unlinkSync(f);
 
-  console.log(`\n=== SYNC RESULT === saved=${saved}, copiedSharedDA=${copiedShared}, skippedDup=${skippedDup}, failed=${failed}`);
+  const reasonStr = Object.keys(failReasons).length ? ` | reasons=${JSON.stringify(failReasons)}` : '';
+  console.log(`\n=== SYNC RESULT === saved=${saved}, copiedSharedDA=${copiedShared}, skippedDup=${skippedDup}, failed=${failed}${reasonStr}`);
   if (!opts.skipIndex && (saved > 0 || copiedShared > 0)) {
     console.log('Running generate-index.js...');
     execFileSync(process.execPath, [path.join(__dirname, 'generate-index.js')], { stdio: 'inherit' });

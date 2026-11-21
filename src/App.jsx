@@ -78,15 +78,26 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.7';
+const APP_VERSION = 'v6.9.8';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.7',
+    version: 'v6.9.8',
     date: BUILD_TIMESTAMP,
+    title: 'Recovered 40 Missing IAL & June 2025 IGCSE PDFs + Hardened Sync Validation',
+    summary: 'Restored all 20 previously truncated IAL Chemistry and Mathematics PDFs (2011, 2018, 2019) plus 20 June 2025 IGCSE Examiner Reports, bringing the verified archive to 19,882 files (16,021 unique records) with 100% valid PDFs.',
+    changes: [
+      'Complete IAL recovery (20/20): Restored IAL Chemistry Oct 2018 Unit 1 QP (linearized to 764 KB), all 15 legacy Jan/Jun 2011 Mathematics QPs and Examiner Reports (C4, D1, FP1–FP3, M1–M3, S1–S3), and all 4 May/Jan 2019 C3/C34 (WMA02) Mark Schemes and Examiner Reports.',
+      'June 2025 IGCSE Examiner Reports (20 PDFs): Added verified June 2025 Examiner Reports for Biology (1B/1BR/2B/2BR), Chemistry (1C/1CR/2C/2CR), English Language A (01/01R/02/02R/03/E), English Language B (01/01R), and Further Pure Mathematics (01/01R/02/02R).',
+      'Hardened multi-source sync guardrails: Added PDF %%EOF trailer and trailing-HTML checks, multi-source fallback retries, and strict Edexcel-only / IAL-vs-IGCSE isolation inside scripts/sync-sources.js.'
+    ]
+  },
+  {
+    version: 'v6.9.7',
+    date: '2026-11-21T22:36:00+06:00',
     title: 'Zero-Warning Console Polish & Passive Touch Drag Fix',
     summary: 'Eliminated browser console warnings and errors during page loads, split-pane touch resizing, and PDF rendering.',
     changes: [
@@ -3484,7 +3495,7 @@ const WelcomePage = ({
           </div>
           <div className="hero-stats-row">
             <div className="hero-stat-pill">
-              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 15981).toLocaleString()}</strong>
+              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 16021).toLocaleString()}</strong>
               <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
             </div>
             <div className="hero-stat-pill">
@@ -3969,8 +3980,8 @@ async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
-  totalFiles: 19842,
-  uniqueFiles: 15981,
+  totalFiles: 19882,
+  uniqueFiles: 16021,
   subjects: DEFAULT_ALL_SUBJECTS,
   ialSubjects: IAL_SUBJECTS_DEFAULT,
   igcseSubjects: IGCSE_SUBJECTS_DEFAULT,
