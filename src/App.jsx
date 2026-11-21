@@ -78,15 +78,26 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.6';
+const APP_VERSION = 'v6.9.7';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.6',
+    version: 'v6.9.7',
     date: BUILD_TIMESTAMP,
+    title: 'Zero-Warning Console Polish & Passive Touch Drag Fix',
+    summary: 'Eliminated browser console warnings and errors during page loads, split-pane touch resizing, and PDF rendering.',
+    changes: [
+      'Removed unused /meta.json preload hint: Eliminated Chrome unused-preload warnings and duplicate /meta.json fetches since catalog metadata is requested with build-busted cache validation.',
+      'Fixed passive touchstart listener errors: Guarded mouse-only preventDefault() calls on split-view and 2-page spread resizer handles and added CSS touch-action: none across all resizers so touch dragging produces zero console errors.',
+      'Cleaner WebPDF worker console: Configured PDF.js verbosity to ERRORS to silence harmless TrueType hinting warnings (TT: undefined function) on legacy exam PDFs while keeping real errors visible.'
+    ]
+  },
+  {
+    version: 'v6.9.6',
+    date: '2026-11-21T22:12:00+06:00',
     title: 'Search Precision & Math Unit Disambiguation, Zero-Flash Prerender Hydration & Desktop/Mobile Alignment Polish',
     summary: 'Fixed multi-word Math unit queries ("pure mathematics 3", "pure 1") colliding with IGCSE Paper 1–4, eliminated the split-second raw HTML flash on page reloads, prevented mobile reader controls from clipping off-screen, and aligned desktop views badges and table columns.',
     changes: [
@@ -1350,11 +1361,12 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
 
   // High-performance desktop horizontal drag (updates CSS directly to eliminate stutter)
   const handleDesktopDragStart = useCallback((e) => {
-    e.preventDefault();
+    if (!e.touches && e.cancelable) e.preventDefault();
     setIsDragging(true);
 
     const onMove = (moveEvent) => {
       if (!modalBodyRef.current) return;
+      if (moveEvent.cancelable) moveEvent.preventDefault();
       const rect = modalBodyRef.current.getBoundingClientRect();
       const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const pct = Math.max(15, Math.min(85, ((clientX - rect.left) / rect.width) * 100));
@@ -1379,11 +1391,12 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
 
   // High-performance mobile vertical drag for phones
   const handleMobileDragStart = useCallback((e) => {
-    e.preventDefault();
+    if (!e.touches && e.cancelable) e.preventDefault();
     setIsDragging(true);
 
     const onMove = (moveEvent) => {
       if (!modalBodyRef.current) return;
+      if (moveEvent.cancelable) moveEvent.preventDefault();
       const rect = modalBodyRef.current.getBoundingClientRect();
       const clientY = moveEvent.touches && moveEvent.touches.length > 0 ? moveEvent.touches[0].clientY : moveEvent.clientY;
       const pct = Math.max(18, Math.min(82, ((clientY - rect.top) / rect.height) * 100));

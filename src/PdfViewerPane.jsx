@@ -754,7 +754,7 @@ export const PdfViewerPane = ({
 
   // High-performance two-page split divider drag (updates CSS directly at 60fps, commits sharp canvas redraw on release)
   const handleSpreadDragStart = useCallback((e) => {
-    e.preventDefault();
+    if (!e.touches && e.cancelable) e.preventDefault();
     e.stopPropagation();
     setIsDraggingSpread(true);
 
@@ -931,6 +931,7 @@ export const PdfViewerPane = ({
 
       if (!active) return;
 
+      const pdfVerbosity = pdfjsLib.VerbosityLevel?.ERRORS ?? 0;
       loadingTask = pdfjsLib.getDocument(
         activeTransport
           ? {
@@ -941,14 +942,16 @@ export const PdfViewerPane = ({
             disableStream: true,
             cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
             cMapPacked: true,
-            enableXfa: false
+            enableXfa: false,
+            verbosity: pdfVerbosity
           }
           : pdfData
             ? {
               data: pdfData.slice(),
               cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
               cMapPacked: true,
-              enableXfa: false
+              enableXfa: false,
+              verbosity: pdfVerbosity
             }
             : {
               url,
@@ -956,7 +959,8 @@ export const PdfViewerPane = ({
               cMapPacked: true,
               enableXfa: false,
               disableAutoFetch: false,
-              rangeChunkSize: 262144
+              rangeChunkSize: 262144,
+              verbosity: pdfVerbosity
             }
       );
 

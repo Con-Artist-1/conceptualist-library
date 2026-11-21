@@ -3345,6 +3345,7 @@ a.breadcrumb-link:hover {
   align-items: center;
   justify-content: center;
   user-select: none;
+  touch-action: none;
   transition: background 0.12s ease;
   z-index: 20;
   flex-shrink: 0;
