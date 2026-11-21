@@ -9070,6 +9070,14 @@ html[data-theme='oled'] body {
     display: none !important;
   }
 
+  .custom-pdf-pane.mobile-mode .pdf-doc-badge {
+    flex-shrink: 0;
+  }
+
+  .custom-pdf-pane.mobile-mode.two-page-mode .pdf-pane-badge-group {
+    display: none !important;
+  }
+
   .custom-pdf-pane.mobile-mode .pdf-pane-nav {
     gap: 2px;
   }
