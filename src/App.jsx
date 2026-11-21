@@ -78,15 +78,26 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.5';
+const APP_VERSION = 'v6.9.6';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.5',
+    version: 'v6.9.6',
     date: BUILD_TIMESTAMP,
+    title: 'Search Precision & Math Unit Disambiguation, Zero-Flash Prerender Hydration & Desktop/Mobile Alignment Polish',
+    summary: 'Fixed multi-word Math unit queries ("pure mathematics 3", "pure 1") colliding with IGCSE Paper 1–4, eliminated the split-second raw HTML flash on page reloads, prevented mobile reader controls from clipping off-screen, and aligned desktop views badges and table columns.',
+    changes: [
+      'Search engine precision & ranking: Preserved Pure Mathematics (WMA11–WMA14), Further Pure (WFM01–WFM03), Mechanics (WME01–WME03), Statistics (WST01–WST03), Decision (WDM11), and Core Mathematics (C1–C4, WMA01–WMA02) unit bindings during query normalization so "pure mathematics 3" never collides with IGCSE Paper 3, separated IAL Unit 1–4 from IGCSE Linear Paper 1–4, and boosted canonical unitCode equivalences.',
+      'Zero-flash prerender hydration: Added synchronous head JS detection (html.js-enabled) to hide the static .seo-prerender-shell before first paint on browser reloads while keeping full semantic HTML visible for non-JS search and AI crawlers.',
+      'Mobile & desktop UI alignment: Converted the paper views counter into a single-line horizontal pill aligned with curriculum and series badges, compacted mobile PDF modal Share/Download buttons to icon controls with clean flex wrapping so 9+ header tabs never clip off-screen, and widened the desktop Series column so Regional badges stay on one centered row.'
+    ]
+  },
+  {
+    version: 'v6.9.5',
+    date: '2026-11-21T15:30:00+06:00',
     title: 'SEO & AI-Visibility Overhaul, Archive PDF Integrity, Cover-Page Spread Toggle & Mobile Reader Polish',
     summary: 'Upgraded static prerendering for AI/Search engines with Book & FAQPage JSON-LD and /llms.txt, cleaned and repaired defective archive PDFs, added a solo Cover-page spread toggle and 1-click study link sharing, and refined mobile 2-Page PDF toolbars.',
     changes: [
@@ -1101,23 +1112,24 @@ function serializePaperForHistory(file, preferredView = 'QP') {
   };
 }
 
-// ─── Question Paper Views Counter Component (Matches Eye + Stacked Count / VIEWS Design) ───
+// ─── Question Paper Views Counter Component (Compact Single-Line Pill) ───
 const PaperViewsCounter = React.memo(({ count = 0, variant = 'table' }) => {
   const safeCount = Number.isFinite(Number(count)) && Number(count) > 0 ? Number(count) : 0;
+  const labelText = safeCount === 1 ? 'VIEW' : 'VIEWS';
   return (
     <div
       className={`paper-views-counter ${variant}`}
-      title={`${safeCount.toLocaleString()} question paper views`}
-      aria-label={`${safeCount.toLocaleString()} views`}
+      title={`${safeCount.toLocaleString()} question paper ${safeCount === 1 ? 'view' : 'views'}`}
+      aria-label={`${safeCount.toLocaleString()} ${safeCount === 1 ? 'view' : 'views'}`}
     >
       <svg
         className="paper-views-icon"
-        width="18"
-        height="18"
+        width="13"
+        height="13"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
@@ -1127,7 +1139,7 @@ const PaperViewsCounter = React.memo(({ count = 0, variant = 'table' }) => {
       </svg>
       <div className="paper-views-meta">
         <span className="paper-views-num">{safeCount.toLocaleString()}</span>
-        <span className="paper-views-label">VIEWS</span>
+        <span className="paper-views-label">{labelText}</span>
       </div>
     </div>
   );
@@ -1173,11 +1185,11 @@ const TableSkeletonLoader = ({ rows = 8, viewMode = 'unified' }) => (
     <table className="file-table">
       <thead>
         <tr>
-          <th style={{ width: viewMode === 'unified' ? '40%' : '48%' }}>
+          <th className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
             {viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
           </th>
-          <th style={{ width: viewMode === 'unified' ? '22%' : '26%' }}>Course &amp; Session</th>
-          <th style={{ width: viewMode === 'unified' ? '38%' : '26%' }}>
+          <th className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>Course &amp; Session</th>
+          <th className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
             {viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
           </th>
         </tr>
@@ -2339,7 +2351,8 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                   </svg>
                 )}
-                <span>{copiedLink ? 'Copied!' : 'Share'}</span>
+                <span className="btn-desktop-text">{copiedLink ? 'Copied!' : 'Share'}</span>
+                {copiedLink && <span className="btn-mobile-text" aria-hidden="true">Copied</span>}
               </button>
 
               {/* Download PDF or full archive directly */}
@@ -2349,13 +2362,14 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
                 rel="noopener noreferrer"
                 className="modal-btn modal-link-btn"
                 title={isSingleSolutionZip ? 'Download full Solution Bank archive (.zip)' : 'Download document'}
+                aria-label={isSingleSolutionZip ? 'Download full Solution Bank archive (.zip)' : 'Download document'}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                <span>Download</span>
+                <span className="btn-desktop-text">Download</span>
               </a>
 
               {/* Close Button */}
@@ -6645,15 +6659,15 @@ function App() {
                   <table className="file-table">
                     <thead>
                       <tr>
-                        <th className="col-sitting" style={{ width: viewMode === 'unified' ? '39%' : '50%' }}>
+                        <th className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
                           {filterDocType === 'Book'
                             ? 'Textbook / Solution Resource'
                             : viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
                         </th>
-                        <th className="col-series" style={{ width: viewMode === 'unified' ? '15%' : '26%' }}>
+                        <th className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>
                           {filterDocType === 'Book' ? 'Course & Category' : viewMode === 'unified' ? 'Series' : 'Course & Session'}
                         </th>
-                        <th className="col-actions" style={{ width: viewMode === 'unified' ? '46%' : '24%' }}>
+                        <th className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
                           {filterDocType === 'Book'
                             ? 'Open Textbook / Resource'
                             : viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}

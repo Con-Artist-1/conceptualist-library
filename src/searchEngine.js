@@ -20,7 +20,7 @@ const STATIC_SEARCH_VOCAB = [
   'specimen', 'specimens', 'syllabus', 'syllabuses', 'sample', 'samples',
   'listening', 'audio', 'mp3', 'recording', 'recordings', 'track', 'tracks', 'subtitles', 'captions', 'transcript', 'transcripts',
   'file', 'files', 'datafile', 'datafiles', 'practical', 'source', 'sources', 'student', 'workbook', 'revision', 'guide', 'lab', 'answers', 'answer',
-  'c12', 'c34', 'fp1', 'fp2', 'fp3',
+  'c1', 'c2', 'c3', 'c4', 'c12', 'c34', 'fp1', 'fp2', 'fp3', 'p1', 'p2', 'p3', 'p4', 'm1', 'm2', 'm3', 's1', 's2', 's3', 'd1', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6',
   // Sessions & curricula
   'january', 'jan', 'february', 'feb', 'june', 'jun', 'may', 'summer',
   'october', 'oct', 'november', 'nov', 'autumn', 'winter', 'edexcel', 'igcse', 'ial',
@@ -171,25 +171,25 @@ const RAW_ATOMIC_SYNONYMS = {
   u1: [
     'u1', 'unit 1', 'wma11', 'wbi11', 'wch11', 'wph11', 'wac11', 'wec11', 'wbs11',
     'wen01', 'wet01', 'wge01', 'whi01', 'wps01', 'wit11', 'wfr01', 'wgn01', 'wsp01',
-    'waa01', 'wgk01', '6bi01', '6ph01', '6ch01', 'wph01', 'yla1', 'p1', 'paper 1'
+    'waa01', 'wgk01', '6bi01', '6ph01', '6ch01', 'wph01', 'wbi01', 'wch01', 'wbs01', 'wec01', '6eca1', 'yla1'
   ],
   u2: [
     'u2', 'unit 2', 'wma12', 'wbi12', 'wch12', 'wph12', 'wac12', 'wec12', 'wbs12',
     'wen02', 'wet02', 'wge02', 'whi02', 'wps02', 'wit12', 'wfr02', 'wgn02', 'wsp02',
-    'waa02', 'wgk02', '6bi02', '6ph02', '6ch02', 'wph02', 'yla2', 'p2', 'paper 2'
+    'waa02', 'wgk02', '6bi02', '6ph02', '6ch02', 'wph02', 'wbi02', 'wch02', 'wbs02', 'wec02', '6eca2', 'yla2'
   ],
   u3: [
     'u3', 'unit 3', 'wma13', 'wbi13', 'wch13', 'wph13', 'wec13', 'wbs13',
     'wen03', 'wet03', 'wge03', 'whi03', 'wps03', 'wit13', 'wfr03', 'wgn03', 'wsp03',
-    '6bi03', '6ph03', '6ch03', 'wph03', 'p3', 'paper 3'
+    '6bi03', '6ph03', '6ch03', 'wph03', 'wbi03', 'wch03', 'wbs03', 'wec03', '6eca3'
   ],
   u4: [
     'u4', 'unit 4', 'wma14', 'wbi14', 'wch14', 'wph14', 'wec14', 'wbs14',
     'wen04', 'wet04', 'wge04', 'whi04', 'wps04', 'wit14', 'wfr04', 'wgn04', 'wsp04',
-    '6bi04', '6ph04', '6ch04', 'wph04', 'p4', 'paper 4'
+    '6bi04', '6ph04', '6ch04', 'wph04', 'wbi04', 'wch04', 'wbs04', 'wec04'
   ],
-  u5: ['u5', 'unit 5', 'wbi15', 'wch15', 'wph15', '6bi05', '6ph05', '6ch05', 'wph05'],
-  u6: ['u6', 'unit 6', 'wbi16', 'wch16', 'wph16', '6bi06', '6ph06', '6ch06', 'wph06'],
+  u5: ['u5', 'unit 5', 'wbi15', 'wch15', 'wph15', '6bi05', '6ph05', '6ch05', 'wph05', 'wbi05', 'wch05'],
+  u6: ['u6', 'unit 6', 'wbi16', 'wch16', 'wph16', '6bi06', '6ph06', '6ch06', 'wph06', 'wbi06', 'wch06', 'wch07'],
 
   p1: ['p1', 'p1a', 'p1r', 'paper 1', 'pure mathematics 1', 'wma11', '1p', '1h', '1f', '1hr', '1fr'],
   p2: ['p2', 'p2a', 'p2r', 'paper 2', 'pure mathematics 2', 'wma12', '2p', '2h', '2f', '2hr', '2fr'],
@@ -202,8 +202,10 @@ const RAW_ATOMIC_SYNONYMS = {
 
   '1r': ['1r', 'p1r', 'paper 1r', '1hr', '1fr'],
   '2r': ['2r', 'p2r', 'paper 2r', '2hr', '2fr'],
-  p1r: ['1r', 'p1r', 'paper 1r', '1hr', '1fr'],
-  p2r: ['2r', 'p2r', 'paper 2r', '2hr', '2fr'],
+  p1r: ['1r', 'p1r', 'paper 1r', '1hr', '1fr', 'wma11r'],
+  p2r: ['2r', 'p2r', 'paper 2r', '2hr', '2fr', 'wma12r'],
+  p3r: ['p3r', 'paper 3r', 'wma13r'],
+  p4r: ['p4r', 'paper 4r', 'wma14r'],
   '1h': ['1h', 'paper 1h', '1ph'],
   '2h': ['2h', 'paper 2h', '2ph'],
   '1hr': ['1hr', 'paper 1hr'],
@@ -240,6 +242,10 @@ const RAW_ATOMIC_SYNONYMS = {
   d1: ['d1', 'd1a', 'd1r', 'wdm11', 'wdm01', 'decision 1', 'decision mathematics 1'],
   wdm11: ['wdm11', 'wdm01', 'd1', 'decision mathematics 1'],
   wdm01: ['wdm01', 'wdm11', 'd1', 'decision mathematics 1'],
+  c1: ['c1', 'c1a', 'c1r', '6663', 'core mathematics 1', 'core 1'],
+  c2: ['c2', 'c2a', 'c2r', '6664', 'core mathematics 2', 'core 2'],
+  c3: ['c3', 'c3a', 'c3r', '6665', 'core mathematics 3', 'core 3'],
+  c4: ['c4', 'c4a', 'c4r', '6666', 'core mathematics 4', 'core 4'],
   c12: ['c12', 'c12a', 'c12r', 'wma01', 'core mathematics 12', 'core 12'],
   c34: ['c34', 'c34a', 'c34r', 'wma02', 'core mathematics 34', 'core 34'],
   wma01: ['wma01', 'c12', 'core mathematics 12'],
@@ -474,6 +480,10 @@ const ITEM_CODE_EQUIV = {
   fp2: ['f2', 'wfm02'], f2: ['fp2', 'wfm02'], wfm02: ['fp2', 'f2'],
   fp3: ['f3', 'wfm03'], f3: ['fp3', 'wfm03'], wfm03: ['fp3', 'f3'],
   d1: ['wdm11', 'wdm01'], wdm11: ['d1', 'wdm01'], wdm01: ['d1', 'wdm11'],
+  c1: ['6663'], '6663': ['c1'],
+  c2: ['6664'], '6664': ['c2'],
+  c3: ['6665'], '6665': ['c3'],
+  c4: ['6666'], '6666': ['c4'],
   c12: ['wma01'], wma01: ['c12'],
   c34: ['wma02'], wma02: ['c34'],
   wma11: ['p1'], wma12: ['p2'], wma13: ['p3'], wma14: ['p4'],
@@ -549,13 +559,6 @@ export function buildFileSearchData(fileObj) {
     highSet.add('maths');
     tokenSet.add('mathematics');
     tokenSet.add('maths');
-    const mathPMap = { p1: 'wma11', p2: 'wma12', p3: 'wma13', p4: 'wma14' };
-    Object.entries(mathPMap).forEach(([pKey, wma]) => {
-      if (tokenSet.has(pKey) || tokenSet.has(`${pKey}r`) || tokenSet.has(`${pKey}a`)) {
-        highSet.add(wma);
-        tokenSet.add(wma);
-      }
-    });
   } else if (subj === 'Information Technology') {
     highSet.add('it');
     highSet.add('ict');
@@ -675,8 +678,12 @@ export function buildFileSearchData(fileObj) {
       tokenSet.add(t);
     });
   }
-  if (fileObj.category === 'Books' || fileObj.category === 'IAL Books' || fileObj.category === 'IGCSE Books') {
+  if (
+    (fileObj.category === 'Books' || fileObj.category === 'IAL Books' || fileObj.category === 'IGCSE Books') &&
+    dt !== 'SOL'
+  ) {
     DOC_TYPE_TOKENS.Book.forEach((t) => {
+      highSet.add(t);
       metaSet.add(t);
       tokenSet.add(t);
     });
@@ -686,6 +693,37 @@ export function buildFileSearchData(fileObj) {
   const sanitizedPathForTokens = String(fileObj.path || '').replace(/\s*\(\d+\)(\.[a-z0-9]+)$/i, '$1');
   addTokensTo(fileObj.name, tokenSet, true);
   addTokensTo(sanitizedPathForTokens, tokenSet, true);
+
+  if (subj === 'Math') {
+    const mathPMap = { p1: 'wma11', p2: 'wma12', p3: 'wma13', p4: 'wma14' };
+    Object.entries(mathPMap).forEach(([pKey, wma]) => {
+      if (tokenSet.has(pKey) || tokenSet.has(`${pKey}r`) || tokenSet.has(`${pKey}a`)) {
+        highSet.add(pKey);
+        highSet.add(wma);
+        tokenSet.add(pKey);
+        tokenSet.add(wma);
+      }
+    });
+    const mathBookCodeMatch = String(fileObj.name || '').match(/\((p[1-4]|m[1-3]|s[1-3]|fp[1-3]|d1|c12|c34)\)/i);
+    if (mathBookCodeMatch) {
+      expandBaseCodeAliases(mathBookCodeMatch[1].toLowerCase(), highSet);
+      expandBaseCodeAliases(mathBookCodeMatch[1].toLowerCase(), tokenSet);
+    }
+  }
+
+  if (isReg && fileObj.unitCode) {
+    const ucLower = fileObj.unitCode.toLowerCase().replace(/[ar]$/, '');
+    const regSuffix = v === 'A' ? 'a' : 'r';
+    highSet.add(`${ucLower}${regSuffix}`);
+    tokenSet.add(`${ucLower}${regSuffix}`);
+    const eqs = ITEM_CODE_EQUIV[ucLower];
+    if (eqs) {
+      for (let i = 0; i < eqs.length; i++) {
+        highSet.add(`${eqs[i]}${regSuffix}`);
+        tokenSet.add(`${eqs[i]}${regSuffix}`);
+      }
+    }
+  }
 
   const highPhraseBase = [
     fileObj.cleanUnitLabel,
@@ -867,15 +905,15 @@ function normalizeQueryString(rawQuery) {
   q = q.replace(/([a-z0-9]{2,})(jan(?:uary)?|feb(?:ruary)?|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?|autumn|winter)(\d{2}|\d{4})\b/gi, '$1 $2 $3');
   q = q.replace(/\b(jan(?:uary)?|feb(?:ruary)?|mar|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?|autumn|winter)[-_\s/]*(\d{2}|\d{4})\b/g, '$1 $2');
 
-  // Normalize common multi-word unit shorthands ("unit 1" -> "u1", "paper 1r" -> "p1r", "mech 1" -> "m1")
+  // Normalize common multi-word unit shorthands ("unit 1" -> "u1", "paper 1r" -> "p1r", "mech 1" -> "m1", "pure mathematics 3" -> "wma13")
   q = q.replace(/\bunit\s*([1-6])\b/g, 'u$1');
   q = q.replace(/\bpaper\s*([1-4][ar]?)\b/g, 'p$1');
-  q = q.replace(/\b(?:mechanics|mech)\s*([1-3][ar]?)\b/g, 'm$1');
-  q = q.replace(/\b(?:statistics|stats?)\s*([1-3][ar]?)\b/g, 's$1');
-  q = q.replace(/\bfurther\s+pure(?:\s+math(?:ematics|s)?)?\s*([1-3][ar]?)\b/g, 'fp$1');
-  q = q.replace(/\bdecision(?:\s+math(?:ematics|s)?)?\s*1\b/g, 'd1');
-  q = q.replace(/\bpure\s+math(?:ematics|s)?\s*([1-4][ar]?)\b/g, 'p$1');
-  q = q.replace(/\bcore\s+(?:math(?:ematics|s)?\s*)?(12|34)\b/g, 'c$1');
+  q = q.replace(/\bfurther\s+(?:pure(?:\s+math(?:ematics|s)?)?|math(?:ematics|s)?)\s*(?:f?p|u)?([1-3])([ar])?\b/g, (_, d, v) => (v ? `fp${d} ${v}` : `fp${d}`));
+  q = q.replace(/\bpure(?:\s+math(?:ematics|s)?)?\s*(?:p|u)?([1-4])([ar])?\b/g, (_, d, v) => (v ? `wma1${d} ${v}` : `wma1${d}`));
+  q = q.replace(/\b(?:mechanics|mech)\s*(?:m|p|u)?([1-3])([ar])?\b/g, (_, d, v) => (v ? `m${d} ${v}` : `m${d}`));
+  q = q.replace(/\b(?:statistics|stats?)\s*(?:s|p|u)?([1-3])([ar])?\b/g, (_, d, v) => (v ? `s${d} ${v}` : `s${d}`));
+  q = q.replace(/\bdecision(?:\s+math(?:ematics|s)?)?\s*(?:d|p|u)?1([ar])?\b/g, (_, v) => (v ? `d1 ${v}` : 'd1'));
+  q = q.replace(/\bcore\s+(?:math(?:ematics|s)?\s*)?(?:c|p|u)?([1-4]|12|34)([ar])?\b/g, (_, d, v) => (v ? `c${d} ${v}` : `c${d}`));
   q = q.replace(/\bmay[-_\s/]+june?\b/g, 'mayjune');
   q = q.replace(/\boct[-_\s/]+nov(?:ember)?\b/g, 'octnov');
 
@@ -1115,12 +1153,28 @@ function scoreGroupMatch(item, searchData, group) {
     else if (hitTier === 'body_exact') s = 8;
     else if (hitTier === 'word_prefix') s = 6;
 
-    // Exact field boosts
+    // Exact field boosts (including canonical unitCode equivalences like WMA13 <-> P3, WME01 <-> M1)
     if (alt.type === 'tok') {
-      if (item.unitCode && item.unitCode.toLowerCase() === alt.val) s += 16;
+      const uc = item.unitCode ? item.unitCode.toLowerCase() : '';
+      const ucBase = uc.replace(/[ar]$/, '');
+      const isExactUnitCode = uc !== '' && (
+        uc === alt.val ||
+        ucBase === alt.val ||
+        (ITEM_CODE_EQUIV[uc] && ITEM_CODE_EQUIV[uc].includes(alt.val)) ||
+        (ITEM_CODE_EQUIV[ucBase] && ITEM_CODE_EQUIV[ucBase].includes(alt.val))
+      );
+      if (isExactUnitCode) s += 16;
       if (item.subject && item.subject.toLowerCase() === alt.val) s += 10;
       if (item.year && String(item.year) === alt.val) s += 8;
-      if (alt.val === group.primary && !alt.isPrefix && alt.editDist === 0) s += 4;
+      const isPrimaryOrEquiv =
+        alt.val === group.primary ||
+        (isExactUnitCode && (
+          uc === group.primary ||
+          ucBase === group.primary ||
+          (ITEM_CODE_EQUIV[uc] && ITEM_CODE_EQUIV[uc].includes(group.primary)) ||
+          (ITEM_CODE_EQUIV[ucBase] && ITEM_CODE_EQUIV[ucBase].includes(group.primary))
+        ));
+      if (isPrimaryOrEquiv && !alt.isPrefix && alt.editDist === 0) s += 4;
     }
 
     if (alt.isPrefix) s -= 1;
@@ -1165,6 +1219,13 @@ export function executeSmartSearch(files, parsedQuery, { isUnified = true } = {}
   }
 
   const { groups, exclusions, corrections, didYouMean } = parsedQuery;
+  const FURTHER_QUERY_KEYS = new Set([
+    'further', 'fmath', 'furthermath', 'furthermaths',
+    'fp1', 'fp2', 'fp3', 'f1', 'f2', 'f3',
+    'wfm01', 'wfm02', 'wfm03', '4pm1', '4pm0'
+  ]);
+  const hasPureQueryToken = groups.some((g) => g.primary === 'pure' || /^wma1[1-4]$/.test(g.primary));
+  const hasFurtherQueryToken = groups.some((g) => FURTHER_QUERY_KEYS.has(g.primary));
   const strictMatched = [];
   const strictRelevance = new WeakMap();
   const groupHitCounts = new Array(groups.length).fill(0);
@@ -1193,6 +1254,10 @@ export function executeSmartSearch(files, parsedQuery, { isUnified = true } = {}
         if (groups[i].isSpecific) specificMatches++;
         if (res.usedTypo) itemUsedTypo = true;
       }
+    }
+
+    if (hasPureQueryToken && !hasFurtherQueryToken && searchData.highSet.has('further')) {
+      totalScore -= 12;
     }
 
     if (matchedCount === groups.length) {

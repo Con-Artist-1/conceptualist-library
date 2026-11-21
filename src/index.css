@@ -697,7 +697,9 @@ a.brand-section {
 
 .search-input {
   width: 100%;
-  padding: 9px 40px 9px 38px;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 40px 0 38px;
   font-size: 14px;
   font-weight: 500;
   font-family: var(--font-family);
@@ -1985,7 +1987,7 @@ a.breadcrumb-link:hover {
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 0.6px;
-  padding: 11px 16px;
+  padding: 11px 14px;
   border-bottom: 2px solid var(--border-medium);
 }
 
@@ -2115,10 +2117,16 @@ a.breadcrumb-link:hover {
 }
 
 .unit-code-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  box-sizing: border-box;
+  line-height: 1;
   font-family: 'Roboto Mono', 'Consolas', monospace;
   font-size: 10.5px;
   font-weight: 700;
-  padding: 1px 6px;
+  padding: 0 6px;
   border-radius: 3px;
   background: var(--bg-page);
   border: 1px solid var(--border-medium);
@@ -2139,17 +2147,27 @@ a.breadcrumb-link:hover {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px 6px;
+  gap: 4px 5px;
   font-size: 11.5px;
   color: var(--text-muted);
   margin-top: 3px;
   font-weight: 600;
 }
 
+.unified-sitting-row .details-secondary {
+  margin-top: 0;
+}
+
 .curr-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  box-sizing: border-box;
+  line-height: 1;
   font-size: 10px;
   font-weight: 800;
-  padding: 1px 6px;
+  padding: 0 6px;
   border-radius: 3px;
   border: 1px solid transparent;
   text-transform: uppercase;
@@ -2458,7 +2476,7 @@ a.breadcrumb-link:hover {
   box-sizing: border-box;
 }
 
-@media (min-width: 769px) and (max-width: 1180px) {
+@media (min-width: 769px) and (max-width: 1220px) {
   .unified-doc-btn .btn-desktop-text,
   .unified-preview-btn .btn-desktop-text {
     display: none;
@@ -2589,13 +2607,18 @@ a.breadcrumb-link:hover {
 }
 
 .modal-header-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  box-sizing: border-box;
   font-size: 10px;
   font-weight: 800;
-  padding: 1.5px 6px;
+  padding: 0 6px;
   border-radius: 3px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -8653,10 +8676,10 @@ html[data-theme='oled'] body {
 
   .file-table .unified-doc-btn,
   .file-table .unified-preview-btn {
-    flex: 1 1 0;
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 36px;
-    padding: 6px 4px;
+    padding: 6px 6px;
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.2px;
@@ -8674,9 +8697,9 @@ html[data-theme='oled'] body {
   .file-table .unified-doc-btn .btn-mobile-text,
   .file-table .unified-preview-btn .btn-mobile-text {
     display: inline !important;
-    font-size: 13.5px !important;
+    font-size: 12px !important;
     font-weight: 800 !important;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     color: #FFFFFF !important;
   }
 
@@ -8790,15 +8813,13 @@ html[data-theme='oled'] body {
 
   .modal-header-controls-bar {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     width: 100%;
     max-width: 100%;
-    gap: 4px;
+    gap: 4px 3.5px;
     box-sizing: border-box;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
   }
 
   .modal-header-controls-bar::-webkit-scrollbar {
@@ -8808,17 +8829,17 @@ html[data-theme='oled'] body {
   .modal-view-tabs,
   .modal-view-extras {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 4px;
-    flex: 0 0 auto;
+    gap: 4px 3.5px;
+    flex: 0 1 auto;
     min-width: 0;
   }
 
   .modal-btn {
-    height: 32px;
-    min-height: 32px;
-    padding: 0 8px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 7px;
     font-size: 11px;
     border-radius: 4px;
     flex-shrink: 0;
@@ -8828,7 +8849,7 @@ html[data-theme='oled'] body {
 
   .modal-view-btn {
     flex: 0 0 auto;
-    min-width: 36px;
+    min-width: 32px;
     text-align: center;
     white-space: nowrap;
   }
@@ -8838,9 +8859,9 @@ html[data-theme='oled'] body {
   }
 
   .modal-swap-split-btn {
-    padding: 0 9px;
+    padding: 0 7px;
     font-size: 11px;
-    height: 32px;
+    height: 30px;
     flex-shrink: 0;
   }
 
@@ -8922,24 +8943,39 @@ html[data-theme='oled'] body {
   }
 
   .modal-theme-toggle-btn {
-    height: 32px;
-    min-width: 34px;
-    padding: 0 8px;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0;
+    justify-content: center;
     flex-shrink: 0;
   }
 
   .modal-hide-header-btn {
-    padding: 0 9px;
+    padding: 0 7px;
     font-size: 11px;
-    height: 32px;
+    height: 30px;
+    min-height: 30px;
     flex-shrink: 0;
   }
 
   .modal-link-btn,
-  .modal-share-btn {
-    padding: 0 9px;
+  .modal-share-btn:not(.copied) {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .modal-share-btn.copied {
+    padding: 0 7px;
     font-size: 11px;
-    height: 32px;
+    height: 30px;
+    min-height: 30px;
     flex-shrink: 0;
   }
 
@@ -9218,7 +9254,7 @@ html[data-theme='oled'] body {
 }
 
 /* ============================================================
-   QUESTION PAPER VIEWS COUNTER (Eye Icon + Stacked Count/VIEWS)
+   QUESTION PAPER VIEWS COUNTER (Compact Single-Line Pill)
    ============================================================ */
 .file-title-top-flex {
   display: flex;
@@ -9236,38 +9272,46 @@ html[data-theme='oled'] body {
 .paper-views-counter {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 3px 9px;
-  border-radius: 5px;
-  background: var(--bg-surface);
+  justify-content: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: var(--bg-page);
   border: 1px solid var(--border-medium);
   color: var(--text-secondary);
   flex-shrink: 0;
   user-select: none;
+  box-sizing: border-box;
+  line-height: 1;
   transition: border-color 0.15s ease;
 }
 
 .paper-views-counter:hover {
-  border-color: var(--border-medium);
+  border-color: var(--border-dark);
 }
 
 .paper-views-counter.modal {
-  background: var(--bg-surface);
+  height: 20px;
+  padding: 0 7px;
+  gap: 4.5px;
+  border-radius: 3px;
+  background: var(--bg-subtle);
   border-color: var(--border-medium);
   color: var(--text-primary);
-  padding: 3px 8px;
 }
 
 .paper-views-counter.card {
-  padding: 2px 8px;
-  gap: 6px;
+  height: 20px;
+  padding: 0 7px;
+  gap: 4.5px;
   background: var(--bg-page);
 }
 
 .paper-views-icon {
   color: var(--text-muted);
   flex-shrink: 0;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .paper-views-counter.modal .paper-views-icon {
@@ -9275,36 +9319,39 @@ html[data-theme='oled'] body {
 }
 
 .paper-views-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
   justify-content: center;
   line-height: 1;
-  gap: 2px;
+  gap: 3.5px;
 }
 
 .paper-views-num {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .paper-views-counter.modal .paper-views-num {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 10.5px;
 }
 
 .paper-views-label {
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 800;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.45px;
   color: var(--text-muted);
   text-transform: uppercase;
+  line-height: 1;
 }
 
 .paper-views-counter.modal .paper-views-label {
+  font-size: 9px;
   color: var(--text-muted);
 }
 
@@ -10327,8 +10374,8 @@ html[data-theme='oled'] body {
   color: #FFFFFF !important;
 }
 
-/* Compact modal header spacing on 1366px / scaled laptop screens so paper title stays readable */
-@media (min-width: 769px) and (max-width: 1420px) {
+/* Compact modal header spacing on 1366px–1536px / scaled laptop screens so paper title stays readable */
+@media (min-width: 769px) and (max-width: 1560px) {
   .modal-header {
     padding: 0 12px;
     gap: 10px;
@@ -10400,6 +10447,10 @@ html[data-theme='oled'] body {
 
   .archive-title-block {
     padding: 8px 16px 10px 16px;
+  }
+
+  .file-table th {
+    padding: 10px 12px;
   }
 
   .file-table td {

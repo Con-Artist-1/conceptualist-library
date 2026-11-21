@@ -36,6 +36,7 @@
     <link rel="preload" href="/meta.json" as="fetch" crossorigin />
     <script>
       (function() {
+        document.documentElement.classList.add('js-enabled');
         function isValidTheme(v) {
           return v === 'light' || v === 'dark' || v === 'oled';
         }
@@ -133,6 +134,9 @@
       #root {
         min-height: 100vh;
         background-color: var(--bg-page);
+      }
+      html.js-enabled .seo-prerender-shell {
+        display: none !important;
       }
     </style>
   </head>
