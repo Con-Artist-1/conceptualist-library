@@ -1268,7 +1268,7 @@ export function getSeoMetadata({
   // Default Homepage SEO metadata (front-load head query per seo-title-optimization)
   return {
     title: 'Edexcel IAL & IGCSE Past Papers & Textbooks | Conceptualist',
-    description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.coverage || '2003–2026'}) side-by-side in Split View.`),
+    description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (2003–2026) in Split View.`),
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Conceptualist Systems, WMA11, WCH11, WPH11, WBI11, 4MA1, mark schemes, examiner reports, Edexcel textbooks pdf',
     canonicalUrl: `${SITE_URL}/`,
     robots,
