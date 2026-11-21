@@ -437,31 +437,103 @@ export default async function handler(req, res) {
       if (!cleanSubtitle) {
         return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle segments' });
       }
-      const aliasKeys = Array.isArray(body?.aliasKeys)
-        ? body.aliasKeys.map((k) => String(k || '').trim()).filter(isValidSubtitleKey).slice(0, 4)
+      const rawAliasKeys = Array.isArray(body?.aliasKeys)
+        ? body.aliasKeys.map((k) => String(k || '').trim()).filter((k) => k && k !== trackKey && isValidSubtitleKey(k)).slice(0, 4)
         : [];
+      const adminKey = process.env.ADMIN_API_KEY || '';
+      const isAdminOverwrite = Boolean(adminKey && req.headers['x-admin-key'] === adminKey);
+
       const localSubs = loadLocalSubtitlesStore();
-      localSubs[trackKey] = cleanSubtitle;
-      for (const ak of aliasKeys) localSubs[ak] = cleanSubtitle;
-      saveLocalSubtitlesStore(localSubs);
+      const hasExistingLocal = Boolean(
+        localSubs[trackKey] &&
+        Array.isArray(localSubs[trackKey].segments) &&
+        localSubs[trackKey].segments.length > 0
+      );
 
       try {
         const db = await getMongoDatabase();
         const subCol = db.collection(COLLECTION_SUBTITLES);
-        await subCol.updateOne(
-          { _id: trackKey },
-          {
-            $set: {
-              subtitle: cleanSubtitle,
-              aliasKeys,
-              updatedAt: cleanSubtitle.updatedAt
+
+        // Guard against unauthenticated overwrite of existing subtitles or cross-track aliasKey hijacking
+        const conflictKeys = [trackKey, ...rawAliasKeys];
+        const existingDocs = await subCol
+          .find(
+            { $or: [{ _id: { $in: conflictKeys } }, { aliasKeys: { $in: conflictKeys } }] },
+            { projection: { _id: 1, aliasKeys: 1, 'subtitle.segments': { $slice: 1 } } }
+          )
+          .toArray();
+
+        const claimedByOther = new Set();
+        let primaryExists = false;
+        for (const doc of existingDocs) {
+          const hasSegs = Array.isArray(doc?.subtitle?.segments) && doc.subtitle.segments.length > 0;
+          if (doc._id === trackKey || (Array.isArray(doc.aliasKeys) && doc.aliasKeys.includes(trackKey))) {
+            if (hasSegs) primaryExists = true;
+          } else {
+            claimedByOther.add(doc._id);
+            if (Array.isArray(doc.aliasKeys)) {
+              for (const ak of doc.aliasKeys) claimedByOther.add(ak);
+            }
+          }
+        }
+
+        if (primaryExists && !isAdminOverwrite) {
+          return sendJsonResponse(res, 200, {
+            ok: true,
+            source: 'mongodb',
+            trackKey,
+            preservedExisting: true
+          });
+        }
+
+        const safeAliasKeys = rawAliasKeys.filter((ak) => !claimedByOther.has(ak) && !localSubs[ak]);
+        if (!hasExistingLocal || isAdminOverwrite) {
+          localSubs[trackKey] = cleanSubtitle;
+          for (const ak of safeAliasKeys) localSubs[ak] = cleanSubtitle;
+          saveLocalSubtitlesStore(localSubs);
+        }
+
+        if (isAdminOverwrite) {
+          await subCol.updateOne(
+            { _id: trackKey },
+            {
+              $set: {
+                subtitle: cleanSubtitle,
+                aliasKeys: safeAliasKeys,
+                updatedAt: cleanSubtitle.updatedAt
+              },
+              $setOnInsert: { createdAt: cleanSubtitle.updatedAt }
             },
-            $setOnInsert: { createdAt: cleanSubtitle.updatedAt }
-          },
-          { upsert: true }
-        );
+            { upsert: true }
+          );
+        } else {
+          await subCol.updateOne(
+            { _id: trackKey },
+            {
+              $setOnInsert: {
+                subtitle: cleanSubtitle,
+                aliasKeys: safeAliasKeys,
+                createdAt: cleanSubtitle.updatedAt,
+                updatedAt: cleanSubtitle.updatedAt
+              }
+            },
+            { upsert: true }
+          );
+        }
         return sendJsonResponse(res, 200, { ok: true, source: 'mongodb', trackKey });
       } catch {
+        if (hasExistingLocal && !isAdminOverwrite) {
+          return sendJsonResponse(res, 200, {
+            ok: true,
+            source: 'server-store',
+            trackKey,
+            preservedExisting: true
+          });
+        }
+        const safeLocalAliases = rawAliasKeys.filter((ak) => !localSubs[ak]);
+        localSubs[trackKey] = cleanSubtitle;
+        for (const ak of safeLocalAliases) localSubs[ak] = cleanSubtitle;
+        saveLocalSubtitlesStore(localSubs);
         return sendJsonResponse(res, 200, { ok: true, source: 'server-store', trackKey });
       }
     }

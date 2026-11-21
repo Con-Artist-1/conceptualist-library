@@ -1,5 +1,34 @@
 // Shared SEO Routing, Slug Resolution & Metadata Generator
 // Used by both the browser React app (src/App.jsx) and build-time SSG (scripts/prerender-seo.js)
+import { BOOK_CATALOG_BY_PATH } from './bookCatalog.js';
+
+export const SUBJECTS_WITH_BOOKS_MAP = {
+  'Edexcel IAL': new Set([
+    'Accounting', 'Biology', 'Business', 'Chemistry', 'Economics',
+    'Information Technology', 'Math', 'Physics', 'Psychology'
+  ]),
+  'Edexcel IGCSE': new Set([
+    'Accounting', 'Biology', 'Business', 'Chemistry', 'Commerce',
+    'Economics', 'Further Pure Mathematics', 'Human Biology',
+    'Information Technology', 'Mathematics A', 'Physics'
+  ])
+};
+
+export function subjectHasBooks(curriculum, subject) {
+  if (!subject) return false;
+  const curr = curriculum || inferCurriculumForSubject(subject, 'Edexcel IAL');
+  return Boolean(SUBJECTS_WITH_BOOKS_MAP[curr]?.has(subject));
+}
+
+export const LEGACY_IAL_UNIT_CODES = new Set([
+  'WBI01', 'WBI02', 'WBI03', 'WBI04', 'WBI05', 'WBI06',
+  'WCH01', 'WCH02', 'WCH03', 'WCH04', 'WCH05', 'WCH06', 'WCH07',
+  'WPH01', 'WPH02', 'WPH03', 'WPH04', 'WPH05', 'WPH06', 'WPH07',
+  'WBS01', 'WBS02', 'WBS03', 'WBS04',
+  'WEC01', 'WEC02', 'WEC03', 'WEC04',
+  '6ECA1', '6ECA2', '6ECA3',
+  'WMA01', 'WMA02', '6663', '6664', '6665', '6666'
+]);
 
 export const IGCSE_MODULAR_CODES = {
   'Accounting': '4WAC1',
@@ -667,6 +696,9 @@ const MATH_CODE_PRIORITY = [
 function getUniqueOrderedUnitCodes(unitNames) {
   const unique = [...new Set(unitNames.map(getUnitCodeFromLabel).filter(Boolean))];
   return unique.sort((a, b) => {
+    const legA = LEGACY_IAL_UNIT_CODES.has(a);
+    const legB = LEGACY_IAL_UNIT_CODES.has(b);
+    if (legA !== legB) return legA ? 1 : -1;
     const ia = MATH_CODE_PRIORITY.indexOf(a);
     const ib = MATH_CODE_PRIORITY.indexOf(b);
     if (ia !== -1 && ib !== -1) return ia - ib;
@@ -678,19 +710,21 @@ function getUniqueOrderedUnitCodes(unitNames) {
 
 function formatCodeRangeForTitle(codes, isMath = false) {
   if (!codes || codes.length === 0) return '';
-  if (isMath && codes.includes('WMA11') && codes.includes('WMA14')) {
+  const currentOnly = codes.filter((c) => !LEGACY_IAL_UNIT_CODES.has(c));
+  const active = currentOnly.length > 0 ? currentOnly : codes;
+  if (isMath && active.includes('WMA11') && active.includes('WMA14')) {
     return 'WMA11–WMA14';
   }
-  if (codes.length >= 2) {
-    const first = codes[0];
-    const last = codes[codes.length - 1];
+  if (active.length >= 2) {
+    const first = active[0];
+    const last = active[active.length - 1];
     const m1 = /^([A-Z]+)(\d+)$/.exec(first);
     const m2 = /^([A-Z]+)(\d+)$/.exec(last);
-    if (m1 && m2 && m1[1] === m2[1] && parseInt(m2[2], 10) - parseInt(m1[2], 10) === codes.length - 1) {
+    if (m1 && m2 && m1[1] === m2[1] && parseInt(m2[2], 10) - parseInt(m1[2], 10) === active.length - 1) {
       return `${first}–${last}`;
     }
   }
-  return codes.slice(0, 3).join(', ');
+  return active.slice(0, 3).join(', ');
 }
 
 function cleanUnitForContext(subjDisplay, filterUnit) {
@@ -705,7 +739,7 @@ function cleanUnitForContext(subjDisplay, filterUnit) {
 }
 
 function compactUnitTitleLabel(label) {
-  // Collapse "Unit 5: Thermodynamics & Oscillations (WPH15)" -> "Unit 5 (WPH15)" when needed to stay <= 65 chars
+  // Collapse "Unit 5: Thermodynamics & Oscillations (WPH15)" -> "Unit 5 (WPH15)" when needed to stay <= 62 chars
   const m = /^(Unit\s+\d+):\s+.+?(\s*\([A-Z0-9]+\))$/i.exec(label);
   if (m) return `${m[1]}${m[2]}`;
   return String(label || '')
@@ -719,13 +753,19 @@ function getCurriculumUniqueCount(meta, curr) {
   if (subjectsMap && Object.keys(subjectsMap).length > 0) {
     return Object.values(subjectsMap).reduce((sum, entry) => sum + (entry?.totalFiles || 0), 0);
   }
-  return curr === 'Edexcel IGCSE' ? 7450 : 8627;
+  return curr === 'Edexcel IGCSE' ? 7377 : 8604;
 }
 
 function getArchiveCounts(meta) {
-  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16077;
-  const totalFiles = meta?.totalFiles || 19938;
-  return { uniqueFiles, totalFiles };
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 15981;
+  const totalFiles = meta?.totalFiles || 19842;
+  const bookPaths = Object.keys(BOOK_CATALOG_BY_PATH);
+  const totalBooks = meta?.totalBooks || bookPaths.length || 73;
+  const ialBooks = meta?.ialBooks || bookPaths.filter((p) => p.startsWith('IAL Books/')).length || 60;
+  const igcseBooks = meta?.igcseBooks || bookPaths.filter((p) => p.startsWith('IGCSE Books/')).length || 13;
+  const dfCount = meta?.dfCount || 46;
+  const audioCount = meta?.audioCount || 272;
+  return { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, dfCount, audioCount };
 }
 
 function pickTitleVariant(candidates, maxLen = 65) {
@@ -875,14 +915,14 @@ export function getSeoMetadata({
   notFound = false,
   meta = null
 }) {
-  const { uniqueFiles, totalFiles } = getArchiveCounts(meta);
+  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, dfCount, audioCount } = getArchiveCounts(meta);
   const isCanonicalDocTypeFilter =
     (filterDocType === 'Book' && !filterUnit) ||
     (filterDocType === 'DF' && !filterCurriculum && !filterSubject && !filterUnit) ||
     (filterDocType === 'AUD' && !filterCurriculum && !filterSubject && !filterUnit);
   // Keep parameterized views (?paper=, ?year=, ?type=) indexable with rel="canonical" pointing to the clean parent URL
   // so Google Search Console consolidates signals cleanly instead of failing validation with "Excluded by 'noindex' tag".
-  // Only free-text internal search queries (?q=...) and genuine 404s emit noindex.
+  // Only free-text internal search queries (?q=...), ultra-thin unit routes (< 3 files), and genuine 404s emit noindex.
   const hasSearchQuery = Boolean(searchQuery && String(searchQuery).trim());
 
   if (notFound) {
@@ -907,7 +947,7 @@ export function getSeoMetadata({
     forceShowTable
   });
   const canonicalUrl = `${SITE_URL}${canonicalPath === '/' ? '/' : canonicalPath}`;
-  const robots = hasSearchQuery ? 'noindex, follow' : 'index, follow';
+  let robots = hasSearchQuery ? 'noindex, follow' : 'index, follow';
 
   if (currentTab === 'about') {
     return {
@@ -924,7 +964,7 @@ export function getSeoMetadata({
   if (currentTab === 'changelog') {
     return {
       title: 'Site Changelog & Updates | Conceptualist Systems',
-      description: fitDescription('Live update history: new 2025–2026 Edexcel past papers, Split View WebPDF optimizations, search improvements, and archive updates.'),
+      description: fitDescription('Live update history: new 2025-2026 Edexcel past papers, Split View WebPDF optimizations, 2-Page book spread reader, and archive updates.'),
       keywords: 'Conceptualist Systems changelog, Edexcel 2026 past papers, 2025 past papers, split view reader',
       canonicalUrl,
       robots: 'index, follow',
@@ -936,80 +976,111 @@ export function getSeoMetadata({
   if (filterDocType === 'DF' && !filterCurriculum && !filterSubject) {
     return {
       title: 'Edexcel IAL & IGCSE IT & CS Data Files (.zip) | Conceptualist',
-      description: 'Download 46 archived Edexcel IAL IT (WIT12, WIT14) and IGCSE ICT & Computer Science (4IT1, 4CP0) practical exam data files free.',
+      description: `Download ${dfCount} archived Edexcel IAL IT (WIT12, WIT14) and IGCSE ICT & Computer Science (4IT1, 4CP0) practical exam data files free.`,
       keywords: 'Edexcel IAL IT data files, WIT12 data files, WIT14 data files, Edexcel IGCSE ICT 4IT1 data files, Computer Science 4CP0 data files',
       canonicalUrl,
       robots,
       h1: 'Edexcel IAL IT & IGCSE Practical Data Files',
-      subtitle: 'Archived practical examination source data archives covering IAL Information Technology (WIT12, WIT14), IGCSE ICT (4IT1), and Computer Science (4CP0).'
+      subtitle: `Archived practical examination source data archives (${dfCount} ZIPs) covering IAL Information Technology (WIT12, WIT14), IGCSE ICT (4IT1), and Computer Science (4CP0).`
     };
   }
 
   if (filterDocType === 'AUD' && !filterCurriculum && !filterSubject) {
     return {
       title: 'Edexcel IAL & IGCSE Listening Audio MP3s | Conceptualist',
-      description: 'Stream and download archived Edexcel IAL & IGCSE ESL, French, German, Spanish, Chinese & Swahili listening audio MP3s and ZIPs with synced transcripts.',
+      description: `Stream and download ${audioCount} archived Edexcel IAL & IGCSE ESL, French, German, Spanish, Chinese & Swahili listening audio MP3s and ZIPs with synced transcripts.`,
       keywords: 'Edexcel IAL listening audio, Edexcel IGCSE listening audio, ESL 4ES1 audio, French 4FR1 WFR02 mp3, German 4GN1 WGN02 mp3, Spanish 4SP1 WSP02 mp3, Chinese 4CN1 audio, Swahili 4SW1 audio',
       canonicalUrl,
       robots,
       h1: 'Edexcel IAL & IGCSE Listening Audio Archive',
-      subtitle: 'Direct MP3 & ZIP listening examination audio tracks across IGCSE ESL, Chinese, Swahili, and IAL/IGCSE French, German & Spanish with synced transcripts.'
+      subtitle: `Direct MP3 & ZIP listening examination audio tracks (${audioCount} files) across IGCSE ESL, Chinese, Swahili, and IAL/IGCSE French, German & Spanish with synced transcripts.`
     };
   }
 
   const subjDisplay = formatSubjectName(filterSubject);
+  const SUBJECT_SHORT_MAP = {
+    'Mathematics': 'Maths',
+    'Information Technology': 'IT',
+    'English as a Second Language': 'ESL',
+    'Further Pure Mathematics': 'Further Pure Maths',
+    'Greek (First Language)': 'Greek (1st Lang)',
+    'Sciences (Double Award)': 'Double Science',
+    'Sciences (Single Award)': 'Single Science'
+  };
+  const subjShort = SUBJECT_SHORT_MAP[subjDisplay] || subjDisplay;
   const currShort = filterCurriculum === 'Edexcel IGCSE' ? 'Edexcel IGCSE' : filterCurriculum === 'Edexcel IAL' ? 'Edexcel IAL' : 'Edexcel';
 
   if (filterDocType === 'Book' && !filterUnit) {
     if (filterSubject) {
       const curr = inferCurriculumForSubject(filterSubject, filterCurriculum);
-      const isIalMath = curr === 'Edexcel IAL' && filterSubject === 'Math';
-      const title = pickTitleVariant([
-        `${curr} ${subjDisplay}${isIalMath ? ' Textbooks & Solution Banks' : ' Textbooks PDF'} | Conceptualist`,
-        `${curr} ${subjDisplay} Textbooks & Solutions | Conceptualist`,
-        `${curr.replace('Edexcel ', '')} ${subjDisplay} Books & Solutions | Conceptualist`
-      ], 65);
+      const isIal = curr === 'Edexcel IAL';
+      const isIalMath = isIal && filterSubject === 'Math';
+      const hasAnswerBooks = isIal && ['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Physics'].includes(filterSubject);
+      const title = pickTitleVariant(
+        isIalMath
+          ? [
+              'Edexcel IAL Maths Solution Banks & Books PDF | Conceptualist',
+              'Edexcel IAL Maths Textbooks & Solution Banks PDF'
+            ]
+          : hasAnswerBooks
+            ? [
+                `${curr} ${subjDisplay} Textbooks & Answers PDF | Conceptualist`,
+                `${curr} ${subjShort} Student Book 1 & 2 PDF + Answers | Conceptualist`,
+                `${curr} ${subjDisplay} Student Book 1 & 2 PDF & Answers`
+              ]
+            : [
+                `${curr} ${subjDisplay} Textbooks PDF | Conceptualist`,
+                `${curr} ${subjShort} Textbooks & Student Books PDF | Conceptualist`,
+                `${curr.replace('Edexcel ', '')} ${subjDisplay} Textbooks PDF | Conceptualist`
+              ],
+        62
+      );
       const description = pickTitleVariant([
-        `Read and download ${curr} ${subjDisplay} student textbooks${isIalMath ? ', P1–P4, M1–M3, S1–S3, D1 & FP1–FP3 Solution Banks' : ', revision guides & answer books'} on Conceptualist.`,
-        `Study ${curr} ${subjDisplay} student books${isIalMath ? ' & Solution Banks' : ' & answers'} in fast in-app WebPDF reader.`
+        isIalMath
+          ? 'Read and download all 28 Edexcel IAL Mathematics Student Books & step-by-step Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) free in our 2-Page WebPDF reader.'
+          : hasAnswerBooks
+            ? `Read and download ${curr} ${subjDisplay} Student Book 1 & 2 PDFs, worked answers, and lab books free online in our 2-Page WebPDF reader.`
+            : `Read and download ${curr} ${subjDisplay} student textbooks and revision guides free online in our 2-Page WebPDF reader.`,
+        `Study ${curr} ${subjDisplay} student books${isIalMath ? ' & Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : hasAnswerBooks ? ', Student Book 1 & 2 answers & guides' : ' & answers'} in WebPDF reader.`
       ], 158);
       return {
         title,
         description,
         keywords: [
           `${curr} ${subjDisplay} textbook pdf`,
-          `${curr} ${subjDisplay} student book answers`,
+          `${curr} ${subjDisplay} student book 1 pdf`,
+          `${curr} ${subjDisplay} student book 2 answers pdf`,
           isIalMath ? 'Edexcel IAL solution bank pdf' : `${curr} ${subjDisplay} solution manual`,
-          isIalMath ? 'Pure Maths P1 P2 P3 P4 M1 S1 Solution Bank' : `${curr} ${subjDisplay} past papers`
+          isIalMath ? 'Pure Maths P1 P2 P3 P4 M1 M2 S1 D1 FP1 Solution Bank' : `${curr} ${subjDisplay} past papers`
         ].join(', '),
         canonicalUrl,
         robots,
-        h1: `${curr} ${subjDisplay} Textbooks${isIalMath ? ' & Solution Banks' : ' & Study Books'}`,
-        subtitle: `Archived Edexcel ${subjDisplay} textbooks, answers, and worked solutions organized cleanly for fast browser viewing with zero ads or paywalls.`
+        h1: `${curr} ${subjDisplay} Textbooks${isIalMath ? ' & Worked Solution Banks' : hasAnswerBooks ? ', Student Books & Answers' : ' & Study Books'}`,
+        subtitle: `Archived ${curr} ${subjDisplay} student books${isIalMath ? ' and chapter-by-chapter P1-P4, M1-M3, S1-S3, D1 & FP1-FP3 Solution Banks' : hasAnswerBooks ? ', Student Book 1 & 2 answer PDFs, and lab books' : ''} with instant 2-Page book spread viewing.`
       };
     }
     if (filterCurriculum) {
       const isIal = filterCurriculum === 'Edexcel IAL';
       return {
-        title: `${filterCurriculum} Textbooks${isIal ? ' & Solution Banks' : ' (9–1) PDF'} | Conceptualist`,
+        title: `${filterCurriculum} Textbooks${isIal ? ' & Solution Banks' : ' (9-1) PDF'} | Conceptualist`,
         description: isIal
-          ? 'Browse 60 Edexcel IAL student textbooks & Maths Solution Banks across 9 subjects in our high-speed WebPDF reader.'
-          : 'Browse 13 Edexcel IGCSE (9–1) student textbooks across Sciences, Mathematics, Business, Commerce & IT free online.',
-        keywords: `${filterCurriculum} textbooks pdf, ${isIal ? 'Edexcel IAL solution banks, IAL Maths solution bank' : 'Edexcel IGCSE 9-1 textbooks pdf'}`,
+          ? `Browse ${ialBooks} Edexcel IAL student textbooks, answer books & Maths Solution Banks across 9 subjects in our 2-Page WebPDF reader.`
+          : `Browse ${igcseBooks} Edexcel IGCSE (9-1) student textbooks across Sciences, Mathematics, Business, Commerce & IT free online.`,
+        keywords: `${filterCurriculum} textbooks pdf, ${isIal ? 'Edexcel IAL solution banks, IAL Maths solution bank, student book 1 2 answers pdf' : 'Edexcel IGCSE 9-1 textbooks pdf'}`,
         canonicalUrl,
         robots,
-        h1: `${filterCurriculum} Textbooks${isIal ? ' & Worked Solution Banks' : ' (9–1)'}`,
-        subtitle: `Read ${filterCurriculum} student textbooks, lab guides, and answers online with instant search and Dark/OLED reading modes.`
+        h1: `${filterCurriculum} Textbooks${isIal ? ' & Worked Solution Banks' : ' (9-1)'}`,
+        subtitle: `Read ${isIal ? ialBooks : igcseBooks} ${filterCurriculum} student textbooks, lab guides, and worked answers online in 2-Page spread mode.`
       };
     }
     return {
-      title: 'Edexcel IAL & IGCSE Textbooks & Solutions PDF | Conceptualist',
-      description: fitDescription('Read 73 Edexcel IAL and IGCSE (9–1) student textbooks, lab books, and worked solution banks free online in WebPDF reader.'),
+      title: 'Edexcel IAL & IGCSE Textbooks & Solution Banks PDF',
+      description: fitDescription(`Read ${totalBooks} Edexcel IAL and IGCSE (9-1) student textbooks, answer PDFs, and Maths worked solution banks free online in 2-Page WebPDF reader.`),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
       robots,
       h1: 'Edexcel IAL & IGCSE Textbooks & Solution Banks',
-      subtitle: '73 course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Commerce, Economics, Accounting, Psychology, and IT.'
+      subtitle: `${totalBooks} course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Commerce, Economics, Accounting, Psychology, and IT.`
     };
   }
 
@@ -1023,21 +1094,32 @@ export function getSeoMetadata({
     const unitShort = unitCode && !compactClean.includes(unitCode)
       ? `${compactClean} (${unitCode})`
       : compactClean;
+    const parenShortMatch = unitClean.match(/\(([A-Z0-9]{2,4})\)/i);
+    const ultraShortUnit = parenShortMatch && unitCode && parenShortMatch[1].toUpperCase() !== unitCode
+      ? `${parenShortMatch[1].toUpperCase()} (${unitCode})`
+      : (unitCode || unitShort);
 
     const unitObj = meta?.wizard?.[filterCurriculum || 'Edexcel IAL']?.[filterSubject]?.units?.[filterUnit];
     const docCount = unitObj?.count || 60;
+    if (unitObj && typeof unitObj.count === 'number' && unitObj.count < 3 && !hasSearchQuery) {
+      robots = 'noindex, follow';
+    }
     const years = unitObj?.years || [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019];
     const minYr = years[years.length - 1] || 2014;
     const maxYr = years[0] || 2026;
     const yrSpan = `${minYr}–${maxYr}`;
     const igcseTitleCode = igcseCode ? ` (${igcseCode.split(' / ')[0]})` : '';
 
+    // Guarantee "Past Papers" in every unit <title> within 62 chars (never drop the transactional intent noun)
     const title = pickTitleVariant([
       `${currShort} ${subjDisplay} ${unitWithCode} Past Papers | Conceptualist`,
-      `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Papers | Conceptualist`,
-      `${currShort} ${subjDisplay} ${unitShort} | Conceptualist`,
-      `${currShort.replace('Edexcel ', '')} ${subjDisplay} ${unitShort} | Conceptualist`
-    ], 65);
+      `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
+      `${currShort} ${subjShort} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
+      `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
+      `${currShort.replace('Edexcel ', '')} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
+      `${currShort.replace('Edexcel ', '')} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
+      `${currShort} ${subjShort} ${ultraShortUnit} Past Papers & Mark Schemes`
+    ], 62);
 
     const codeNote = !unitWithCode.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
     const shortCodeNote = !unitShort.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
@@ -1078,43 +1160,57 @@ export function getSeoMetadata({
     const docCount = subjWizard?.totalFiles || 150;
     const unitNames = Object.keys(subjWizard?.units || {});
     const unitCodes = getUniqueOrderedUnitCodes(unitNames);
+    const currentSpecCodes = unitCodes.filter((c) => !LEGACY_IAL_UNIT_CODES.has(c));
+    const displayUnitCodes = currentSpecCodes.length > 0 ? currentSpecCodes : unitCodes;
     const igcseCode = curr === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
     const cov = (curr === 'Edexcel IGCSE' ? meta?.igcseSubjectCoverage?.[filterSubject] : meta?.ialSubjectCoverage?.[filterSubject]) || '2014 – June 2026';
+    const hasBooks = subjectHasBooks(curr, filterSubject);
 
     const fullCodeStr = curr === 'Edexcel IGCSE' && igcseCode
       ? ` (${igcseCode})`
-      : unitCodes.length > 0
-        ? ` (${unitCodes.slice(0, 6).join(', ')})`
+      : displayUnitCodes.length > 0
+        ? ` (${displayUnitCodes.slice(0, 6).join(', ')})`
         : '';
 
     const shortCodeToken = curr === 'Edexcel IGCSE' && igcseCode
       ? igcseCode.split(' / ')[0]
-      : formatCodeRangeForTitle(unitCodes, filterSubject === 'Math');
+      : formatCodeRangeForTitle(displayUnitCodes, filterSubject === 'Math');
     const shortCodeStr = shortCodeToken ? ` (${shortCodeToken})` : '';
 
+    // Guarantee "Past Papers" in every subject <title> within 62 chars
     const title = pickTitleVariant([
       `${curr} ${subjDisplay}${shortCodeStr} Past Papers & MS | Conceptualist`,
       `${curr} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
+      `${curr} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
       `${curr} ${subjDisplay} Past Papers & Mark Schemes | Conceptualist`,
       `${curr.replace('Edexcel ', '')} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
-      `${curr.replace('Edexcel ', '')} ${subjDisplay}${shortCodeStr} Papers | Conceptualist`,
-      `${curr} ${subjDisplay} Past Papers | Conceptualist`
-    ], 65);
+      `${curr.replace('Edexcel ', '')} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
+      `${curr} ${subjDisplay} Past Papers | Conceptualist`,
+      `${curr} ${subjShort} Past Papers | Conceptualist`,
+      `${curr} ${subjDisplay} Past Papers & Mark Schemes`
+    ], 62);
+
+    const resourceTail = hasBooks
+      ? 'past exam papers, mark schemes, examiner reports & textbooks'
+      : 'past exam papers, mark schemes & examiner reports';
+    const resourceTailShort = hasBooks
+      ? 'past papers, mark schemes & textbooks'
+      : 'past papers, mark schemes & examiner reports';
 
     const description = pickTitleVariant([
-      `Browse ${docCount}+ ${curr} ${subjDisplay}${fullCodeStr} past exam papers, mark schemes, examiner reports & textbooks (${cov}) in Split View.`,
-      `Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} past exam papers, mark schemes, examiner reports & textbooks (${cov}) in Split View.`,
-      `Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} past papers, mark schemes & examiner reports (${cov}) in Split View.`,
-      fitDescription(`Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} past papers, mark schemes & textbooks (${cov}).`)
+      `Browse ${docCount}+ ${curr} ${subjDisplay}${fullCodeStr} ${resourceTail} (${cov}) in Split View.`,
+      `Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} ${resourceTail} (${cov}) in Split View.`,
+      `Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} ${resourceTailShort} (${cov}) in Split View.`,
+      fitDescription(`Browse ${docCount}+ ${curr} ${subjDisplay}${shortCodeStr} ${resourceTailShort} (${cov}).`)
     ], 158);
 
     const keywords = [
       `${curr} ${subjDisplay} past papers`,
       `${curr} ${subjDisplay} mark schemes`,
       `${subjDisplay} Edexcel past papers`,
-      ...unitCodes.map(c => `${c} past papers`),
+      ...displayUnitCodes.map(c => `${c} past papers`),
       igcseCode ? `${igcseCode} past papers` : '',
-      `${curr} ${subjDisplay} textbooks pdf`
+      hasBooks ? `${curr} ${subjDisplay} textbooks pdf` : ''
     ].filter(Boolean).join(', ');
 
     return {
@@ -1123,8 +1219,8 @@ export function getSeoMetadata({
       keywords,
       canonicalUrl,
       robots,
-      h1: `${curr} ${subjDisplay}${fullCodeStr} Past Papers & Resources`,
-      subtitle: `Browse ${docCount} unique examination papers, mark schemes, examiner reports, and textbooks (${cov}) across ${unitNames.length || 'all'} course units.`
+      h1: `${curr} ${subjDisplay}${fullCodeStr} Past Papers & ${hasBooks ? 'Textbooks' : 'Mark Schemes'}`,
+      subtitle: `Browse ${docCount} unique examination papers, mark schemes${hasBooks ? ', examiner reports, and textbooks' : ', and examiner reports'} (${cov}) across ${unitNames.length || 'all'} course units.`
     };
   }
 
@@ -1147,12 +1243,12 @@ export function getSeoMetadata({
     const igcseCount = getCurriculumUniqueCount(meta, 'Edexcel IGCSE');
     const igcseSubjCount = meta?.igcseSubjects?.length || 43;
     return {
-      title: 'Edexcel IGCSE Past Papers & Mark Schemes (9–1) | Conceptualist',
-      description: fitDescription(`Browse ${igcseCount.toLocaleString()}+ Edexcel IGCSE (9–1 & Modular) past papers, mark schemes, examiner reports & textbooks across ${igcseSubjCount} subjects (4MA1, 4PH1, 4CH1, 4BI1).`),
+      title: 'Edexcel IGCSE Past Papers & Mark Schemes (9-1) | Conceptualist',
+      description: fitDescription(`Browse ${igcseCount.toLocaleString()}+ Edexcel IGCSE (9-1 & Modular) past papers, mark schemes, examiner reports & textbooks across ${igcseSubjCount} subjects (4MA1, 4PH1, 4CH1, 4BI1).`),
       keywords: 'Edexcel IGCSE past papers, International GCSE Edexcel past papers, 4MA1, 4PH1, 4CH1, 4BI1, Edexcel IGCSE Modular past papers, Regional 1R 2R past papers',
       canonicalUrl,
       robots,
-      h1: 'Edexcel International GCSE (IGCSE 9–1) Past Papers & Textbooks',
+      h1: 'Edexcel International GCSE (IGCSE 9-1) Past Papers & Textbooks',
       subtitle: `Complete archive across ${igcseSubjCount} IGCSE subjects including Foundation, Higher, Regional (R), and Modular series with instant Split View.`
     };
   }
@@ -1169,9 +1265,9 @@ export function getSeoMetadata({
     };
   }
 
-  // Default Homepage SEO metadata
+  // Default Homepage SEO metadata (front-load head query per seo-title-optimization)
   return {
-    title: 'Conceptualist Systems | Edexcel IAL & IGCSE Past Papers',
+    title: 'Edexcel IAL & IGCSE Past Papers & Textbooks | Conceptualist',
     description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.coverage || '2003–2026'}) side-by-side in Split View.`),
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Conceptualist Systems, WMA11, WCH11, WPH11, WBI11, 4MA1, mark schemes, examiner reports, Edexcel textbooks pdf',
     canonicalUrl: `${SITE_URL}/`,
@@ -1179,6 +1275,104 @@ export function getSeoMetadata({
     h1: 'Edexcel IAL & IGCSE Past Exam Papers & Textbooks',
     subtitle: `${uniqueFiles.toLocaleString()}+ unique Question Papers, Mark Schemes, Examiner Reports, and Textbooks across ${totalFiles.toLocaleString()} archived files (${meta?.coverage || 'January 2003 – June 2026'}).`
   };
+}
+
+export function buildRouteFaqEntries({
+  currentTab = 'library',
+  filterCurriculum = '',
+  filterSubject = '',
+  filterUnit = '',
+  filterDocType = null,
+  meta = null
+} = {}) {
+  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, dfCount, audioCount } = getArchiveCounts(meta);
+  const subjDisplay = formatSubjectName(filterSubject);
+  const curr = filterCurriculum || (filterSubject ? inferCurriculumForSubject(filterSubject, 'Edexcel IAL') : '');
+  const faqs = [];
+
+  if (currentTab === 'about' || currentTab === 'changelog') {
+    return faqs;
+  }
+
+  if (filterDocType === 'Book' && !filterUnit) {
+    if (filterSubject) {
+      const isIalMath = curr === 'Edexcel IAL' && filterSubject === 'Math';
+      faqs.push({
+        q: `How do I read ${curr} ${subjDisplay} textbooks${isIalMath ? ' and Worked Solution Banks' : ''} online?`,
+        a: `Click any ${curr} ${subjDisplay} Student Book${isIalMath ? ' or Worked Solution Bank ZIP (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : ' or Answer PDF'} on this page to open it directly in our 2-Page side-by-side WebPDF reader with zero ads or downloads required.`
+      });
+      if (isIalMath) {
+        faqs.push({
+          q: 'Which Edexcel IAL Mathematics units have Worked Solution Banks included?',
+          a: 'All 14 Pearson Edexcel IAL Mathematics units are covered chapter-by-chapter: Pure Mathematics 1-4 (WMA11-WMA14), Mechanics 1-3 (WME01-WME03), Statistics 1-3 (WST01-WST03), Decision Mathematics 1 (WDM11), and Further Pure Mathematics 1-3 (WFM01-WFM03).'
+        });
+      }
+    } else {
+      faqs.push({
+        q: 'How many Edexcel IAL and IGCSE textbooks and Solution Banks are in the archive?',
+        a: `The library indexes ${totalBooks} verified resources (${ialBooks} Edexcel IAL student books, lab books, answer PDFs, and Worked Solution Banks plus ${igcseBooks} Edexcel IGCSE 9-1 student books), all viewable in 2-Page book spread mode.`
+      });
+    }
+    return faqs;
+  }
+
+  if (filterDocType === 'AUD') {
+    faqs.push({
+      q: 'Which Edexcel language listening exams include audio and synced transcripts?',
+      a: `All ${audioCount} archived MP3 and ZIP listening tracks across Edexcel IAL French (WFR02, WFR04), German (WGN02, WGN04), and Spanish (WSP02, WSP04), plus Edexcel IGCSE ESL (4ES1), Chinese (4CN1), Swahili (4SW1), French (4FR1), German (4GN1), and Spanish (4SP1) stream directly in-browser above the Question Paper with live closed captions (CC).`
+    });
+    return faqs;
+  }
+
+  if (filterDocType === 'DF') {
+    faqs.push({
+      q: 'Which Edexcel practical exams require source data files (.zip)?',
+      a: `The archive hosts ${dfCount} official practical examination data file archives for Edexcel IAL Information Technology Unit 2 (WIT12) and Unit 4 (WIT14), Edexcel IGCSE ICT Paper 2 (4IT1), and Edexcel IGCSE Computer Science Paper 2 (4CP0).`
+    });
+    return faqs;
+  }
+
+  if (filterSubject && filterUnit) {
+    const unitCode = getUnitCodeFromLabel(filterUnit);
+    const legacyEq = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject, filterUnit });
+    const unitObj = meta?.wizard?.[curr]?.[filterSubject]?.units?.[filterUnit];
+    const docCount = unitObj?.count || 60;
+    const years = unitObj?.years || [2026, 2025];
+    const yrSpan = `${years[years.length - 1] || 2014}-${years[0] || 2026}`;
+
+    faqs.push({
+      q: `How many ${curr} ${subjDisplay} ${filterUnit} past papers and mark schemes are available?`,
+      a: `This archive indexes ${docCount} verified Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for ${curr} ${subjDisplay} ${filterUnit}${unitCode ? ` (${unitCode})` : ''} spanning ${yrSpan}. Click Split View on any sitting to compare the Question Paper and Mark Scheme side by side.`
+    });
+    if (legacyEq) {
+      faqs.push({
+        q: `What are the specification and legacy unit codes for ${curr} ${subjDisplay} ${filterUnit}?`,
+        a: `${legacyEq}. Both current and legacy series are indexed so you can practice every compatible past examination question.`
+      });
+    }
+    return faqs;
+  }
+
+  if (filterSubject) {
+    const subjWizard = meta?.wizard?.[curr]?.[filterSubject];
+    const docCount = subjWizard?.totalFiles || 150;
+    const unitNames = Object.keys(subjWizard?.units || {});
+    const unitCodes = getUniqueOrderedUnitCodes(unitNames).filter((c) => !LEGACY_IAL_UNIT_CODES.has(c));
+    const igcseCode = curr === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
+    const legacySpec = SUBJECT_LEGACY_SPEC_CODES[curr]?.[filterSubject] || '';
+
+    faqs.push({
+      q: `Which units and specification codes are covered in ${curr} ${subjDisplay}?`,
+      a: `This collection indexes ${docCount} unique past papers, mark schemes, and examiner reports across ${unitNames.length || 'all'} ${curr} ${subjDisplay} units${igcseCode ? ` (specification ${igcseCode})` : unitCodes.length ? ` (${unitCodes.join(', ')})` : ''}${legacySpec ? `, including ${legacySpec}` : ''}.`
+    });
+    return faqs;
+  }
+
+  faqs.push({
+    q: 'What is included in the Conceptualist Systems Edexcel archive?',
+    a: `Conceptualist Systems indexes ${uniqueFiles.toLocaleString()} unique Edexcel IAL and IGCSE Question Papers, Mark Schemes, Examiner Reports, ${totalBooks} Textbooks and Solution Banks, ${audioCount} Listening Audio tracks with synced subtitles, and ${dfCount} IT/CS Data Files (${totalFiles.toLocaleString()} total archived files covering 2003-2026).`
+  });
+  return faqs;
 }
 
 export function buildJsonLd({
@@ -1322,6 +1516,71 @@ export function buildJsonLd({
         }))
       });
     }
+  }
+
+  // Add rich Book / CreativeWork ItemList on Textbook routes using verified ISBNs & authors from bookCatalog.js
+  if (filterDocType === 'Book' && !filterUnit) {
+    const matchingBooks = Object.entries(BOOK_CATALOG_BY_PATH).filter(([bookPath]) => {
+      const bookCurr = bookPath.startsWith('IGCSE Books/') ? 'Edexcel IGCSE' : 'Edexcel IAL';
+      if (filterCurriculum && bookCurr !== filterCurriculum) return false;
+      if (filterSubject) {
+        const folderSubj = bookPath.split('/')[1] || '';
+        const normFolder = folderSubj === 'Maths' ? (bookCurr === 'Edexcel IGCSE' ? 'Mathematics A' : 'Math')
+          : folderSubj === 'Further Pure Maths' ? 'Further Pure Mathematics'
+          : folderSubj;
+        if (normFolder !== filterSubject) return false;
+      }
+      return true;
+    });
+    if (matchingBooks.length > 0) {
+      graph.push({
+        '@type': 'ItemList',
+        name: seo.h1,
+        numberOfItems: matchingBooks.length,
+        itemListElement: matchingBooks.slice(0, 35).map(([bookPath, bMeta], idx) => {
+          const isZip = bookPath.toLowerCase().endsWith('.zip');
+          const itemNode = {
+            '@type': isZip ? 'CreativeWork' : 'Book',
+            name: bMeta.title,
+            inLanguage: 'en',
+            url: `${seo.canonicalUrl}#paper=${encodeURIComponent(bookPath)}&view=${isZip ? 'SOL' : 'Book'}`
+          };
+          if (bMeta.authors) itemNode.author = { '@type': 'Person', name: bMeta.authors };
+          if (bMeta.publisher) itemNode.publisher = { '@type': 'Organization', name: bMeta.publisher };
+          if (bMeta.year) itemNode.datePublished = String(bMeta.year);
+          if (bMeta.isbn) itemNode.isbn = bMeta.isbn;
+          return {
+            '@type': 'ListItem',
+            position: idx + 1,
+            item: itemNode
+          };
+        })
+      });
+    }
+  }
+
+  // Add Answer-Engine FAQPage schema when route has data-derived Q&As
+  const faqEntries = buildRouteFaqEntries({
+    currentTab,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterDocType,
+    meta
+  });
+  if (faqEntries.length > 0) {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${seo.canonicalUrl}#faq`,
+      mainEntity: faqEntries.map((entry) => ({
+        '@type': 'Question',
+        name: entry.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: entry.a
+        }
+      }))
+    });
   }
 
   return {

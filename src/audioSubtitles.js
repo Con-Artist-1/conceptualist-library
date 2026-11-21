@@ -28,6 +28,7 @@ export async function loadStaticSubtitlesIndex() {
 export function buildCandidateSubtitleKeys({
   sittingKey,
   audioPath,
+  altPaths,
   trackFileName,
   trackIndex,
   spec,
@@ -39,12 +40,18 @@ export function buildCandidateSubtitleKeys({
   const cleanSitting = String(sittingKey || '').trim();
   const cleanPath = String(audioPath || '').replace(/\\/g, '/').trim();
   const cleanTrackName = String(trackFileName || '').trim();
+  const cleanAlts = Array.isArray(altPaths)
+    ? altPaths.map((p) => String(p || '').replace(/\\/g, '/').trim()).filter(Boolean)
+    : [];
 
   if (cleanSitting && Number.isInteger(trackIndex) && trackIndex >= 0) {
     keys.push(`${cleanSitting}#track-${trackIndex + 1}`);
   }
   if (cleanPath && cleanTrackName) {
     keys.push(`${cleanPath}#${cleanTrackName}`);
+  }
+  for (const alt of cleanAlts) {
+    if (cleanTrackName) keys.push(`${alt}#${cleanTrackName}`);
   }
   if (cleanSitting) {
     keys.push(cleanSitting);
@@ -63,6 +70,9 @@ export function buildCandidateSubtitleKeys({
   }
   if (cleanPath) {
     keys.push(cleanPath);
+  }
+  for (const alt of cleanAlts) {
+    keys.push(alt);
   }
   return Array.from(new Set(keys));
 }

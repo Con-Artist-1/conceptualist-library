@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   SITE_URL,
+  IGCSE_SPEC_CODES,
   getCurriculumSlug,
   getSubjectSlug,
   getUnitSlug,
@@ -11,9 +12,11 @@ import {
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
   getSeoMetadata,
-  buildJsonLd
+  buildJsonLd,
+  buildRouteFaqEntries
 } from '../src/seoRoutes.js';
 import { compareUnitLabels, isLegacyIalUnitLabel } from '../src/unitParser.js';
+import { BOOK_CATALOG_BY_PATH } from '../src/bookCatalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -424,8 +427,43 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
   const links = [];
   const itemEntries = [];
   const legacyNote = getLegacyEquivalentsForState({ filterCurriculum, filterSubject, filterUnit });
+  const faqEntries = buildRouteFaqEntries({
+    currentTab,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterDocType,
+    meta
+  });
 
-  if (filterDocType === 'Book') {
+  if (currentTab === 'about') {
+    itemEntries.push(
+      '<li><strong>Archive Scope:</strong> Independent Edexcel IAL (19 subjects) and IGCSE (43 subjects) digital repository covering January 2003 through June 2026.</li>',
+      '<li><strong>In-Browser Study Tools:</strong> Side-by-side Question Paper and Mark Scheme Split View, Resizable Two-Page Book Spread reader, chapter-by-chapter ZIP Worked Solution Bank viewer, and Listening Audio player with synced closed captions (CC).</li>',
+      '<li><strong>Core Team:</strong> Nafiz.R (Founder &amp; Lead Architect), Nazmul.K (Co-Founder &amp; Systems Lead), Jemison Flaren (Systems Architect), Gemin Arghen (Infrastructure Engineer), Claudis Oppen (Research &amp; Intelligence Lead), Gemin Faure Hidrojen (Intern, Optimizer).</li>',
+      '<li><strong>Educational Notice:</strong> Independent student study archive; not affiliated with or endorsed by Pearson plc or Edexcel.</li>'
+    );
+    links.push(
+      '<li><a href="/ial">Edexcel International A-Level (IAL) Past Papers</a></li>',
+      '<li><a href="/igcse">Edexcel International GCSE (IGCSE) Past Papers</a></li>',
+      '<li><a href="/textbooks">Edexcel IAL &amp; IGCSE Textbooks &amp; Solution Banks</a></li>',
+      '<li><a href="/audio">Listening Audio Archive with Synced Subtitles</a></li>',
+      '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>'
+    );
+  } else if (currentTab === 'changelog') {
+    itemEntries.push(
+      '<li><strong>v6.9.5 (Latest):</strong> Full SEO &amp; AI-visibility upgrade (real DOM prerendering, llms.txt index, Book &amp; FAQPage JSON-LD, current-spec unit code prioritization, lateral unit linking, and 1-click Copy Study Link).</li>',
+      '<li><strong>v6.9.4:</strong> Resizable Two-Page Side-by-Side PDF Reader Mode for textbooks and standalone past papers.</li>',
+      '<li><strong>v6.9.3:</strong> Instant cache freshness, 24-hour auto-reload, and 100% Fast Web View large-PDF linearization.</li>',
+      '<li><strong>v6.9.2:</strong> Added IGCSE (9-1) Commerce Student Book and Mathematics A Student Book 2 (73 total textbooks &amp; solution banks).</li>',
+      '<li><strong>v6.9:</strong> Verified bibliographic textbook catalog, unit ordering, and hash-based modal deep links.</li>'
+    );
+    links.push(
+      '<li><a href="/papers">Browse All Edexcel IAL &amp; IGCSE Past Papers</a></li>',
+      '<li><a href="/textbooks">Browse Textbooks &amp; Worked Solution Banks</a></li>',
+      '<li><a href="/about">About Conceptualist Systems</a></li>'
+    );
+  } else if (filterDocType === 'Book') {
     let bookItems = indexLookup?.booksAll || [];
     if (filterCurriculum) {
       bookItems = bookItems.filter(b => b.curriculum === filterCurriculum);
@@ -436,8 +474,27 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     for (const book of bookItems) {
       const label = DOC_TYPE_HUMAN[book.docType] || 'Textbook PDF';
       const subjLabel = `${book.curriculum} ${formatSubjectName(book.subject)}`;
-      const cleanBookTitle = String(book.name || '').replace(/\.(pdf|zip|rar)$/i, '').trim();
-      itemEntries.push(`<li><strong>${escapeHtml(cleanBookTitle)}</strong> — ${escapeHtml(subjLabel)} (${escapeHtml(label)})</li>`);
+      const catalogEntry = BOOK_CATALOG_BY_PATH[book.path] || null;
+      const cleanBookTitle = catalogEntry?.title || String(book.name || '').replace(/\.(pdf|zip|rar)$/i, '').trim();
+      const metaDetails = [
+        catalogEntry?.authors ? `Authors: ${catalogEntry.authors}` : '',
+        catalogEntry?.publisher ? `Publisher: ${catalogEntry.publisher}` : '',
+        catalogEntry?.year ? `Year: ${catalogEntry.year}` : '',
+        catalogEntry?.isbn ? `ISBN: ${catalogEntry.isbn}` : ''
+      ].filter(Boolean).join(' · ');
+      itemEntries.push(
+        `<li><strong>${escapeHtml(cleanBookTitle)}</strong>: ${escapeHtml(subjLabel)} (${escapeHtml(label)})${metaDetails ? ` · <span>${escapeHtml(metaDetails)}</span>` : ''}</li>`
+      );
+    }
+    if (!filterCurriculum) {
+      links.push(
+        '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
+        '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
+      );
+    } else if (filterCurriculum === 'Edexcel IAL') {
+      links.push('<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>');
+    } else if (filterCurriculum === 'Edexcel IGCSE') {
+      links.push('<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>');
     }
     if (indexLookup?.booksByCurrSubj) {
       for (const key of [...indexLookup.booksByCurrSubj.keys()].sort()) {
@@ -458,18 +515,46 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       const unitTxt = item.cleanUnitLabel || item.unitCode || '';
       const sessTxt = item.session || (item.year ? String(item.year) : '');
       itemEntries.push(
-        `<li><strong>${escapeHtml(item.name)}</strong> — ${escapeHtml(item.curriculum)} ${escapeHtml(formatSubjectName(item.subject))}${unitTxt ? ` (${escapeHtml(unitTxt)})` : ''}${sessTxt ? ` — ${escapeHtml(sessTxt)}` : ''}</li>`
+        `<li><strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(item.curriculum)} ${escapeHtml(formatSubjectName(item.subject))}${unitTxt ? ` (${escapeHtml(unitTxt)})` : ''}${sessTxt ? ` (${escapeHtml(sessTxt)})` : ''}</li>`
       );
     }
+    links.push(
+      '<li><a href="/ial/information-technology">Edexcel IAL Information Technology Past Papers (WIT11-WIT14)</a></li>',
+      '<li><a href="/ial/information-technology/it-unit-2-wit12">Edexcel IAL IT Unit 2 (WIT12) Past Papers &amp; Data Files</a></li>',
+      '<li><a href="/ial/information-technology/it-unit-4-wit14">Edexcel IAL IT Unit 4 (WIT14) Past Papers &amp; Data Files</a></li>',
+      '<li><a href="/igcse/information-technology">Edexcel IGCSE ICT (4IT1) Past Papers &amp; Data Files</a></li>',
+      '<li><a href="/igcse/information-technology/paper-2-p2">Edexcel IGCSE ICT Paper 2 (4IT1/02) Practical Papers</a></li>',
+      '<li><a href="/igcse/computer-science">Edexcel IGCSE Computer Science (4CP0) Past Papers</a></li>',
+      '<li><a href="/igcse/computer-science/paper-2-p2">Edexcel IGCSE Computer Science Paper 2 (4CP0/02) Practical Papers</a></li>',
+      '<li><a href="/textbooks/ial/information-technology">Edexcel IAL Information Technology Student Books 1 &amp; 2</a></li>',
+      '<li><a href="/textbooks/igcse/information-technology">Edexcel IGCSE ICT Student Textbook</a></li>'
+    );
   } else if (filterDocType === 'AUD') {
     const audItems = [...(indexLookup?.audioAll || [])].sort((a, b) => (Number(b.sortKey) || 0) - (Number(a.sortKey) || 0));
     for (const item of audItems) {
       const unitTxt = item.cleanUnitLabel || item.unitCode || '';
       const sessTxt = item.session || (item.year ? String(item.year) : '');
       itemEntries.push(
-        `<li><strong>${escapeHtml(item.name)}</strong> — ${escapeHtml(item.curriculum)} ${escapeHtml(formatSubjectName(item.subject))}${unitTxt ? ` (${escapeHtml(unitTxt)})` : ''}${sessTxt ? ` — ${escapeHtml(sessTxt)} Listening Audio (MP3)` : ''}</li>`
+        `<li><strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(item.curriculum)} ${escapeHtml(formatSubjectName(item.subject))}${unitTxt ? ` (${escapeHtml(unitTxt)})` : ''}${sessTxt ? ` (${escapeHtml(sessTxt)} Listening Audio MP3)` : ''}</li>`
       );
     }
+    links.push(
+      '<li><a href="/ial/french">Edexcel IAL French Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/ial/french/french-unit-2-wfr02">Edexcel IAL French Unit 2 (WFR02) Listening &amp; Response</a></li>',
+      '<li><a href="/ial/french/french-unit-4-wfr04">Edexcel IAL French Unit 4 (WFR04) Research &amp; Listening</a></li>',
+      '<li><a href="/ial/german">Edexcel IAL German Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/ial/german/german-unit-2-wgn02">Edexcel IAL German Unit 2 (WGN02) Listening &amp; Response</a></li>',
+      '<li><a href="/ial/german/german-unit-4-wgn04">Edexcel IAL German Unit 4 (WGN04) Research &amp; Listening</a></li>',
+      '<li><a href="/ial/spanish">Edexcel IAL Spanish Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/ial/spanish/spanish-unit-2-wsp02">Edexcel IAL Spanish Unit 2 (WSP02) Listening &amp; Response</a></li>',
+      '<li><a href="/ial/spanish/spanish-unit-4-wsp04">Edexcel IAL Spanish Unit 4 (WSP04) Research &amp; Listening</a></li>',
+      '<li><a href="/igcse/english-as-a-second-language">Edexcel IGCSE English as a Second Language (4ES1) Past Papers &amp; Audio</a></li>',
+      '<li><a href="/igcse/chinese">Edexcel IGCSE Chinese (4CN1) Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/igcse/french">Edexcel IGCSE French (4FR1) Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/igcse/german">Edexcel IGCSE German (4GN1) Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/igcse/spanish">Edexcel IGCSE Spanish (4SP1) Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/igcse/swahili">Edexcel IGCSE Swahili (4SW1) Past Papers &amp; Listening Audio</a></li>'
+    );
   } else if (filterSubject && filterCurriculum && filterUnit) {
     const currSlug = getCurriculumSlug(filterCurriculum);
     const subjSlug = getSubjectSlug(filterSubject);
@@ -481,7 +566,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
         .map(t => DOC_TYPE_HUMAN[t] || t);
       const variantTxt = grp.variant ? ` (${grp.variant})` : '';
       itemEntries.push(
-        `<li><strong>${escapeHtml(grp.session)}${escapeHtml(variantTxt)}</strong> — ${escapeHtml(filterSubject)} ${escapeHtml(filterUnit)}: ${escapeHtml(dtLabels.join(', '))}</li>`
+        `<li><strong>${escapeHtml(grp.session)}${escapeHtml(variantTxt)}</strong>: ${escapeHtml(filterSubject)} ${escapeHtml(filterUnit)} (${escapeHtml(dtLabels.join(', '))})</li>`
       );
     }
     if (indexLookup?.booksByCurrSubj?.has(`${filterCurriculum}::${filterSubject}`)) {
@@ -492,13 +577,22 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     links.push(
       `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`All ${filterCurriculum} ${formatSubjectName(filterSubject)} Units & Past Papers`)}</a></li>`
     );
+    // Lateral sibling unit links so every unit page has strong contextual inbound/outbound links
+    const unitsObj = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units || {};
+    const siblingUnits = Object.keys(unitsObj).sort((a, b) => compareUnitLabels(a, b, filterSubject));
+    for (const sibUnit of siblingUnits) {
+      if (sibUnit === filterUnit) continue;
+      links.push(
+        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(sibUnit)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${sibUnit} Past Papers`)}</a></li>`
+      );
+    }
   } else if (filterSubject && filterCurriculum) {
     const currSlug = getCurriculumSlug(filterCurriculum);
     const subjSlug = getSubjectSlug(filterSubject);
     const unitsObj = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units || {};
-    for (const u of Object.keys(unitsObj)) {
+    for (const u of Object.keys(unitsObj).sort((a, b) => compareUnitLabels(a, b, filterSubject))) {
       links.push(
-        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} — ${u} Past Papers & Mark Schemes`)}</a></li>`
+        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${u} Past Papers & Mark Schemes`)}</a></li>`
       );
     }
     if (indexLookup?.booksByCurrSubj?.has(`${filterCurriculum}::${filterSubject}`)) {
@@ -512,43 +606,69 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
         .filter(t => grp.docTypes.has(t))
         .map(t => DOC_TYPE_HUMAN[t] || t);
       itemEntries.push(
-        `<li><strong>${escapeHtml(grp.session)}${grp.unitLabel ? ` — ${escapeHtml(grp.unitLabel)}` : ''}</strong>: ${escapeHtml(dtLabels.join(', '))}</li>`
+        `<li><strong>${escapeHtml(grp.session)}${grp.unitLabel ? ` (${escapeHtml(grp.unitLabel)})` : ''}</strong>: ${escapeHtml(dtLabels.join(', '))}</li>`
       );
     }
   } else if (filterCurriculum) {
     const currSlug = getCurriculumSlug(filterCurriculum);
+    links.push(
+      `<li><a href="/textbooks/${currSlug}">${escapeHtml(`${filterCurriculum} Textbooks & Worked Solution Banks`)}</a></li>`
+    );
     const subjectsObj = meta?.wizard?.[filterCurriculum] || {};
     for (const s of Object.keys(subjectsObj).sort()) {
+      const subjSlug = getSubjectSlug(s);
       links.push(
-        `<li><a href="/${currSlug}/${getSubjectSlug(s)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} Past Papers & Textbooks`)}</a></li>`
+        `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} Past Papers & Mark Schemes`)}</a></li>`
       );
+      const uKeys = Object.keys(subjectsObj[s]?.units || {});
+      if (uKeys.length === 1) {
+        links.push(
+          `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0])}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
+        );
+      }
     }
   } else if (currentTab === 'library') {
+    links.push(
+      '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
+      '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
+    );
     for (const curr of ['Edexcel IAL', 'Edexcel IGCSE']) {
       const currSlug = getCurriculumSlug(curr);
       const subjectsObj = meta?.wizard?.[curr] || {};
       for (const s of Object.keys(subjectsObj).sort()) {
+        const subjSlug = getSubjectSlug(s);
         links.push(
-          `<li><a href="/${currSlug}/${getSubjectSlug(s)}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
+          `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
         );
+        const uKeys = Object.keys(subjectsObj[s]?.units || {});
+        if (uKeys.length === 1) {
+          links.push(
+            `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0])}">${escapeHtml(`${curr} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
+          );
+        }
       }
     }
   }
 
-  return `<main class="seo-prerender-shell" style="max-width:1100px;margin:24px auto;padding:0 16px;font-family:system-ui,-apple-system,sans-serif;">
+  const faqHtml = faqEntries.length > 0
+    ? `<section aria-label="Frequently Asked Questions"><h2>Frequently Asked Questions</h2>${faqEntries.map(f => `<article><h3>${escapeHtml(f.q)}</h3><p>${escapeHtml(f.a)}</p></article>`).join('\n        ')}</section>`
+    : '';
+
+  return `<main class="seo-prerender-shell" style="max-width:1160px;margin:24px auto;padding:20px 16px;font-family:'Roboto',system-ui,-apple-system,sans-serif;color:var(--text-primary,#1A1D20);background:var(--bg-surface,#FFFFFF);border-top:3px solid var(--mcmaster-maroon,#6F1D2B);box-sizing:border-box;">
       <nav aria-label="Breadcrumb" style="font-size:13px;margin-bottom:12px;">
-        <a href="/">Conceptualist Library Home</a>
-        ${filterDocType === 'Book' ? ' / <a href="/textbooks">Textbooks &amp; Solutions</a>' : ''}
+        <a href="/" style="color:inherit;">Conceptualist Library Home</a>
+        ${filterDocType === 'Book' ? ' / <a href="/textbooks" style="color:inherit;">Textbooks &amp; Solutions</a>' : ''}
         ${filterDocType === 'DF' ? ' / <span>IT &amp; CS Data Files</span>' : ''}
         ${filterDocType === 'AUD' ? ' / <span>Listening Audio MP3s</span>' : ''}
-        ${filterCurriculum ? ` / <a href="${filterDocType === 'Book' ? `/textbooks/${getCurriculumSlug(filterCurriculum)}` : `/${getCurriculumSlug(filterCurriculum)}`}">${escapeHtml(filterCurriculum)}</a>` : ''}
-        ${filterSubject ? ` / <a href="${filterDocType === 'Book' ? `/textbooks/${getCurriculumSlug(filterCurriculum || 'Edexcel IAL')}/${getSubjectSlug(filterSubject)}` : `/${getCurriculumSlug(filterCurriculum || 'Edexcel IAL')}/${getSubjectSlug(filterSubject)}`}">${escapeHtml(formatSubjectName(filterSubject))}</a>` : ''}
+        ${filterCurriculum ? ` / <a href="${filterDocType === 'Book' ? `/textbooks/${getCurriculumSlug(filterCurriculum)}` : `/${getCurriculumSlug(filterCurriculum)}`}" style="color:inherit;">${escapeHtml(filterCurriculum)}</a>` : ''}
+        ${filterSubject ? ` / <a href="${filterDocType === 'Book' ? `/textbooks/${getCurriculumSlug(filterCurriculum || 'Edexcel IAL')}/${getSubjectSlug(filterSubject)}` : `/${getCurriculumSlug(filterCurriculum || 'Edexcel IAL')}/${getSubjectSlug(filterSubject)}`}" style="color:inherit;">${escapeHtml(formatSubjectName(filterSubject))}</a>` : ''}
         ${filterUnit ? ` / <span>${escapeHtml(filterUnit)}</span>` : ''}
       </nav>
-      <h1>${escapeHtml(seo.h1)}</h1>
-      <p>${escapeHtml(seo.description)}</p>
-      <p>${escapeHtml(seo.subtitle)}</p>
-      ${legacyNote ? `<p><strong>Specification &amp; Legacy Codes:</strong> ${escapeHtml(legacyNote)}</p>` : ''}
+      <h1 style="margin:0 0 8px 0;font-size:24px;">${escapeHtml(seo.h1)}</h1>
+      <p style="margin:0 0 8px 0;line-height:1.5;">${escapeHtml(seo.description)}</p>
+      <p style="margin:0 0 12px 0;line-height:1.5;">${escapeHtml(seo.subtitle)}</p>
+      ${legacyNote ? `<p style="margin:0 0 12px 0;"><strong>Specification &amp; Legacy Codes:</strong> ${escapeHtml(legacyNote)}</p>` : ''}
+      ${faqHtml}
       <nav aria-label="Archive Navigation">
         <p>
           <a href="/papers">All Past Papers</a> |
@@ -650,19 +770,80 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
   const jsonLdScript = `  <script id="seo-json-ld" type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n  </head>`;
   html = html.replace(/<\/head>/i, jsonLdScript);
 
-  // Inject crawlable semantic HTML inside <div id="root">...</div> wrapped in <noscript>
-  // This guarantees search engine crawlers receive all structured content and links,
-  // while preventing any raw unstyled HTML flicker or bullet-point flash for human users during hydration.
+  // Inject crawlable semantic HTML directly inside <div id="root">...</div> (without <noscript>!)
+  // so non-JS AI search crawlers (OAI-SearchBot, PerplexityBot, ClaudeBot, GPTBot), Bingbot, and Googlebot Wave-1
+  // index real visible DOM headings, Q&As, sittings, and internal links, while React createRoot replaces it on mount.
   html = html.replace(
     /<div id="root"><\/div>/i,
-    `<div id="root"><noscript>${staticBody}</noscript></div>`
+    `<div id="root">${staticBody}</div>`
   );
 
   return html;
 }
 
-function generateSitemapXml(routes, lastmodDate) {
-  const sitemapRoutes = routes.filter(r => r.includeInSitemap);
+function generateLlmsTxt(meta, indexLookup) {
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16079;
+  const totalFiles = meta?.totalFiles || 19940;
+  const booksCount = indexLookup?.booksAll?.length || Object.keys(BOOK_CATALOG_BY_PATH).length || 73;
+  const audioCount = indexLookup?.audioAll?.length || 272;
+  const dfCount = indexLookup?.dfAll?.length || 46;
+  const ialSubjects = Object.keys(meta?.wizard?.['Edexcel IAL'] || {}).sort();
+  const igcseSubjects = Object.keys(meta?.wizard?.['Edexcel IGCSE'] || {}).sort();
+
+  const lines = [
+    '# Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library',
+    '',
+    `> Conceptualist Systems (${SITE_URL}) is a free, zero-ad academic study archive indexing ${uniqueFiles.toLocaleString()} unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), ${booksCount} Student Textbooks & Worked Solution Banks, ${audioCount} Listening Audio tracks with synced closed captions (CC), and ${dfCount} IT & Computer Science practical Data Files (${totalFiles.toLocaleString()} total archived files covering January 2003 through June 2026).`,
+    '',
+    '## Core Platform Capabilities',
+    '- **Side-by-Side Split View Reader:** Open any paired Question Paper (QP) and Mark Scheme (MS) side by side in the browser with synchronized zoom and draggable split divider.',
+    '- **Resizable Two-Page Book Spread Mode:** Read all 73 Edexcel IAL & IGCSE student textbooks and standalone past papers in a 2-Page side-by-side spread with Pure OLED and Academic Dark reading modes.',
+    '- **In-Browser Worked Solution Bank Reader:** Stream all 14 Edexcel IAL Mathematics Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) chapter-by-chapter directly in the browser without downloading full ZIP archives.',
+    '- **Synced Listening Audio & Subtitles (CC):** Play MP3 and multi-track ZIP listening examinations above the Question Paper with clickable time-synced transcripts across French, German, Spanish, ESL, Chinese, and Swahili.',
+    '',
+    '## Primary Archive Hubs',
+    `- [Library Homepage](${SITE_URL}/): Interactive subject, unit, and examination year navigator.`,
+    `- [All Past Papers Catalog](${SITE_URL}/papers): Full searchable catalog of ${uniqueFiles.toLocaleString()} unique Edexcel resources.`,
+    `- [Edexcel IAL Past Papers](${SITE_URL}/ial): ${ialSubjects.length} International A-Level subjects (2003-2026).`,
+    `- [Edexcel IGCSE Past Papers](${SITE_URL}/igcse): ${igcseSubjects.length} International GCSE (9-1, Regional R, and Modular 4W*) subjects.`,
+    `- [Textbooks & Worked Solution Banks](${SITE_URL}/textbooks): ${booksCount} student books, answer PDFs, lab books, and IAL Maths Solution Banks.`,
+    `- [Edexcel IAL Textbooks & Solution Banks](${SITE_URL}/textbooks/ial): Student Book 1 & 2 PDFs, answers, and P1-P4/M1-M3/S1-S3/D1/FP1-FP3 Solution Banks.`,
+    `- [Edexcel IGCSE (9-1) Textbooks](${SITE_URL}/textbooks/igcse): Official student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.`,
+    `- [Listening Audio Archive (MP3 & Live CC)](${SITE_URL}/audio): ${audioCount} listening audio tracks and synced transcripts.`,
+    `- [IT & Computer Science Practical Data Files](${SITE_URL}/data-files): ${dfCount} practical exam source ZIPs for WIT12, WIT14, 4IT1, and 4CP0.`,
+    '',
+    `## Edexcel International A-Level (IAL) Subjects (${ialSubjects.length})`,
+    ...ialSubjects.map((s) => {
+      const sObj = meta?.wizard?.['Edexcel IAL']?.[s] || {};
+      const uCount = Object.keys(sObj.units || {}).length;
+      return `- [Edexcel IAL ${formatSubjectName(s)}](${SITE_URL}/ial/${getSubjectSlug(s)}): ${sObj.totalFiles || 0} unique files across ${uCount} units.`;
+    }),
+    '',
+    `## Edexcel International GCSE (IGCSE) Subjects (${igcseSubjects.length})`,
+    ...igcseSubjects.map((s) => {
+      const sObj = meta?.wizard?.['Edexcel IGCSE']?.[s] || {};
+      const code = IGCSE_SPEC_CODES[s] ? ` (${IGCSE_SPEC_CODES[s]})` : '';
+      return `- [Edexcel IGCSE ${formatSubjectName(s)}${code}](${SITE_URL}/igcse/${getSubjectSlug(s)}): ${sObj.totalFiles || 0} unique files.`;
+    }),
+    '',
+    '## Subject Textbooks & Solution Bank Collections',
+    ...[...(indexLookup?.booksByCurrSubj?.keys() || [])].sort().map((key) => {
+      const [curr, subj] = key.split('::');
+      const list = indexLookup.booksByCurrSubj.get(key) || [];
+      return `- [${curr} ${formatSubjectName(subj)} Textbooks & Solutions](${SITE_URL}/textbooks/${getCurriculumSlug(curr)}/${getSubjectSlug(subj)}): ${list.length} books/solution banks.`;
+    }),
+    ''
+  ];
+
+  return lines.join('\n');
+}
+
+function generateSitemapXml(routes, lastmodDate, meta) {
+  const sitemapRoutes = routes.filter((r) => {
+    if (!r.includeInSitemap) return false;
+    const seo = getSeoMetadata({ ...r.state, meta });
+    return !String(seo.robots || '').includes('noindex');
+  });
   const urlEntries = sitemapRoutes.map(r => {
     const loc = r.path === '/' ? `${SITE_URL}/` : `${SITE_URL}${r.path}`;
     return `  <url>
@@ -714,20 +895,28 @@ function run() {
     }
   }
 
-  // 1. Write public/sitemap.xml
-  const sitemapXml = generateSitemapXml(routes, lastmodDate);
+  // 1. Write public/sitemap.xml & public/llms.txt
+  const sitemapXml = generateSitemapXml(routes, lastmodDate, meta);
   const publicSitemapPath = path.join(PUBLIC_DIR, 'sitemap.xml');
   fs.writeFileSync(publicSitemapPath, sitemapXml, 'utf8');
-  const sitemapCount = routes.filter(r => r.includeInSitemap).length;
-  console.log(`✅ Generated public/sitemap.xml with ${sitemapCount} canonical URLs.`);
+  const sitemapCount = (sitemapXml.match(/<url>/g) || []).length;
+  console.log(`✅ Generated public/sitemap.xml with ${sitemapCount} indexable canonical URLs.`);
+
+  const llmsTxt = generateLlmsTxt(meta, indexLookup);
+  fs.writeFileSync(path.join(PUBLIC_DIR, 'llms.txt'), llmsTxt, 'utf8');
+  console.log(`✅ Generated public/llms.txt (${llmsTxt.split('\n').length} lines).`);
 
   // 2. If dist/index.html exists, write dist/shards and pre-render static HTML for all routes
   const distIndexPath = path.join(DIST_DIR, 'index.html');
   if (fs.existsSync(distIndexPath)) {
     const templateHtml = fs.readFileSync(distIndexPath, 'utf8');
 
-    // Copy updated sitemap.xml to dist/sitemap.xml
+    // Copy updated sitemap.xml, llms.txt & robots.txt to dist/
     fs.writeFileSync(path.join(DIST_DIR, 'sitemap.xml'), sitemapXml, 'utf8');
+    fs.writeFileSync(path.join(DIST_DIR, 'llms.txt'), llmsTxt, 'utf8');
+    if (fs.existsSync(path.join(PUBLIC_DIR, 'robots.txt'))) {
+      fs.copyFileSync(path.join(PUBLIC_DIR, 'robots.txt'), path.join(DIST_DIR, 'robots.txt'));
+    }
 
     if (rawIndex) {
       const shardCount = writeDistShards(rawIndex);

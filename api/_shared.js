@@ -51,19 +51,29 @@ export function isAllowedOrigin(req, requireHeader = false) {
   const origin = req.headers['origin'] || '';
   const referer = req.headers['referer'] || '';
   if (!origin && !referer) return !requireHeader;
-  const allowedHosts = [
+  const exactHosts = new Set([
     'localhost',
     '127.0.0.1',
     'conceptualist.uk',
-    'www.conceptualist.uk',
-    '.vercel.app'
-  ];
+    'www.conceptualist.uk'
+  ]);
+  for (const envHost of [
+    process.env.VERCEL_URL,
+    process.env.VERCEL_BRANCH_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ]) {
+    if (envHost) exactHosts.add(String(envHost).trim().toLowerCase());
+  }
   const target = origin || referer;
   try {
     const url = new URL(target);
-    return allowedHosts.some((h) =>
-      h.startsWith('.') ? url.hostname.endsWith(h) : url.hostname === h
-    );
+    const host = url.hostname.toLowerCase();
+    if (exactHosts.has(host)) return true;
+    // Allow only project-scoped Vercel preview deployment hostnames
+    if (/^(search-app|conceptualist)(-[a-z0-9-]+)?\.vercel\.app$/i.test(host)) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }

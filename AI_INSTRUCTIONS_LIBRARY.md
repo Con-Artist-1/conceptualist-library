@@ -6,7 +6,7 @@ Welcome! If you are an AI assistant tasked with working on the curated document 
 
 ## 1. Directory Structure
 
-The library is an independent study archive indexing **100% Pearson Edexcel** exam resources containing **19,938 archived files** (**16,077 deduplicated unique documents**) across **19 IAL subjects** and **43 IGCSE subjects** covering **January 2003 – June 2026**.
+The library is an independent study archive indexing **100% Pearson Edexcel** exam resources containing **19,842 archived files** (**15,981 deduplicated unique documents**) across **19 IAL subjects** and **43 IGCSE subjects** covering **January 2003 – June 2026**.
 
 **Main Root Folders:**
 1. **`Past Papers\IAL`**: Contains Edexcel International A-Level (IAL) and legacy GCE Maths papers across 19 subjects (strictly excludes UK GCE non-Math specs and pre-launch years).
@@ -40,7 +40,7 @@ The front-end application (React 19 + Vite 8 + Vercel Web Analytics & Speed Insi
 - `public/meta.json`: High-speed compact metadata & wizard catalog for `0ms` initial UI hydration.
 - `dist/shards/*.json`: **65 compact route shards** loaded in parallel with `meta.json` on cold landing pages (up to 96% smaller than full index payloads).
 - `public/index.json`: Tuple-encoded (`keys` + `files`) deduplicated global catalog loaded on demand / background upgrade, with Hugging Face `live_index.json` fallback.
-- `public/audio-subtitles.json`: Pre-generated Tier 1 subtitle index (`28` cached keys covering `9/272` `AUD` resources: 10 French Transcript PDFs `2019–2021` + all 4 tracks of `French WFR02 Jan 2026`), incrementally preserved and merged from `.data/audio_subtitles.json` whenever `generate-index.js` runs. Remaining un-indexed ESL, Chinese, Swahili, French, German, and Spanish audio packs use Tier 2 MongoDB (`audio_subtitles`) caching and Tier 3 on-demand browser generation (`inferWhisperLanguage`).
+- `public/audio-subtitles.json`: Pre-generated Tier 1 subtitle index (`32` cached keys covering `11/272` `AUD` resources: 10 French Transcript PDFs `2019–2021`, IGCSE ESL June 2018 P2/P2R Transcript PDFs, + all 4 tracks of `French WFR02 Jan 2026`), incrementally preserved and merged from `.data/audio_subtitles.json` whenever `generate-index.js` runs. Remaining un-indexed ESL, Chinese, Swahili, French, German, and Spanish audio packs use Tier 2 MongoDB (`audio_subtitles`) caching and Tier 3 on-demand browser generation (`inferWhisperLanguage`).
 
 **Core Production Scripts (`search-app/scripts/`):**
 The scripts directory contains strictly **8 essential utilities**. Keep all temporary/verification scripts outside the repo (e.g. in AppData scratch directories).
@@ -144,7 +144,7 @@ Core Conceptualist Systems contributors listed on `/about`:
 
 1. **Do not break folder structures.** Stick to `Past Papers\IAL`, `Past Papers\IGCSE`, `IAL Books`, and `IGCSE Books`.
 2. **Independent Archive & Non-Affiliation Copy.** NEVER claim the site, papers, or books are "Official Pearson" or "Official Edexcel" in UI headings, badges, SEO titles/descriptions, JSON-LD, or docs. Keep the **Not affiliated with Pearson or Edexcel** disclaimer intact on Home, Footer, and `/about`.
-3. **Clean file names & Large-PDF `/ObjStm` prep.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing. For new `>= 5 MB` non-linearized PDFs lacking `/ObjStm` (such as ReportLab books), repack compressed object streams (`pikepdf` `ObjectStreamMode.generate`, verifying page count and keeping any pre-existing corrupt source files like `Past Papers\IGCSE\Biology\2023 May\Examiner-report\IGCSE_BIOLOGY_2023_MayJune_P1_ER.pdf` untouched) before `generate-index.js`, `sync-hf.js`, and `upload-live-index-hf.js`.
+3. **Clean file names & Large-PDF `/ObjStm` prep.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing. All 19,406 `.pdf` files in the archive are verified valid PDFs (`%PDF-` header + `%%EOF` trailer), and all 394 `>= 5 MB` PDFs are linearized (`/Linearized` + `/ObjStm`). For new `>= 5 MB` PDFs, linearize with `qpdf --linearize --object-streams=generate` before `generate-index.js`, `sync-hf.js`, and `upload-live-index-hf.js`.
 4. **Strict script hygiene.** Keep no scripts at repo root and strictly retain only the 8 core scripts in `search-app/scripts/` (`build.js`, `deploy-vercel.js`, `generate-index.js`, `prerender-seo.js`, `push-github.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`). Store temporary/verification scripts outside the repo (AppData scratch folder).
 5. **Use Forward Slashes (`/`) in JSON.** Windows backslashes break static builds and Hugging Face URL resolution.
 6. **Node Invocations:** Invoke Node scripts on Windows via Antigravity IDE's Electron runtime, piping `cmd /c "... 2>&1" | Write-Output` from PowerShell so GUI-subsystem stdout/stderr is captured cleanly:
@@ -152,10 +152,10 @@ Core Conceptualist Systems contributors listed on `/about`:
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, `/papers` Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.9` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v6.9.5` for current release) and keep `CHANGELOG_HISTORY` in `search-app/src/App.jsx` human, brief, and concise with accurate timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
    - **Deploy & IndexNow:** Always run `scripts/deploy-vercel.js`, wait for `=== Production Deployment READY! ===` + `[IndexNow] Submitted ... canonical URLs`, and verify live deployment on `https://www.conceptualist.uk`.
 
-Enjoy working with this independent 19,938-file (16,077-unique-record) Edexcel study archive!
+Enjoy working with this independent 19,842-file (15,981-unique-record) Edexcel study archive!

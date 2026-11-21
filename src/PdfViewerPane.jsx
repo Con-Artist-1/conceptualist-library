@@ -193,8 +193,12 @@ const SPREAD_RESIZER_WIDTH = 8;
 const SPREAD_MIN_PCT = 22;
 const SPREAD_MAX_PCT = 78;
 
-function getSpreadStartPage(pageNum) {
+function getSpreadStartPage(pageNum, coverOffset = false) {
   const p = Math.max(1, Number(pageNum) || 1);
+  if (coverOffset) {
+    if (p === 1) return 1;
+    return p % 2 === 0 ? p : p - 1;
+  }
   return p % 2 === 1 ? p : p - 1;
 }
 
@@ -522,6 +526,7 @@ export const PdfViewerPane = ({
   ));
   const [visiblePages, setVisiblePages] = useState(new Set([1, 2]));
   const [twoPageMode, setTwoPageMode] = useState(() => Boolean(allowTwoPage && defaultTwoPage));
+  const [coverSpreadOffset, setCoverSpreadOffset] = useState(false);
   const [spreadSplitRatio, setSpreadSplitRatio] = useState(50);
   const [isDraggingSpread, setIsDraggingSpread] = useState(false);
 
@@ -571,6 +576,7 @@ export const PdfViewerPane = ({
   const defaultTwoPageRef = useRef(defaultTwoPage);
   const twoPageModeRef = useRef(Boolean(allowTwoPage && twoPageMode));
   const isTwoPageActiveRef = useRef(isTwoPageActive);
+  const coverSpreadOffsetRef = useRef(coverSpreadOffset);
   const spreadRatioRef = useRef(spreadSplitRatio);
 
   useEffect(() => {
@@ -592,6 +598,10 @@ export const PdfViewerPane = ({
   }, [allowTwoPage, twoPageMode, isTwoPageActive]);
 
   useEffect(() => {
+    coverSpreadOffsetRef.current = coverSpreadOffset;
+  }, [coverSpreadOffset]);
+
+  useEffect(() => {
     spreadRatioRef.current = spreadSplitRatio;
   }, [spreadSplitRatio]);
 
@@ -599,6 +609,8 @@ export const PdfViewerPane = ({
   useEffect(() => {
     userToggledTwoPageRef.current = false;
     setTwoPageMode(Boolean(allowTwoPageRef.current && defaultTwoPageRef.current));
+    setCoverSpreadOffset(false);
+    coverSpreadOffsetRef.current = false;
     setSpreadSplitRatio(50);
     spreadRatioRef.current = 50;
   }, [url, pdfData]);
@@ -988,7 +1000,7 @@ export const PdfViewerPane = ({
         const requestedStart = Number(initialPageRef.current) || 1;
         const rawStartPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
         const willBeTwoPage = Boolean(twoPageModeRef.current && doc.numPages > 1);
-        const startPage = willBeTwoPage ? getSpreadStartPage(rawStartPage) : rawStartPage;
+        const startPage = willBeTwoPage ? getSpreadStartPage(rawStartPage, coverSpreadOffsetRef.current) : rawStartPage;
         const initialWindow = new Set([startPage]);
         if (willBeTwoPage && startPage + 1 <= doc.numPages) {
           initialWindow.add(startPage + 1);
@@ -1116,7 +1128,7 @@ export const PdfViewerPane = ({
 
         // Edge case: bottom of document
         if (scrollTop + clientHeight >= scrollHeight - 20) {
-          const bottomPage = isTwoPageActive ? getSpreadStartPage(numPages) : numPages;
+          const bottomPage = isTwoPageActive ? getSpreadStartPage(numPages, coverSpreadOffsetRef.current) : numPages;
           if (currentPageRef.current !== bottomPage) {
             currentPageRef.current = bottomPage;
             setCurrentPage(bottomPage);
@@ -1163,7 +1175,7 @@ export const PdfViewerPane = ({
   const scrollToPage = useCallback((pageNum, smooth = true) => {
     const prevPage = currentPageRef.current;
     const rawClamped = Math.max(1, Math.min(pageNum, numPages || 1));
-    const clamped = isTwoPageActiveRef.current ? getSpreadStartPage(rawClamped) : rawClamped;
+    const clamped = isTwoPageActiveRef.current ? getSpreadStartPage(rawClamped, coverSpreadOffsetRef.current) : rawClamped;
     const isFarJump = Math.abs(clamped - prevPage) > (isTwoPageActiveRef.current ? 6 : 4);
     currentPageRef.current = clamped;
     setCurrentPage(clamped);
@@ -1202,9 +1214,23 @@ export const PdfViewerPane = ({
   }, [numPages]);
 
   const handleStepPage = useCallback((direction) => {
-    const step = isTwoPageActiveRef.current ? 2 : 1;
-    const base = isTwoPageActiveRef.current ? getSpreadStartPage(currentPageRef.current) : currentPageRef.current;
-    scrollToPage(base + direction * step);
+    if (!isTwoPageActiveRef.current) {
+      scrollToPage(currentPageRef.current + direction);
+      return;
+    }
+    const useCover = coverSpreadOffsetRef.current;
+    const base = getSpreadStartPage(currentPageRef.current, useCover);
+    if (useCover) {
+      if (base === 1 && direction > 0) {
+        scrollToPage(2);
+        return;
+      }
+      if (base === 2 && direction < 0) {
+        scrollToPage(1);
+        return;
+      }
+    }
+    scrollToPage(base + direction * 2);
   }, [scrollToPage]);
 
   const handleToggleTwoPage = useCallback(() => {
@@ -1213,7 +1239,7 @@ export const PdfViewerPane = ({
     userToggledTwoPageRef.current = true;
     setTwoPageMode((prev) => {
       const next = !prev;
-      const target = next ? getSpreadStartPage(anchorPage) : anchorPage;
+      const target = next ? getSpreadStartPage(anchorPage, coverSpreadOffsetRef.current) : anchorPage;
       pendingLayoutJumpRef.current = target;
       setVisiblePages(() => {
         const seed = new Set([target]);
@@ -1226,7 +1252,26 @@ export const PdfViewerPane = ({
     });
   }, [allowTwoPage, numPages]);
 
-  // Preserve reading position cleanly when toggling between 1-Page and 2-Page layout
+  const handleToggleCoverOffset = useCallback(() => {
+    if (!isTwoPageActive || numPages <= 2) return;
+    const anchorPage = currentPageRef.current || 1;
+    setCoverSpreadOffset((prev) => {
+      const next = !prev;
+      coverSpreadOffsetRef.current = next;
+      const target = getSpreadStartPage(anchorPage, next);
+      pendingLayoutJumpRef.current = target;
+      setVisiblePages(() => {
+        const seed = new Set([target]);
+        if (target + 1 <= numPages) seed.add(target + 1);
+        if (target + 2 <= numPages) seed.add(target + 2);
+        if (target - 1 >= 1) seed.add(target - 1);
+        return seed;
+      });
+      return next;
+    });
+  }, [isTwoPageActive, numPages]);
+
+  // Preserve reading position cleanly when toggling between 1-Page, 2-Page, and Cover Offset layouts
   useEffect(() => {
     const target = pendingLayoutJumpRef.current;
     if (!loading && numPages > 0 && target) {
@@ -1234,7 +1279,7 @@ export const PdfViewerPane = ({
       const raf = requestAnimationFrame(() => scrollToPage(target, false));
       return () => cancelAnimationFrame(raf);
     }
-  }, [isTwoPageActive, loading, numPages, scrollToPage]);
+  }, [isTwoPageActive, coverSpreadOffset, loading, numPages, scrollToPage]);
 
   const handleInputPageCommit = () => {
     const parsed = parseInt(inputPage, 10);
@@ -1350,16 +1395,28 @@ export const PdfViewerPane = ({
   const spreadRows = useMemo(() => {
     if (!isTwoPageActive || numPages <= 0) return [];
     const rows = [];
-    for (let p = 1; p <= numPages; p += 2) {
-      rows.push([p, p + 1 <= numPages ? p + 1 : null]);
+    if (coverSpreadOffset) {
+      rows.push([1, null]);
+      for (let p = 2; p <= numPages; p += 2) {
+        rows.push([p, p + 1 <= numPages ? p + 1 : null]);
+      }
+    } else {
+      for (let p = 1; p <= numPages; p += 2) {
+        rows.push([p, p + 1 <= numPages ? p + 1 : null]);
+      }
     }
     return rows;
-  }, [isTwoPageActive, numPages]);
+  }, [isTwoPageActive, numPages, coverSpreadOffset]);
 
-  const currentSpreadStart = isTwoPageActive ? getSpreadStartPage(currentPage) : currentPage;
-  const currentSpreadPartner = isTwoPageActive && currentSpreadStart + 1 <= numPages ? currentSpreadStart + 1 : null;
+  const currentSpreadStart = isTwoPageActive ? getSpreadStartPage(currentPage, coverSpreadOffset) : currentPage;
+  const currentSpreadPartner =
+    isTwoPageActive && !(coverSpreadOffset && currentSpreadStart === 1) && currentSpreadStart + 1 <= numPages
+      ? currentSpreadStart + 1
+      : null;
   const isAtFirstPage = currentSpreadStart <= 1;
-  const isAtLastPage = isTwoPageActive ? currentSpreadStart + 1 >= numPages : currentPage >= numPages;
+  const isAtLastPage = isTwoPageActive
+    ? (coverSpreadOffset && currentSpreadStart === 1 ? numPages <= 1 : currentSpreadStart + 1 >= numPages)
+    : currentPage >= numPages;
   const isLargePdfDoc = !pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
 
   const markPaneActive = () => {
@@ -1431,27 +1488,45 @@ export const PdfViewerPane = ({
         {/* Zoom & Action Tools */}
         <div className="pdf-pane-tools">
           {allowTwoPage && (
-            <button
-              type="button"
-              className={`pdf-tool-btn pdf-two-page-btn ${isTwoPageActive ? 'active' : ''}`}
-              disabled={loading || numPages <= 1}
-              onClick={handleToggleTwoPage}
-              aria-pressed={isTwoPageActive}
-              title={
-                numPages <= 1 && !loading
-                  ? 'Two-page view requires at least 2 pages'
-                  : isTwoPageActive
-                    ? 'Switch to Single Page View (currently 2-Page Side-by-Side)'
-                    : 'Switch to 2-Page Side-by-Side View (with resizable divider)'
-              }
-              aria-label={isTwoPageActive ? 'Switch to Single Page View' : 'Switch to Two-Page View'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="2" y="4" width="8.5" height="16" rx="1.5" />
-                <rect x="13.5" y="4" width="8.5" height="16" rx="1.5" />
-              </svg>
-              <span className="pdf-two-page-label">2-Page</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className={`pdf-tool-btn pdf-two-page-btn ${isTwoPageActive ? 'active' : ''}`}
+                disabled={loading || numPages <= 1}
+                onClick={handleToggleTwoPage}
+                aria-pressed={isTwoPageActive}
+                title={
+                  numPages <= 1 && !loading
+                    ? 'Two-page view requires at least 2 pages'
+                    : isTwoPageActive
+                      ? 'Switch to Single Page View (currently 2-Page Side-by-Side)'
+                      : 'Switch to 2-Page Side-by-Side View (with resizable divider)'
+                }
+                aria-label={isTwoPageActive ? 'Switch to Single Page View' : 'Switch to Two-Page View'}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="2" y="4" width="8.5" height="16" rx="1.5" />
+                  <rect x="13.5" y="4" width="8.5" height="16" rx="1.5" />
+                </svg>
+                <span className="pdf-two-page-label">2-Page</span>
+              </button>
+              {isTwoPageActive && numPages > 2 && (
+                <button
+                  type="button"
+                  className={`pdf-tool-btn pdf-cover-offset-btn ${coverSpreadOffset ? 'active' : ''}`}
+                  onClick={handleToggleCoverOffset}
+                  aria-pressed={coverSpreadOffset}
+                  title={
+                    coverSpreadOffset
+                      ? 'Cover page solo active (Page 1 solo, then 2–3, 4–5). Click for standard 1–2, 3–4 pairing.'
+                      : 'Offset Page 1 as solo Cover (pairs 2–3, 4–5 for book spreads)'
+                  }
+                  aria-label="Toggle solo cover page pairing"
+                >
+                  <span>Cover</span>
+                </button>
+              )}
+            </>
           )}
 
           <button
@@ -1626,7 +1701,7 @@ export const PdfViewerPane = ({
                         fluidWidthFraction={spreadLayout.rightWidthFraction}
                         isVisible={
                           visiblePages.has(rightPage) &&
-                          (firstPagePainted || getSpreadStartPage(rightPage) === currentSpreadStart)
+                          (firstPagePainted || getSpreadStartPage(rightPage, coverSpreadOffset) === currentSpreadStart)
                         }
                         isNear={firstPagePainted && Math.abs(rightPage - currentSpreadStart) <= 4}
                         isMobile={isMobile}

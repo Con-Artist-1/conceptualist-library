@@ -78,15 +78,26 @@ function useIsMobile(breakpointPx = 768) {
 
 const PAGE_SIZE = 80;
 const BUILD_TIMESTAMP = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-13T00:00:00.000Z';
-const APP_VERSION = 'v6.9.4';
+const APP_VERSION = 'v6.9.5';
 const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 
 const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.4',
+    version: 'v6.9.5',
     date: BUILD_TIMESTAMP,
+    title: 'SEO & AI-Visibility Overhaul, Archive PDF Integrity, Cover-Page Spread Toggle & Mobile Reader Polish',
+    summary: 'Upgraded static prerendering for AI/Search engines with Book & FAQPage JSON-LD and /llms.txt, cleaned and repaired defective archive PDFs, added a solo Cover-page spread toggle and 1-click study link sharing, and refined mobile 2-Page PDF toolbars.',
+    changes: [
+      'Search & AI-Engine (GEO) Prerendering: Rendered full semantic HTML directly inside #root with Answer-Engine Q&A blocks, Book + ItemList + FAQPage Schema.org JSON-LD (with verified ISBNs, authors & publishers), /llms.txt catalog index, current-first IAL unit code ordering, and lateral sibling-unit cross-linking across all unit pages.',
+      'Archive PDF Integrity & Audio Subtitles: Repaired trailing-HTML IAL Biology papers, removed unrecoverable HTML error shells from the PDF catalog, synced canonical IAL French 2019–2021 audio subtitle keys, and seeded 205 timed transcript segments for IGCSE ESL June 2018 listening tracks.',
+      'Reader & Mobile Polish: Added a 1-click "Share" button in the PDF reader header, an optional "Cover" pairing toggle in 2-Page mode (1 solo, 2–3, 4–5), compact 390px mobile 2-Page toolbar sizing with active maroon state across Light/Dark/OLED, and tightened API origin/subtitle write guards.'
+    ]
+  },
+  {
+    version: 'v6.9.4',
+    date: '2026-11-20T01:40:00+06:00',
     title: 'Resizable Two-Page Side-by-Side PDF Reader Mode',
     summary: 'Added a side-by-side Two-Page spread reader with a draggable split-screen style resizer for textbooks and all standalone PDFs (QP, MS, ER, Worked Solutions).',
     changes: [
@@ -165,7 +176,7 @@ const CHANGELOG_HISTORY = [
     summary: 'Grew the archive to 19,938 total files (16,077 unique records) across 19 IAL and 43 IGCSE subjects, adding 16 new IGCSE courses, Oct 2025 & May/June 2026 Modular Maths A, and expanded listening audio.',
     changes: [
       '16 new IGCSE subjects & Bengali merge: Added Art & Design, Bangladesh Studies, Chinese, Greek (First Language), Modern Greek, Gujarati, Hindi, Islamiyat, Pakistan Studies, Sciences (Double & Single Award with Linear 1B/1C/1P & Modular Unit 1B–6P), Sinhala, Swahili, Tamil, Turkish, and Urdu, plus 2011–2019 legacy Bengali merged into Bangla.',
-      '2025–2026 Modular & gap fill: Added October 2025 and May/June 2026 Modular Mathematics A (4WM1H/4WM2H), filled missing 2014–2024 IAL Economics/Science/Law/History/IT gaps, recovered extra-time ESL/Chinese/Swahili/MFL listening tracks, and expanded audio to 273 tracks and archives with Chinese & Swahili Whisper support.',
+      '2025–2026 Modular & gap fill: Added October 2025 and May/June 2026 Modular Mathematics A (4WM1H/4WM2H), filled missing 2014–2024 IAL Economics/Science/Law/History/IT gaps, recovered extra-time ESL/Chinese/Swahili/MFL listening tracks, and expanded audio to 272 tracks and archives with Chinese & Swahili Whisper support.',
       'Search & streaming refinements: Disambiguated IGCSE paper variants (F/H Tiers, Double/Single Science B/C/P disciplines), guarded IGCSE doc IDs from colliding with IAL W-codes, expanded Data Files to 46 archives, and packed new >= 5 MB PDFs with compact /ObjStm object streams.'
     ]
   },
@@ -182,7 +193,7 @@ const CHANGELOG_HISTORY = [
   },
   {
     version: 'v6.4',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-16T17:15:00.000Z',
     title: 'In-Browser Worked Solutions Reader',
     summary: 'Made all 14 IAL Maths Worked Solution Banks (P1–P4, M1–M3, S1–S3, D1, FP1–FP3) viewable chapter-by-chapter right inside WebPDF without downloading full archives.',
     changes: [
@@ -1642,6 +1653,29 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
   const [whisperApprovedIdentity, setWhisperApprovedIdentity] = useState('');
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
   const [whisperRetryCount, setWhisperRetryCount] = useState(0);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const copyTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
+
+  const handleCopyShareLink = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const shareUrl = window.location.href;
+    const triggerCopied = () => {
+      setCopiedLink(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedLink(false), 1800);
+    };
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(shareUrl).then(triggerCopied).catch(() => {
+        triggerCopied();
+      });
+    } else {
+      triggerCopied();
+    }
+  }, []);
 
   const activeAudioContext = useMemo(() => {
     if (!file) return null;
@@ -1657,6 +1691,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
           mode: 'card',
           audioUrl: activeZipTrack.blobUrl,
           audioPath: currentDoc.path || '',
+          altPaths: currentDoc.altPaths || file.altPaths || [],
           sittingKey,
           trackIndex: zipTracks.length > 1 ? safeTrackIdx : 0,
           isMultiTrack: zipTracks.length > 1,
@@ -1672,6 +1707,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
           mode: 'card',
           audioUrl: getHfUrl(currentDoc.path),
           audioPath: currentDoc.path || '',
+          altPaths: currentDoc.altPaths || file.altPaths || [],
           sittingKey,
           trackIndex: null,
           isMultiTrack: false,
@@ -1686,10 +1722,12 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
 
     if (audioDockOpen && canDockAudio && audSib) {
       if (!useFullSingleAudio && activeZipTrack?.blobUrl) {
+        const zipTarget = audZipSib || audSib;
         return {
           mode: 'dock',
           audioUrl: activeZipTrack.blobUrl,
-          audioPath: (audZipSib || audSib).path || '',
+          audioPath: zipTarget.path || '',
+          altPaths: zipTarget.altPaths || audSib.altPaths || file.altPaths || [],
           sittingKey,
           trackIndex: zipTracks.length > 1 ? safeTrackIdx : 0,
           isMultiTrack: zipTracks.length > 1,
@@ -1706,6 +1744,7 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
           mode: 'dock',
           audioUrl: getHfUrl(singleTarget.path),
           audioPath: singleTarget.path || '',
+          altPaths: singleTarget.altPaths || audSib.altPaths || file.altPaths || [],
           sittingKey,
           trackIndex: null,
           isMultiTrack: false,
@@ -2280,6 +2319,27 @@ const PreviewModal = ({ file, initialView = '', viewsCount = 0, showViews = fals
               >
                 <span className="btn-desktop-text">Hide Header</span>
                 <span className="btn-mobile-text" aria-hidden="true">Hide</span>
+              </button>
+
+              {/* Share / Copy Study Link Button */}
+              <button
+                type="button"
+                className={`modal-btn modal-share-btn ${copiedLink ? 'copied' : ''}`}
+                onClick={handleCopyShareLink}
+                title="Copy direct study link to this paper view"
+                aria-label={copiedLink ? 'Study link copied to clipboard' : 'Copy direct study link'}
+              >
+                {copiedLink ? (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                )}
+                <span>{copiedLink ? 'Copied!' : 'Share'}</span>
               </button>
 
               {/* Download PDF or full archive directly */}
@@ -3390,14 +3450,14 @@ const WelcomePage = ({
       <div className={`welcome-hero ${selectedSubject ? 'mobile-hidden' : ''}`}>
         <div className="welcome-hero-top">
           <div>
-            <h1>Past Exam Papers &amp; Course Resources</h1>
+            <h1>Edexcel IAL &amp; IGCSE Past Exam Papers &amp; Textbooks</h1>
             <p>
               Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
             </p>
           </div>
           <div className="hero-stats-row">
             <div className="hero-stat-pill">
-              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 16077).toLocaleString()}</strong>
+              <strong>{(data.meta?.uniqueFiles || data.meta?.totalFiles || 15981).toLocaleString()}</strong>
               <span>{data.meta?.uniqueFiles ? 'Unique Papers' : 'Total Files'}</span>
             </div>
             <div className="hero-stat-pill">
@@ -3882,8 +3942,8 @@ async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
-  totalFiles: 19940,
-  uniqueFiles: 16079,
+  totalFiles: 19842,
+  uniqueFiles: 15981,
   subjects: DEFAULT_ALL_SUBJECTS,
   ialSubjects: IAL_SUBJECTS_DEFAULT,
   igcseSubjects: IGCSE_SUBJECTS_DEFAULT,
