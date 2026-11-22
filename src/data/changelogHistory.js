@@ -2,8 +2,19 @@ import { BUILD_TIMESTAMP } from '../lib/appMeta.js';
 
 export const CHANGELOG_HISTORY = [
   {
-    version: 'v6.9.9',
+    version: 'v7.0',
     date: BUILD_TIMESTAMP,
+    title: 'Modular Architecture, Lazy Audio/Solution Chunks & Semantic Theme Variables',
+    summary: 'Decomposed oversized monolith modules and stylesheets into cohesive, cacheable ES modules and semantic CSS theme tokens while lazy-splitting audio/ZIP readers out of standard PDF viewing.',
+    changes: [
+      'Modular UI & Hook Decomposition: Extracted Header, Footer, Breadcrumbs, SearchBanner, FilterDrawer (lazy), PaperTable/PaperRow, ArchiveContextStrip, CrashRecoveryScreen, NotFoundCard (lazy), ThemeToggleButton, ResourceCard, VirtualPdfPage, and useTheme into dedicated modules alongside shared lib/ utilities (paperKeys, networkUtils, pdfRangeTransport, pdfLayoutMath).',
+      'Lazy Reader Subsystems & Worker Deduplication: Split AudioPlayerDock (ZIP/subtitle stack) and SolutionBankView (chapter/exercise ZIP PDF extractor) into on-demand async chunks so standard Past Paper PDFs never fetch audio or ZIP modules, and moved static search dictionaries and curriculum maps into src/data/ cleanly shared across main thread, Web Worker, and SSR prerendering.',
+      'Semantic CSS Theme Variables & Build Version Sync: Consolidated all Light, Dark, and Pure OLED overrides across index.css, secondary.css, and modal.css into CSS custom properties (~1,940 duplicated CSS lines removed with zero visual drift) and synced index.html <head> cache keys directly from appMeta.js via Vite transformIndexHtml.'
+    ]
+  },
+  {
+    version: 'v6.9.9',
+    date: '2026-11-22T14:20:00+06:00',
     title: 'Web Worker Search & Indexing, Modular Code/CSS Splitting & Zero-Waterfall Cold Boot',
     summary: 'Broke up the monolithic app bundle and stylesheet into lazy-loaded chunks, moved full 16,021-record catalog hydration and smart search onto a dedicated Web Worker, eliminated the startup fetch waterfall, and added zero-waste click-down PDF pre-warming.',
     changes: [

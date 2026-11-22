@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getCleanUnitLabel } from '../unitParser.js';
+import { SUBJECTS_WITH_BOOKS_MAP } from '../data/curriculumCatalog.js';
+import {
+  getPaperViewKey,
+  isQuestionPaperEligibleForViews,
+  getPaperTotalViews
+} from './paperKeys.js';
+
+export { SUBJECTS_WITH_BOOKS_MAP as SUBJECTS_WITH_BOOKS };
+export { getPaperViewKey, isQuestionPaperEligibleForViews, getPaperTotalViews };
 
 export const normalizePaperTelemetryMode = (activeView, canSplit, fallbackDocType) => {
   if (activeView === 'split' && canSplit) return 'split';
@@ -47,11 +56,6 @@ export const DOC_TYPE_INFO = {
   AUD: { label: 'Audio', fullLabel: 'Listening Audio', cls: 'aud' },
   SC: { label: 'Source', fullLabel: 'Source / Transcript', cls: 'sc' },
   SAM: { label: 'SAM', fullLabel: 'Specimen / Syllabus', cls: 'sam' }
-};
-
-export const SUBJECTS_WITH_BOOKS = {
-  'Edexcel IAL': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Information Technology', 'Math', 'Physics', 'Psychology']),
-  'Edexcel IGCSE': new Set(['Accounting', 'Biology', 'Business', 'Chemistry', 'Commerce', 'Economics', 'Further Pure Mathematics', 'Human Biology', 'Information Technology', 'Mathematics A', 'Physics'])
 };
 
 export const IAL_AUDIO_SUBJECTS = new Set(['French', 'German', 'Spanish']);
@@ -370,32 +374,6 @@ export function canCountPaperViewNow(paperKey, { isPageReload = false } = {}) {
     // Ignore storage quota errors
   }
   return true;
-}
-
-// Canonical key so Unified Sitting, Individual QP, Modal, and History Card share the exact same view counter
-export function getPaperViewKey(file) {
-  if (!file) return '';
-  if (file.id && String(file.id).includes('|')) return file.id;
-  if (file.spec && file.subject && file.unitCode && file.session) {
-    return `${file.spec}|${file.subject}|${file.unitCode}|${file.variant || ''}|${file.session}`;
-  }
-  const qpPath = file.docs?.QP?.path || file.siblings?.QP?.path || file.path || file.name || '';
-  return qpPath;
-}
-
-export function isQuestionPaperEligibleForViews(file) {
-  if (!file) return false;
-  if (file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books' || file.docType === 'Book') return true;
-  if (file.isUnifiedSitting) return Boolean(file.docs?.QP || file.docType === 'QP' || file.isPendingSkeleton);
-  return file.docType === 'QP' || Boolean(file.docs?.QP);
-}
-
-export function getPaperTotalViews(file, viewsMap) {
-  if (!file) return 0;
-  const key = getPaperViewKey(file);
-  if (!key || !viewsMap) return 0;
-  const count = Number(viewsMap[key]);
-  return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
 // Build a 0ms placeholder object from #paper= / ?paper= URL parameter while index.json resolves in the background

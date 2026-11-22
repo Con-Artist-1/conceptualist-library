@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useDeferredValue, useRef, lazy, Suspense } from 'react';
-import { flushSync } from 'react-dom';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef, lazy, Suspense } from 'react';
 import './index.css';
 import {
   buildRoutePath,
@@ -22,24 +21,16 @@ import {
   BUILD_TIMESTAMP,
   META_CACHE_KEY,
   DAILY_CACHE_TTL_MS,
-  formatUpdateTimestamp,
-  forcePurgeCacheAndReload,
   softReloadKeepingUrl
 } from './lib/appMeta.js';
+import { resilientFetch, buildIndexCacheUrl } from './lib/networkUtils.js';
 import {
-  shouldHandleClientNavigation,
   useIsMobile,
-  DOC_TYPE_INFO,
   SUBJECTS_WITH_BOOKS,
   IAL_AUDIO_SUBJECTS,
   IGCSE_AUDIO_SUBJECTS,
   hasDataFilesForCourse,
-  getScDocumentLabel,
-  getDocTypeBadge,
-  formatBytes,
   formatSubjectDisplay,
-  getShortUnitDisplay,
-  getDisplayTitle,
   getUnifiedSittingTitle,
   HISTORY_STORAGE_KEY,
   ACTIVE_MODAL_PAPER_SESSION_KEY,
@@ -59,14 +50,21 @@ import {
   getInitialRecentHistory
 } from './lib/libraryHelpers.js';
 import { getCatalogClient } from './lib/catalogClient.js';
-import { preloadReaderChunksOnce, prewarmPaperOnPointerDown } from './lib/pdfPrewarm.js';
-import { PaperViewsCounter } from './components/PaperViewsCounter.jsx';
-import { PdfPaneSkeleton, TableSkeletonLoader } from './components/Skeletons.jsx';
+import { preloadReaderChunksOnce } from './lib/pdfPrewarm.js';
+import { useTheme } from './hooks/useTheme.js';
+import { AppErrorBoundary, CrashRecoveryScreen } from './components/CrashRecoveryScreen.jsx';
+import { Header } from './components/Header.jsx';
+import { SearchBanner } from './components/SearchBanner.jsx';
+import { PaperTable } from './components/PaperTable.jsx';
+import { ArchiveContextStrip } from './components/ArchiveContextStrip.jsx';
+import { Footer } from './components/Footer.jsx';
+import { PdfPaneSkeleton } from './components/Skeletons.jsx';
 import WelcomePage from './components/WelcomePage.jsx';
 
 const PreviewModal = lazy(() => import('./components/PreviewModal.jsx'));
 const AboutPage = lazy(() => import('./components/AboutPage.jsx'));
 const ChangelogPage = lazy(() => import('./components/ChangelogPage.jsx'));
+const NotFoundCard = lazy(() => import('./components/NotFoundCard.jsx'));
 
 const PAGE_SIZE = 50;
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
@@ -93,25 +91,6 @@ const EMPTY_SEARCH_META = {
   didYouMean: ''
 };
 
-async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
-  let lastErr = null;
-  for (const url of urls) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timer);
-      if (res.ok) return res;
-      lastErr = new Error(`HTTP ${res.status} for ${url}`);
-    } catch (err) {
-      clearTimeout(timer);
-      lastErr = err;
-      console.warn(`Fetch candidate failed (${url}):`, err.message);
-    }
-  }
-  throw lastErr || new Error('All fetch candidates failed');
-}
-
 function getInitialCachedMeta() {
   try {
     const raw = localStorage.getItem(META_CACHE_KEY);
@@ -129,136 +108,6 @@ function getInitialCachedMeta() {
     // Ignore storage errors
   }
   return null;
-}
-
-// ─── Institutional Crash / Stale Cache Recovery Screen ───────────
-const CrashRecoveryScreen = ({ errorMsg }) => {
-  useEffect(() => {
-    const isChunkError = /dynamically imported module|Loading chunk|Failed to fetch|preload/i.test(errorMsg || '');
-    if (!isChunkError) return;
-    try {
-      if (!sessionStorage.getItem('cs_auto_healed')) {
-        sessionStorage.setItem('cs_auto_healed', '1');
-        forcePurgeCacheAndReload();
-      }
-    } catch {
-      // Ignore storage access errors
-    }
-  }, [errorMsg]);
-
-  return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: 'var(--bg-page, #F2F1ED)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px',
-      fontFamily: 'Roboto, Inter, sans-serif'
-    }}>
-      <div style={{
-        backgroundColor: 'var(--bg-surface, #FFFFFF)',
-        border: '1px solid var(--border-medium, #C8C4BC)',
-        borderTop: '4px solid var(--mcmaster-maroon, #6F1D2B)',
-        borderRadius: '3px',
-        maxWidth: '540px',
-        width: '100%',
-        padding: '32px',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
-      }}>
-        <div style={{
-          fontSize: '11px',
-          fontWeight: 800,
-          textTransform: 'uppercase',
-          letterSpacing: '0.6px',
-          color: 'var(--text-link, #6F1D2B)',
-          marginBottom: '6px'
-        }}>
-          Conceptualist Systems — Repository Recovery
-        </div>
-        <h1 style={{
-          fontSize: '20px',
-          fontWeight: 800,
-          color: 'var(--text-primary, #1A1D20)',
-          marginBottom: '10px'
-        }}>
-          Outdated Browser Cache Detected
-        </h1>
-        <p style={{
-          fontSize: '14px',
-          color: 'var(--text-secondary, #2E343B)',
-          lineHeight: 1.55,
-          marginBottom: '20px'
-        }}>
-          Your browser attempted to load an older cached version of the repository index after a recent site update. Click the button below to purge stale cache data and load the latest catalog.
-        </p>
-        {errorMsg && (
-          <div style={{
-            fontSize: '11.5px',
-            fontFamily: 'Roboto Mono, monospace',
-            backgroundColor: 'var(--bg-subtle, #F2F1ED)',
-            border: '1px solid var(--border-light, #E2DFD9)',
-            padding: '8px 12px',
-            color: 'var(--text-muted, #525860)',
-            marginBottom: '20px',
-            wordBreak: 'break-word'
-          }}>
-            Diagnostic: {errorMsg}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={forcePurgeCacheAndReload}
-            style={{
-              backgroundColor: '#6F1D2B',
-              color: '#FFFFFF',
-              border: '1px solid #6F1D2B',
-              borderRadius: '2px',
-              padding: '10px 20px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Clear Cache &amp; Force Reload
-          </button>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            style={{
-              backgroundColor: '#FFFFFF',
-              color: '#1A1D20',
-              border: '1px solid #C8C4BC',
-              borderRadius: '2px',
-              padding: '10px 16px',
-              fontSize: '13.5px',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Standard Refresh
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-class AppErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, errorMsg: '' };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, errorMsg: error?.message || 'Unexpected runtime error' };
-  }
-  render() {
-    if (this.state.hasError) {
-      return <CrashRecoveryScreen errorMsg={this.state.errorMsg} />;
-    }
-    return this.props.children;
-  }
 }
 
 // ─── Main Application ────────────────────────────────────────────
@@ -322,173 +171,7 @@ function App() {
   const [pendingPaperParam, setPendingPaperParam] = useState(initialRoute.paperParam || '');
   const [viewMode, setViewMode] = useState('unified');
 
-  // Theme Management (Default: follows device prefers-color-scheme until explicitly cached; Supports 'light' | 'dark' | 'oled')
-  const readSavedTheme = () => {
-    try {
-      const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|; )cs_theme=([^;]*)/) : null;
-      const cookieTheme = match ? decodeURIComponent(match[1]) : null;
-      if (cookieTheme === 'dark' || cookieTheme === 'light' || cookieTheme === 'oled') return cookieTheme;
-      const localTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('cs_theme') : null;
-      if (localTheme === 'dark' || localTheme === 'light' || localTheme === 'oled') return localTheme;
-    } catch {
-      // Ignore storage errors
-    }
-    return null;
-  };
-
-  const getSystemTheme = () => {
-    try {
-      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-    } catch {
-      // Ignore matchMedia errors
-    }
-    return 'light';
-  };
-
-  const [theme, setTheme] = useState(() => readSavedTheme() || getSystemTheme());
-  const hasExplicitThemeRef = useRef(Boolean(readSavedTheme()));
-
-  const themeSwitchRafRef = useRef(null);
-  const activeThemeTransitionRef = useRef(null);
-  const didMountThemeRef = useRef(false);
-
-  const isPreviewOpen = Boolean(previewFile);
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle('modal-open', isPreviewOpen);
-    return () => root.classList.remove('modal-open');
-  }, [isPreviewOpen]);
-
-  useLayoutEffect(() => {
-    try {
-      const root = document.documentElement;
-      const isThemeChange = didMountThemeRef.current;
-      didMountThemeRef.current = true;
-      const isViewTransitionActive = root.classList.contains('theme-vt');
-
-      if (isThemeChange && !isViewTransitionActive) {
-        root.classList.add('theme-switching');
-      }
-      if (root.getAttribute('data-theme') !== theme) {
-        root.setAttribute('data-theme', theme);
-      }
-      const metaTheme = document.getElementById('meta-theme-color');
-      const metaColor = theme === 'oled' ? '#000000' : (theme === 'dark' ? '#121417' : '#6F1D2B');
-      if (metaTheme && metaTheme.getAttribute('content') !== metaColor) {
-        metaTheme.setAttribute('content', metaColor);
-      }
-
-      if (isThemeChange && !isViewTransitionActive) {
-        if (themeSwitchRafRef.current) {
-          cancelAnimationFrame(themeSwitchRafRef.current);
-        }
-        themeSwitchRafRef.current = requestAnimationFrame(() => {
-          themeSwitchRafRef.current = requestAnimationFrame(() => {
-            root.classList.remove('theme-switching');
-            themeSwitchRafRef.current = null;
-          });
-        });
-      }
-    } catch {
-      // Ignore DOM sync errors
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    return () => {
-      if (themeSwitchRafRef.current) {
-        cancelAnimationFrame(themeSwitchRafRef.current);
-        themeSwitchRafRef.current = null;
-      }
-      if (activeThemeTransitionRef.current) {
-        try {
-          activeThemeTransitionRef.current.skipTransition();
-        } catch {
-          // Ignore stale transition cleanup
-        }
-        activeThemeTransitionRef.current = null;
-      }
-      document.documentElement.classList.remove('theme-vt', 'theme-switching');
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hasExplicitThemeRef.current) return;
-    try {
-      localStorage.setItem('cs_theme', theme);
-      document.cookie = `cs_theme=${theme}; max-age=31536000; path=/; SameSite=Lax`;
-    } catch {
-      // Ignore storage errors
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleSystemThemeChange = (e) => {
-      if (hasExplicitThemeRef.current) return;
-      setTheme(e.matches ? 'dark' : 'light');
-    };
-    if (typeof mql.addEventListener === 'function') {
-      mql.addEventListener('change', handleSystemThemeChange);
-      return () => mql.removeEventListener('change', handleSystemThemeChange);
-    }
-    if (typeof mql.addListener === 'function') {
-      mql.addListener(handleSystemThemeChange);
-      return () => mql.removeListener(handleSystemThemeChange);
-    }
-    return undefined;
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    hasExplicitThemeRef.current = true;
-    const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'oled' : 'light';
-    const root = typeof document !== 'undefined' ? document.documentElement : null;
-    const prefersReduced =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (!root || prefersReduced || typeof document.startViewTransition !== 'function') {
-      setTheme(nextTheme);
-      return;
-    }
-
-    if (activeThemeTransitionRef.current) {
-      try {
-        activeThemeTransitionRef.current.skipTransition();
-      } catch {
-        // Ignore stale transition state
-      }
-      activeThemeTransitionRef.current = null;
-    }
-
-    root.classList.add('theme-vt', 'theme-switching');
-    try {
-      const vt = document.startViewTransition(() => {
-        flushSync(() => {
-          setTheme(nextTheme);
-        });
-        root.setAttribute('data-theme', nextTheme);
-        const metaTheme = document.getElementById('meta-theme-color');
-        const metaColor = nextTheme === 'oled' ? '#000000' : (nextTheme === 'dark' ? '#121417' : '#6F1D2B');
-        if (metaTheme) metaTheme.setAttribute('content', metaColor);
-      });
-      activeThemeTransitionRef.current = vt;
-      vt.finished.finally(() => {
-        if (activeThemeTransitionRef.current === vt) {
-          activeThemeTransitionRef.current = null;
-          root.classList.remove('theme-vt', 'theme-switching');
-        }
-      });
-    } catch {
-      activeThemeTransitionRef.current = null;
-      root.classList.remove('theme-vt', 'theme-switching');
-      setTheme(nextTheme);
-    }
-  }, [theme]);
+  const { theme, toggleTheme } = useTheme({ isPreviewOpen: Boolean(previewFile) });
 
   // Filters initialized directly from URL route
   const [filterCurriculum, setFilterCurriculum] = useState(initialHistoryState ? '' : (initialRoute.filterCurriculum || ''));
@@ -1017,7 +700,7 @@ function App() {
       '/index.json',
       'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index.json'
     ];
-    const INDEX_CACHE_URL = `https://cs-cache.local/index_${APP_VERSION}_${buildQuery}.json`;
+    const INDEX_CACHE_URL = buildIndexCacheUrl(APP_VERSION, BUILD_TIMESTAMP);
 
     // Consume any in-flight early fetch kicked off in <head> before JS finished parsing
     const earlyFetch = typeof window !== 'undefined' ? window.__CS_EARLY_FETCH__ : null;
@@ -1883,6 +1566,150 @@ function App() {
 
   const welcomeDataProp = useMemo(() => ({ meta }), [meta]);
 
+  const handleQuickCurriculum = useCallback((currValue) => {
+    setIsNotFound(false);
+    if (!currValue) {
+      setFilterCurriculum('');
+    } else {
+      setFilterCurriculum((prev) => (prev === currValue ? '' : currValue));
+      setForceShowTable(true);
+    }
+  }, []);
+
+  const handleQuickDocType = useCallback((docTypeValue) => {
+    setIsNotFound(false);
+    if (!docTypeValue) {
+      setFilterDocType(null);
+    } else {
+      setFilterDocType((prev) => (prev === docTypeValue ? null : docTypeValue));
+      setForceShowTable(true);
+    }
+  }, []);
+
+  const handleQuickRouteFilter = useCallback((action) => {
+    setCurrentTab('library');
+    clearFilters({ pushUrl: false });
+    if (action === 'ial') setFilterCurriculum('Edexcel IAL');
+    else if (action === 'igcse') setFilterCurriculum('Edexcel IGCSE');
+    else if (action === 'textbooks') setFilterDocType('Book');
+    else if (action === 'data-files') setFilterDocType('DF');
+    else if (action === 'audio') setFilterDocType('AUD');
+    setForceShowTable(true);
+  }, [clearFilters]);
+
+  const handleOpenTab = useCallback((tab) => {
+    setIsNotFound(false);
+    setCurrentTab(tab);
+  }, []);
+
+  const breadcrumbProps = useMemo(() => ({
+    navigateToHome,
+    filterCurriculum,
+    onClearCurriculum: () => setFilterCurriculum(''),
+    filterSubject,
+    onClearSubject: () => { setFilterSubject(''); setFilterUnit(''); },
+    filterUnit,
+    onClearUnit: () => setFilterUnit(''),
+    filterYear,
+    onClearYear: () => setFilterYear(''),
+    filterSession,
+    onClearSession: () => setFilterSession(''),
+    filterDocType,
+    onClearDocType: () => setFilterDocType(null),
+    breadcrumbParts: selectedPath ? selectedPath.split(/[\\/]/).filter(Boolean) : [],
+    onSelectBreadcrumbPath: (pathSlice) => {
+      setSelectedPath(pathSlice);
+      setForceShowTable(true);
+    },
+    searchQuery,
+    onClearSearch: () => setSearchQuery(''),
+    filesLoading,
+    loadError,
+    catalogTotalCount,
+    totalMatchedCount,
+    visibleFilesCount: visibleFiles.length,
+    viewMode
+  }), [
+    navigateToHome,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterYear,
+    filterSession,
+    filterDocType,
+    selectedPath,
+    searchQuery,
+    filesLoading,
+    loadError,
+    catalogTotalCount,
+    totalMatchedCount,
+    visibleFiles.length,
+    viewMode
+  ]);
+
+  const filterDrawerProps = useMemo(() => ({
+    filterCurriculum,
+    onSelectCurriculum: handleQuickCurriculum,
+    filterDocType,
+    onSelectDocType: handleQuickDocType,
+    filterSubject,
+    availableSubjects: availableSubjectsForFilter,
+    onChangeSubject: (val) => {
+      setIsNotFound(false);
+      setFilterSubject(val);
+      setFilterUnit('');
+      if (val) setForceShowTable(true);
+    },
+    filterUnit,
+    availableUnits: availableUnitsForFilter,
+    onChangeUnit: (val) => {
+      setIsNotFound(false);
+      setFilterUnit(val);
+      setForceShowTable(true);
+    },
+    filterYear,
+    availableYears: availableYearsForFilter,
+    onChangeYear: (val) => {
+      setIsNotFound(false);
+      setFilterYear(val);
+      if (val) setForceShowTable(true);
+    },
+    filterSession,
+    onChangeSession: (val) => {
+      setIsNotFound(false);
+      setFilterSession(val);
+      if (val) setForceShowTable(true);
+    },
+    sortBy,
+    onChangeSort: (val) => {
+      setSortBy(val);
+      setForceShowTable(true);
+    },
+    viewMode,
+    onChangeViewMode: setViewMode,
+    hasActiveFilters,
+    onResetAll: clearFilters,
+    totalMatchedCount,
+    onDoneMobile: () => setShowFilters(false)
+  }), [
+    filterCurriculum,
+    handleQuickCurriculum,
+    filterDocType,
+    handleQuickDocType,
+    filterSubject,
+    availableSubjectsForFilter,
+    filterUnit,
+    availableUnitsForFilter,
+    filterYear,
+    availableYearsForFilter,
+    filterSession,
+    sortBy,
+    viewMode,
+    hasActiveFilters,
+    clearFilters,
+    totalMatchedCount
+  ]);
+
   if (loading) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-primary, #1A1D20)', backgroundColor: 'var(--bg-page, transparent)', fontFamily: 'Roboto, sans-serif' }}>
@@ -1895,636 +1722,58 @@ function App() {
     return <CrashRecoveryScreen errorMsg="Repository metadata missing or stale cache encountered." />;
   }
 
-  const breadcrumbParts = selectedPath ? selectedPath.split(/[\\/]/).filter(Boolean) : [];
-
-  const renderBreadcrumbs = (classNameAdd = '') => (
-    <div className={`breadcrumb-container ${classNameAdd}`}>
-      <div className="breadcrumb-trail">
-        <a href="/" className="breadcrumb-link home" onClick={navigateToHome}>
-          <span className="btn-desktop-text">← Library Home</span>
-          <span className="btn-mobile-text" aria-hidden="true">← Home</span>
-        </a>
-        {filterCurriculum && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => setFilterCurriculum('')} title="Click to remove curriculum filter">
-              {filterCurriculum} ×
-            </button>
-          </>
-        )}
-        {filterSubject && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => { setFilterSubject(''); setFilterUnit(''); }} title="Click to remove subject filter">
-              {formatSubjectDisplay(filterSubject)} ×
-            </button>
-          </>
-        )}
-        {filterUnit && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => setFilterUnit('')} title="Click to remove unit filter">
-              {filterUnit} ×
-            </button>
-          </>
-        )}
-        {filterYear && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => setFilterYear('')} title="Click to remove year filter">
-              {filterYear} ×
-            </button>
-          </>
-        )}
-        {filterSession && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => setFilterSession('')} title="Click to remove session filter">
-              {filterSession} ×
-            </button>
-          </>
-        )}
-        {filterDocType && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => setFilterDocType(null)} title="Click to remove document type filter">
-              {DOC_TYPE_INFO[filterDocType]?.fullLabel || filterDocType} ×
-            </button>
-          </>
-        )}
-        {breadcrumbParts.map((part, i) => (
-          <React.Fragment key={i}>
-            <span className="breadcrumb-separator">/</span>
-            <button
-              type="button"
-              className="breadcrumb-link"
-              onClick={() => {
-                const pathSlice = breadcrumbParts.slice(0, i + 1).join('/');
-                setSelectedPath(pathSlice);
-                setForceShowTable(true);
-              }}
-            >
-              {part}
-            </button>
-          </React.Fragment>
-        ))}
-        {searchQuery && (
-          <>
-            <span className="breadcrumb-separator">/</span>
-            <button type="button" className="breadcrumb-link" onClick={() => setSearchQuery('')} title="Clear search query">
-              Search: &ldquo;{searchQuery}&rdquo; ×
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className="result-summary">
-        {filesLoading ? (
-          <span>Loading full catalog...</span>
-        ) : loadError && catalogTotalCount === 0 ? (
-          <span style={{ color: '#8A2030', fontWeight: 600 }}>Reconnecting to archive...</span>
-        ) : totalMatchedCount > visibleFiles.length ? (
-          <>
-            Showing <strong>{visibleFiles.length}</strong> of <strong>{totalMatchedCount.toLocaleString()}</strong>{' '}
-            {filterDocType === 'Book'
-              ? 'textbooks'
-              : (viewMode === 'unified' ? 'exam sittings' : 'documents')}
-          </>
-        ) : (
-          <>
-            Displaying <strong>{totalMatchedCount.toLocaleString()}</strong> matching{' '}
-            {filterDocType === 'Book'
-              ? (totalMatchedCount === 1 ? 'textbook' : 'textbooks')
-              : viewMode === 'unified'
-                ? (totalMatchedCount === 1 ? 'exam sitting' : 'exam sittings')
-                : (totalMatchedCount === 1 ? 'document' : 'documents')}
-          </>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div className="app-container">
-      {/* Header */}
-      <header className="header-top">
-        <div className={`header-top-row ${!showWelcome && !isNotFound && currentTab === 'library' ? 'mobile-hidden' : ''}`}>
-          <a
-            href="/"
-            className="brand-section"
-            onClick={navigateToHome}
-            aria-label="Conceptualist Systems - Library Home"
-          >
-            <div className="brand-logo-text">
-              Conceptualist <span className="brand-logo-accent">Systems</span>
-            </div>
-            <div className="brand-tagline">
-              <span className="title">EDEXCEL LIBRARY</span>
-              <span>Past Exam Papers & Resources</span>
-            </div>
-          </a>
+      <Header
+        isMobile={isMobile}
+        showWelcome={showWelcome}
+        isNotFound={isNotFound}
+        currentTab={currentTab}
+        navigateToHome={navigateToHome}
+        activeDateText={activeDateText}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onToggleNavTab={() => handleOpenTab(currentTab !== 'library' ? 'library' : 'about')}
+        breadcrumbProps={breadcrumbProps}
+      />
 
-          <div className="header-right-group">
-            <div className="header-coverage-badge">
-              <strong>{activeDateText}</strong>
-            </div>
-            <button
-              type="button"
-              className="header-theme-btn"
-              onClick={toggleTheme}
-              title={
-                theme === 'light'
-                  ? 'Current: Academic Light - Click for Dark Mode'
-                  : theme === 'dark'
-                  ? 'Current: Academic Dark - Click for Pure OLED Mode'
-                  : 'Current: Pure OLED - Click for Light Mode'
-              }
-              aria-label="Toggle Theme"
-            >
-              {theme === 'light' ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span>Light</span>
-                </>
-              ) : theme === 'dark' ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  <span>Dark</span>
-                </>
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9"/><path d="M12 3v18A9 9 0 0 0 12 3z" fill="currentColor"/></svg>
-                  <span>OLED</span>
-                </>
-              )}
-            </button>
-            <a
-              href={currentTab !== 'library' ? '/' : '/about'}
-              className={`header-nav-btn ${currentTab !== 'library' ? 'active' : ''}`}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-                e.preventDefault();
-                setIsNotFound(false);
-                setCurrentTab(currentTab !== 'library' ? 'library' : 'about');
-              }}
-            >
-              {currentTab !== 'library' ? (
-                <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="15 18 9 12 15 6"/></svg>
-                  <span>Library</span>
-                </>
-              ) : (
-                'About'
-              )}
-            </a>
-          </div>
-        </div>
-
-        {/* Integrated Mobile Header Breadcrumb Strip */}
-        {isMobile && currentTab === 'library' && !showWelcome && !isNotFound && (
-          <div className="mobile-header-breadcrumb">
-            {renderBreadcrumbs('mobile-header-breadcrumb-content')}
-            <button
-              type="button"
-              className="mobile-breadcrumb-theme-btn"
-              onClick={toggleTheme}
-              title={
-                theme === 'light'
-                  ? 'Current: Light - Tap for Dark'
-                  : theme === 'dark'
-                  ? 'Current: Dark - Tap for Pure OLED'
-                  : 'Current: OLED - Tap for Light'
-              }
-              aria-label={`Switch color theme (current: ${theme})`}
-            >
-              {theme === 'light' ? (
-                <>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  <span>Light</span>
-                </>
-              ) : theme === 'dark' ? (
-                <>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  <span>Dark</span>
-                </>
-              ) : (
-                <>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18A9 9 0 0 0 12 3z" fill="currentColor"/></svg>
-                  <span>OLED</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </header>
-
-      {/* Main Search & Filter Banner */}
       {currentTab === 'library' && (
-        <div className="search-banner">
-          <div className="search-row">
-            <div className="search-input-wrapper">
-              <label htmlFor="search-input" className="sr-only">
-                Search repository by course code, subject, unit or year
-              </label>
-              <svg className="search-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-              <input
-                ref={searchInputRef}
-                id="search-input"
-                type="text"
-                className="search-input"
-                placeholder={isMobile ? 'Search unit, code, or year...' : 'Search by course code, subject, unit or year (e.g. WMA11, Biology, 4MA1)...'}
-                value={searchQuery}
-                onFocus={() => ensureFullIndexRef.current?.()}
-                onChange={(e) => { setIsNotFound(false); setSearchQuery(e.target.value); }}
-                aria-label="Search by course code, subject, unit or year"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  className="search-clear-btn"
-                  onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
-                  aria-label="Clear search query"
-                >
-                  ✕
-                </button>
-              ) : (
-                <kbd className="search-shortcut-hint" title="Press / to search">/</kbd>
-              )}
-            </div>
-            <div className="search-button-group">
-              <div className="quick-curriculum-pills" role="group" aria-label="Filter by curriculum">
-                <button
-                  type="button"
-                  className={`quick-curr-btn ${filterCurriculum === '' ? 'active' : ''}`}
-                  onClick={() => { setIsNotFound(false); setFilterCurriculum(''); }}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  className={`quick-curr-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
-                  onClick={() => {
-                    setIsNotFound(false);
-                    setFilterCurriculum(filterCurriculum === 'Edexcel IAL' ? '' : 'Edexcel IAL');
-                    setForceShowTable(true);
-                  }}
-                >
-                  IAL
-                </button>
-                <button
-                  type="button"
-                  className={`quick-curr-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
-                  onClick={() => {
-                    setIsNotFound(false);
-                    setFilterCurriculum(filterCurriculum === 'Edexcel IGCSE' ? '' : 'Edexcel IGCSE');
-                    setForceShowTable(true);
-                  }}
-                >
-                  IGCSE
-                </button>
-              </div>
-              <button
-                type="button"
-                className={`filter-drawer-toggle ${showFilters ? 'active' : ''}`}
-                onClick={() => setShowFilters((prev) => !prev)}
-                aria-expanded={showFilters}
-                aria-controls="catalog-filter-drawer"
-                aria-label="Toggle Filters"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                </svg>
-                <span className="filter-toggle-label">Filters</span>
-                {activeDrawerFilterCount > 0 && (
-                  <span className="filter-count-badge">{activeDrawerFilterCount}</span>
-                )}
-              </button>
-              {hasActiveFilters && !showFilters && (
-                <button
-                  type="button"
-                  className="search-reset-inline"
-                  onClick={clearFilters}
-                  title="Clear all active filters and return to Library Home"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Collapsible Filter Controls Drawer */}
-          {showFilters && (
-            <div id="catalog-filter-drawer" className="filter-controls-container">
-              <div className="filter-row">
-                <div className="drawer-curriculum-group">
-                  <span className="filter-group-label">Curriculum:</span>
-                  <div className="filter-pills" role="group" aria-label="Filter by curriculum">
-                    <button
-                      type="button"
-                      className={`filter-btn ${filterCurriculum === '' ? 'active' : ''}`}
-                      onClick={() => { setIsNotFound(false); setFilterCurriculum(''); }}
-                    >
-                      All
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-btn ${filterCurriculum === 'Edexcel IAL' ? 'active' : ''}`}
-                      onClick={() => {
-                        setIsNotFound(false);
-                        setFilterCurriculum(filterCurriculum === 'Edexcel IAL' ? '' : 'Edexcel IAL');
-                        setForceShowTable(true);
-                      }}
-                    >
-                      Edexcel IAL
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-btn ${filterCurriculum === 'Edexcel IGCSE' ? 'active' : ''}`}
-                      onClick={() => {
-                        setIsNotFound(false);
-                        setFilterCurriculum(filterCurriculum === 'Edexcel IGCSE' ? '' : 'Edexcel IGCSE');
-                        setForceShowTable(true);
-                      }}
-                    >
-                      Edexcel IGCSE
-                    </button>
-                  </div>
-                </div>
-
-                <span className="filter-group-label">Type:</span>
-                <div className="filter-pills" role="group" aria-label="Filter by document type">
-                  <button
-                    type="button"
-                    className={`filter-btn ${filterDocType === null ? 'active' : ''}`}
-                    onClick={() => { setIsNotFound(false); setFilterDocType(null); }}
-                  >
-                    All Types
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-btn ${filterDocType === 'QP' ? 'active' : ''}`}
-                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'QP' ? null : 'QP'); setForceShowTable(true); }}
-                  >
-                    Question Papers
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-btn ${filterDocType === 'MS' ? 'active' : ''}`}
-                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'MS' ? null : 'MS'); setForceShowTable(true); }}
-                  >
-                    Mark Schemes
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-btn ${filterDocType === 'ER' ? 'active' : ''}`}
-                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'ER' ? null : 'ER'); setForceShowTable(true); }}
-                  >
-                    Examiner Reports
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-btn ${filterDocType === 'Book' ? 'active' : ''}`}
-                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Book' ? null : 'Book'); setForceShowTable(true); }}
-                  >
-                    Textbooks
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-btn ${filterDocType === 'Extra' ? 'active' : ''}`}
-                    onClick={() => { setIsNotFound(false); setFilterDocType(filterDocType === 'Extra' ? null : 'Extra'); setForceShowTable(true); }}
-                  >
-                    Audio / Data / SAMs
-                  </button>
-                </div>
-              </div>
-
-              <div className="filter-row filter-row-selects">
-                <label htmlFor="subject-select" className="filter-group-label">Subject:</label>
-                <select
-                  id="subject-select"
-                  aria-label="Filter documents by subject"
-                  className="filter-select"
-                  value={filterSubject}
-                  onChange={(e) => {
-                    setIsNotFound(false);
-                    setFilterSubject(e.target.value);
-                    setFilterUnit('');
-                    if (e.target.value) setForceShowTable(true);
-                  }}
-                >
-                  <option value="">All Subjects</option>
-                  {availableSubjectsForFilter.map((s) => (
-                    <option key={s} value={s}>{formatSubjectDisplay(s)}</option>
-                  ))}
-                </select>
-
-                {availableUnitsForFilter.length > 0 && (
-                  <>
-                    <label htmlFor="unit-select" className="filter-group-label">Unit:</label>
-                    <select
-                      id="unit-select"
-                      aria-label="Filter documents by unit or paper"
-                      className="filter-select"
-                      value={filterUnit}
-                      onChange={(e) => {
-                        setIsNotFound(false);
-                        setFilterUnit(e.target.value);
-                        setForceShowTable(true);
-                      }}
-                    >
-                      <option value="">All Units & Papers</option>
-                      {availableUnitsForFilter.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  </>
-                )}
-
-                <label htmlFor="year-select" className="filter-group-label">Year:</label>
-                <select
-                  id="year-select"
-                  aria-label="Filter documents by examination year"
-                  className="filter-select"
-                  value={filterYear}
-                  onChange={(e) => {
-                    setIsNotFound(false);
-                    setFilterYear(e.target.value);
-                    if (e.target.value) setForceShowTable(true);
-                  }}
-                >
-                  <option value="">All Years</option>
-                  {availableYearsForFilter.map((y) => (
-                    <option key={y} value={String(y)}>{y}</option>
-                  ))}
-                </select>
-
-                {filterDocType !== 'Book' && (
-                  <>
-                    <label htmlFor="session-select" className="filter-group-label">Session:</label>
-                    <select
-                      id="session-select"
-                      aria-label="Filter documents by examination session"
-                      className="filter-select"
-                      value={filterSession}
-                      onChange={(e) => {
-                        setIsNotFound(false);
-                        setFilterSession(e.target.value);
-                        if (e.target.value) setForceShowTable(true);
-                      }}
-                    >
-                      <option value="">All Sessions</option>
-                      <option value="January">January</option>
-                      <option value="June">June</option>
-                      <option value="October">October</option>
-                    </select>
-                  </>
-                )}
-
-                <label htmlFor="sort-select" className="filter-group-label">Sort:</label>
-                <select
-                  id="sort-select"
-                  aria-label="Sort documents"
-                  className="filter-select"
-                  value={sortBy}
-                  onChange={(e) => { setSortBy(e.target.value); setForceShowTable(true); }}
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="popular">Most Viewed</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="name_asc">Name (A–Z)</option>
-                  <option value="name_desc">Name (Z–A)</option>
-                  <option value="size_desc">File Size (Largest)</option>
-                </select>
-
-                <span className="filter-group-label">View:</span>
-                <div className="view-mode-toggle" role="group" aria-label="Toggle Unified Sittings vs Individual Files">
-                  <button
-                    type="button"
-                    className={`view-mode-btn ${viewMode === 'unified' ? 'active' : ''}`}
-                    onClick={() => setViewMode('unified')}
-                    title="Combine QP, MS, and ER from the same sitting into one row"
-                  >
-                    Unified Sittings
-                  </button>
-                  <button
-                    type="button"
-                    className={`view-mode-btn ${viewMode === 'separate' ? 'active' : ''}`}
-                    onClick={() => setViewMode('separate')}
-                    title="Show every file as a separate row"
-                  >
-                    Individual Files
-                  </button>
-                </div>
-
-                {hasActiveFilters && (
-                  <button type="button" className="filter-reset-btn" onClick={clearFilters}>
-                    Reset All
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  className="filter-apply-btn mobile-only"
-                  onClick={() => setShowFilters(false)}
-                >
-                  Done &amp; View Results ({totalMatchedCount.toLocaleString()})
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <SearchBanner
+          searchInputRef={searchInputRef}
+          isMobile={isMobile}
+          searchQuery={searchQuery}
+          onSearchChange={(val) => { setIsNotFound(false); setSearchQuery(val); }}
+          onSearchFocus={() => ensureFullIndexRef.current?.()}
+          onClearSearch={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+          filterCurriculum={filterCurriculum}
+          onSelectCurriculum={handleQuickCurriculum}
+          showFilters={showFilters}
+          onToggleFilters={() => setShowFilters((prev) => !prev)}
+          activeDrawerFilterCount={activeDrawerFilterCount}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+          filterDrawerProps={filterDrawerProps}
+        />
       )}
 
-      {/* Main Layout */}
       <div className="main-layout">
         <main className="content-area">
           {currentTab === 'about' ? (
             <Suspense fallback={<div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading About...</div>}>
-              <AboutPage onGoHome={() => { setIsNotFound(false); setCurrentTab('library'); }} />
+              <AboutPage onGoHome={() => handleOpenTab('library')} />
             </Suspense>
           ) : currentTab === 'changelog' ? (
             <Suspense fallback={<div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading Changelog...</div>}>
-              <ChangelogPage onGoHome={() => { setIsNotFound(false); setCurrentTab('library'); }} />
+              <ChangelogPage onGoHome={() => handleOpenTab('library')} />
             </Suspense>
           ) : isNotFound ? (
-            <div className="not-found-card" role="region" aria-label="Page not found">
-              <span className="not-found-badge">404 • Route Not Found</span>
-              <h1>{seoMeta.h1}</h1>
-              <p>{seoMeta.subtitle}</p>
-              <div className="not-found-actions">
-                <a href="/" className="search-button" onClick={navigateToHome}>
-                  Return to Library Home
-                </a>
-                <a
-                  href="/ial"
-                  className="filter-btn"
-                  onClick={(e) => {
-                    if (!shouldHandleClientNavigation(e)) return;
-                    e.preventDefault();
-                    clearFilters({ pushUrl: false });
-                    setFilterCurriculum('Edexcel IAL');
-                    setForceShowTable(true);
-                  }}
-                >
-                  Edexcel IAL
-                </a>
-                <a
-                  href="/igcse"
-                  className="filter-btn"
-                  onClick={(e) => {
-                    if (!shouldHandleClientNavigation(e)) return;
-                    e.preventDefault();
-                    clearFilters({ pushUrl: false });
-                    setFilterCurriculum('Edexcel IGCSE');
-                    setForceShowTable(true);
-                  }}
-                >
-                  Edexcel IGCSE
-                </a>
-                <a
-                  href="/textbooks"
-                  className="filter-btn"
-                  onClick={(e) => {
-                    if (!shouldHandleClientNavigation(e)) return;
-                    e.preventDefault();
-                    clearFilters({ pushUrl: false });
-                    setFilterDocType('Book');
-                    setForceShowTable(true);
-                  }}
-                >
-                  Textbooks
-                </a>
-                <a
-                  href="/data-files"
-                  className="filter-btn"
-                  onClick={(e) => {
-                    if (!shouldHandleClientNavigation(e)) return;
-                    e.preventDefault();
-                    clearFilters({ pushUrl: false });
-                    setFilterDocType('DF');
-                    setForceShowTable(true);
-                  }}
-                >
-                  Data Files
-                </a>
-                <a
-                  href="/audio"
-                  className="filter-btn"
-                  onClick={(e) => {
-                    if (!shouldHandleClientNavigation(e)) return;
-                    e.preventDefault();
-                    clearFilters({ pushUrl: false });
-                    setFilterDocType('AUD');
-                    setForceShowTable(true);
-                  }}
-                >
-                  Audio Archive
-                </a>
-              </div>
-            </div>
+            <Suspense fallback={null}>
+              <NotFoundCard
+                seoMeta={seoMeta}
+                onNavigateHome={navigateToHome}
+                onQuickRoute={handleQuickRouteFilter}
+              />
+            </Suspense>
           ) : showWelcome ? (
             <WelcomePage
               data={welcomeDataProp}
@@ -2543,517 +1792,36 @@ function App() {
               onTrySampleAudio={handleTrySampleAudio}
               onSelectFinalFilter={handleSelectFinalFilter}
             />
-          ) : (() => {
-            const isSearchActive = Boolean(searchQuery && searchQuery.trim());
-            return (
-              <>
-                {isSearchActive ? (
-                  <>
-                    <h1 className="sr-only">{seoMeta.h1}</h1>
-                    {!(filesLoading && visibleFiles.length === 0) && totalMatchedCount > 0 && (!isMobile || searchMeta.didYouMean) && (
-                      <div className="search-results-bar">
-                        {!isMobile && (
-                          <span className="search-results-count">
-                            {totalMatchedCount > visibleFiles.length ? (
-                              <>Showing <strong>{visibleFiles.length}</strong> of <strong>{totalMatchedCount.toLocaleString()}</strong> {viewMode === 'unified' ? 'matching exam sittings' : 'matching documents'}</>
-                            ) : (
-                              <><strong>{totalMatchedCount.toLocaleString()}</strong> {totalMatchedCount === 1 ? (viewMode === 'unified' ? 'matching exam sitting' : 'matching document') : (viewMode === 'unified' ? 'matching exam sittings' : 'matching documents')}</>
-                            )}
-                          </span>
-                        )}
-                        {searchMeta.didYouMean && (
-                          <span className="search-did-you-mean">
-                            Did you mean{' '}
-                            <button
-                              type="button"
-                              className="search-did-you-mean-btn"
-                              onClick={() => setSearchQuery(searchMeta.didYouMean)}
-                            >
-                              {searchMeta.didYouMean}
-                            </button>
-                            ?
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {!(filesLoading && visibleFiles.length === 0) && searchMeta.isPartialFallback && totalMatchedCount > 0 && (
-                      <div className="search-fallback-banner" role="status">
-                        <span>
-                          No exact match for all terms — showing closest partial matches
-                          {searchMeta.missingTerms?.length > 0 && (
-                            <> (missing: <strong>{searchMeta.missingTerms.join(', ')}</strong>)</>
-                          )}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                ) : !isMobile ? (
-                  <div className="archive-context-header">
-                    {renderBreadcrumbs('desktop-breadcrumb')}
-                    <div className="archive-title-block">
-                      <h1 className="archive-page-h1">{seoMeta.h1}</h1>
-                      {seoMeta.subtitle && (
-                        <p className="archive-page-subtitle">{seoMeta.subtitle}</p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="archive-title-header">
-                    <h1 className="archive-page-h1">{seoMeta.h1}</h1>
-                    {seoMeta.subtitle && (
-                      <p className="archive-page-subtitle">{seoMeta.subtitle}</p>
-                    )}
-                  </div>
-                )}
-
-                {filesLoading && visibleFiles.length === 0 ? (
-                  <TableSkeletonLoader rows={8} viewMode={viewMode} />
-                ) : visibleFiles.length > 0 ? (
-                  <div className="file-list">
-                    <table className="file-table">
-                      <thead>
-                        <tr>
-                          <th className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
-                            {filterDocType === 'Book'
-                              ? 'Textbook / Solution Resource'
-                              : viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
-                          </th>
-                          <th className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>
-                            {filterDocType === 'Book' ? 'Course & Category' : viewMode === 'unified' ? 'Series' : 'Course & Session'}
-                          </th>
-                          <th className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
-                            {filterDocType === 'Book'
-                              ? 'Open Textbook / Resource'
-                              : viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleFiles.map((file) => {
-                          const isUnified = Boolean(viewMode === 'unified' && file.isUnifiedSitting);
-                          const activeDoc = isUnified
-                            ? ((filterDocType && file.docs?.[filterDocType]) || file.primaryFile || file)
-                            : file;
-                          const badge = getDocTypeBadge(activeDoc.docType, activeDoc.category);
-                          const displayTitle = isUnified ? getUnifiedSittingTitle(file) : getDisplayTitle(file);
-                          const titleCls = isUnified ? 'title-unified' : (badge ? `title-${badge.cls}` : 'title-default');
-                          const shortUnit = getShortUnitDisplay(file);
-                          const isPdf = activeDoc.ext === 'pdf';
-                          const siblings = file.siblings || null;
-                          const docs = file.docs || {};
-                          const canSplit = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
-                          const defaultViewMode =
-                            filterDocType === 'AUD' && (docs.AUD || activeDoc.docType === 'AUD')
-                              ? 'AUD'
-                              : canSplit
-                              ? 'split'
-                              : (docs.QP ? 'QP' : (activeDoc.docType || 'QP'));
-                          const eligibleForViews = isQuestionPaperEligibleForViews(file);
-                          const paperViews = eligibleForViews
-                            ? getPaperTotalViews(file, viewsMap)
-                            : 0;
-
-                          return (
-                            <tr key={file.id || file.path} className={isUnified ? 'unified-sitting-row' : ''}>
-                              <td className="file-title-cell">
-                                <div className="file-title-top-flex">
-                                  <div style={{ minWidth: 0, flex: 1 }}>
-                                    <div className="file-title-row">
-                                      <a
-                                        href={getOnSitePaperUrl(file, defaultViewMode)}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(file, defaultViewMode); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(file, defaultViewMode);
-                                        }}
-                                        className={titleCls}
-                                        title={isUnified ? `View ${DOC_TYPE_INFO[activeDoc.docType]?.fullLabel || 'Document'} (${displayTitle}) on-site` : `View ${displayTitle} on-site`}
-                                      >
-                                        {displayTitle}
-                                      </a>
-                                    </div>
-                                    <div className="file-meta-subrow">
-                                      {isUnified ? (
-                                        <span className="unified-meta-subline" title={file.folderPath}>
-                                          {file.fileCount} {file.fileCount === 1 ? 'file' : 'files'} · {file.docTypes.join(' · ')}
-                                          {file.totalSize ? ` · ${formatBytes(file.totalSize)}` : ''}
-                                        </span>
-                                      ) : (
-                                        <>
-                                          {(() => {
-                                            const bookMeta = file.bookMeta || null;
-                                            const sublineText = bookMeta
-                                              ? [bookMeta.authors, bookMeta.publisher, bookMeta.year].filter(Boolean).join(' · ')
-                                              : file.path;
-                                            return (
-                                              <span className="file-path-subtext file-location" title={sublineText}>
-                                                {sublineText}
-                                              </span>
-                                            );
-                                          })()}
-                                          {file.size ? (
-                                            <span className="file-size-tag">
-                                              {formatBytes(file.size)} · {(file.ext || 'PDF').toUpperCase()}
-                                            </span>
-                                          ) : null}
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {eligibleForViews && (
-                                    <PaperViewsCounter count={paperViews} variant="table" />
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                {!isUnified && (
-                                  <div className="details-primary">
-                                    {formatSubjectDisplay(file.subject)}
-                                    {!(file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') && shortUnit
-                                      ? ` — ${shortUnit}`
-                                      : ''}
-                                  </div>
-                                )}
-                                <div className="details-secondary">
-                                  <span className={`curr-mini-badge ${file.curriculum === 'Edexcel IGCSE' ? 'igcse' : 'ial'}`}>
-                                    {file.curriculum ? file.curriculum.replace('Edexcel ', '') : 'IAL'}
-                                  </span>
-                                  {isUnified && file.unitCode && (
-                                    <span className="unit-code-chip">{file.unitCode}</span>
-                                  )}
-                                  {file.session ? (
-                                    <span className="session-pill-tag">{file.session}</span>
-                                  ) : file.year ? (
-                                    <span>Year {file.year}</span>
-                                  ) : (
-                                    <span>Reference Resource</span>
-                                  )}
-                                  {Boolean(file.variant === 'R' || file.variant === 'A' || (file.variant && file.variant.includes('R'))) && (
-                                    <span className="curr-mini-badge regional" title="Regional examination series">
-                                      {file.variant === 'A' ? 'Alt A' : 'Regional'}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                {isUnified ? (
-                                  <div className="unified-actions-cell">
-                                    {docs.QP && (
-                                      <a
-                                        href={getOnSitePaperUrl(file, 'QP')}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(file, 'QP'); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(file, 'QP');
-                                        }}
-                                        className="unified-doc-btn qp"
-                                        title={`Open Question Paper — ${docs.QP.name} (${formatBytes(docs.QP.size)})`}
-                                      >
-                                        <span className="btn-desktop-text">Question Paper</span>
-                                        <span className="btn-mobile-text" aria-hidden="true">QP</span>
-                                      </a>
-                                    )}
-                                    {docs.MS && (
-                                      <a
-                                        href={getOnSitePaperUrl(file, 'MS')}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(file, 'MS'); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(file, 'MS');
-                                        }}
-                                        className="unified-doc-btn ms"
-                                        title={`Open Mark Scheme — ${docs.MS.name} (${formatBytes(docs.MS.size)})`}
-                                      >
-                                        <span className="btn-desktop-text">Mark Scheme</span>
-                                        <span className="btn-mobile-text" aria-hidden="true">MS</span>
-                                      </a>
-                                    )}
-                                    {docs.ER && (
-                                      <a
-                                        href={getOnSitePaperUrl(file, 'ER')}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(file, 'ER'); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(file, 'ER');
-                                        }}
-                                        className="unified-doc-btn er"
-                                        title={`Open Examiner Report — ${docs.ER.name} (${formatBytes(docs.ER.size)})`}
-                                      >
-                                        <span className="btn-desktop-text">Examiner Report</span>
-                                        <span className="btn-mobile-text" aria-hidden="true">ER</span>
-                                      </a>
-                                    )}
-                                    {['AUD', 'SC', 'DF', 'SOL', 'SAM'].map((extraType) => {
-                                      const extraDoc = docs[extraType];
-                                      if (!extraDoc) return null;
-                                      const [scFullLabel, scShortLabel] = extraType === 'SC' ? getScDocumentLabel(extraDoc) : [null, null];
-                                      const labelMap = {
-                                        AUD: 'Audio',
-                                        SC: scFullLabel || 'Source',
-                                        DF: 'Data Files',
-                                        SOL: 'Solutions',
-                                        SAM: 'Specimen'
-                                      };
-                                      return (
-                                        <a
-                                          key={extraType}
-                                          href={getOnSitePaperUrl(file, extraType)}
-                                          rel="nofollow"
-                                          onPointerEnter={preloadReaderChunksOnce}
-                                          onFocus={preloadReaderChunksOnce}
-                                          onPointerDown={(e) => { if (e.button === 0 && extraType !== 'AUD') prewarmPaperOnPointerDown(file, extraType); }}
-                                          onClick={(e) => {
-                                            if (!shouldHandleClientNavigation(e)) return;
-                                            e.preventDefault();
-                                            openOnSiteReader(file, extraType);
-                                          }}
-                                          className={`unified-doc-btn ${extraType === 'AUD' ? 'aud' : 'extra'}`}
-                                          title={`Open ${extraType === 'SC' ? scFullLabel : (DOC_TYPE_INFO[extraType]?.fullLabel || extraType)} on-site — ${extraDoc.name}`}
-                                        >
-                                          <span className="btn-desktop-text">{labelMap[extraType] || extraType}</span>
-                                          <span className="btn-mobile-text" aria-hidden="true">{extraType === 'SC' ? scShortLabel : extraType}</span>
-                                        </a>
-                                      );
-                                    })}
-                                    {isPdf && canSplit && (
-                                      <a
-                                        href={getOnSitePaperUrl(file, 'split')}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(file, 'split'); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(file, 'split');
-                                        }}
-                                        className="unified-preview-btn split-btn"
-                                        title="Open Question Paper and Mark Scheme side by side in Split View"
-                                      >
-                                        <span className="btn-desktop-text">Split View</span>
-                                        <span className="btn-mobile-text" aria-hidden="true">Split</span>
-                                      </a>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="row-actions-cell">
-                                    {viewMode === 'unified' ? (
-                                      <a
-                                        href={getOnSitePaperUrl(file, file.docType || 'Book')}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(file, file.docType || 'Book'); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(file, file.docType || 'Book');
-                                        }}
-                                        className={`unified-doc-btn ${badge?.cls === 'book' || badge?.cls === 'sol' ? 'book' : (badge?.cls || 'extra')}`}
-                                      >
-                                        <span className="btn-desktop-text">
-                                          {badge?.cls === 'book'
-                                            ? 'Open Textbook'
-                                            : badge?.cls === 'sol'
-                                              ? 'Worked Solutions'
-                                              : `Open ${badge?.fullLabel || 'Resource'}`}
-                                        </span>
-                                        <span className="btn-mobile-text" aria-hidden="true">{badge?.label || 'DOC'}</span>
-                                      </a>
-                                    ) : (
-                                      <>
-                                        {badge ? (
-                                          <span className={`doc-badge ${badge.cls}`} title={badge.fullLabel}>
-                                            {badge.label}
-                                          </span>
-                                        ) : (
-                                          <span className="doc-badge default">Doc</span>
-                                        )}
-
-                                        {siblings && ['QP', 'MS', 'ER'].map((sibType) => {
-                                          if (sibType === file.docType) return null;
-                                          const sib = siblings[sibType];
-                                          if (!sib) return null;
-                                          return (
-                                            <a
-                                              key={sibType}
-                                              href={getOnSitePaperUrl(sib, sibType)}
-                                              rel="nofollow"
-                                              onPointerEnter={preloadReaderChunksOnce}
-                                              onFocus={preloadReaderChunksOnce}
-                                              onPointerDown={(e) => { if (e.button === 0) prewarmPaperOnPointerDown(sib, sibType); }}
-                                              onClick={(e) => {
-                                                if (!shouldHandleClientNavigation(e)) return;
-                                                e.preventDefault();
-                                                openOnSiteReader(sib, sibType);
-                                              }}
-                                              className={`sibling-pill ${sibType.toLowerCase()}`}
-                                              title={`Open matching ${DOC_TYPE_INFO[sibType]?.fullLabel} (${file.session})`}
-                                            >
-                                              {sibType} ↗
-                                            </a>
-                                          );
-                                        })}
-                                      </>
-                                    )}
-
-                                    {(isPdf || activeDoc.docType === 'AUD' || (activeDoc.docType === 'SOL' && activeDoc.ext === 'zip')) && viewMode !== 'unified' && (
-                                      <a
-                                        href={getOnSitePaperUrl(activeDoc, activeDoc.docType || 'QP')}
-                                        rel="nofollow"
-                                        onPointerEnter={preloadReaderChunksOnce}
-                                        onFocus={preloadReaderChunksOnce}
-                                        onPointerDown={(e) => { if (e.button === 0 && activeDoc.docType !== 'AUD') prewarmPaperOnPointerDown(activeDoc, activeDoc.docType || 'QP'); }}
-                                        onClick={(e) => {
-                                          if (!shouldHandleClientNavigation(e)) return;
-                                          e.preventDefault();
-                                          openOnSiteReader(activeDoc, activeDoc.docType || 'QP');
-                                        }}
-                                        className="preview-btn"
-                                        title={
-                                          activeDoc.docType === 'AUD'
-                                            ? 'Play Listening Audio On-Site'
-                                            : siblings?.QP?.ext === 'pdf' && siblings?.MS?.ext === 'pdf'
-                                            ? 'Open Question Paper and Mark Scheme in PDF Reader'
-                                            : 'Quick In-App PDF Preview'
-                                        }
-                                      >
-                                        {activeDoc.docType === 'AUD' ? 'Listen' : 'View'}
-                                      </a>
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-
-                    {totalMatchedCount > visibleFiles.length && (
-                      <div className="pagination-bar">
-                        <span className="pagination-info">
-                          Showing <strong>{visibleFiles.length}</strong> of <strong>{totalMatchedCount.toLocaleString()}</strong> matching documents
-                        </span>
-                        <div className="pagination-actions">
-                          <button
-                            type="button"
-                            className="search-button pagination-btn"
-                            onClick={() => setVisibleCount((c) => c + 100)}
-                          >
-                            Load 100 More ↓
-                          </button>
-                          {totalMatchedCount - visibleFiles.length <= 600 && (
-                            <button
-                              type="button"
-                              className="filter-btn"
-                              onClick={() => setVisibleCount(totalMatchedCount)}
-                            >
-                              Show All ({totalMatchedCount.toLocaleString()})
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="no-results-box">
-                    {loadError && catalogTotalCount === 0 ? (
-                      <>
-                        <h3>Connecting to repository archive...</h3>
-                        <p>
-                          The network connection took longer than expected ({loadError}). Reconnecting automatically in the background...
-                        </p>
-                        <button
-                          type="button"
-                          className="search-button"
-                          style={{ marginTop: '14px' }}
-                          onClick={retryLoadIndex}
-                        >
-                          Retry Connection Now
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <h3>No matching documents found</h3>
-                        <p>Try refining your search terms or resetting an active filter above.</p>
-                        {searchMeta.didYouMean && (
-                          <p className="search-did-you-mean search-did-you-mean-empty">
-                            Did you mean{' '}
-                            <button
-                              type="button"
-                              className="search-did-you-mean-btn"
-                              onClick={() => setSearchQuery(searchMeta.didYouMean)}
-                            >
-                              {searchMeta.didYouMean}
-                            </button>
-                            ?
-                          </p>
-                        )}
-                        {hasActiveFilters && (
-                          <button
-                            type="button"
-                            className="search-button"
-                            style={{ marginTop: '14px' }}
-                            onClick={clearFilters}
-                          >
-                            Reset All Filters
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {archiveContextInfo && !(filesLoading && visibleFiles.length === 0) && (
-                  <section className="archive-context-strip" aria-label="Archive specifications and related resources">
-                    <div className="archive-context-copy">
-                      <div className="archive-context-eyebrow">Specification &amp; Archive Reference</div>
-                      <h2 className="archive-context-heading">{archiveContextInfo.heading}</h2>
-                      {archiveContextInfo.legacyInfo && (
-                        <p className="archive-context-legacy">{archiveContextInfo.legacyInfo}</p>
-                      )}
-                      <p className="archive-context-note">{archiveContextInfo.note}</p>
-                    </div>
-                    {archiveContextInfo.links.length > 0 && (
-                      <nav className="archive-context-links" aria-label="Related course resources">
-                        {archiveContextInfo.links.map((item) => (
-                          <a
-                            key={item.href}
-                            href={item.href}
-                            className="archive-context-link"
-                            onClick={(e) => {
-                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-                              e.preventDefault();
-                              item.onClick();
-                            }}
-                          >
-                            {item.label} →
-                          </a>
-                        ))}
-                      </nav>
-                    )}
-                  </section>
-                )}
-              </>
-            );
-          })()}
+          ) : (
+            <>
+              <PaperTable
+                isMobile={isMobile}
+                searchQuery={searchQuery}
+                onSetSearchQuery={setSearchQuery}
+                seoMeta={seoMeta}
+                filesLoading={filesLoading}
+                visibleFiles={visibleFiles}
+                totalMatchedCount={totalMatchedCount}
+                viewMode={viewMode}
+                searchMeta={searchMeta}
+                filterDocType={filterDocType}
+                viewsMap={viewsMap}
+                loadError={loadError}
+                catalogTotalCount={catalogTotalCount}
+                hasActiveFilters={hasActiveFilters}
+                onRetryLoadIndex={retryLoadIndex}
+                onClearFilters={clearFilters}
+                onLoadMore={() => setVisibleCount((c) => c + 100)}
+                onShowAll={() => setVisibleCount(totalMatchedCount)}
+                getOnSitePaperUrl={getOnSitePaperUrl}
+                onOpenReader={openOnSiteReader}
+                breadcrumbProps={breadcrumbProps}
+              />
+              {archiveContextInfo && !(filesLoading && visibleFiles.length === 0) && (
+                <ArchiveContextStrip archiveContextInfo={archiveContextInfo} />
+              )}
+            </>
+          )}
         </main>
       </div>
 
@@ -3090,98 +1858,7 @@ function App() {
         </Suspense>
       )}
 
-      {/* Global Footer at the Very Bottom */}
-      <footer className="footer-bottom">
-        <div className="footer-left-col">
-          <div>© 2026 <strong>Conceptualist Systems</strong> — Independent Study Archive</div>
-          <div
-            className="footer-update-micro"
-            onClick={() => { setIsNotFound(false); setCurrentTab('changelog'); }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsNotFound(false); setCurrentTab('changelog'); } }}
-            title="Click to view full site changelog & version history"
-          >
-            {APP_VERSION} · Updated {formatUpdateTimestamp(BUILD_TIMESTAMP)} · Not affiliated with Pearson or Edexcel
-          </div>
-        </div>
-        <div className="footer-links">
-          <a
-            href="/ial"
-            className="footer-link"
-            onClick={(e) => {
-              if (!shouldHandleClientNavigation(e)) return;
-              e.preventDefault();
-              setCurrentTab('library');
-              clearFilters({ pushUrl: false });
-              setFilterCurriculum('Edexcel IAL');
-              setForceShowTable(true);
-            }}
-          >
-            Edexcel IAL
-          </a>
-          <span className="footer-sep">•</span>
-          <a
-            href="/igcse"
-            className="footer-link"
-            onClick={(e) => {
-              if (!shouldHandleClientNavigation(e)) return;
-              e.preventDefault();
-              setCurrentTab('library');
-              clearFilters({ pushUrl: false });
-              setFilterCurriculum('Edexcel IGCSE');
-              setForceShowTable(true);
-            }}
-          >
-            Edexcel IGCSE
-          </a>
-          <span className="footer-sep">•</span>
-          <a
-            href="/textbooks"
-            className="footer-link"
-            onClick={(e) => {
-              if (!shouldHandleClientNavigation(e)) return;
-              e.preventDefault();
-              setCurrentTab('library');
-              clearFilters({ pushUrl: false });
-              setFilterDocType('Book');
-              setForceShowTable(true);
-            }}
-          >
-            Textbooks
-          </a>
-          <span className="footer-sep">•</span>
-          <a
-            href="/changelog"
-            className="footer-link"
-            onClick={(e) => {
-              if (!shouldHandleClientNavigation(e)) return;
-              e.preventDefault();
-              setIsNotFound(false);
-              setCurrentTab('changelog');
-            }}
-          >
-            Changelog
-          </a>
-          <span className="footer-sep">•</span>
-          <a
-            href="/about"
-            className="footer-link"
-            onClick={(e) => {
-              if (!shouldHandleClientNavigation(e)) return;
-              e.preventDefault();
-              setIsNotFound(false);
-              setCurrentTab('about');
-            }}
-          >
-            About Us &amp; Team
-          </a>
-          <span className="footer-sep">•</span>
-          <a href="mailto:diavlon.pxa@gmail.com" className="footer-link">
-            Contact Us
-          </a>
-        </div>
-      </footer>
+      <Footer onNavigateQuickFilter={handleQuickRouteFilter} onOpenTab={handleOpenTab} />
     </div>
   );
 }

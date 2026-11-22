@@ -310,10 +310,23 @@ const serveLibraryFiles = () => {
 
 const APP_BUILD_TIME = new Date().toISOString()
 
+function readAppVersionFromMeta() {
+  const metaSrc = fs.readFileSync(path.join(__dirname, 'src', 'lib', 'appMeta.js'), 'utf8')
+  const match = metaSrc.match(/export const APP_VERSION\s*=\s*['"]([^'"]+)['"]/)
+  if (!match || !match[1]) {
+    throw new Error('Could not parse APP_VERSION from src/lib/appMeta.js')
+  }
+  return match[1]
+}
+
+const APP_VERSION_VALUE = readAppVersionFromMeta()
+
 const injectBuildTimestampHtml = () => ({
   name: 'inject-build-timestamp-html',
   transformIndexHtml(html) {
-    return html.replace(/__CS_BUILD_TIME__/g, APP_BUILD_TIME)
+    return html
+      .replace(/__CS_BUILD_TIME__/g, APP_BUILD_TIME)
+      .replace(/__CS_APP_VERSION__/g, APP_VERSION_VALUE)
   }
 })
 

@@ -9,6 +9,11 @@ import {
   serializeItemForUi,
   getFallbackUnitsFromState
 } from '../lib/catalogEngine.js';
+import {
+  resilientFetch,
+  readCachedIndex,
+  writeCachedIndex
+} from '../lib/networkUtils.js';
 
 let catalogState = null;
 let isFullLoaded = false;
@@ -22,52 +27,6 @@ let lastQueryMeta = {
 };
 
 const decoder = new TextDecoder('utf-8');
-
-async function resilientWorkerFetch(urls, options = {}, timeoutMs = 45000) {
-  let lastErr = new Error('Network error');
-  for (const url of urls) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...options, signal: ctrl.signal });
-      clearTimeout(timer);
-      if (res.ok) return res;
-      lastErr = new Error(`HTTP ${res.status} (${url})`);
-    } catch (err) {
-      clearTimeout(timer);
-      lastErr = err;
-    }
-  }
-  throw lastErr;
-}
-
-async function readCachedIndex(cacheUrl) {
-  if (typeof caches === 'undefined' || !cacheUrl) return null;
-  try {
-    const cache = await caches.open('cs_index_cache');
-    const match = await cache.match(cacheUrl);
-    if (match) return await match.json();
-  } catch {
-    // Ignore cache read failures
-  }
-  return null;
-}
-
-async function writeCachedIndex(cacheUrl, response) {
-  if (typeof caches === 'undefined' || !cacheUrl || !response) return;
-  try {
-    const cache = await caches.open('cs_index_cache');
-    const keys = await cache.keys();
-    for (const req of keys) {
-      if (req.url !== cacheUrl) {
-        await cache.delete(req);
-      }
-    }
-    await cache.put(cacheUrl, response);
-  } catch {
-    // Ignore cache write failures
-  }
-}
 
 function applyJson(json, { isFull }) {
   if (!isFull && isFullLoaded) {
@@ -178,7 +137,7 @@ self.onmessage = async (event) => {
         }
       }
 
-      const res = await resilientWorkerFetch(urls, {}, 50000);
+      const res = await resilientFetch(urls, {}, 50000);
       const clone = res.clone();
       const json = await res.json();
       if (cacheUrl) void writeCachedIndex(cacheUrl, clone);

@@ -94,7 +94,9 @@
               .catch(function() { return null; });
 
             if (shard || needsFull) {
-              var cacheKey = 'https://cs-cache.local/index_v6.9.9_' + q + '.json';
+              var appVer = '__CS_APP_VERSION__';
+              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v7.0';
+              var cacheKey = 'https://cs-cache.local/index_' + verTag + '_' + q + '.json';
               var checkCache = (typeof caches !== 'undefined')
                 ? caches.open('cs_index_cache')
                     .then(function(c) { return c.match(cacheKey); })

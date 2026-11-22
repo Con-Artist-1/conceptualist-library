@@ -3,6 +3,7 @@
 
 import { extractVariant, getCleanUnitLabel, compareUnitLabels } from '../unitParser.js';
 import { getBookMetadata } from '../bookCatalog.js';
+import { getPaperTotalViews } from './paperKeys.js';
 import {
   buildFileSearchData,
   finalizeUnifiedSearchData,
@@ -30,23 +31,6 @@ function preferSiblingCandidate(existing, candidate) {
   const caPdf = candidate.ext === 'pdf' ? 1 : 0;
   if (caPdf !== exPdf) return caPdf > exPdf;
   return scoreFile(candidate) > scoreFile(existing);
-}
-
-function getPaperViewKeyLocal(file) {
-  if (!file) return '';
-  if (file.id && String(file.id).includes('|')) return file.id;
-  if (file.spec && file.subject && file.unitCode && file.session) {
-    return `${file.spec}|${file.subject}|${file.unitCode}|${file.variant || ''}|${file.session}`;
-  }
-  return file.docs?.QP?.path || file.siblings?.QP?.path || file.path || file.name || '';
-}
-
-function getPaperTotalViewsLocal(file, viewsMap) {
-  if (!file || !viewsMap) return 0;
-  const key = getPaperViewKeyLocal(file);
-  if (!key) return 0;
-  const count = Number(viewsMap[key]);
-  return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
 function sanitizeLeafDoc(d) {
@@ -545,7 +529,7 @@ export function queryCatalogState(state, params) {
     });
   } else if (sortBy === 'popular') {
     sorted.sort((a, b) => {
-      const vDiff = getPaperTotalViewsLocal(b, viewsMap) - getPaperTotalViewsLocal(a, viewsMap);
+      const vDiff = getPaperTotalViews(b, viewsMap) - getPaperTotalViews(a, viewsMap);
       if (vDiff !== 0) return vDiff;
       const kDiff = (b.sortKey || 0) - (a.sortKey || 0);
       if (kDiff !== 0) return kDiff;

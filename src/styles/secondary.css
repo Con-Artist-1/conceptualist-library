@@ -1,38 +1,164 @@
-/* Secondary Page Styles (About & Changelog — Light, Academic Dark & Pure OLED) */
+/* Secondary Page Styles (About & Changelog — Semantic Theme Tokens for Light, Dark & Pure OLED) */
+
+:root,
+[data-theme='light'] {
+  --sec-bg-outer: transparent;
+  --sec-bg-card: var(--bg-surface);
+  --sec-card-border: var(--border-medium);
+  --sec-card-top: var(--mcmaster-maroon);
+  --sec-card-shadow: var(--shadow-sm);
+  --sec-title: var(--mcmaster-maroon);
+  --sec-lead: var(--text-secondary);
+  --sec-heading: var(--text-primary);
+  --sec-text: var(--text-secondary);
+  --sec-muted: var(--text-muted);
+  --sec-divider: var(--border-medium);
+  --sec-subcard-bg: var(--bg-page);
+  --sec-subcard-border: var(--border-medium);
+  --sec-subcard-accent: var(--mcmaster-maroon);
+  --sec-box-border: var(--border-medium);
+  --sec-contact-bg: var(--badge-qp-bg);
+  --sec-contact-border: var(--badge-qp-border);
+  --sec-contact-text: var(--badge-qp-text);
+  --sec-contact-link: var(--mcmaster-maroon);
+  --sec-contact-link-dec: none;
+  --sec-accent-strong: var(--mcmaster-maroon);
+  --sec-purge-bg: var(--bg-surface);
+  --sec-purge-border: var(--border-medium);
+  --sec-purge-text: var(--mcmaster-maroon);
+  --sec-purge-hover-bg: var(--mcmaster-maroon);
+  --sec-purge-hover-border: var(--mcmaster-maroon);
+  --sec-entry-bg: var(--bg-page);
+  --sec-entry-border: var(--border-medium);
+  --sec-entry-left: var(--border-dark);
+  --sec-entry-latest-bg: var(--bg-surface);
+  --sec-entry-latest-border: var(--border-medium);
+  --sec-entry-latest-left: var(--mcmaster-maroon);
+  --sec-entry-summary: var(--text-secondary);
+  --sec-badge-bg: var(--bg-subtle);
+  --sec-badge-text: var(--text-primary);
+  --sec-badge-border: var(--border-medium);
+  --sec-badge-latest-bg: var(--mcmaster-maroon);
+  --sec-badge-latest-border: var(--mcmaster-maroon);
+}
+
+[data-theme='dark'] {
+  --sec-bg-outer: #121417;
+  --sec-bg-card: #1B1E23;
+  --sec-card-border: #282C34;
+  --sec-card-top: #8C1D2F;
+  --sec-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --sec-title: #F0F2F5;
+  --sec-lead: #CBD5E1;
+  --sec-heading: #F0F2F5;
+  --sec-text: #CBD5E1;
+  --sec-muted: #8892A0;
+  --sec-divider: #282C34;
+  --sec-subcard-bg: #17191E;
+  --sec-subcard-border: #282C34;
+  --sec-subcard-accent: #8C1D2F;
+  --sec-box-border: #282C34;
+  --sec-contact-bg: #0F2640;
+  --sec-contact-border: #1E4E78;
+  --sec-contact-text: #79B8FF;
+  --sec-contact-link: #58A6FF;
+  --sec-contact-link-dec: underline;
+  --sec-accent-strong: #FF758F;
+  --sec-purge-bg: #121417;
+  --sec-purge-border: #343A46;
+  --sec-purge-text: #FF758F;
+  --sec-purge-hover-bg: #8C1D2F;
+  --sec-purge-hover-border: #A8253B;
+  --sec-entry-bg: #17191E;
+  --sec-entry-border: #282C34;
+  --sec-entry-left: #363C46;
+  --sec-entry-latest-bg: #1B1E23;
+  --sec-entry-latest-border: #343A46;
+  --sec-entry-latest-left: #8C1D2F;
+  --sec-entry-summary: #CBD5E1;
+  --sec-badge-bg: #121417;
+  --sec-badge-text: #CBD5E1;
+  --sec-badge-border: #343A46;
+  --sec-badge-latest-bg: #8C1D2F;
+  --sec-badge-latest-border: #A8253B;
+}
+
+[data-theme='oled'] {
+  --sec-bg-outer: #000000;
+  --sec-bg-card: #080808;
+  --sec-card-border: #222222;
+  --sec-card-top: #FF5370;
+  --sec-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  --sec-title: #FFFFFF;
+  --sec-lead: #E2E8F0;
+  --sec-heading: #FFFFFF;
+  --sec-text: #CBD5E1;
+  --sec-muted: #94A3B8;
+  --sec-divider: #222222;
+  --sec-subcard-bg: #0E0E0E;
+  --sec-subcard-border: #252525;
+  --sec-subcard-accent: #FF5370;
+  --sec-box-border: #282828;
+  --sec-contact-bg: #0B192C;
+  --sec-contact-border: #1E3A5F;
+  --sec-contact-text: #79B8FF;
+  --sec-contact-link: #58A6FF;
+  --sec-contact-link-dec: underline;
+  --sec-accent-strong: #FF758F;
+  --sec-purge-bg: #141414;
+  --sec-purge-border: #333333;
+  --sec-purge-text: #FF758F;
+  --sec-purge-hover-bg: #8C1D2F;
+  --sec-purge-hover-border: #FF5370;
+  --sec-entry-bg: #0A0A0A;
+  --sec-entry-border: #202020;
+  --sec-entry-left: #333333;
+  --sec-entry-latest-bg: #0E0E0E;
+  --sec-entry-latest-border: #2E2E2E;
+  --sec-entry-latest-left: #FF5370;
+  --sec-entry-summary: #E2E8F0;
+  --sec-badge-bg: #161616;
+  --sec-badge-text: #E2E8F0;
+  --sec-badge-border: #303030;
+  --sec-badge-latest-bg: #8C1D2F;
+  --sec-badge-latest-border: #B82840;
+}
 
 /* ===================== ABOUT PAGE ===================== */
 .about-container {
   max-width: 900px;
   margin: 0 auto;
+  background-color: var(--sec-bg-outer);
+  color: var(--sec-heading);
 }
 
 .about-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  border-top: 4px solid var(--mcmaster-maroon);
+  background-color: var(--sec-bg-card);
+  border: 1px solid var(--sec-card-border);
+  border-top: 4px solid var(--sec-card-top);
   border-radius: var(--radius-md);
   padding: 36px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--sec-card-shadow);
 }
 
 .about-title {
   font-family: var(--font-heading);
   font-size: 26px;
   font-weight: 800;
-  color: var(--mcmaster-maroon);
+  color: var(--sec-title);
   margin-bottom: 12px;
 }
 
 .about-lead {
   font-size: 16px;
-  color: var(--text-secondary);
+  color: var(--sec-lead);
   line-height: 1.6;
   font-weight: 500;
 }
 
 .about-divider {
   border: none;
-  border-top: 1px solid var(--border-medium);
+  border-top: 1px solid var(--sec-divider);
   margin: 24px 0;
 }
 
@@ -44,13 +170,13 @@
   font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--sec-heading);
   margin-bottom: 10px;
 }
 
 .about-section p {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--sec-text);
   line-height: 1.6;
 }
 
@@ -62,9 +188,9 @@
 }
 
 .team-card {
-  background: var(--bg-page);
-  border: 1px solid var(--border-medium);
-  border-left: 4px solid var(--mcmaster-maroon);
+  background: var(--sec-subcard-bg);
+  border: 1px solid var(--sec-subcard-border);
+  border-left: 4px solid var(--sec-subcard-accent);
   border-radius: var(--radius-sm);
   padding: 16px;
 }
@@ -72,29 +198,30 @@
 .team-name {
   font-weight: 800;
   font-size: 16px;
-  color: var(--text-primary);
+  color: var(--sec-heading);
 }
 
 .team-role {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--sec-muted);
   font-weight: 600;
   margin-top: 2px;
 }
 
 .contact-box {
-  background: var(--badge-qp-bg);
-  border: 1px solid var(--badge-qp-border);
+  background: var(--sec-contact-bg);
+  border: 1px solid var(--sec-contact-border);
   border-radius: var(--radius-sm);
   padding: 14px 18px;
   margin-top: 12px;
-  color: var(--badge-qp-text);
+  color: var(--sec-contact-text);
   font-size: 14px;
 }
 
 .contact-box a {
-  color: var(--mcmaster-maroon);
+  color: var(--sec-contact-link);
   font-weight: 800;
+  text-decoration: var(--sec-contact-link-dec);
 }
 
 /* ===================== CHANGELOG PAGE ===================== */
@@ -106,10 +233,14 @@
   flex-wrap: wrap;
 }
 
+.changelog-header-top p {
+  color: var(--sec-text);
+}
+
 .changelog-build-box {
-  background: var(--bg-page);
-  border: 1px solid var(--border-medium);
-  border-left: 4px solid var(--mcmaster-maroon);
+  background: var(--sec-subcard-bg);
+  border: 1px solid var(--sec-box-border);
+  border-left: 4px solid var(--sec-subcard-accent);
   border-radius: var(--radius-sm);
   padding: 12px 16px;
   display: flex;
@@ -120,25 +251,25 @@
 
 .changelog-build-version {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--sec-heading);
 }
 
 .changelog-build-version strong {
-  color: var(--mcmaster-maroon);
+  color: var(--sec-accent-strong);
   font-weight: 800;
 }
 
 .changelog-build-time {
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--sec-muted);
   font-weight: 600;
 }
 
 .changelog-purge-btn {
   margin-top: 6px;
-  background: var(--bg-surface);
-  color: var(--mcmaster-maroon);
-  border: 1px solid var(--border-medium);
+  background: var(--sec-purge-bg);
+  color: var(--sec-purge-text);
+  border: 1px solid var(--sec-purge-border);
   border-radius: var(--radius-sm);
   padding: 5px 10px;
   font-size: 11.5px;
@@ -149,9 +280,9 @@
 }
 
 .changelog-purge-btn:hover {
-  background: var(--mcmaster-maroon);
+  background: var(--sec-purge-hover-bg);
   color: #FFFFFF;
-  border-color: var(--mcmaster-maroon);
+  border-color: var(--sec-purge-hover-border);
 }
 
 .changelog-list {
@@ -161,17 +292,18 @@
 }
 
 .changelog-entry {
-  background: var(--bg-page);
-  border: 1px solid var(--border-medium);
-  border-left: 4px solid var(--border-dark);
+  background: var(--sec-entry-bg);
+  border: 1px solid var(--sec-entry-border);
+  border-left: 4px solid var(--sec-entry-left);
   border-radius: var(--radius-sm);
   padding: 18px 22px;
 }
 
 .changelog-entry.latest {
-  border-left-color: var(--mcmaster-maroon);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--sec-entry-latest-border);
+  border-left: 4px solid var(--sec-entry-latest-left);
+  background: var(--sec-entry-latest-bg);
+  box-shadow: var(--sec-card-shadow);
 }
 
 .changelog-entry-header {
@@ -191,9 +323,9 @@
 }
 
 .changelog-badge {
-  background: var(--bg-subtle);
-  color: var(--text-primary);
-  border: 1px solid var(--border-medium);
+  background: var(--sec-badge-bg);
+  color: var(--sec-badge-text);
+  border: 1px solid var(--sec-badge-border);
   font-size: 11px;
   font-weight: 800;
   padding: 2px 8px;
@@ -202,28 +334,28 @@
 }
 
 .changelog-badge.latest {
-  background: var(--mcmaster-maroon);
+  background: var(--sec-badge-latest-bg);
   color: #FFFFFF;
-  border-color: var(--mcmaster-maroon);
+  border: 1px solid var(--sec-badge-latest-border);
 }
 
 .changelog-entry-title {
   font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--sec-heading);
 }
 
 .changelog-entry-date {
   font-size: 12px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--sec-muted);
 }
 
 .changelog-entry-summary {
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--sec-entry-summary);
   margin-bottom: 10px;
 }
 
@@ -233,287 +365,10 @@
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--sec-text);
   line-height: 1.5;
 }
 
-/* About & Changelog Pages (Complete High Contrast Styling) */
-[data-theme='dark'] .about-container {
-  background-color: #121417 !important;
-  color: #F0F2F5 !important;
+.changelog-bullets li {
+  color: var(--sec-text);
 }
-
-[data-theme='dark'] .about-card {
-  background-color: #1B1E23 !important;
-  border: 1px solid #282C34 !important;
-  border-top: 4px solid #8C1D2F !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-}
-
-[data-theme='dark'] .about-title {
-  color: #F0F2F5 !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='dark'] .about-lead {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .about-divider {
-  border-top: 1px solid #282C34 !important;
-}
-
-[data-theme='dark'] .about-section h2 {
-  color: #F0F2F5 !important;
-}
-
-[data-theme='dark'] .about-section p {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .team-card {
-  background: #17191E !important;
-  border: 1px solid #282C34 !important;
-  border-left: 4px solid #8C1D2F !important;
-}
-
-[data-theme='dark'] .team-name {
-  color: #F0F2F5 !important;
-}
-
-[data-theme='dark'] .team-role {
-  color: #8892A0 !important;
-}
-
-[data-theme='dark'] .contact-box {
-  background: #0F2640 !important;
-  border: 1px solid #1E4E78 !important;
-  color: #79B8FF !important;
-}
-
-[data-theme='dark'] .contact-box a {
-  color: #58A6FF !important;
-  text-decoration: underline;
-}
-
-[data-theme='dark'] .changelog-header-top p {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .changelog-build-box {
-  background: #17191E !important;
-  border: 1px solid #282C34 !important;
-  border-left: 4px solid #8C1D2F !important;
-}
-
-[data-theme='dark'] .changelog-build-version {
-  color: #F0F2F5 !important;
-}
-
-[data-theme='dark'] .changelog-build-version strong {
-  color: #FF758F !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='dark'] .changelog-build-time {
-  color: #8892A0 !important;
-}
-
-[data-theme='dark'] .changelog-purge-btn {
-  background: #121417 !important;
-  border: 1px solid #343A46 !important;
-  color: #FF758F !important;
-  font-weight: 700 !important;
-}
-
-[data-theme='dark'] .changelog-purge-btn:hover {
-  background: #8C1D2F !important;
-  border-color: #A8253B !important;
-  color: #FFFFFF !important;
-}
-
-[data-theme='dark'] .changelog-entry {
-  background: #17191E !important;
-  border: 1px solid #282C34 !important;
-  border-left: 4px solid #363C46 !important;
-}
-
-[data-theme='dark'] .changelog-entry.latest {
-  background: #1B1E23 !important;
-  border: 1px solid #343A46 !important;
-  border-left: 4px solid #8C1D2F !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-}
-
-[data-theme='dark'] .changelog-badge {
-  background: #121417 !important;
-  color: #CBD5E1 !important;
-  border: 1px solid #343A46 !important;
-}
-
-[data-theme='dark'] .changelog-badge.latest {
-  background: #8C1D2F !important;
-  color: #FFFFFF !important;
-  border: 1px solid #A8253B !important;
-}
-
-[data-theme='dark'] .changelog-entry-title {
-  color: #F0F2F5 !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='dark'] .changelog-entry-date {
-  color: #8892A0 !important;
-  font-weight: 700 !important;
-}
-
-[data-theme='dark'] .changelog-entry-summary {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .changelog-bullets {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='dark'] .changelog-bullets li {
-  color: #CBD5E1 !important;
-}
-
-/* About & Changelog Pages (High Contrast) */
-[data-theme='oled'] .about-container {
-  background-color: #000000 !important;
-  color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .about-card {
-  background-color: #080808 !important;
-  border: 1px solid #222222 !important;
-  border-top: 4px solid #FF5370 !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
-}
-
-[data-theme='oled'] .about-title {
-  color: #FFFFFF !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='oled'] .about-lead {
-  color: #E2E8F0 !important;
-}
-
-[data-theme='oled'] .about-divider {
-  border-top: 1px solid #222222 !important;
-}
-
-[data-theme='oled'] .about-section h2 {
-  color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .about-section p {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='oled'] .team-card {
-  background: #0E0E0E !important;
-  border: 1px solid #252525 !important;
-  border-left: 4px solid #FF5370 !important;
-}
-
-[data-theme='oled'] .team-name {
-  color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .team-role {
-  color: #94A3B8 !important;
-}
-
-[data-theme='oled'] .contact-box {
-  background: #0B192C !important;
-  border: 1px solid #1E3A5F !important;
-  color: #79B8FF !important;
-}
-
-[data-theme='oled'] .contact-box a {
-  color: #58A6FF !important;
-  text-decoration: underline;
-}
-
-[data-theme='oled'] .changelog-build-box {
-  background: #0E0E0E !important;
-  border: 1px solid #282828 !important;
-  border-left: 4px solid #FF5370 !important;
-}
-
-[data-theme='oled'] .changelog-build-version {
-  color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .changelog-build-version strong {
-  color: #FF758F !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='oled'] .changelog-build-time {
-  color: #94A3B8 !important;
-}
-
-[data-theme='oled'] .changelog-purge-btn {
-  background: #141414 !important;
-  border: 1px solid #333333 !important;
-  color: #FF758F !important;
-  font-weight: 700 !important;
-}
-
-[data-theme='oled'] .changelog-purge-btn:hover {
-  background: #8C1D2F !important;
-  border-color: #FF5370 !important;
-  color: #FFFFFF !important;
-}
-
-[data-theme='oled'] .changelog-entry {
-  background: #0A0A0A !important;
-  border: 1px solid #202020 !important;
-  border-left: 4px solid #333333 !important;
-}
-
-[data-theme='oled'] .changelog-entry.latest {
-  background: #0E0E0E !important;
-  border: 1px solid #2E2E2E !important;
-  border-left: 4px solid #FF5370 !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
-}
-
-[data-theme='oled'] .changelog-badge {
-  background: #161616 !important;
-  color: #E2E8F0 !important;
-  border: 1px solid #303030 !important;
-}
-
-[data-theme='oled'] .changelog-badge.latest {
-  background: #8C1D2F !important;
-  color: #FFFFFF !important;
-  border: 1px solid #B82840 !important;
-}
-
-[data-theme='oled'] .changelog-entry-title {
-  color: #FFFFFF !important;
-  font-weight: 800 !important;
-}
-
-[data-theme='oled'] .changelog-entry-date {
-  color: #94A3B8 !important;
-  font-weight: 700 !important;
-}
-
-[data-theme='oled'] .changelog-entry-summary {
-  color: #E2E8F0 !important;
-}
-
-[data-theme='oled'] .changelog-bullets {
-  color: #CBD5E1 !important;
-}
-
-[data-theme='oled'] .changelog-bullets li {
-  color: #CBD5E1 !important;
-}
-
