@@ -2,8 +2,19 @@ import { BUILD_TIMESTAMP } from '../lib/appMeta.js';
 
 export const CHANGELOG_HISTORY = [
   {
-    version: 'v7.1',
+    version: 'v7.2',
     date: BUILD_TIMESTAMP,
+    title: '100% Full-Archive Pre-Indexed Audio Subtitles (All 272 IAL & IGCSE Listening Resources)',
+    summary: 'Expanded sharded static subtitles to cover 100% of every listening audio file across both Edexcel IAL and IGCSE — 367 unique tracks and 50,363 timed segments across 9 lazy subject shards with zero device-side loading wait.',
+    changes: [
+      'Complete IGCSE pre-indexing (229 unique tracks): Pre-indexed all 6 IGCSE listening subjects into lazy per-subject shards — English as a Second Language (46 tracks), German (56), French (53), Spanish (36), Chinese Mandarin & Cantonese (28), and Swahili (10) — bringing total static coverage to 272/272 audio resources (367 unique SHA-256 tracks / 992 manifest keys / 50,363 timed segments).',
+      'Silero VAD timing & reading-time rubric polish: Used Silero Voice Activity Detection across long 25–65 minute IGCSE exams to preserve exact wall-clock timestamps across silence pauses, spliced crisp English opening rubrics and post-5/8-minute-reading-pause instructions on non-English papers, and added clickable reading-time pause cues so students can jump straight to Question 1.',
+      'Zero-bloat lazy subject delivery: Visitors only fetch compact public/subtitles/manifest.json (112.7 KB) plus the single subject shard for the exam they open (154 KB–1.77 MB uncompressed), keeping standard Past Paper PDFs and non-audio pages completely unaffected.'
+    ]
+  },
+  {
+    version: 'v7.1',
+    date: '2026-11-22T22:15:00+06:00',
     title: '100% IAL Pre-Indexed Audio Subtitles, Sharded Delivery & Sync/Slicing Fixes',
     summary: 'Fixed early subtitle cutoffs, multi-unit ZIP passage slicing, and cross-unit track mismatches, migrated static subtitles to lazy per-subject shards, and pre-indexed 100% of all Edexcel IAL listening audio plus full-length IGCSE ESL June 2018 recordings.',
     changes: [
