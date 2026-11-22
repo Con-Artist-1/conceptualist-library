@@ -136,8 +136,11 @@ export default function AudioPlayerDock({
           sittingKey,
           trackIndex: zipTracks.length > 1 ? safeTrackIdx : 0,
           isMultiTrack: zipTracks.length > 1,
+          entryPath: activeZipTrack.entryPath || '',
           trackFileName: activeZipTrack.fileName || '',
           unitHint: activeZipTrack.unitHint || '',
+          isUnitTrack: Boolean(activeZipTrack.isUnitTrack),
+          isCombinedUnitArchive: Boolean(activeZipTrack.isCombinedUnitArchive),
           subject,
           spec,
           session
@@ -152,8 +155,11 @@ export default function AudioPlayerDock({
           sittingKey,
           trackIndex: null,
           isMultiTrack: false,
+          entryPath: currentDoc.name || '',
           trackFileName: currentDoc.name || '',
           unitHint: '',
+          isUnitTrack: false,
+          isCombinedUnitArchive: false,
           subject,
           spec,
           session
@@ -173,8 +179,11 @@ export default function AudioPlayerDock({
           sittingKey,
           trackIndex: zipTracks.length > 1 ? safeTrackIdx : 0,
           isMultiTrack: zipTracks.length > 1,
+          entryPath: activeZipTrack.entryPath || '',
           trackFileName: activeZipTrack.fileName || '',
           unitHint: activeZipTrack.unitHint || '',
+          isUnitTrack: Boolean(activeZipTrack.isUnitTrack),
+          isCombinedUnitArchive: Boolean(activeZipTrack.isCombinedUnitArchive),
           subject,
           spec,
           session
@@ -190,8 +199,11 @@ export default function AudioPlayerDock({
           sittingKey,
           trackIndex: null,
           isMultiTrack: false,
+          entryPath: singleTarget.name || '',
           trackFileName: singleTarget.name || '',
           unitHint: '',
+          isUnitTrack: false,
+          isCombinedUnitArchive: false,
           subject,
           spec,
           session
@@ -250,7 +262,9 @@ export default function AudioPlayerDock({
         if (existing && Array.isArray(existing.segments) && existing.segments.length > 0) {
           const adapted = adaptSubtitleEntryForTrack(existing, {
             isMultiTrack: activeAudioContext.isMultiTrack,
-            trackIndex: activeAudioContext.trackIndex || 0
+            trackIndex: activeAudioContext.trackIndex || 0,
+            isUnitTrack: activeAudioContext.isUnitTrack,
+            isCombinedUnitArchive: activeAudioContext.isCombinedUnitArchive
           });
           setSubtitleEntry(adapted);
           setSubtitleLoading(false);
@@ -270,7 +284,8 @@ export default function AudioPlayerDock({
         const generated = await generateLiveWhisperSubtitles({
           audioUrl: activeAudioContext.audioUrl,
           subject: activeAudioContext.subject,
-          trackIndex: activeAudioContext.trackIndex || 0,
+          spec: activeAudioContext.spec,
+          trackIndex: activeAudioContext.trackIndex,
           getCurrentTime: () => audioCurrentTimeRef.current,
           shouldCancel: () => cancelled,
           onProgress: (st) => {
@@ -313,10 +328,13 @@ export default function AudioPlayerDock({
   const activeSubtitleIdx = useMemo(() => {
     if (!subtitleSegments.length) return -1;
     const t = audioCurrentTime;
+    if (t < subtitleSegments[0].start - 0.5) return -1;
     let active = 0;
     for (let i = 0; i < subtitleSegments.length; i++) {
       if (subtitleSegments[i].start - 0.18 <= t) {
         active = i;
+      } else {
+        break;
       }
     }
     return active;
@@ -326,6 +344,8 @@ export default function AudioPlayerDock({
   const nextSubtitleSeg =
     activeSubtitleIdx >= 0 && activeSubtitleIdx + 1 < subtitleSegments.length
       ? subtitleSegments[activeSubtitleIdx + 1]
+      : activeSubtitleIdx === -1 && subtitleSegments.length > 0
+      ? subtitleSegments[0]
       : null;
 
   useEffect(() => {
@@ -404,8 +424,10 @@ export default function AudioPlayerDock({
 
   const renderSubtitleBar = (variant) => {
     if (!subtitlesEnabled || !activeAudioContext) return null;
-    const isOfficial = subtitleEntry?.source === 'official-transcript-pdf';
-    const sourceBadgeText = isOfficial
+    const isTranscriptSource =
+      subtitleEntry?.source === 'official-transcript-pdf' ||
+      subtitleEntry?.source === 'transcript-aligned';
+    const sourceBadgeText = isTranscriptSource
       ? 'Transcript PDF'
       : subtitleEntry?.tier === 'static' || subtitleEntry?.tier === 'cloud'
       ? 'Synchronized Subtitles'
@@ -492,19 +514,35 @@ export default function AudioPlayerDock({
               Generate AI Subtitles
             </button>
           </div>
-        ) : activeSubtitleSeg ? (
+        ) : activeSubtitleSeg || nextSubtitleSeg ? (
           <div className="modal-subtitle-live-stage">
-            <button
-              type="button"
-              className="modal-subtitle-active-line"
-              onClick={() => handleSeekToSubtitle(activeSubtitleSeg.start)}
-              title={`Click to replay from ${formatSubtitleTimestamp(activeSubtitleSeg.start)}`}
-            >
-              <span className="modal-subtitle-time-badge">
-                {formatSubtitleTimestamp(activeSubtitleSeg.start)}
-              </span>
-              <span className="modal-subtitle-active-text">{activeSubtitleSeg.text}</span>
-            </button>
+            {activeSubtitleSeg ? (
+              <button
+                type="button"
+                className="modal-subtitle-active-line"
+                onClick={() => handleSeekToSubtitle(activeSubtitleSeg.start)}
+                title={`Click to replay from ${formatSubtitleTimestamp(activeSubtitleSeg.start)}`}
+              >
+                <span className="modal-subtitle-time-badge">
+                  {formatSubtitleTimestamp(activeSubtitleSeg.start)}
+                </span>
+                <span className="modal-subtitle-active-text">{activeSubtitleSeg.text}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="modal-subtitle-active-line"
+                onClick={() => handleSeekToSubtitle(nextSubtitleSeg.start)}
+                title={`Click to jump to first spoken line at ${formatSubtitleTimestamp(nextSubtitleSeg.start)}`}
+              >
+                <span className="modal-subtitle-time-badge">
+                  {formatSubtitleTimestamp(audioCurrentTime)}
+                </span>
+                <span className="modal-subtitle-active-text">
+                  Listening — speech starts at {formatSubtitleTimestamp(nextSubtitleSeg.start)}
+                </span>
+              </button>
+            )}
             {nextSubtitleSeg && (
               <button
                 type="button"
@@ -565,12 +603,12 @@ export default function AudioPlayerDock({
             title={
               !useFullSingleAudio && activeZipTrack
                 ? `${activeZipTrack.title} (${audZipSib?.name || audSib.name})`
-                : audSib.name || audSib.path
+                : (audSingleSib || audSib).name || (audSingleSib || audSib).path
             }
           >
             {!useFullSingleAudio && activeZipTrack
               ? activeZipTrack.title
-              : audSib.name || 'Listening Audio Track'}
+              : (audSingleSib || audSib).name || 'Listening Audio Track'}
           </span>
         </div>
 
@@ -620,6 +658,7 @@ export default function AudioPlayerDock({
           </div>
         ) : (
           <audio
+            key={activeAudioIdentity || 'dock-audio'}
             ref={audioPlayerRef}
             controls
             autoPlay
@@ -765,6 +804,7 @@ export default function AudioPlayerDock({
                 {activeZipTrack?.blobUrl && (
                   <>
                     <audio
+                      key={activeAudioIdentity || 'card-zip-audio'}
                       ref={audioPlayerRef}
                       controls
                       autoPlay

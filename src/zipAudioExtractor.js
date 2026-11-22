@@ -34,7 +34,9 @@ function buildTrackLabels(rawEntryPath, index, total) {
     return {
       shortLabel: `Track ${num}`,
       title: `Track ${num} — ${baseName}`,
-      unitHint: /2[_-]/i.test(stem) ? 'U2' : /4[_-]/i.test(stem) ? 'U4' : ''
+      unitHint: /2[_-]/i.test(stem) ? 'U2' : /4[_-]/i.test(stem) ? 'U4' : '',
+      isUnitTrack: false,
+      isTrackedPart: true
     };
   }
 
@@ -43,14 +45,18 @@ function buildTrackLabels(rawEntryPath, index, total) {
     return {
       shortLabel: 'Unit 2 Audio',
       title: `Unit 2 — ${baseName}`,
-      unitHint: 'U2'
+      unitHint: 'U2',
+      isUnitTrack: true,
+      isTrackedPart: false
     };
   }
   if (/\b(?:U4|WFR04|WGN04|WSP04|Unit\s*4)\b/i.test(rawEntryPath)) {
     return {
       shortLabel: 'Unit 4 Audio',
       title: `Unit 4 — ${baseName}`,
-      unitHint: 'U4'
+      unitHint: 'U4',
+      isUnitTrack: true,
+      isTrackedPart: false
     };
   }
 
@@ -58,14 +64,18 @@ function buildTrackLabels(rawEntryPath, index, total) {
     return {
       shortLabel: `Track ${index + 1}`,
       title: `Track ${index + 1} — ${baseName}`,
-      unitHint: ''
+      unitHint: '',
+      isUnitTrack: false,
+      isTrackedPart: true
     };
   }
 
   return {
     shortLabel: 'Audio Track',
     title: baseName,
-    unitHint: ''
+    unitHint: '',
+    isUnitTrack: false,
+    isTrackedPart: false
   };
 }
 
@@ -265,8 +275,18 @@ export async function extractZipAudioTracks(url, onProgress = null) {
         a.entryPath.localeCompare(b.entryPath, undefined, { numeric: true, sensitivity: 'base' })
       );
 
-      const tracks = rawTracks.map((item, idx) => {
-        const labels = buildTrackLabels(item.entryPath, idx, rawTracks.length);
+      const trackDrafts = rawTracks.map((item, idx) => ({
+        item,
+        idx,
+        labels: buildTrackLabels(item.entryPath, idx, rawTracks.length)
+      }));
+      const isCombinedUnitArchive =
+        trackDrafts.some((d) => d.labels.isUnitTrack) ||
+        (trackDrafts.some((d) => d.labels.unitHint === 'U2') &&
+          trackDrafts.some((d) => d.labels.unitHint === 'U4') &&
+          !trackDrafts.every((d) => d.labels.isTrackedPart));
+
+      const tracks = trackDrafts.map(({ item, idx, labels }) => {
         const blob = new Blob([item.bytes], { type: item.mimeType });
         const blobUrl =
           typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
@@ -283,6 +303,9 @@ export async function extractZipAudioTracks(url, onProgress = null) {
           shortLabel: labels.shortLabel,
           title: labels.title,
           unitHint: labels.unitHint,
+          isUnitTrack: labels.isUnitTrack,
+          isTrackedPart: labels.isTrackedPart,
+          isCombinedUnitArchive,
           blobUrl
         };
       });

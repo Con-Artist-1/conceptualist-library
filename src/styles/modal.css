@@ -3335,9 +3335,11 @@
 
   .modal-audio-dock-actions {
     order: 2;
-    margin-left: auto;
+    flex: 1 1 100%;
+    max-width: 100%;
+    margin-left: 0;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .modal-audio-dock-tracks {

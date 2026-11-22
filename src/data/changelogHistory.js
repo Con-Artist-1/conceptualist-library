@@ -2,8 +2,19 @@ import { BUILD_TIMESTAMP } from '../lib/appMeta.js';
 
 export const CHANGELOG_HISTORY = [
   {
-    version: 'v7.0.1',
+    version: 'v7.1',
     date: BUILD_TIMESTAMP,
+    title: '100% IAL Pre-Indexed Audio Subtitles, Sharded Delivery & Sync/Slicing Fixes',
+    summary: 'Fixed early subtitle cutoffs, multi-unit ZIP passage slicing, and cross-unit track mismatches, migrated static subtitles to lazy per-subject shards, and pre-indexed 100% of all Edexcel IAL listening audio plus full-length IGCSE ESL June 2018 recordings.',
+    changes: [
+      'Real-audio forced alignment & full-duration sync: Replaced linear estimate timestamps with real audio word-level forced alignment against verbatim Transcript PDFs (fixing the 5:02 cutoff on 6:59 French WFR02 June 2021 recordings, kerning-split text in legacy 2019 PDFs, and the 23:37 early cutoff on 42:34 IGCSE ESL June 2018 P2/P2R tracks) with clean English exam intro splicing.',
+      'Multi-unit ZIP & track-switching fixes: Stopped Audio U2U4.zip archives from slicing off Passages 2–4, prioritized exact per-track and unit-hint subtitle keys so switching between Unit 2 Audio, Unit 4 Audio, and Full Audio inside the same modal always loads the matching unit captions, added a pre-speech standby state, and keyed the audio element cleanly across track switches.',
+      'Sharded static subtitles & 100% IAL coverage: Migrated static subtitles to public/subtitles/manifest.json + lazy per-subject shards (ial-french, ial-german, ial-spanish, igcse-esl — 140 unique SHA-256 tracks / 400 keys covering all 96 IAL listening resources + 2 IGCSE ESL 2018 tracks), fixed regional _R_AUD variant parsing so IGCSE P2 and P2R audio no longer collide, and raised /api/views shared cloud cache caps to 1,200 segments / 320 KB with multi-key fallback lookup.'
+    ]
+  },
+  {
+    version: 'v7.0.1',
+    date: '2026-11-22T16:40:00+06:00',
     title: 'Entry Bundle Trimming, Idle Telemetry & Pure OLED Filter Polish',
     summary: 'Removed heavy unit-parsing tables and telemetry from the synchronous entry bundle, trimmed unused CSS custom properties, and fixed Pure OLED filter button contrast.',
     changes: [

@@ -352,10 +352,23 @@ fs.writeFileSync(metaPath, JSON.stringify(metaOutput));
 const rootLiveIndexPath = path.join(TARGET_DIR, 'live_index.json');
 fs.writeFileSync(rootLiveIndexPath, JSON.stringify(output));
 
-// Incrementally maintain public/audio-subtitles.json (preserves existing Whisper/PDF subtitles & merges any local server cache)
+// Incrementally maintain audio subtitles coverage (sharded public/subtitles/manifest.json + legacy fallback)
+const subtitlesManifestPath = path.join(publicDir, 'subtitles', 'manifest.json');
 const subtitlesPath = path.join(publicDir, 'audio-subtitles.json');
 const localServerSubtitlesPath = path.resolve(__dirname, '..', '.data', 'audio_subtitles.json');
 try {
+  let manifestKeys = {};
+  let shardCount = 0;
+  let uniqueTrackCount = 0;
+  if (fs.existsSync(subtitlesManifestPath)) {
+    const parsedManifest = JSON.parse(fs.readFileSync(subtitlesManifestPath, 'utf-8'));
+    if (parsedManifest && typeof parsedManifest.keys === 'object') {
+      manifestKeys = parsedManifest.keys;
+      shardCount = Array.isArray(parsedManifest.shards) ? parsedManifest.shards.length : 0;
+      uniqueTrackCount = new Set(Object.values(manifestKeys)).size;
+    }
+  }
+
   let subDb = { version: '1.0', generatedAt: new Date().toISOString(), tracks: {} };
   if (fs.existsSync(subtitlesPath)) {
     const existing = JSON.parse(fs.readFileSync(subtitlesPath, 'utf-8'));
@@ -368,27 +381,36 @@ try {
     const localCached = JSON.parse(fs.readFileSync(localServerSubtitlesPath, 'utf-8'));
     if (localCached && typeof localCached.tracks === 'object') {
       for (const [k, v] of Object.entries(localCached.tracks)) {
-        if (!subDb.tracks[k] && v && Array.isArray(v.segments) && v.segments.length > 0) {
+        if (!manifestKeys[k] && !subDb.tracks[k] && v && Array.isArray(v.segments) && v.segments.length > 0) {
           subDb.tracks[k] = v;
           mergedCount++;
         }
       }
     }
   }
-  if (!fs.existsSync(subtitlesPath) || mergedCount > 0) {
+  if ((!fs.existsSync(subtitlesPath) && Object.keys(manifestKeys).length === 0) || mergedCount > 0) {
     subDb.generatedAt = new Date().toISOString();
-    fs.writeFileSync(subtitlesPath, JSON.stringify(subDb, null, 2));
+    fs.writeFileSync(subtitlesPath, JSON.stringify(subDb));
   }
   const tracksMap = subDb.tracks || {};
-  const totalSubKeys = Object.keys(tracksMap).length;
+  const allSubtitleKeys = new Set([...Object.keys(manifestKeys), ...Object.keys(tracksMap)]);
   const audFiles = dedupedFiles.filter((f) => f.docType === 'AUD');
   const coveredAudCount = audFiles.filter((f) => {
-    const sit = `${f.spec || 'IAL'}|${f.subject || ''}|${f.unitCode || ''}||${f.session || ''}`;
-    return Boolean(tracksMap[f.path] || tracksMap[sit] || tracksMap[`${sit}#track-1`]);
+    const sit = `${f.spec || 'IAL'}|${f.subject || ''}|${f.unitCode || ''}|${f.variant || ''}|${f.session || ''}`;
+    if (allSubtitleKeys.has(f.path) || allSubtitleKeys.has(sit) || allSubtitleKeys.has(`${sit}#track-1`)) {
+      return true;
+    }
+    const zipPrefix = `${f.path}#`;
+    for (const k of allSubtitleKeys) {
+      if (k.startsWith(zipPrefix)) return true;
+    }
+    return false;
   }).length;
-  console.log(`Audio Subtitles Index: ${totalSubKeys} cached subtitle keys covering ${coveredAudCount}/${audFiles.length} audio resources (${mergedCount} newly merged from .data/audio_subtitles.json).`);
+  console.log(
+    `Audio Subtitles Index: ${allSubtitleKeys.size} subtitle keys (${uniqueTrackCount} sharded unique tracks across ${shardCount} shards) covering ${coveredAudCount}/${audFiles.length} audio resources (${mergedCount} newly merged from .data/audio_subtitles.json).`
+  );
 } catch (err) {
-  console.warn('Warning: could not sync audio-subtitles.json:', err.message);
+  console.warn('Warning: could not sync audio subtitles metadata:', err.message);
 }
 
 console.log(`Index generated successfully at ${outputPath}`);

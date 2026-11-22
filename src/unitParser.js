@@ -719,9 +719,9 @@ export function extractVariant(file) {
     if (mSol) return `Sol-${mSol[1].toUpperCase()}`;
   }
 
-  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*0?[12]F[-_\s]*R?|4WM[12]F|Foundation|F(?=[-_](?:R|Mod|QP|MS|ER)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
-  const isH = /(?:^|[^A-Z0-9])(?:[1-4]H[-_]?R?|Paper[-_\s]*0?[1-4]H[-_\s]*R?|4WM[12]H|Higher|H(?=[-_](?:R|Mod|QP|MS|ER)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
-  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*0?[1-4][A-EBCPFH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-6][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][A-EFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R|(?:[FH]-)?R(?=[-_](?:Mod|QP|MS|ER)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
+  const isF = /(?:^|[^A-Z0-9])(?:[12]F[-_]?R?|Paper[-_\s]*0?[12]F[-_\s]*R?|4WM[12]F|Foundation|F(?=[-_](?:R|Mod|QP|MS|ER|AUD|SC|DF)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
+  const isH = /(?:^|[^A-Z0-9])(?:[1-4]H[-_]?R?|Paper[-_\s]*0?[1-4]H[-_\s]*R?|4WM[12]H|Higher|H(?=[-_](?:R|Mod|QP|MS|ER|AUD|SC|DF)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
+  const isR = /(?:^|[^A-Z0-9])(?:Paper[-_\s]*0?[1-4][A-EBCPFH]?[-_\s]*R|Unit[-_\s]*[1-6]R|Modular[-_\s]*[1-6][A-Z]*R|P[1-4]R|U[1-6]R|[1-4][A-EFH]R|WMA1[1-4]R|C[1-4]R|C12R|C34R|M[1-3]R|S[1-3]R|D1R|0[1-4]R|(?:[FH]-)?R(?=[-_](?:Mod|QP|MS|ER|AUD|SC|DF)(?:[-_.]|$)))(?:[^A-Z0-9]|$)/i.test(p);
 
   if (isMod) {
     if (isF && isR) return 'F-R-Mod';

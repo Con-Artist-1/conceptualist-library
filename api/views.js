@@ -72,7 +72,7 @@ function saveLocalSubtitlesStore(tracksMap) {
 function sanitizeSubtitlePayload(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.segments)) return null;
   const cleanSegments = [];
-  for (const seg of raw.segments.slice(0, 250)) {
+  for (const seg of raw.segments.slice(0, 1200)) {
     if (!seg || typeof seg !== 'object') continue;
     const start = Number(seg.start);
     const end = Number(seg.end);
@@ -338,27 +338,67 @@ export default async function handler(req, res) {
         res.setHeader('Cache-Control', 'no-store, max-age=0');
         return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle trackKey' });
       }
+      const rawAltsParam =
+        typeof req.query?.alts === 'string'
+          ? req.query.alts
+          : urlObj.searchParams.get('alts') || '';
+      const validAlts = rawAltsParam
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k && k !== subtitlesKeyParam && isValidSubtitleKey(k))
+        .slice(0, 4);
+      const lookupKeys = [subtitlesKeyParam, ...validAlts];
+
       res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
       const localSubs = loadLocalSubtitlesStore();
       try {
         const db = await getMongoDatabase();
         const subCol = db.collection(COLLECTION_SUBTITLES);
-        const doc = await subCol.findOne(
-          { $or: [{ _id: subtitlesKeyParam }, { aliasKeys: subtitlesKeyParam }] },
-          { projection: { _id: 1, subtitle: 1 } }
-        );
-        if (doc?.subtitle && Array.isArray(doc.subtitle.segments)) {
-          localSubs[subtitlesKeyParam] = doc.subtitle;
-          return sendJsonResponse(res, 200, { ok: true, source: 'mongodb', subtitle: doc.subtitle });
+        const docs = await subCol
+          .find(
+            { $or: [{ _id: { $in: lookupKeys } }, { aliasKeys: { $in: lookupKeys } }] },
+            { projection: { _id: 1, aliasKeys: 1, subtitle: 1 } }
+          )
+          .limit(6)
+          .toArray();
+        let bestDoc = null;
+        let matchedKey = subtitlesKeyParam;
+        for (const k of lookupKeys) {
+          const found = docs.find(
+            (d) => d._id === k || (Array.isArray(d.aliasKeys) && d.aliasKeys.includes(k))
+          );
+          if (found?.subtitle && Array.isArray(found.subtitle.segments)) {
+            bestDoc = found;
+            matchedKey = k;
+            break;
+          }
+        }
+        if (bestDoc) {
+          localSubs[matchedKey] = bestDoc.subtitle;
+          return sendJsonResponse(res, 200, {
+            ok: true,
+            source: 'mongodb',
+            matchedKey,
+            subtitle: bestDoc.subtitle
+          });
         }
       } catch {
         // Fallback to local subtitles store
       }
-      const fallbackHit = localSubs[subtitlesKeyParam] || null;
+      for (const k of lookupKeys) {
+        if (localSubs[k]) {
+          return sendJsonResponse(res, 200, {
+            ok: true,
+            source: 'server-store',
+            matchedKey: k,
+            subtitle: localSubs[k]
+          });
+        }
+      }
       return sendJsonResponse(res, 200, {
         ok: true,
         source: 'server-store',
-        subtitle: fallbackHit
+        subtitle: null
       });
     }
 
@@ -421,7 +461,7 @@ export default async function handler(req, res) {
     let viewerId = '';
     let body = null;
     try {
-      body = await readJsonBody(req, 65536);
+      body = await readJsonBody(req, 327680);
       paperKey = typeof body?.paperKey === 'string' ? body.paperKey.trim() : '';
       viewerId = typeof body?.viewerId === 'string' ? body.viewerId.trim().slice(0, 64) : '';
     } catch {
