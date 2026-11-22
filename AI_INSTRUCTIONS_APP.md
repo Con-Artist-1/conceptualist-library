@@ -6,7 +6,7 @@ Welcome! If you are an AI assistant working inside `e:\The Library\search-app`, 
 
 ## 1. Core Production Scripts (`search-app/scripts/`)
 
-Keep `search-app/scripts/` strictly limited to these **8 core utilities** (do not leave scratch/test scripts behind):
+Keep `search-app/scripts/` strictly limited to these **9 core utilities** (do not leave scratch/test scripts behind):
 
 1. **`generate-index.js`**: Scans `Past Papers/`, `IAL Books/`, and `IGCSE Books/` using `src/unitParser.js`, deduplicates variants, and outputs `public/meta.json` (`~0ms` wizard bootstrap), `public/index.json` (tuple-encoded `keys` + `files`), and root `live_index.json`. Also reports Tier 1 subtitle coverage across `AUD` listening resources from `public/subtitles/manifest.json` (plus legacy `public/audio-subtitles.json` & `.data/audio_subtitles.json` merging). Ignores `toaz.info-*` junk artifacts and merges legacy Physics `WPH07` into `WPH13`.
 2. **`build.js`**: Runs the Vite 8 production build (`dist/`) and invokes `prerender-seo.js`.
@@ -20,6 +20,7 @@ Keep `search-app/scripts/` strictly limited to these **8 core utilities** (do no
 6. **`sync-hf.js`**: Syncs library documents to the Hugging Face dataset (`Diavlon/mcmaster-docs-library`).
 7. **`upload-live-index-hf.js`**: Uploads root `live_index.json` to Hugging Face as a resilient client fallback.
 8. **`sync-sources.js`**: Fast multi-source updater (`bsr`, `dp`, `igexams`, `ssc`, `pmt`, `pl`) supporting `--dry-run` (default) / `--apply`, `--sources=`, `--since=YYYY`, `--qpdf=`, incremental `.data/library_sha_cache.json` SHA-256 caching, strict Edexcel-only & IAL vs UK GCE / IGCSE isolation (blocks non-IAL subjects, `4xxx`/IGCSE/GCSE paper codes, AQA/OCR/CIE boards, and `toaz.info` junk), PDF magic + `%%EOF` trailer + trailing-HTML validation, multi-source fallback retries per deduplication key, `curl.exe` large-file fallback, `Sciences (Double Award)` shared-paper restore, optional `qpdf` `/ObjStm` optimization, and automatic `generate-index.js` re-indexing.
+9. **`index-audio-subtitles.js`**: Incremental offline audio subtitle pre-indexer (`npm run subtitles`). Scans `public/index.json` for all `AUD` files (`.mp3`/`.wav`/`.m4a`/`.ogg` and single/nested `.zip` archives), skips tracks already present in `public/subtitles/*.json` by SHA-256 hash, and processes **only newly added tracks** using local Whisper binaries & models in git-ignored `.data/whisper/` (CPU OpenBLAS AVX2 + single Vulkan GPU worker, `--cpu-only`, `--dry-run`, `--force`) with Silero VAD on IGCSE, opening & post-reading-pause English rubric probes, and geometry-aware PDF.js verbatim transcript forced alignment on IAL tracks, merging results cleanly into `public/subtitles/<shard>.json` and `public/subtitles/manifest.json`.
 
 ---
 
@@ -109,8 +110,14 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
 
 ## 6. Adding New Audio Files & Subtitle Maintenance
 
-- **Incremental Updates Only:** You do not need to re-transcribe older listening sittings when adding new audio archives or Transcript PDFs. Drop new `.mp3`/`.wav`/`.zip`/Transcript PDFs into `Past Papers/` and run `scripts/generate-index.js`.
-- **Automatic Preservation & Sharded Coverage:** Sharded static subtitles live in `public/subtitles/manifest.json` and per-subject shard files (`public/subtitles/*.json`). `generate-index.js` reports combined coverage across `public/subtitles/manifest.json` + legacy `public/audio-subtitles.json` (and merges `.data/audio_subtitles.json` while `push-github.js` excludes `.data/`). Uncached tracks stay transcribable on-demand via the in-browser **Generate AI Subtitles** opt-in prompt and save to MongoDB (`audio_subtitles`).
+- **Incremental 1-Command Pre-Indexing:** You never need to re-transcribe older listening sittings when adding new audio files or Transcript PDFs. Drop new `.mp3`/`.wav`/`.zip`/Transcript PDFs into `Past Papers/` (or pull them with `scripts/sync-sources.js --apply`), then run:
+  ```powershell
+  $env:ELECTRON_RUN_AS_NODE="1"
+  $exe = "C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe"
+  cmd /c "`"$exe`" `"e:\The Library\search-app\scripts\generate-index.js`" && `"$exe`" `"e:\The Library\search-app\scripts\index-audio-subtitles.js`" && `"$exe`" `"e:\The Library\search-app\scripts\generate-index.js`" 2>&1" | Write-Output
+  ```
+  *(Supports `--dry-run` to preview newly detected audio tracks, `--cpu-only` to bypass Vulkan GPU, and `--gpu-dev=N` / `--threads=N`. Never run more than 1 concurrent Vulkan process on RX 550.)*
+- **Local Runtime & Automatic Preservation:** Local Whisper CLI binaries (`cpu/whisper-cli.exe`, `vulkan/whisper-cli.exe`) and GGML models (`ggml-base-q5_1.bin`, `ggml-silero-v5.1.2.bin`) live in git-ignored `search-app/.data/whisper/` (excluded by `.gitignore`, `push-github.js`, and `deploy-vercel.js`; models auto-download if absent). `index-audio-subtitles.js` skips all tracks whose SHA-256 already exists in `public/subtitles/*.json` and merges only new tracks + keys into `public/subtitles/`. Any un-indexed tracks still remain transcribable on-demand in-browser via **Generate AI Subtitles** and save to MongoDB (`audio_subtitles`).
 
 ---
 
@@ -122,7 +129,7 @@ $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output
    ```
 3. Verify locally via **Brave Origin Headless** (`C:\Program Files\BraveSoftware\Brave-Origin\Application\brave.exe` with `--headless=new`, `--user-data-dir=<temp>`, and CDP WebSocket) across desktop (`1366x768`, `1440x900`) and mobile (`390x844`) in Light, Dark, and Pure OLED modes:
-   - *CDP Notes:* Fresh temp `--user-data-dir` profiles open `chrome://brave-origin-startup/` on launch; navigate via `Page.navigate` after `Page.enable` until `location.href` leaves `chrome://`. Note that headless Chromium inherits the host Windows "Animation effects" state (`prefers-reduced-motion`), so test both `{ name: 'prefers-reduced-motion', value: 'no-preference' }` and `'reduce'` via `Emulation.setEmulatedMedia` when verifying View Transitions. Set `server: { hmr: false }` in Vite harnesses during long async Whisper flows. Store scratch test files outside the repo (`AppData` brain/scratch), verify `.data/audio_subtitles.json` is unpolluted, and keep `scripts/` strictly limited to the 8 core scripts.
+   - *CDP Notes:* Fresh temp `--user-data-dir` profiles open `chrome://brave-origin-startup/` on launch; navigate via `Page.navigate` after `Page.enable` until `location.href` leaves `chrome://`. Note that headless Chromium inherits the host Windows "Animation effects" state (`prefers-reduced-motion`), so test both `{ name: 'prefers-reduced-motion', value: 'no-preference' }` and `'reduce'` via `Emulation.setEmulatedMedia` when verifying View Transitions. Set `server: { hmr: false }` in Vite harnesses during long async Whisper flows. Store scratch test files outside the repo (`AppData` brain/scratch), verify `.data/audio_subtitles.json` is unpolluted, and keep `scripts/` strictly limited to the 9 core scripts.
 4. **Push to GitHub via `scripts/push-github.js`** (NEVER run CLI `git push`):
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\push-github.js`" `"<commit message>`" 2>&1" | Write-Output

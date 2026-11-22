@@ -81,12 +81,18 @@ Preview the compiled production bundle locally:
 npm run preview
 ```
 
-### Rebuilding the Index
+### Rebuilding the Index & Pre-Indexing New Audio
 
-After adding or organizing library documents (or new audio packages / Transcript PDFs) in `Past Papers/`, `IAL Books/`, or `IGCSE Books/`, regenerate `public/meta.json`, `public/index.json`, root `live_index.json`, incrementally preserve/merge `public/audio-subtitles.json`, and run SEO pre-renders:
+After adding or organizing library documents (or new audio packages / Transcript PDFs) in `Past Papers/`, `IAL Books/`, or `IGCSE Books/`, regenerate `public/meta.json`, `public/index.json`, root `live_index.json`, and run SEO pre-renders:
 
 ```bash
 npm run index
+```
+
+If new listening audio files were added, incrementally pre-index only the newly added tracks into `public/subtitles/` (skips all already-indexed SHA-256 tracks; supports `--dry-run` and `--cpu-only`):
+
+```bash
+npm run subtitles
 ```
 
 ### IndexNow & Environment Credentials
@@ -101,7 +107,7 @@ npm run indexnow
 
 - `api/`: Vercel serverless endpoints (`views.js` for paper popularity counters & shared audio subtitle caching; `telemetry.js` for anonymized session metrics; `_shared.js` for MongoDB pooling, validation & rate limits).
 - `public/`: Static assets, self-hosted WOFF2 fonts (`fonts/`), locally bundled PDF.js (`pdfjs/`), generated catalog files (`meta.json`, `index.json`), sharded pre-indexed subtitles (`subtitles/manifest.json` + subject shards, plus legacy `audio-subtitles.json` stub), Open Graph card (`og-card.png`), IndexNow verification `<INDEXNOW_KEY>.txt`, `llms.txt`, `robots.txt`, and `sitemap.xml`.
-- `scripts/`: Strictly the 8 core automation utilities (`generate-index.js`, `build.js`, `prerender-seo.js`, `push-github.js`, `deploy-vercel.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`).
+- `scripts/`: Strictly the 9 core automation utilities (`generate-index.js`, `index-audio-subtitles.js`, `build.js`, `prerender-seo.js`, `push-github.js`, `deploy-vercel.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`).
 - `src/`: Modular application source:
   - Root modules: `main.jsx`, `App.jsx`, `PdfViewerPane.jsx`, `searchEngine.js`, `seoRoutes.js`, `unitParser.js`, `bookCatalog.js`, `audioSubtitles.js`, `zipUtils.js`, `zipAudioExtractor.js`, `zipPdfExtractor.js`, `telemetry.js`, `index.css`.
   - `src/components/`: `WelcomePage.jsx`, `Header.jsx`, `Footer.jsx`, `Breadcrumbs.jsx`, `SearchBanner.jsx`, `PaperTable.jsx`, `ArchiveContextStrip.jsx`, `CrashRecoveryScreen.jsx`, `ThemeToggleButton.jsx`, `PaperViewsCounter.jsx`, `Skeletons.jsx`, `ResourceCard.jsx`, `VirtualPdfPage.jsx`, plus lazy-loaded `PreviewModal.jsx`, `AudioPlayerDock.jsx`, `SolutionBankView.jsx`, `FilterDrawer.jsx`, `AboutPage.jsx`, `ChangelogPage.jsx`, and `NotFoundCard.jsx`.
