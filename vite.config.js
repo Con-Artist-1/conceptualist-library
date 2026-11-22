@@ -308,12 +308,21 @@ const serveLibraryFiles = () => {
   }
 }
 
+const APP_BUILD_TIME = new Date().toISOString()
+
+const injectBuildTimestampHtml = () => ({
+  name: 'inject-build-timestamp-html',
+  transformIndexHtml(html) {
+    return html.replace(/__CS_BUILD_TIME__/g, APP_BUILD_TIME)
+  }
+})
+
 // https://vite.dev/config/
 export default defineConfig({
   define: {
-    __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __APP_BUILD_TIME__: JSON.stringify(APP_BUILD_TIME),
   },
-  plugins: [react(), serveLibraryFiles()],
+  plugins: [react(), serveLibraryFiles(), injectBuildTimestampHtml()],
   build: {
     target: 'es2022',
     rollupOptions: {

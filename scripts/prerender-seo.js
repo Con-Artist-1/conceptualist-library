@@ -11,12 +11,14 @@ import {
   getUnitCodeFromLabel,
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
+  getShardPathForRoute,
   getSeoMetadata,
   buildJsonLd,
   buildRouteFaqEntries
 } from '../src/seoRoutes.js';
 import { compareUnitLabels, isLegacyIalUnitLabel } from '../src/unitParser.js';
 import { BOOK_CATALOG_BY_PATH } from '../src/bookCatalog.js';
+import { CHANGELOG_HISTORY } from '../src/data/changelogHistory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -451,13 +453,11 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>'
     );
   } else if (currentTab === 'changelog') {
-    itemEntries.push(
-      '<li><strong>v6.9.5 (Latest):</strong> Full SEO &amp; AI-visibility upgrade (real DOM prerendering, llms.txt index, Book &amp; FAQPage JSON-LD, current-spec unit code prioritization, lateral unit linking, and 1-click Copy Study Link).</li>',
-      '<li><strong>v6.9.4:</strong> Resizable Two-Page Side-by-Side PDF Reader Mode for textbooks and standalone past papers.</li>',
-      '<li><strong>v6.9.3:</strong> Instant cache freshness, 24-hour auto-reload, and 100% Fast Web View large-PDF linearization.</li>',
-      '<li><strong>v6.9.2:</strong> Added IGCSE (9-1) Commerce Student Book and Mathematics A Student Book 2 (73 total textbooks &amp; solution banks).</li>',
-      '<li><strong>v6.9:</strong> Verified bibliographic textbook catalog, unit ordering, and hash-based modal deep links.</li>'
-    );
+    for (const entry of CHANGELOG_HISTORY.slice(0, 8)) {
+      itemEntries.push(
+        `<li><strong>${escapeHtml(entry.version)}:</strong> ${escapeHtml(entry.title)} — ${escapeHtml(entry.summary)}</li>`
+      );
+    }
     links.push(
       '<li><a href="/papers">Browse All Edexcel IAL &amp; IGCSE Past Papers</a></li>',
       '<li><a href="/textbooks">Browse Textbooks &amp; Worked Solution Banks</a></li>',
@@ -693,12 +693,35 @@ function setOrInsertTag(html, tagRegex, newTag) {
   return html.replace(/<\/head>/i, `  ${newTag}\n  </head>`);
 }
 
+function buildInstantBootShell(seo) {
+  return `<div class="app-boot-shell" aria-hidden="true">` +
+    `<div class="boot-header"><div class="boot-brand">Conceptualist <span>Systems</span></div></div>` +
+    `<div class="boot-search-bar"><div class="boot-search-pill"></div></div>` +
+    `<div class="boot-main"><div class="boot-hero">` +
+      `<div class="boot-title">${escapeHtml(seo.h1)}</div>` +
+      `<p class="boot-subtitle">${escapeHtml(seo.subtitle || seo.description)}</p>` +
+    `</div></div>` +
+  `</div>`;
+}
+
 function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
   const seo = getSeoMetadata({ ...route.state, meta });
   const jsonLd = buildJsonLd({ ...route.state, seo, meta });
   const staticBody = buildStaticSemanticBody(route, seo, meta, indexLookup);
+  const bootShell = buildInstantBootShell(seo);
+  const routeShard = getShardPathForRoute(route.state);
+  const routeNeedsFull = Boolean(
+    !routeShard &&
+    route.state.currentTab === 'library' &&
+    !route.state.notFound &&
+    (route.state.forceShowTable || route.state.filterCurriculum || route.state.filterDocType)
+  );
 
   let html = templateHtml;
+
+  // Inject route-specific parallel early-fetch targets into <head> script
+  html = html.replace(/__CS_ROUTE_SHARD__/g, routeShard || '');
+  html = html.replace(/__CS_ROUTE_NEEDS_FULL__/g, routeNeedsFull ? '1' : '0');
 
   // Replace <title>
   html = setOrInsertTag(
@@ -772,10 +795,11 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
 
   // Inject crawlable semantic HTML directly inside <div id="root">...</div> (without <noscript>!)
   // so non-JS AI search crawlers (OAI-SearchBot, PerplexityBot, ClaudeBot, GPTBot), Bingbot, and Googlebot Wave-1
-  // index real visible DOM headings, Q&As, sittings, and internal links, while React createRoot replaces it on mount.
+  // index real visible DOM headings, Q&As, sittings, and internal links, while JS browsers paint .app-boot-shell
+  // immediately until React createRoot mounts the full interactive UI.
   html = html.replace(
     /<div id="root"><\/div>/i,
-    `<div id="root">${staticBody}</div>`
+    `<div id="root">${bootShell}${staticBody}</div>`
   );
 
   return html;
@@ -808,7 +832,7 @@ function generateLlmsTxt(meta, indexLookup) {
     `- [Edexcel IGCSE Past Papers](${SITE_URL}/igcse): ${igcseSubjects.length} International GCSE (9-1, Regional R, and Modular 4W*) subjects.`,
     `- [Textbooks & Worked Solution Banks](${SITE_URL}/textbooks): ${booksCount} student books, answer PDFs, lab books, and IAL Maths Solution Banks.`,
     `- [Edexcel IAL Textbooks & Solution Banks](${SITE_URL}/textbooks/ial): Student Book 1 & 2 PDFs, answers, and P1-P4/M1-M3/S1-S3/D1/FP1-FP3 Solution Banks.`,
-    `- [Edexcel IGCSE (9-1) Textbooks](${SITE_URL}/textbooks/igcse): Official student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.`,
+    `- [Edexcel IGCSE (9-1) Textbooks](${SITE_URL}/textbooks/igcse): Verified student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.`,
     `- [Listening Audio Archive (MP3 & Live CC)](${SITE_URL}/audio): ${audioCount} listening audio tracks and synced transcripts.`,
     `- [IT & Computer Science Practical Data Files](${SITE_URL}/data-files): ${dfCount} practical exam source ZIPs for WIT12, WIT14, 4IT1, and 4CP0.`,
     '',

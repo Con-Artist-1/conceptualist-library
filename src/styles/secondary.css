@@ -1,0 +1,519 @@
+/* Secondary Page Styles (About & Changelog — Light, Academic Dark & Pure OLED) */
+
+/* ===================== ABOUT PAGE ===================== */
+.about-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.about-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-top: 4px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-md);
+  padding: 36px;
+  box-shadow: var(--shadow-sm);
+}
+
+.about-title {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--mcmaster-maroon);
+  margin-bottom: 12px;
+}
+
+.about-lead {
+  font-size: 16px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.about-divider {
+  border: none;
+  border-top: 1px solid var(--border-medium);
+  margin: 24px 0;
+}
+
+.about-section {
+  margin-bottom: 24px;
+}
+
+.about-section h2 {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.about-section p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.team-card {
+  background: var(--bg-page);
+  border: 1px solid var(--border-medium);
+  border-left: 4px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+
+.team-name {
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.team-role {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.contact-box {
+  background: var(--badge-qp-bg);
+  border: 1px solid var(--badge-qp-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-top: 12px;
+  color: var(--badge-qp-text);
+  font-size: 14px;
+}
+
+.contact-box a {
+  color: var(--mcmaster-maroon);
+  font-weight: 800;
+}
+
+/* ===================== CHANGELOG PAGE ===================== */
+.changelog-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.changelog-build-box {
+  background: var(--bg-page);
+  border: 1px solid var(--border-medium);
+  border-left: 4px solid var(--mcmaster-maroon);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 240px;
+}
+
+.changelog-build-version {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.changelog-build-version strong {
+  color: var(--mcmaster-maroon);
+  font-weight: 800;
+}
+
+.changelog-build-time {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.changelog-purge-btn {
+  margin-top: 6px;
+  background: var(--bg-surface);
+  color: var(--mcmaster-maroon);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  font-family: var(--font-family);
+}
+
+.changelog-purge-btn:hover {
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF;
+  border-color: var(--mcmaster-maroon);
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.changelog-entry {
+  background: var(--bg-page);
+  border: 1px solid var(--border-medium);
+  border-left: 4px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  padding: 18px 22px;
+}
+
+.changelog-entry.latest {
+  border-left-color: var(--mcmaster-maroon);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.changelog-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.changelog-version-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.changelog-badge {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+  border: 1px solid var(--border-medium);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 100px;
+  text-transform: uppercase;
+}
+
+.changelog-badge.latest {
+  background: var(--mcmaster-maroon);
+  color: #FFFFFF;
+  border-color: var(--mcmaster-maroon);
+}
+
+.changelog-entry-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.changelog-entry-date {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.changelog-entry-summary {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.changelog-bullets {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* About & Changelog Pages (Complete High Contrast Styling) */
+[data-theme='dark'] .about-container {
+  background-color: #121417 !important;
+  color: #F0F2F5 !important;
+}
+
+[data-theme='dark'] .about-card {
+  background-color: #1B1E23 !important;
+  border: 1px solid #282C34 !important;
+  border-top: 4px solid #8C1D2F !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme='dark'] .about-title {
+  color: #F0F2F5 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme='dark'] .about-lead {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .about-divider {
+  border-top: 1px solid #282C34 !important;
+}
+
+[data-theme='dark'] .about-section h2 {
+  color: #F0F2F5 !important;
+}
+
+[data-theme='dark'] .about-section p {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .team-card {
+  background: #17191E !important;
+  border: 1px solid #282C34 !important;
+  border-left: 4px solid #8C1D2F !important;
+}
+
+[data-theme='dark'] .team-name {
+  color: #F0F2F5 !important;
+}
+
+[data-theme='dark'] .team-role {
+  color: #8892A0 !important;
+}
+
+[data-theme='dark'] .contact-box {
+  background: #0F2640 !important;
+  border: 1px solid #1E4E78 !important;
+  color: #79B8FF !important;
+}
+
+[data-theme='dark'] .contact-box a {
+  color: #58A6FF !important;
+  text-decoration: underline;
+}
+
+[data-theme='dark'] .changelog-header-top p {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .changelog-build-box {
+  background: #17191E !important;
+  border: 1px solid #282C34 !important;
+  border-left: 4px solid #8C1D2F !important;
+}
+
+[data-theme='dark'] .changelog-build-version {
+  color: #F0F2F5 !important;
+}
+
+[data-theme='dark'] .changelog-build-version strong {
+  color: #FF758F !important;
+  font-weight: 800 !important;
+}
+
+[data-theme='dark'] .changelog-build-time {
+  color: #8892A0 !important;
+}
+
+[data-theme='dark'] .changelog-purge-btn {
+  background: #121417 !important;
+  border: 1px solid #343A46 !important;
+  color: #FF758F !important;
+  font-weight: 700 !important;
+}
+
+[data-theme='dark'] .changelog-purge-btn:hover {
+  background: #8C1D2F !important;
+  border-color: #A8253B !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='dark'] .changelog-entry {
+  background: #17191E !important;
+  border: 1px solid #282C34 !important;
+  border-left: 4px solid #363C46 !important;
+}
+
+[data-theme='dark'] .changelog-entry.latest {
+  background: #1B1E23 !important;
+  border: 1px solid #343A46 !important;
+  border-left: 4px solid #8C1D2F !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme='dark'] .changelog-badge {
+  background: #121417 !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #343A46 !important;
+}
+
+[data-theme='dark'] .changelog-badge.latest {
+  background: #8C1D2F !important;
+  color: #FFFFFF !important;
+  border: 1px solid #A8253B !important;
+}
+
+[data-theme='dark'] .changelog-entry-title {
+  color: #F0F2F5 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme='dark'] .changelog-entry-date {
+  color: #8892A0 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme='dark'] .changelog-entry-summary {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .changelog-bullets {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .changelog-bullets li {
+  color: #CBD5E1 !important;
+}
+
+/* About & Changelog Pages (High Contrast) */
+[data-theme='oled'] .about-container {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .about-card {
+  background-color: #080808 !important;
+  border: 1px solid #222222 !important;
+  border-top: 4px solid #FF5370 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
+}
+
+[data-theme='oled'] .about-title {
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+[data-theme='oled'] .about-lead {
+  color: #E2E8F0 !important;
+}
+
+[data-theme='oled'] .about-divider {
+  border-top: 1px solid #222222 !important;
+}
+
+[data-theme='oled'] .about-section h2 {
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .about-section p {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='oled'] .team-card {
+  background: #0E0E0E !important;
+  border: 1px solid #252525 !important;
+  border-left: 4px solid #FF5370 !important;
+}
+
+[data-theme='oled'] .team-name {
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .team-role {
+  color: #94A3B8 !important;
+}
+
+[data-theme='oled'] .contact-box {
+  background: #0B192C !important;
+  border: 1px solid #1E3A5F !important;
+  color: #79B8FF !important;
+}
+
+[data-theme='oled'] .contact-box a {
+  color: #58A6FF !important;
+  text-decoration: underline;
+}
+
+[data-theme='oled'] .changelog-build-box {
+  background: #0E0E0E !important;
+  border: 1px solid #282828 !important;
+  border-left: 4px solid #FF5370 !important;
+}
+
+[data-theme='oled'] .changelog-build-version {
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .changelog-build-version strong {
+  color: #FF758F !important;
+  font-weight: 800 !important;
+}
+
+[data-theme='oled'] .changelog-build-time {
+  color: #94A3B8 !important;
+}
+
+[data-theme='oled'] .changelog-purge-btn {
+  background: #141414 !important;
+  border: 1px solid #333333 !important;
+  color: #FF758F !important;
+  font-weight: 700 !important;
+}
+
+[data-theme='oled'] .changelog-purge-btn:hover {
+  background: #8C1D2F !important;
+  border-color: #FF5370 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme='oled'] .changelog-entry {
+  background: #0A0A0A !important;
+  border: 1px solid #202020 !important;
+  border-left: 4px solid #333333 !important;
+}
+
+[data-theme='oled'] .changelog-entry.latest {
+  background: #0E0E0E !important;
+  border: 1px solid #2E2E2E !important;
+  border-left: 4px solid #FF5370 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
+}
+
+[data-theme='oled'] .changelog-badge {
+  background: #161616 !important;
+  color: #E2E8F0 !important;
+  border: 1px solid #303030 !important;
+}
+
+[data-theme='oled'] .changelog-badge.latest {
+  background: #8C1D2F !important;
+  color: #FFFFFF !important;
+  border: 1px solid #B82840 !important;
+}
+
+[data-theme='oled'] .changelog-entry-title {
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+}
+
+[data-theme='oled'] .changelog-entry-date {
+  color: #94A3B8 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme='oled'] .changelog-entry-summary {
+  color: #E2E8F0 !important;
+}
+
+[data-theme='oled'] .changelog-bullets {
+  color: #CBD5E1 !important;
+}
+
+[data-theme='oled'] .changelog-bullets li {
+  color: #CBD5E1 !important;
+}
+

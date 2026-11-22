@@ -48,7 +48,6 @@
             : (isValidTheme(localTheme)
                 ? localTheme
                 : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-          // Theme support: 'light' (Academic Light), 'dark' (Academic Dark), 'oled' (Pure OLED)
           document.documentElement.setAttribute('data-theme', t);
           var metaTc = document.getElementById('meta-theme-color');
           if (metaTc) {
@@ -63,6 +62,67 @@
           } catch (err) {}
           document.documentElement.setAttribute('data-theme', fallback);
         }
+
+        // Parallel early fetch: download /meta.json + active route shard (or /index.json on /papers)
+        // simultaneously with CSS & JS bundles to eliminate the startup network waterfall.
+        try {
+          var bt = '__CS_BUILD_TIME__';
+          if (bt && bt.indexOf('__CS_') !== 0 && typeof fetch === 'function') {
+            var q = encodeURIComponent(bt);
+            var shard = '__CS_ROUTE_SHARD__';
+            if (shard.indexOf('__CS_') === 0) shard = '';
+            var needsFull = '__CS_ROUTE_NEEDS_FULL__' === '1';
+            if (!shard && !needsFull) {
+              var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+              var segs = p.split('/').filter(Boolean);
+              if (p === '/textbooks' || p === '/textbooks/ial' || p === '/textbooks/igcse') shard = '/shards/textbooks.json';
+              else if (p === '/audio') shard = '/shards/audio.json';
+              else if (p === '/data-files') shard = '/shards/data-files.json';
+              else if (segs[0] === 'textbooks' && segs.length === 3) shard = '/shards/' + segs[1].toLowerCase() + '-' + segs[2].toLowerCase() + '.json';
+              else if ((segs[0] === 'ial' || segs[0] === 'igcse') && segs.length >= 2) shard = '/shards/' + segs[0] + '-' + segs[1].toLowerCase() + '.json';
+              else if (p === '/papers' || p === '/ial' || p === '/igcse' || (location.search && location.search.indexOf('q=') !== -1)) needsFull = true;
+            }
+            var ef = {
+              buildTime: bt,
+              shardPath: shard,
+              metaPromise: null,
+              shardBufferPromise: null,
+              fullBufferPromise: null
+            };
+            ef.metaPromise = fetch('/meta.json?v=' + q, { cache: 'no-cache' })
+              .then(function(r) { return r.ok ? r.json() : null; })
+              .catch(function() { return null; });
+
+            if (shard || needsFull) {
+              var cacheKey = 'https://cs-cache.local/index_v6.9.9_' + q + '.json';
+              var checkCache = (typeof caches !== 'undefined')
+                ? caches.open('cs_index_cache')
+                    .then(function(c) { return c.match(cacheKey); })
+                    .catch(function() { return null; })
+                : Promise.resolve(null);
+
+              if (shard) {
+                ef.shardBufferPromise = checkCache.then(function(hit) {
+                  if (hit) return null;
+                  return fetch(shard + '?v=' + q, { priority: 'low' })
+                    .then(function(r) {
+                      var ct = r.headers.get('content-type') || '';
+                      return (r.ok && ct.indexOf('application/json') !== -1) ? r.arrayBuffer() : null;
+                    })
+                    .catch(function() { return null; });
+                });
+              } else if (needsFull) {
+                ef.fullBufferPromise = checkCache.then(function(hit) {
+                  if (hit) return null;
+                  return fetch('/index.json?v=' + q, { priority: 'low' })
+                    .then(function(r) { return r.ok ? r.arrayBuffer() : null; })
+                    .catch(function() { return null; });
+                });
+              }
+            }
+            window.__CS_EARLY_FETCH__ = ef;
+          }
+        } catch (err) {}
       })();
       window.addEventListener('vite:preloadError', function () {
         try {
@@ -73,15 +133,19 @@
       });
     </script>
 
-    <!-- Critical Anti-FOUC Baseline Theme & Surface Styles -->
+    <!-- Critical Anti-FOUC Baseline Theme, Surface & Instant Boot Shell Styles -->
     <style id="critical-anti-fouc">
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme]) {
           --bg-page: #121417;
           --bg-surface: #1B1E23;
           --text-primary: #F0F2F5;
+          --text-muted: #9AA4B2;
+          --border-medium: #282C34;
           --mcmaster-maroon: #8C1D2F;
           --mcmaster-gold: #D4AF37;
+          --boot-hdr-bg: #17191E;
+          --boot-hdr-border: #8C1D2F;
           background-color: #121417;
           color: #F0F2F5;
         }
@@ -90,8 +154,12 @@
         --bg-page: #F4F3EF;
         --bg-surface: #FFFFFF;
         --text-primary: #1A1D20;
+        --text-muted: #525860;
+        --border-medium: #C8C4BC;
         --mcmaster-maroon: #6F1D2B;
         --mcmaster-gold: #C9A45C;
+        --boot-hdr-bg: #6F1D2B;
+        --boot-hdr-border: #C9A45C;
         background-color: #F4F3EF;
         color: #1A1D20;
       }
@@ -99,8 +167,12 @@
         --bg-page: #121417;
         --bg-surface: #1B1E23;
         --text-primary: #F0F2F5;
+        --text-muted: #9AA4B2;
+        --border-medium: #282C34;
         --mcmaster-maroon: #8C1D2F;
         --mcmaster-gold: #D4AF37;
+        --boot-hdr-bg: #17191E;
+        --boot-hdr-border: #8C1D2F;
         background-color: #121417;
         color: #F0F2F5;
       }
@@ -108,8 +180,12 @@
         --bg-page: #000000;
         --bg-surface: #000000;
         --text-primary: #FFFFFF;
+        --text-muted: #9CA3AF;
+        --border-medium: #262626;
         --mcmaster-maroon: #8C1D2F;
         --mcmaster-gold: #FFD33D;
+        --boot-hdr-bg: #000000;
+        --boot-hdr-border: #222222;
         background-color: #000000;
         color: #FFFFFF;
       }
@@ -136,6 +212,92 @@
       }
       html.js-enabled .seo-prerender-shell {
         display: none !important;
+      }
+      html:not(.js-enabled) .app-boot-shell {
+        display: none !important;
+      }
+      .app-boot-shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-page);
+        color: var(--text-primary);
+      }
+      .boot-header {
+        height: 54px;
+        padding: 0 24px;
+        background: var(--boot-hdr-bg);
+        border-bottom: 2px solid var(--boot-hdr-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #FFFFFF;
+        box-sizing: border-box;
+      }
+      .boot-brand {
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+      }
+      .boot-brand span {
+        color: var(--mcmaster-gold);
+        font-weight: 700;
+      }
+      .boot-search-bar {
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-medium);
+        padding: 10px 24px;
+      }
+      .boot-search-pill {
+        max-width: 1280px;
+        margin: 0 auto;
+        height: 38px;
+        border: 1px solid var(--border-medium);
+        border-radius: 3px;
+        background: var(--bg-page);
+      }
+      .boot-main {
+        max-width: 1280px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 18px 24px;
+        box-sizing: border-box;
+      }
+      .boot-hero {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-medium);
+        border-top: 3px solid var(--mcmaster-maroon);
+        border-radius: 3px;
+        padding: 18px 22px;
+      }
+      .boot-title {
+        font-size: 21px;
+        font-weight: 800;
+        color: var(--mcmaster-maroon);
+        margin: 0 0 6px 0;
+        line-height: 1.25;
+      }
+      [data-theme='dark'] .boot-title,
+      [data-theme='oled'] .boot-title {
+        color: var(--text-primary);
+      }
+      .boot-subtitle {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin: 0;
+        line-height: 1.45;
+      }
+      @media (max-height: 760px) and (min-width: 769px) {
+        .boot-header { height: 48px; padding: 0 20px; }
+        .boot-search-bar { padding: 8px 20px; }
+        .boot-main { padding: 14px 20px; }
+      }
+      @media (max-width: 768px) {
+        .boot-header { height: 50px; padding: 0 14px; }
+        .boot-search-bar { padding: 8px 14px; }
+        .boot-main { padding: 12px 14px; }
+        .boot-title { font-size: 18px; }
       }
     </style>
   </head>

@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import './styles/modal.css';
+import {
+  preloadPdfJsModule,
+  consumePrewarmedRangeBootstrap,
+  consumePrewarmedPdfBytes
+} from './lib/pdfPrewarm.js';
 
 // Shared singleton promise to lazy-load PDF.js only when the viewer is first opened
-let pdfjsPromise = null;
 const mountedPaneIds = new Set();
 let activePaneId = null;
 let nextPaneSeq = 1;
@@ -23,48 +28,55 @@ function bufferSliceContainsAscii(u8, needle) {
 }
 
 function loadPdfJs() {
-  if (!pdfjsPromise) {
-    const base = typeof window !== 'undefined' ? window.location.origin : '';
-    pdfjsPromise = import(/* @vite-ignore */ `${base}/pdfjs/pdf.min.mjs`)
-      .then((mod) => {
-        // Point worker to absolute URL on the current host
-        mod.GlobalWorkerOptions.workerSrc = `${base}/pdfjs/pdf.worker.min.mjs`;
-        return mod;
-      })
-      .catch((err) => {
-        pdfjsPromise = null;
-        throw err;
-      });
-  }
-  return pdfjsPromise;
+  return preloadPdfJsModule();
 }
 
 // Resolve redirects once and stream byte ranges on demand for large PDFs (>= 5 MB)
 async function createLargePdfRangeTransport(pdfjsLib, url, signal, onBytesProgress, onInitialRangeError) {
-  const bootRes = await fetch(url, {
-    headers: { Range: `bytes=0-${STREAM_BOOTSTRAP_BYTES - 1}` },
-    signal
-  });
-  if (!bootRes.ok && bootRes.status !== 206) {
-    throw new Error(`HTTP ${bootRes.status}`);
-  }
-  if (bootRes.status !== 206) {
-    try { await bootRes.body?.cancel?.(); } catch { }
-    return null;
+  let resolvedCdnUrl = url;
+  let totalLength = 0;
+  let initialData = null;
+
+  const prewarmedPromise = consumePrewarmedRangeBootstrap(url);
+  if (prewarmedPromise) {
+    try {
+      const pre = await prewarmedPromise;
+      if (pre && pre.initialData && pre.totalLength > STREAM_CHUNK_SIZE * 2) {
+        resolvedCdnUrl = pre.resolvedCdnUrl || url;
+        totalLength = pre.totalLength;
+        initialData = pre.initialData;
+      }
+    } catch {
+      // Fall back to fresh bootstrap fetch below
+    }
   }
 
-  const cr = bootRes.headers.get('content-range') || '';
-  const crMatch = /\/(\d+)$/.exec(cr);
-  const totalLength = crMatch ? parseInt(crMatch[1], 10) : 0;
-  if (!totalLength || totalLength <= STREAM_CHUNK_SIZE * 2) {
-    try { await bootRes.body?.cancel?.(); } catch { }
-    return null;
-  }
+  if (!initialData) {
+    const bootRes = await fetch(url, {
+      headers: { Range: `bytes=0-${STREAM_BOOTSTRAP_BYTES - 1}` },
+      signal
+    });
+    if (!bootRes.ok && bootRes.status !== 206) {
+      throw new Error(`HTTP ${bootRes.status}`);
+    }
+    if (bootRes.status !== 206) {
+      try { await bootRes.body?.cancel?.(); } catch { }
+      return null;
+    }
 
-  const resolvedCdnUrl = bootRes.url || url;
-  const initialData = new Uint8Array(await bootRes.arrayBuffer());
-  if (initialData.byteLength === 0) {
-    return null;
+    const cr = bootRes.headers.get('content-range') || '';
+    const crMatch = /\/(\d+)$/.exec(cr);
+    totalLength = crMatch ? parseInt(crMatch[1], 10) : 0;
+    if (!totalLength || totalLength <= STREAM_CHUNK_SIZE * 2) {
+      try { await bootRes.body?.cancel?.(); } catch { }
+      return null;
+    }
+
+    resolvedCdnUrl = bootRes.url || url;
+    initialData = new Uint8Array(await bootRes.arrayBuffer());
+    if (initialData.byteLength === 0) {
+      return null;
+    }
   }
 
   const isLinearized = bufferSliceContainsAscii(initialData, '/Linearized');
@@ -931,7 +943,21 @@ export const PdfViewerPane = ({
 
       if (!active) return;
 
+      let prewarmedBytes = null;
+      if (!activeTransport && !pdfData && url) {
+        const preBytesPromise = consumePrewarmedPdfBytes(url);
+        if (preBytesPromise) {
+          try {
+            prewarmedBytes = await preBytesPromise;
+          } catch {
+            prewarmedBytes = null;
+          }
+          if (!active) return;
+        }
+      }
+
       const pdfVerbosity = pdfjsLib.VerbosityLevel?.ERRORS ?? 0;
+      const inMemoryData = pdfData ? pdfData.slice() : prewarmedBytes;
       loadingTask = pdfjsLib.getDocument(
         activeTransport
           ? {
@@ -945,9 +971,9 @@ export const PdfViewerPane = ({
             enableXfa: false,
             verbosity: pdfVerbosity
           }
-          : pdfData
+          : inMemoryData
             ? {
-              data: pdfData.slice(),
+              data: inMemoryData,
               cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
               cMapPacked: true,
               enableXfa: false,
@@ -964,7 +990,7 @@ export const PdfViewerPane = ({
             }
       );
 
-      if (!activeTransport && !pdfData) {
+      if (!activeTransport && !inMemoryData) {
         loadingTask.onProgress = (progressData) => {
           if (!active || !progressData) return;
           if (typeof progressData.total === 'number' && progressData.total > 0) {

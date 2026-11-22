@@ -15,7 +15,7 @@
 - [Edexcel IGCSE Past Papers](https://www.conceptualist.uk/igcse): 43 International GCSE (9-1, Regional R, and Modular 4W*) subjects.
 - [Textbooks & Worked Solution Banks](https://www.conceptualist.uk/textbooks): 73 student books, answer PDFs, lab books, and IAL Maths Solution Banks.
 - [Edexcel IAL Textbooks & Solution Banks](https://www.conceptualist.uk/textbooks/ial): Student Book 1 & 2 PDFs, answers, and P1-P4/M1-M3/S1-S3/D1/FP1-FP3 Solution Banks.
-- [Edexcel IGCSE (9-1) Textbooks](https://www.conceptualist.uk/textbooks/igcse): Official student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.
+- [Edexcel IGCSE (9-1) Textbooks](https://www.conceptualist.uk/textbooks/igcse): Verified student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.
 - [Listening Audio Archive (MP3 & Live CC)](https://www.conceptualist.uk/audio): 272 listening audio tracks and synced transcripts.
 - [IT & Computer Science Practical Data Files](https://www.conceptualist.uk/data-files): 46 practical exam source ZIPs for WIT12, WIT14, 4IT1, and 4CP0.
 

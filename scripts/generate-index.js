@@ -89,15 +89,16 @@ function buildTree(dirPath, rootPath) {
           ? 'Specimen'
           : null;
 
+        const computedYear = bookMeta?.year || (sessionDate ? sessionDate.year : extractYear(relPath));
         node.children.push({
           name: displayFileName,
           path: relPath,
           size: fs.statSync(fullPath).size,
           subject,
           docType: detectDocType(item.name, relPath),
-          year: bookMeta?.year || (sessionDate ? sessionDate.year : extractYear(relPath)),
+          year: computedYear,
           session: sessionDate ? sessionDate.label : fallbackSession,
-          sortKey: sessionDate ? sessionDate.sortKey : null,
+          sortKey: sessionDate ? sessionDate.sortKey : (computedYear ? computedYear * 100 : 200000),
           unitCode,
           unitName,
           spec,
@@ -303,9 +304,21 @@ const files = dedupedFiles.map(f => [
   f.altPaths
 ]);
 
+const isBookCategory = (cat) => cat === CATEGORY_BOOKS || cat === CATEGORY_IGCSE || cat === 'Books';
+const totalBooks = dedupedFiles.filter((f) => isBookCategory(f.category)).length;
+const ialBooks = dedupedFiles.filter((f) => f.category === CATEGORY_BOOKS).length;
+const igcseBooks = dedupedFiles.filter((f) => f.category === CATEGORY_IGCSE).length;
+const dfCount = dedupedFiles.filter((f) => f.docType === 'DF').length;
+const audioCount = dedupedFiles.filter((f) => f.docType === 'AUD').length;
+
 const metaInfo = {
   totalFiles: flatFiles.length,
   uniqueFiles: dedupedFiles.length,
+  totalBooks,
+  ialBooks,
+  igcseBooks,
+  dfCount,
+  audioCount,
   subjects: allSubjects,
   ialSubjects,
   igcseSubjects,
