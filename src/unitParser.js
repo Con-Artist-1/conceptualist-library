@@ -379,66 +379,7 @@ const SUBJECT_CLEAN_UNIT_LABELS = {
   ]
 };
 
-const LEGACY_UNIT_CODE_RE = /\((W(?:PH|BI|CH|BS|EC)0[1-7]|6ECA[1-3])\)$/i;
-
-export function isLegacyIalUnitLabel(label = '') {
-  return LEGACY_UNIT_CODE_RE.test(String(label || '').trim());
-}
-
-const MATH_UNIT_ORDER = [
-  'Pure Mathematics 1 (P1)',
-  'Pure Mathematics 2 (P2)',
-  'Pure Mathematics 3 (P3)',
-  'Pure Mathematics 4 (P4)',
-  'Mechanics 1 (M1)',
-  'Mechanics 2 (M2)',
-  'Mechanics 3 (M3)',
-  'Statistics 1 (S1)',
-  'Statistics 2 (S2)',
-  'Statistics 3 (S3)',
-  'Decision Mathematics 1 (D1)',
-  'Further Pure 1 (FP1)',
-  'Further Pure 2 (FP2)',
-  'Further Pure 3 (FP3)',
-  'Core Mathematics 12 (C12)',
-  'Core Mathematics 34 (C34)',
-  'Core Mathematics 1 (C1)',
-  'Core Mathematics 2 (C2)',
-  'Core Mathematics 3 (C3)',
-  'Core Mathematics 4 (C4)'
-];
-
-export function compareUnitLabels(a = '', b = '', subject = '') {
-  const strA = String(a || '');
-  const strB = String(b || '');
-  const isMath = subject === 'Math' || subject === 'Mathematics';
-  if (isMath || MATH_UNIT_ORDER.includes(strA) || MATH_UNIT_ORDER.includes(strB)) {
-    const ia = MATH_UNIT_ORDER.indexOf(strA);
-    const ib = MATH_UNIT_ORDER.indexOf(strB);
-    if (ia !== -1 && ib !== -1) return ia - ib;
-    if (ia !== -1) return -1;
-    if (ib !== -1) return 1;
-  }
-
-  // Group Current Spec (tier 0) -> Legacy IAL W*0x (tier 1) -> Legacy GCE 6ECA* (tier 2)
-  const getTier = (s) => {
-    if (/\(6ECA[1-3]\)$/i.test(s)) return 2;
-    if (/\(W(?:PH|BI|CH|BS|EC)0[1-7]\)$/i.test(s)) return 1;
-    return 0;
-  };
-  const tierDiff = getTier(strA) - getTier(strB);
-  if (tierDiff !== 0) return tierDiff;
-
-  // Natural numeric sort by Unit/Paper number (1..7)
-  const numA = strA.match(/\b(?:Unit|Paper)\s+(\d+)\b/i);
-  const numB = strB.match(/\b(?:Unit|Paper)\s+(\d+)\b/i);
-  if (numA && numB) {
-    const diff = parseInt(numA[1], 10) - parseInt(numB[1], 10);
-    if (diff !== 0) return diff;
-  }
-
-  return strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
-}
+export { isLegacyIalUnitLabel, compareUnitLabels } from './lib/unitSort.js';
 
 export function getCurriculum(file) {
   const p = file.path || '';

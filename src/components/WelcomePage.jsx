@@ -6,7 +6,7 @@ import {
   IAL_SUBJECTS_DEFAULT,
   IGCSE_SUBJECTS_DEFAULT
 } from '../lib/routeCore.js';
-import { compareUnitLabels, isLegacyIalUnitLabel } from '../unitParser.js';
+import { compareUnitLabels, isLegacyIalUnitLabel } from '../lib/unitSort.js';
 import {
   shouldHandleClientNavigation,
   formatSubjectDisplay,

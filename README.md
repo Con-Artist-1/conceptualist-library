@@ -1,33 +1,37 @@
 # Conceptualist Systems — Past Papers & Textbooks Library
 
-A high-speed web application for searching, browsing, and viewing Pearson Edexcel past papers, mark schemes, examiner reports, textbooks, IT/CS data files, and language listening audio. The curated repository spans **19,938 archived files** (**16,077 unique documents**) across **19 IAL subjects** and **43 IGCSE subjects** covering **January 2003 – June 2026**, live at `https://www.conceptualist.uk`.
+An independent student study archive and high-speed web reader for searching, browsing, and studying Pearson Edexcel past papers, mark schemes, examiner reports, textbooks, worked solution banks, IT/CS data files, and language listening audio. The curated repository spans **19,882 archived files** (**16,021 deduplicated unique records**) across **19 IAL subjects** and **43 IGCSE subjects** covering **January 2003 – June 2026**, live at `https://www.conceptualist.uk`.
+
+> **Independent Study Archive:** Conceptualist Systems is an independent student study index and reader and is **not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel**.
 
 ## Features
 
-- **Fast Search & Single-Pass Filtering:** Client-side search engine (`src/searchEngine.js`) featuring dynamic catalog vocabulary, atomic phrase & subject-scoped unit/spec matching (`M1`, `C12`/`C34`, `WPH01–WPH07`, `4WBI1`/`4WCH1`/`4WPH1`), Edexcel code normalization (`WMA11/01`, `4MA1/2HR`), bidirectional session aliases (`May`/`June`/`Summer`, `Oct`/`Nov`), typo tolerance (`Did you mean`), quoted `"exact phrases"`, `-exclusions`, and automatic partial-match recovery, paired with single-pass filtering by curriculum (`IAL` or `IGCSE`), subject, unit/paper code, exam session, and document type.
-- **In-House WebPDF Reader & Split View:** Lazy-loaded canvas PDF reader powered by Mozilla PDF.js (`4.10.38`) featuring `IntersectionObserver` viewport virtualization, single-hop CDN byte-range streaming (`PDFDataRangeTransport`, `128 KB` chunks) for large PDFs (`>= 5 MB`), adaptive DPR scaling, animated download progress tracking, direct document download links, keyboard shortcuts, and synchronized side-by-side Split View (with adjustable desktop and mobile dividers).
-- **Three Academic Themes:** Follows your device's current light or dark mode automatically on first visit, with instant cycling between **Academic Light**, **Academic Dark** (slate charcoal), and **Pure OLED** (`#000000`), hue-preserving diagram/graph canvas inversion, and dual persistence (`localStorage` + 1-year cookie) once customized.
-- **Dedicated Resource Viewers, ZIP Audio & Synchronized Subtitles (`CC`):** Automatically pairs Question Papers, Mark Schemes, and Examiner Reports per exam sitting; unpacks `.zip` and nested `.zip` listening packages directly in browser memory via `DecompressionStream` (`src/zipAudioExtractor.js`) for docked & standalone playback with individual track + full archive downloads; and provides synchronized captions + click-to-seek **Full Transcript** drawers via `src/audioSubtitles.js` (pre-indexed Transcript PDFs & Whisper tracks in `public/audio-subtitles.json`, shared MongoDB `audio_subtitles` caching, and opt-in on-demand browser VAD + `Xenova/whisper-tiny` WASM generation), plus `DF` archives on `/data-files`.
-- **Canonical SEO, Route Sharding & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **65 compact JSON route shards**, **299 pre-rendered static HTML routes** (with permanent `308` shorthand alias redirects and static `404.html`), JSON-LD schema, Open Graph preview cards, a **299-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
-- **View Tracking, History & Telemetry:** Serverless `/api/views` & `/api/telemetry` endpoints backed by MongoDB (shared view counters, subtitle caching, 90-day anonymized session study-time metrics, per-paper cooldown, rate limiting, and local `.data/*.json` fallbacks), browser Recent History cards, and Vercel Web Analytics & Speed Insights.
-- **Mobile & Desktop Polish:** Responsive `100dvh` full-screen reader modals, `3 × 3` button navigation grid in the mobile footer, pixel-uniform headers, and `>= 16px` mobile inputs to prevent iOS Safari zoom.
+- **Off-Thread Web Worker Catalog & Smart Search:** Moves full 16,021-record JSON hydration, tuple expansion, sibling pairing, filtering, sorting, and smart fuzzy search (`src/searchEngine.js` + `src/data/searchDictionaries.js`) onto a dedicated ES Module Web Worker (`src/workers/catalog.worker.js`), transferring only compact `<= 50`-row slices to the main thread. Features canonical Math branch disambiguation (`pure mathematics 1..4` → `WMA11..WMA14`, `M1..M3`, `S1..S3`, `D1`, `FP1..FP3`, `C1..C4`/`C12`/`C34`), Edexcel cover-code normalization (`WMA11/01`, `4MA1/2HR`), bidirectional session aliases (`May`/`June`/`Summer`, `Oct`/`Nov`), typo recovery (`Did you mean`), quoted `"exact phrases"`, `-exclusions`, and automatic partial-match fallback.
+- **In-House WebPDF Reader, Split View & 2-Page Spreads:** Lazy-loaded canvas PDF reader (`src/PdfViewerPane.jsx`, `src/components/VirtualPdfPage.jsx`, `src/lib/pdfRangeTransport.js`, `src/lib/pdfLayoutMath.js`) powered by locally bundled Mozilla PDF.js (`4.10.38`) featuring `IntersectionObserver` viewport virtualization, Page-1-first progressive two-pass canvas rendering, single-hop CDN byte-range streaming (`PDFDataRangeTransport`, `128 KB` / `256 KB` chunks) for large PDFs (`>= 5 MB`), resizable **2-Page Book Spread** mode with solo **Cover** offset toggle, `90°` page rotation, `Swap Panes`, `1-click Share` direct study links, keyboard shortcuts, and synchronized QP/MS **Split View** (with adjustable desktop and mobile touch dividers).
+- **Worked Solutions ZIP Reader & Synchronized Audio Subtitles (`CC`):**
+  - Lazy-loaded **Worked Solutions ZIP viewer** (`src/components/SolutionBankView.jsx`, `src/zipPdfExtractor.js`) streams only the ZIP Central Directory via HTTP `206` Range requests and extracts clicked chapter/exercise PDFs on demand across all 14 IAL Maths Solution Banks directly inside WebPDF.
+  - Lazy-loaded **Audio Player Dock & Subtitles** (`src/components/AudioPlayerDock.jsx`, `src/zipAudioExtractor.js`, `src/audioSubtitles.js`) unpacks `.zip` / nested `.zip` listening archives in browser memory via `DecompressionStream` and resolves clickable synced captions across Tier 1 static `public/audio-subtitles.json` → Tier 2 MongoDB `audio_subtitles` cache → Tier 3 opt-in browser RMS VAD + `Xenova/whisper-tiny` WASM live generation. Standard Past Paper QP/MS opens fetch zero audio or Solution Bank ZIP chunks.
+- **Three Academic Themes (Semantic CSS Custom Properties):** Automatically follows the visitor's OS `prefers-color-scheme` on first visit, with directional S-curve View Transitions cycling **Academic Light**, **Academic Dark** (slate charcoal), and **Pure OLED** (`#000000`), hue-preserving diagram/graph PDF canvas inversion, dual persistence (`localStorage` + 1-year cookie), and full `prefers-reduced-motion` support.
+- **Canonical SEO, Route Sharding, `/llms.txt` & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **65 compact JSON route shards**, **299 pre-rendered canonical static HTML routes + `404.html`** (with `422` permanent `308` shorthand redirects), `Book` + `ItemList` + `FAQPage` Schema.org JSON-LD, `public/llms.txt`, a **296-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
+- **View Tracking, History & Idle Telemetry:** Serverless `/api/views` & `/api/telemetry` endpoints backed by MongoDB Atlas (shared view counters, subtitle caching, 90-day anonymized session metrics, rate limits, and local `.data/*.json` fallbacks), browser Recent History cards, idle-deferred telemetry (`src/telemetry.js`), and Vercel Web Analytics & Speed Insights.
+- **Mobile & Desktop Polish:** Compact `1280px` desktop layout, collapsible lazy `FilterDrawer`, `100dvh` mobile reader modals, `3 × 3` mobile footer link grid, and `>= 16px` mobile inputs preventing iOS Safari zoom.
 
 ## How It Works
 
-The frontend is designed for minimal cold-load payloads and zero runtime server bottlenecks:
+The frontend eliminates startup waterfalls and keeps main-thread blocking minimal:
 
-1. **Instant Bootstrap (`public/meta.json`):** Loads the compact subject/unit catalog and navigation tree immediately for fast first paint.
-2. **Route-Sharded Loading (`dist/shards/*.json`):** Deep subject, textbook, audio, or data-file URLs fetch only their compact route shard (~4% of the full index size) in parallel with `meta.json`.
-3. **Full Catalog Upgrade (`public/index.json`):** Streams the tuple-encoded deduplicated search index seamlessly in the background (with Hugging Face `live_index.json` fallback) for instant global queries.
-4. **On-Demand PDF Virtualization:** PDF pages render lazily via WebPDF workers as they enter the scroll viewport and release offscreen textures to keep mobile and desktop memory bounded.
+1. **Zero-Waterfall `<head>` Early Fetch:** Inline boot script starts `/meta.json?v=...` and the active route shard (or `/index.json` on `/papers`) in parallel with CSS/JS downloads, with build version automatically synced via Vite `transformIndexHtml`.
+2. **Route-Sharded Loading (`dist/shards/*.json`):** Deep subject, textbook, audio, or data-file pages hydrate immediately from compact route shards (up to 96% smaller than `index.json`).
+3. **Off-Thread Full Catalog Upgrade (`public/index.json`):** `src/workers/catalog.worker.js` fetches, caches (`cs_index_cache`), parses, and indexes the full tuple-encoded catalog off the main thread (with Hugging Face `live_index.json` fallback).
+4. **Zero-Waste Pre-Warming & Virtualization:** `src/lib/pdfPrewarm.js` preloads lazy reader JS chunks once on first hover (zero Hugging Face traffic) and starts the clicked PDF's request only on `pointerdown`, while `VirtualPdfPage` renders visible canvases on demand and releases offscreen GPU textures.
 
 ## Tech Stack
 
 - React 19
 - Vite 8
 - Mozilla PDF.js (`4.10.38`)
-- Plain CSS (3-theme custom properties & responsive mobile grid/modal rules)
-- MongoDB Node Driver (`mongodb` for `/api/views`)
+- Plain CSS (semantic 3-theme custom properties across `index.css`, `modal.css`, `secondary.css`)
+- MongoDB Node Driver (`mongodb` for `/api/views` & `/api/telemetry`)
 - Vercel Web Analytics & Speed Insights
 - Oxlint
 
@@ -47,7 +51,7 @@ npm install
 
 ### Development
 
-Start the local Vite dev server (includes `/api/views` JSON fallback and `/library-files/` disk byte-range streaming):
+Start the local Vite dev server (includes `/api/views`, `/api/telemetry`, `/shards/`, and `/library-files/` disk byte-range streaming):
 
 ```bash
 npm run dev
@@ -55,15 +59,15 @@ npm run dev
 
 ### Linting
 
-Verify code quality with Oxlint (`0` warnings/errors required):
+Verify code quality with Oxlint (`0` warnings/errors required across `src api scripts`):
 
 ```bash
-npm run lint
+npx oxlint src api scripts
 ```
 
 ### Building for Production
 
-Compile the Vite bundle, generate `public/sitemap.xml` (`299` URLs), sync `422` permanent `308` shorthand/legacy redirects in `vercel.json`, create `dist/shards/` (`65` route shards), and pre-render `299` canonical HTML pages plus `404.html` into `dist/`:
+Compile the Vite bundle, generate `public/sitemap.xml` (`296` canonical URLs) and `public/llms.txt`, sync `422` permanent `308` shorthand/legacy redirects into `vercel.json`, create `dist/shards/` (`65` route shards), and pre-render `299` canonical HTML pages plus `404.html` into `dist/`:
 
 ```bash
 npm run build
@@ -96,13 +100,19 @@ npm run indexnow
 ## Project Structure
 
 - `api/`: Vercel serverless endpoints (`views.js` for paper popularity counters & shared audio subtitle caching; `telemetry.js` for anonymized session metrics; `_shared.js` for MongoDB pooling, validation & rate limits).
-- `public/`: Static assets, self-hosted WOFF2 fonts (`fonts/`), PDF.js runtime (`pdfjs/`), generated index/metadata (`meta.json`, `index.json`), pre-indexed subtitle catalog (`audio-subtitles.json`), Open Graph card (`og-card.png`), IndexNow verification `<INDEXNOW_KEY>.txt`, `robots.txt`, and `sitemap.xml`.
-- `scripts/`: Core automation utilities (`generate-index.js`, `build.js`, `prerender-seo.js`, `push-github.js`, `deploy-vercel.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`).
-- `src/`: Source code including `App.jsx`, `bookCatalog.js`, `searchEngine.js`, lazy-loaded `PdfViewerPane.jsx`, `zipUtils.js`, `zipAudioExtractor.js`, `zipPdfExtractor.js`, `audioSubtitles.js`, `telemetry.js`, `seoRoutes.js`, `unitParser.js`, `index.css`, and `main.jsx`.
-- `index.html`: Entry HTML with preloads, `favicon.ico` + `favicon.svg`, and `<style id="critical-anti-fouc">` for flicker-free Light/Dark/OLED boot.
-- `package.json`: Project dependencies and npm scripts.
-- `vercel.json`: Permanent `308` shorthand/legacy redirects (`422`), security/CSP headers, and route cache policies.
-- `vite.config.js`: Vite configuration and local disk streaming middleware.
+- `public/`: Static assets, self-hosted WOFF2 fonts (`fonts/`), locally bundled PDF.js (`pdfjs/`), generated catalog files (`meta.json`, `index.json`), pre-indexed subtitle catalog (`audio-subtitles.json`), Open Graph card (`og-card.png`), IndexNow verification `<INDEXNOW_KEY>.txt`, `llms.txt`, `robots.txt`, and `sitemap.xml`.
+- `scripts/`: Strictly the 8 core automation utilities (`generate-index.js`, `build.js`, `prerender-seo.js`, `push-github.js`, `deploy-vercel.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`).
+- `src/`: Modular application source:
+  - Root modules: `main.jsx`, `App.jsx`, `PdfViewerPane.jsx`, `searchEngine.js`, `seoRoutes.js`, `unitParser.js`, `bookCatalog.js`, `audioSubtitles.js`, `zipUtils.js`, `zipAudioExtractor.js`, `zipPdfExtractor.js`, `telemetry.js`, `index.css`.
+  - `src/components/`: `WelcomePage.jsx`, `Header.jsx`, `Footer.jsx`, `Breadcrumbs.jsx`, `SearchBanner.jsx`, `PaperTable.jsx`, `ArchiveContextStrip.jsx`, `CrashRecoveryScreen.jsx`, `ThemeToggleButton.jsx`, `PaperViewsCounter.jsx`, `Skeletons.jsx`, `ResourceCard.jsx`, `VirtualPdfPage.jsx`, plus lazy-loaded `PreviewModal.jsx`, `AudioPlayerDock.jsx`, `SolutionBankView.jsx`, `FilterDrawer.jsx`, `AboutPage.jsx`, `ChangelogPage.jsx`, and `NotFoundCard.jsx`.
+  - `src/data/`: `curriculumCatalog.js`, `searchDictionaries.js`, `changelogHistory.js`.
+  - `src/hooks/`: `useTheme.js`.
+  - `src/lib/`: `appMeta.js`, `catalogClient.js`, `catalogEngine.js`, `libraryHelpers.js`, `networkUtils.js`, `paperKeys.js`, `pdfLayoutMath.js`, `pdfPrewarm.js`, `pdfRangeTransport.js`, `routeCore.js`, `unitSort.js`.
+  - `src/styles/`: Lazy-loaded `modal.css` and `secondary.css`.
+  - `src/workers/`: `catalog.worker.js`.
+- `index.html`: Entry HTML with parallel early-fetch bootstrap, preloads, and `<style id="critical-anti-fouc">` for zero-flicker Light/Dark/OLED boot.
+- `vercel.json`: Permanent `308` redirects (`422`), security/CSP headers, and route cache policies.
+- `vite.config.js`: Vite 8 config, automatic `__CS_APP_VERSION__` / `__CS_BUILD_TIME__` HTML stamping, and local disk streaming middleware.
 
 ## Team
 
@@ -115,4 +125,4 @@ npm run indexnow
 
 ## License
 
-This project is maintained for educational purposes.
+This project is maintained for independent educational use.

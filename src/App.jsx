@@ -14,8 +14,7 @@ import {
   IAL_SUBJECTS_DEFAULT,
   IGCSE_SUBJECTS_DEFAULT
 } from './lib/routeCore.js';
-import { compareUnitLabels } from './unitParser.js';
-import { initTelemetryTracker } from './telemetry.js';
+import { compareUnitLabels } from './lib/unitSort.js';
 import {
   APP_VERSION,
   BUILD_TIMESTAMP,
@@ -245,7 +244,34 @@ function App() {
   }, [refreshViewsFromApi]);
 
   useEffect(() => {
-    return initTelemetryTracker({ getViewerId: getOrCreateViewerId });
+    let cancelled = false;
+    let cleanup = null;
+    let timerId = null;
+    let idleId = null;
+
+    const startTelemetry = () => {
+      import('./telemetry.js')
+        .then((mod) => {
+          if (cancelled || typeof mod?.initTelemetryTracker !== 'function') return;
+          cleanup = mod.initTelemetryTracker({ getViewerId: getOrCreateViewerId });
+        })
+        .catch(() => {});
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(startTelemetry, { timeout: 1500 });
+    } else {
+      timerId = setTimeout(startTelemetry, 1200);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timerId !== null) clearTimeout(timerId);
+      if (typeof cleanup === 'function') cleanup();
+    };
   }, []);
 
   const recordPaperInteraction = useCallback((fileObj, preferredView = '', options = {}) => {

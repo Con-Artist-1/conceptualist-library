@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getCleanUnitLabel } from '../unitParser.js';
 import { SUBJECTS_WITH_BOOKS_MAP } from '../data/curriculumCatalog.js';
 import {
   getPaperViewKey,
@@ -405,7 +404,7 @@ export function buildPendingPaperPlaceholder(paperParam, viewParam = 'QP') {
       path: raw,
       name: `${subject} ${unitCode} ${session}`
     };
-    tempFile.cleanUnitLabel = getCleanUnitLabel(tempFile) || unitCode;
+    tempFile.cleanUnitLabel = unitCode;
     return tempFile;
   }
 
@@ -477,7 +476,7 @@ export function serializePaperForHistory(file, preferredView = 'QP') {
     subject: file.subject || '',
     unitCode: file.unitCode || '',
     unitName: file.unitName || '',
-    cleanUnitLabel: file.cleanUnitLabel || getCleanUnitLabel(file) || '',
+    cleanUnitLabel: file.cleanUnitLabel || file.unitName || file.unitCode || '',
     variant: file.variant || '',
     year: file.year || '',
     session: file.session || '',

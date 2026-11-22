@@ -48,15 +48,11 @@
   --mcmaster-maroon: #6F1D2B;
   --mcmaster-maroon-hover: #541420;
   --mcmaster-gold: #C9A45C;
-  --mcmaster-gold-dark: #9E7B36;
-  --mcmaster-dark: #18191B;
   --igcse-blue: #233B54;
-  --igcse-blue-hover: #18293B;
 
   --bg-page: #F4F3EF;
   --bg-surface: #FFFFFF;
   --bg-subtle: #EBE8E1;
-  --bg-sidebar: #FFFFFF;
 
   --text-primary: #1A1D20;
   --text-secondary: #2E343B;
@@ -69,7 +65,6 @@
 
   --font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   --font-heading: 'Roboto', 'Inter', sans-serif;
-  --font-mono: 'Roboto Mono', ui-monospace, monospace;
   --radius-sm: 2px;
   --radius-md: 3px;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -420,15 +415,11 @@
   --mcmaster-maroon: #8C1D2F;
   --mcmaster-maroon-hover: #A8253B;
   --mcmaster-gold: #D4AF37;
-  --mcmaster-gold-dark: #B89228;
-  --mcmaster-dark: #0E1013;
   --igcse-blue: #4A7BB0;
-  --igcse-blue-hover: #6B9BD0;
 
   --bg-page: #121417;
   --bg-surface: #1B1E23;
   --bg-subtle: #0E1013;
-  --bg-sidebar: #17191E;
 
   --text-primary: #F0F2F5;
   --text-secondary: #CBD5E1;
@@ -778,7 +769,6 @@
   --bg-page: #000000;
   --bg-surface: #000000;
   --bg-subtle: #080808;
-  --bg-sidebar: #000000;
 
   --text-primary: #FFFFFF;
   --text-secondary: #CBD5E1;
@@ -792,9 +782,7 @@
   --mcmaster-maroon: #8C1D2F;
   --mcmaster-maroon-hover: #A8253B;
   --mcmaster-gold: #FFD33D;
-  --mcmaster-gold-dark: #B89228;
   --igcse-blue: #58A6FF;
-  --igcse-blue-hover: #79B8FF;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.8);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.9);
@@ -857,13 +845,13 @@
   --drawer-toggle-mob-active-bg: #8C1D2F;
   --drawer-toggle-mob-active-border: #FF5370;
   --drawer-toggle-mob-active-text: #FFFFFF;
-  --filter-btn-bg: #FFFFFF;
+  --filter-btn-bg: #111111;
   --filter-btn-border: #2D2D2D;
-  --filter-btn-text: #1A1D20;
-  --filter-btn-hover-bg: #080808;
-  --filter-btn-hover-border: #8C1D2F;
+  --filter-btn-text: #E2E8F0;
+  --filter-btn-hover-bg: #1C1C1C;
+  --filter-btn-hover-border: #FF5370;
   --filter-btn-active-bg: #8C1D2F;
-  --filter-btn-active-border: #8C1D2F;
+  --filter-btn-active-border: #FF5370;
   --filter-select-bg: #111111;
   --filter-select-border: #333333;
   --filter-select-focus: #8C1D2F;
@@ -1127,8 +1115,6 @@
   --footer-mob-link-hover-bg: #181818;
   --footer-mob-link-hover-border: #FFD33D;
 }
-
-/* OLED inherits default light pill contrast inside filter drawer to preserve visual parity */
 
 /* --- Reset --- */
 *,

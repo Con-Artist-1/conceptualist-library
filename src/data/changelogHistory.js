@@ -2,8 +2,19 @@ import { BUILD_TIMESTAMP } from '../lib/appMeta.js';
 
 export const CHANGELOG_HISTORY = [
   {
-    version: 'v7.0',
+    version: 'v7.0.1',
     date: BUILD_TIMESTAMP,
+    title: 'Entry Bundle Trimming, Idle Telemetry & Pure OLED Filter Polish',
+    summary: 'Removed heavy unit-parsing tables and telemetry from the synchronous entry bundle, trimmed unused CSS custom properties, and fixed Pure OLED filter button contrast.',
+    changes: [
+      'Lighter initial JS boot: Extracted lightweight unitSort.js (compareUnitLabels / isLegacyIalUnitLabel) so full unitParser.js filename regex tables stay strictly off-thread in the catalog Web Worker and build scripts, and deferred telemetry.js loading until browser idle.',
+      'Pure OLED filter drawer polish: Updated OLED .filter-btn tokens from white boxes to true dark OLED surfaces (#111111 with #E2E8F0 text and #FF5370 hover/active borders) and pruned 5 unused legacy CSS custom properties from index.css.',
+      'Documentation sync: Refreshed README.md and AI assistant guides to match the v7.0.1 modular architecture, verified 19,882-file / 16,021-record archive counts, 296-URL sitemap, and /llms.txt.'
+    ]
+  },
+  {
+    version: 'v7.0',
+    date: '2026-11-22T15:24:00+06:00',
     title: 'Modular Architecture, Lazy Audio/Solution Chunks & Semantic Theme Variables',
     summary: 'Decomposed oversized monolith modules and stylesheets into cohesive, cacheable ES modules and semantic CSS theme tokens while lazy-splitting audio/ZIP readers out of standard PDF viewing.',
     changes: [
