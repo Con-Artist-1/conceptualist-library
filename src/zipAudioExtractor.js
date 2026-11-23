@@ -316,7 +316,9 @@ export async function extractZipAudioTracks(url, onProgress = null, { signal } =
         zipExtractionCache.set(url, { tracks, createdAt: Date.now() });
         return tracks;
       } finally {
-        inFlightExtractions.delete(url);
+        if (inFlightExtractions.get(url) === entry) {
+          inFlightExtractions.delete(url);
+        }
       }
     })();
 
@@ -331,6 +333,7 @@ export async function extractZipAudioTracks(url, onProgress = null, { signal } =
     if (onProgress) entry.progressListeners.delete(onProgress);
     entry.refCount = Math.max(0, entry.refCount - 1);
     if (entry.refCount === 0 && inFlightExtractions.get(url) === entry) {
+      inFlightExtractions.delete(url);
       entry.controller.abort();
     }
   };

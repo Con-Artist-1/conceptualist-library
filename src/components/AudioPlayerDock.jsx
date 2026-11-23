@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { extractZipAudioTracks } from '../zipAudioExtractor.js';
 import {
   buildCandidateSubtitleKeys,
@@ -9,6 +9,7 @@ import {
   formatSubtitleTimestamp
 } from '../audioSubtitles.js';
 import { formatBytes, getHfUrl, getDownloadUrl, getPaperViewKey } from '../lib/libraryHelpers.js';
+import { hardStopAudioElement, registerAudioElement, stopAllSiteAudio } from '../lib/audioLifecycle.js';
 
 function CcIcon() {
   return (
@@ -40,18 +41,27 @@ export default function AudioPlayerDock({
   isSingleAudio = false,
   onCloseDock
 }) {
+  const hasDirectSingleAudio = Boolean(mode === 'dock' && audSingleSib);
+  const isCombinedU2U4Zip = Boolean(
+    audZipSib && /u2u4/i.test(audZipSib.name || audZipSib.path || '')
+  );
+  const shouldSkipRedundantZip = hasDirectSingleAudio && isCombinedU2U4Zip;
+  const activeZipDoc = mode === 'card'
+    ? (isSingleAudioZip ? currentDoc : null)
+    : (shouldSkipRedundantZip ? null : (audZipSib || null));
+  const activeZipUrl = activeZipDoc ? getHfUrl(activeZipDoc.path) : '';
+  const effectiveUnitCode = file?.unitCode || currentDoc?.unitCode || '';
+
   const [zipTracks, setZipTracks] = useState([]);
-  const [zipLoading, setZipLoading] = useState(false);
+  const [zipLoading, setZipLoading] = useState(() => Boolean(activeZipUrl));
   const [zipError, setZipError] = useState(null);
   const [zipProgress, setZipProgress] = useState(null);
   const [selectedTrackIdx, setSelectedTrackIdx] = useState(0);
-  const [useFullSingleAudio, setUseFullSingleAudio] = useState(false);
+  const [useFullSingleAudio, setUseFullSingleAudio] = useState(() => hasDirectSingleAudio);
 
-  const activeZipDoc = mode === 'card'
-    ? (isSingleAudioZip ? currentDoc : null)
-    : (audZipSib || null);
-  const activeZipUrl = activeZipDoc ? getHfUrl(activeZipDoc.path) : '';
-  const effectiveUnitCode = file?.unitCode || currentDoc?.unitCode || '';
+  useEffect(() => {
+    setUseFullSingleAudio(hasDirectSingleAudio);
+  }, [hasDirectSingleAudio, activeZipUrl]);
 
   useEffect(() => {
     if (!activeZipUrl) {
@@ -64,6 +74,7 @@ export default function AudioPlayerDock({
 
     let cancelled = false;
     const ctrl = new AbortController();
+    setZipTracks([]);
     setZipLoading(true);
     setZipError(null);
     setZipProgress({ phase: 'downloading', percent: 0 });
@@ -87,7 +98,10 @@ export default function AudioPlayerDock({
           }
         }
         setSelectedTrackIdx(initialIdx);
-        setUseFullSingleAudio(false);
+        // Never hijack or restart active Full Audio playback when tracked chapter ZIP finishes loading
+        if (!hasDirectSingleAudio) {
+          setUseFullSingleAudio(false);
+        }
         setZipLoading(false);
       })
       .catch((err) => {
@@ -100,15 +114,37 @@ export default function AudioPlayerDock({
       cancelled = true;
       ctrl.abort();
     };
-  }, [activeZipUrl, effectiveUnitCode]);
+  }, [activeZipUrl, effectiveUnitCode, hasDirectSingleAudio]);
 
   const safeTrackIdx = zipTracks.length > 0 ? Math.min(selectedTrackIdx, zipTracks.length - 1) : 0;
   const activeZipTrack = zipTracks[safeTrackIdx] || null;
 
   const audioPlayerRef = useRef(null);
+  const audioCleanupRef = useRef(null);
+  const [audioEl, setAudioEl] = useState(null);
   const audioCurrentTimeRef = useRef(0);
   const transcriptListRef = useRef(null);
   const prevTranscriptExpandedRef = useRef(false);
+
+  const setAudioElementRef = useCallback((node) => {
+    if (audioCleanupRef.current) {
+      audioCleanupRef.current();
+      audioCleanupRef.current = null;
+    }
+    audioPlayerRef.current = node;
+    setAudioEl(node);
+    if (node) {
+      audioCleanupRef.current = registerAudioElement(node);
+    }
+  }, []);
+
+  useLayoutEffect(() => () => {
+    if (audioCleanupRef.current) {
+      audioCleanupRef.current();
+      audioCleanupRef.current = null;
+    }
+    hardStopAudioElement(audioPlayerRef.current);
+  }, []);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
   const [subtitleEntry, setSubtitleEntry] = useState(null);
@@ -148,10 +184,10 @@ export default function AudioPlayerDock({
           session
         };
       }
-      if (isSingleAudio && currentDoc?.path) {
+      if (isSingleAudio && (singleUrl || currentDoc?.path)) {
         return {
           mode: 'card',
-          audioUrl: getHfUrl(currentDoc.path),
+          audioUrl: singleUrl || getHfUrl(currentDoc.path),
           audioPath: currentDoc.path || '',
           altPaths: currentDoc.altPaths || file.altPaths || [],
           sittingKey,
@@ -220,6 +256,7 @@ export default function AudioPlayerDock({
     currentDoc,
     isSingleAudioZip,
     isSingleAudio,
+    singleUrl,
     activeZipTrack,
     zipTracks.length,
     safeTrackIdx,
@@ -232,6 +269,36 @@ export default function AudioPlayerDock({
   const activeAudioIdentity = activeAudioContext
     ? `${activeAudioContext.audioPath}::${activeAudioContext.trackFileName}::${activeAudioContext.trackIndex ?? 'full'}`
     : '';
+  const activeAudioSrc = activeAudioContext?.audioUrl || '';
+
+  // Imperatively switch src and play on a single persistent <audio> node (no key-swap or detached autoplay)
+  useEffect(() => {
+    const el = audioEl;
+    if (!el || !activeAudioSrc) return undefined;
+
+    stopAllSiteAudio({ except: el });
+    try {
+      el.pause();
+      if (el.readyState > 0) el.currentTime = 0;
+    } catch {
+      // Ignore pre-metadata reset errors
+    }
+    el.src = activeAudioSrc;
+    el.load();
+
+    if (el.isConnected) {
+      const playPromise = el.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          // Ignore browser autoplay policy or abort rejections
+        });
+      }
+    }
+
+    return () => {
+      hardStopAudioElement(el);
+    };
+  }, [audioEl, activeAudioSrc, activeAudioIdentity]);
 
   useEffect(() => {
     audioCurrentTimeRef.current = 0;
@@ -654,18 +721,18 @@ export default function AudioPlayerDock({
           </div>
         )}
 
-        {zipLoading && !useFullSingleAudio && !activeZipTrack && audSingleSib && (
-          <div className="modal-audio-dock-status" role="status" aria-live="polite">
+        {zipLoading && activeZipUrl && zipTracks.length === 0 && audSingleSib && (
+          <div className="modal-audio-dock-status compact" role="status" aria-live="polite">
             <span className="pdf-skeleton-spinner" aria-hidden="true" />
             <span className="modal-audio-dock-status-text">
               {zipProgress?.phase === 'unpacking'
-                ? `Loading chapter tracks (${zipProgress.currentTrack}/${zipProgress.totalTracks}) — playing full audio...`
-                : `Loading chapter tracks${zipProgress?.percent ? ` (${zipProgress.percent}%)` : '...'} — playing full audio`}
+                ? `Loading tracks (${zipProgress.currentTrack}/${zipProgress.totalTracks})...`
+                : `Loading chapter tracks${zipProgress?.percent ? ` (${zipProgress.percent}%)` : '...'}`}
             </span>
           </div>
         )}
 
-        {zipLoading && !useFullSingleAudio && !activeZipTrack && !audSingleSib ? (
+        {(zipLoading && !activeAudioSrc) || (!activeAudioSrc && !zipError) ? (
           <div className="modal-audio-dock-status" role="status" aria-live="polite">
             <span className="pdf-skeleton-spinner" aria-hidden="true" />
             <span className="modal-audio-dock-status-text">
@@ -674,7 +741,7 @@ export default function AudioPlayerDock({
                 : `Streaming & unpacking ZIP audio in browser${zipProgress?.percent ? ` (${zipProgress.percent}%)` : '...'}`}
             </span>
           </div>
-        ) : zipError && !useFullSingleAudio && !audSingleSib ? (
+        ) : zipError && !activeAudioSrc ? (
           <div className="modal-audio-dock-status error" role="alert">
             <span className="modal-audio-dock-status-text">
               Unable to unpack archive in browser ({zipError}).
@@ -682,17 +749,10 @@ export default function AudioPlayerDock({
           </div>
         ) : (
           <audio
-            key={activeAudioIdentity || 'dock-audio'}
-            ref={audioPlayerRef}
+            ref={setAudioElementRef}
             controls
-            autoPlay
             preload="metadata"
             className="modal-audio-dock-player"
-            src={
-              !useFullSingleAudio && activeZipTrack?.blobUrl
-                ? activeZipTrack.blobUrl
-                : getHfUrl((audSingleSib || audSib).path)
-            }
             onTimeUpdate={handleAudioTimeUpdate}
             onSeeked={handleAudioTimeUpdate}
             onLoadedMetadata={handleAudioTimeUpdate}
@@ -739,7 +799,11 @@ export default function AudioPlayerDock({
           <button
             type="button"
             className="modal-audio-dock-close"
-            onClick={onCloseDock}
+            onClick={() => {
+              hardStopAudioElement(audioPlayerRef.current);
+              stopAllSiteAudio();
+              onCloseDock?.();
+            }}
             aria-label="Close docked audio player"
             title="Hide Audio Bar"
           >
@@ -764,11 +828,10 @@ export default function AudioPlayerDock({
               {renderCcButton('Subtitles (CC)')}
             </div>
             <audio
-              ref={audioPlayerRef}
+              ref={setAudioElementRef}
               controls
-              autoPlay
+              preload="metadata"
               className="modal-audio-player"
-              src={singleUrl}
               onTimeUpdate={handleAudioTimeUpdate}
               onSeeked={handleAudioTimeUpdate}
               onLoadedMetadata={handleAudioTimeUpdate}
@@ -829,13 +892,10 @@ export default function AudioPlayerDock({
                 {activeZipTrack?.blobUrl && (
                   <>
                     <audio
-                      key={activeAudioIdentity || 'card-zip-audio'}
-                      ref={audioPlayerRef}
+                      ref={setAudioElementRef}
                       controls
-                      autoPlay
                       preload="metadata"
                       className="modal-audio-player"
-                      src={activeZipTrack.blobUrl}
                       onTimeUpdate={handleAudioTimeUpdate}
                       onSeeked={handleAudioTimeUpdate}
                       onLoadedMetadata={handleAudioTimeUpdate}

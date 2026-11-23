@@ -1362,9 +1362,17 @@
   border: 1px solid var(--audio-status-border);
   display: flex;
   align-items: center;
+  gap: 8px;
   font-size: 12px;
   font-weight: 600;
   color: var(--audio-status-text);
+}
+
+.modal-audio-dock-status.compact {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 240px;
+  padding: 0 10px;
 }
 
 .modal-audio-dock-status.error {

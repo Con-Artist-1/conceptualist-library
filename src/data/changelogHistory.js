@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v7.3.2',
+    date: '2026-11-23T08:35:00+06:00',
+    title: 'Single-Stream Audio Lifecycle & ZIP Track Swap Fix',
+    summary: 'Fixed overlapping double audio playback and lingering background audio after closing the reader or navigating back to the home page.',
+    changes: [
+      'Single persistent audio player & full teardown: Replaced key-swapped JSX autoplay with an imperative single-element playback controller and global active-audio guard (src/lib/audioLifecycle.js) that pauses, clears src, flushes the browser media pipeline, and resets MediaSession whenever tracks switch, the modal/dock closes, or you navigate away.',
+      'Stopped mid-playback ZIP hijacking: Skipped redundant background downloads of combined Audio U2U4.zip archives when the sitting already has a direct unit MP3/WAV, and kept active Full Audio playing smoothly when tracked chapter ZIPs finish unpacking instead of restarting or overlapping audio.',
+      'Cleaner ZIP abort recovery & Back navigation: Synchronously cleared aborted in-flight ZIP extractions so rapid reopens never stall, and normalized same-paper hash routes via replaceState so Browser Back leaves the audio reader cleanly in one step.'
+    ]
+  },
+  {
     version: 'v7.3.1',
     date: '2026-11-23T07:45:00+06:00',
     title: 'Zero-Waterfall Home Preload & Scoped Lazy CSS Tokens',

@@ -34,6 +34,7 @@ import {
 import { buildArchiveContextInfo } from './lib/archiveContext.js';
 import { getCatalogClient } from './lib/catalogClient.js';
 import { preloadReaderChunksOnce } from './lib/pdfPrewarm.js';
+import { stopAllSiteAudio } from './lib/audioLifecycle.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useViewsState } from './hooks/useViewsState.js';
 import { useDeployRefresh } from './hooks/useDeployRefresh.js';
@@ -296,8 +297,19 @@ function App() {
   }, [recordPaperInteraction]);
 
   // Handle browser Back/Forward & hash deep-link navigation across all routes, wizard steps, and modals
+  const lastNavLocRef = useRef('');
+  const lastNavAtRef = useRef(0);
+
   useEffect(() => {
     const handlePopState = (event) => {
+      const locKey = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const now = Date.now();
+      if (event?.type === 'hashchange' && locKey === lastNavLocRef.current && now - lastNavAtRef.current < 80) {
+        return;
+      }
+      lastNavLocRef.current = locKey;
+      lastNavAtRef.current = now;
+
       isPopStateRef.current = true;
       const popReqId = ++popStateReqIdRef.current;
       const navState = (event && event.state) || window.history.state || null;
@@ -350,6 +362,7 @@ function App() {
           })
           .catch(() => {});
       } else {
+        stopAllSiteAudio();
         setPreviewFile(null);
         setPendingPaperParam('');
       }
@@ -361,6 +374,13 @@ function App() {
       window.removeEventListener('hashchange', handlePopState);
     };
   }, []);
+
+  // Guarantee zero audio ever lingers when no preview modal is open
+  useEffect(() => {
+    if (!previewFile) {
+      stopAllSiteAudio();
+    }
+  }, [previewFile]);
 
   // Re-resolve unit slug and route validity once wizard metadata finishes hydrating on cold visits
   const initialUnitHydratedRef = useRef(false);
@@ -772,6 +792,7 @@ function App() {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
       if (e.preventDefault) e.preventDefault();
     }
+    stopAllSiteAudio();
     setCurrentTab('library');
     setIsNotFound(false);
     setWizardSubject(null);
@@ -1135,6 +1156,9 @@ function App() {
   }, []);
 
   const handleQuickRouteFilter = useCallback((action) => {
+    stopAllSiteAudio();
+    setPreviewFile(null);
+    setPendingPaperParam('');
     setCurrentTab('library');
     clearFilters({ pushUrl: false });
     if (action === 'ial') setFilterCurriculum('Edexcel IAL');
@@ -1146,6 +1170,9 @@ function App() {
   }, [clearFilters]);
 
   const handleOpenTab = useCallback((tab) => {
+    stopAllSiteAudio();
+    setPreviewFile(null);
+    setPendingPaperParam('');
     setIsNotFound(false);
     setCurrentTab(tab);
   }, []);
@@ -1401,6 +1428,7 @@ function App() {
             showViews={!previewFile.isNotFound && isQuestionPaperEligibleForViews(previewFile)}
             viewsCount={!previewFile.isNotFound && isQuestionPaperEligibleForViews(previewFile) ? getPaperTotalViews(previewFile, viewsMap) : 0}
             onClose={() => {
+              stopAllSiteAudio();
               setPreviewFile(null);
               setPendingPaperParam('');
               try {

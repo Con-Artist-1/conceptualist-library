@@ -3,7 +3,7 @@
 export const BUILD_TIMESTAMP =
   typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-22T00:00:00.000Z';
 
-export const APP_VERSION = 'v7.3.1';
+export const APP_VERSION = 'v7.3.2';
 export const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 export const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;

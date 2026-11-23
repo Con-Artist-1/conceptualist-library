@@ -16,6 +16,7 @@ import { PaperViewsCounter } from './PaperViewsCounter.jsx';
 import { PdfPaneSkeleton } from './Skeletons.jsx';
 import { ThemeToggleButton } from './ThemeToggleButton.jsx';
 import { ResourceCard } from './ResourceCard.jsx';
+import { stopAllSiteAudio } from '../lib/audioLifecycle.js';
 
 const PdfViewerPane = lazy(() => import('../PdfViewerPane.jsx'));
 const AudioPlayerDock = lazy(() => import('./AudioPlayerDock.jsx'));
@@ -51,17 +52,26 @@ const PreviewModal = ({
   const hasPdfFallback = Boolean(siblings.QP?.ext === 'pdf' || siblings.MS?.ext === 'pdf');
   const canDockAudio = isPlayableAudioSib && hasPdfFallback;
 
-  const [audioDockOpen, setAudioDockOpen] = useState(() => Boolean(initialView === 'AUD' && canDockAudio));
+  const shouldStartAudioDock = Boolean(
+    canDockAudio && (initialView === 'AUD' || (!initialView && file?.docType === 'AUD'))
+  );
+  const [audioDockOpen, setAudioDockOpen] = useState(() => shouldStartAudioDock);
   const [swapSplit, setSwapSplit] = useState(false);
 
   // On mobile portrait, default to single QP view for maximum readable document height; on desktop, default to split view
   const [activeView, setActiveView] = useState(() => {
-    if (initialView === 'AUD' && canDockAudio) {
+    if (shouldStartAudioDock) {
       return !isMobile && canSplit ? 'split' : (siblings.QP ? 'QP' : siblings.MS ? 'MS' : 'QP');
     }
     if (initialView === 'split' && canSplit) return 'split';
     if (initialView && (siblings[initialView] || file?.docType === initialView)) return initialView;
-    return isMobile ? (file?.docType || (siblings.QP ? 'QP' : 'split')) : (canSplit ? 'split' : (file?.docType || 'QP'));
+    const fallback = isMobile
+      ? (file?.docType || (siblings.QP ? 'QP' : 'split'))
+      : (canSplit ? 'split' : (file?.docType || 'QP'));
+    if (canDockAudio && fallback === 'AUD') {
+      return !isMobile && canSplit ? 'split' : (siblings.QP ? 'QP' : 'MS');
+    }
+    return fallback;
   });
 
   useEffect(() => {
@@ -72,9 +82,21 @@ const PreviewModal = ({
     }
   }, [canDockAudio, activeView, isMobile, canSplit, siblings.QP]);
 
+  useLayoutEffect(() => () => {
+    stopAllSiteAudio();
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    stopAllSiteAudio();
+    onClose();
+  }, [onClose]);
+
   const handleSelectView = useCallback((nextView) => {
     if (nextView === 'AUD' && canDockAudio) {
-      setAudioDockOpen((prev) => !prev);
+      setAudioDockOpen((prev) => {
+        if (prev) stopAllSiteAudio();
+        return !prev;
+      });
       return;
     }
     setActiveView(nextView);
@@ -208,7 +230,7 @@ const PreviewModal = ({
         if (!headerVisible) {
           setHeaderVisible(true);
         } else {
-          onClose();
+          handleCloseModal();
         }
       } else if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const tag = e.target?.tagName;
@@ -219,7 +241,7 @@ const PreviewModal = ({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose, headerVisible]);
+  }, [handleCloseModal, headerVisible]);
 
   // Shared split drag handler parameterized for desktop (horizontal) and mobile (vertical)
   const startSplitDrag = useCallback((axis, e) => {
@@ -390,7 +412,7 @@ const PreviewModal = ({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={handleCloseModal}>
       <div
         ref={modalContainerRef}
         role="dialog"
@@ -428,7 +450,7 @@ const PreviewModal = ({
                 <button
                   type="button"
                   className="modal-close-btn mobile-only-close"
-                  onClick={onClose}
+                  onClick={handleCloseModal}
                   aria-label="Close preview"
                   title="Close Preview (Esc)"
                 >
@@ -617,7 +639,7 @@ const PreviewModal = ({
               <button
                 type="button"
                 className="modal-close-btn desktop-only-close"
-                onClick={onClose}
+                onClick={handleCloseModal}
                 aria-label="Close preview"
                 title="Close Preview (Esc)"
               >
@@ -639,7 +661,10 @@ const PreviewModal = ({
               audSib={audSib}
               audZipSib={audZipSib}
               audSingleSib={audSingleSib}
-              onCloseDock={() => setAudioDockOpen(false)}
+              onCloseDock={() => {
+                stopAllSiteAudio();
+                setAudioDockOpen(false);
+              }}
             />
           </Suspense>
         )}
@@ -661,7 +686,7 @@ const PreviewModal = ({
                 <h3>Document Not Found in Archive</h3>
                 <p>The requested study link could not be matched to a file in the current catalog ({file.path || file.name}).</p>
                 <div className="modal-sol-error-actions">
-                  <button type="button" className="modal-download-btn" onClick={onClose}>
+                  <button type="button" className="modal-download-btn" onClick={handleCloseModal}>
                     Return to Archive
                   </button>
                 </div>
@@ -734,7 +759,7 @@ const PreviewModal = ({
                     isMobile={isMobile}
                   />
                 </Suspense>
-              ) : !isSinglePdf && (isSingleAudio || isSingleAudioZip) ? (
+              ) : !isSinglePdf && (isSingleAudio || isSingleAudioZip) && !(audioDockOpen && canDockAudio) ? (
                 <Suspense fallback={<PdfPaneSkeleton title={`Opening ${singleTitle}...`} subtitle="Loading Listening Audio Player" />}>
                   <AudioPlayerDock
                     mode="card"

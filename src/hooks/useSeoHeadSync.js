@@ -71,9 +71,25 @@ export function useSeoHeadSync({
       if (currentUrl !== nextUrl || stateChanged) {
         const isLegacyPaperMigration = window.location.search.includes('paper=') && nextUrl.includes('#paper=');
         const isInitialColdStateTag = currentUrl === nextUrl && prevState === null;
+        const currentHashStr = String(window.location.hash || '').replace(/^#/, '');
+        const currentHashParams = currentHashStr.includes('=') ? new URLSearchParams(currentHashStr) : null;
+        const currentPaperKey = currentHashParams?.get('paper') || '';
+        const currentViewParam = currentHashParams?.get('view') || '';
+        const nextPaperKey = previewFile && !previewFile.isNotFound
+          ? (previewFile.id || previewFile.path || '')
+          : (pendingPaperParam || '');
+        const isSamePaperNormalization = Boolean(
+          currentPaperKey &&
+          nextPaperKey &&
+          currentPaperKey === nextPaperKey &&
+          currentViewParam === (previewInitialView || '')
+        );
         if (isPopStateRef.current) {
           isPopStateRef.current = false;
-        } else if (deferredSearchQuery || isLegacyPaperMigration || isInitialColdStateTag) {
+          if (isSamePaperNormalization && currentUrl !== nextUrl) {
+            window.history.replaceState(nextHistoryState, '', nextUrl);
+          }
+        } else if (deferredSearchQuery || isLegacyPaperMigration || isInitialColdStateTag || isSamePaperNormalization) {
           window.history.replaceState(nextHistoryState, '', nextUrl);
         } else {
           window.history.pushState(nextHistoryState, '', nextUrl);
