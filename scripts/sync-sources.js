@@ -81,6 +81,7 @@ function parseArgs(argv) {
     syllabuses: null,
     sinceYear: 0,
     qpdfPath: '',
+    dumpJson: '',
     skipPack: false,
     skipIndex: false,
     limit: Infinity
@@ -93,8 +94,9 @@ function parseArgs(argv) {
     else if (arg === '--skip-index') opts.skipIndex = true;
     else if (arg.startsWith('--board=')) opts.board = arg.slice(8).trim().toLowerCase() || 'edexcel';
     else if (arg.startsWith('--sources=')) opts.sources = arg.slice(10).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-    else if (arg.startsWith('--syllabuses=')) {
-      const codes = arg.slice(13).split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg.startsWith('--syllabuses=') || arg.startsWith('--syllabus=')) {
+      const rawArg = arg.slice(arg.indexOf('=') + 1);
+      const codes = rawArg.split(',').map(s => s.trim()).filter(Boolean);
       const resolved = new Set();
       for (const c of codes) {
         const entry = resolveCambridgeSyllabus(c);
@@ -104,12 +106,13 @@ function parseArgs(argv) {
     }
     else if (arg.startsWith('--since=')) opts.sinceYear = Number(arg.slice(8)) || 0;
     else if (arg.startsWith('--qpdf=')) opts.qpdfPath = arg.slice(7);
+    else if (arg.startsWith('--dump-json=')) opts.dumpJson = arg.slice(12).trim();
     else if (arg.startsWith('--limit=')) opts.limit = Number(arg.slice(8)) || Infinity;
   }
   if (!opts.sources) {
     opts.sources = opts.board === 'cambridge'
-      ? ['beh', 'elevare', 'bsr', 'papa']
-      : ['bsr', 'dp', 'igexams', 'ssc', 'pmt', 'pl', 'elevare'];
+      ? ['beh', 'elevare', 'bsr', 'pmt', 'almr', 'cie', 'papa']
+      : ['bsr', 'dp', 'igexams', 'ssc', 'pmt', 'pl', 'elevare', 'beh', 'almr'];
   }
   return opts;
 }
@@ -331,7 +334,7 @@ function isStrictTrueIal(subj, fullPath, sessKey) {
   if (/(?:^|[^a-z0-9])(?:4w?[a-z]{2}\d|6(?:bi|ch|ph|ec|bs|ac|ps|ge|hi|en|et|fr|gn|sp)\d{2}|600[12]|8[a-z]{2}\d|9[a-z]{2}\d)(?:[^a-z0-9]|$)/.test(low)) return false;
   if (/(?:^|[^a-z0-9])(?:paper\s*)?(?:[12][bcp]r?|[1-4][hf]r?)(?:[^a-z0-9]|$)/.test(low)) return false;
   if (/(?:^|[^0-9])66[6-9]\d[a-z]?(?:[^a-z0-9]|$)/.test(low)) return false;
-  if (subj === 'Math' && /\bc[1-4](?:jan|jun|may)/i.test(low) && !/c12|c34|wma/i.test(low)) return false;
+  if (subj === 'Math' && /(?:^|[^a-z0-9])c[1-4](?:[^0-9a-z]|$)/i.test(low) && !/c12|c34|wma/i.test(low)) return false;
   if ((subj === 'English Language' || subj === 'English Literature') && /\bwps0?\d\b/i.test(low)) return false;
   if (/\bgce\b|(?<!international[-_\s])a[-_\s]?level/i.test(low) && !/international[-_\s]a[-_\s]?level/i.test(low)) return false;
   const yr = Number((sessKey || '').slice(0, 4) || 0);
@@ -350,6 +353,7 @@ function mapSubject(spec, cardOrTitle, folderPath, name) {
     .trim();
   const normName = String(name || '').replace(/[_-]+/g, ' ');
   if (spec === 'IGCSE' && cleaned.includes('human biology')) return 'Human Biology';
+  if (spec === 'IGCSE' && cleaned.includes('further pure')) return 'Further Pure Mathematics';
   if (spec === 'IAL') {
     if (cleaned.includes('business')) return 'Business';
     if (cleaned.includes('math')) return 'Math';
@@ -446,15 +450,33 @@ async function crawlDriveTree(roots, sinceYear) {
 async function crawlBsr(sinceYear) {
   console.log('[BSR] Fetching https://britishstudentroom.com/edexcel/ ...');
   const html = await fetch('https://britishstudentroom.com/edexcel/', { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
-  const roots = [];
+  const cards = [];
   for (const m of html.matchAll(/<div class="subject-card"([^>]*)>/gi)) {
     const attrs = m[1];
     const level = attrs.match(/data-level="([^"]*)"/)?.[1] || '';
     if (level !== 'IAL' && level !== 'IGCSE') continue;
     const title = decodeHtml(attrs.match(/data-title="([^"]*)"/)?.[1] || '');
-    const slice = html.slice(m.index, m.index + 1200);
-    const driveUrl = slice.match(/openAuthModal\('([^']+)'\)/)?.[1] || '';
-    if (driveUrl) roots.push({ source: 'BSR', spec: level, title, driveUrl });
+    const slice = html.slice(m.index, m.index + 1400);
+    const driveUrl = slice.match(/openAuthModal\('(https:\/\/drive\.google\.com\/[^']+)'\)/)?.[1] || '';
+    const subHref = slice.match(/href=["'](\/past-papers\/[^"']+)["']/)?.[1] || '';
+    cards.push({ spec: level, title, driveUrl, subHref });
+  }
+  const roots = [];
+  const seenDrive = new Set();
+  for (let i = 0; i < cards.length; i += 8) {
+    await Promise.all(cards.slice(i, i + 8).map(async (c) => {
+      let dUrl = c.driveUrl;
+      if (!dUrl && c.subHref) {
+        try {
+          const subHtml = await fetch(`https://britishstudentroom.com${c.subHref}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+          dUrl = subHtml.match(/openAuthModal\('(https:\/\/drive\.google\.com\/[^']+)'\)/)?.[1] || '';
+        } catch { /* ignore */ }
+      }
+      if (dUrl && !seenDrive.has(dUrl)) {
+        seenDrive.add(dUrl);
+        roots.push({ source: 'BSR', spec: c.spec, title: c.title, driveUrl: dUrl });
+      }
+    }));
   }
   console.log(`[BSR] Found ${roots.length} IAL/IGCSE Drive roots; crawling folders...`);
   return crawlDriveTree(roots, sinceYear);
@@ -586,11 +608,32 @@ async function crawlSsc(sinceYear) {
   return [...direct, ...driveFiles];
 }
 
+const PMT_EDEXCEL_HUBS = [
+  'https://www.physicsandmathstutor.com/a-level-maths-papers/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-maths/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-physics/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-physics/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-chemistry/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-biology/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-biology/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-economics/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-economics/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-computer-science/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-computer-science/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-geography/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-geography/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-psychology/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-english-language/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-english-language/',
+  'https://www.physicsandmathstutor.com/past-papers/a-level-english-literature/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-english-literature/',
+  'https://www.physicsandmathstutor.com/past-papers/gcse-history/'
+];
+
 async function crawlPmt() {
   console.log('[PMT] Scanning Physics & Maths Tutor Edexcel IAL/IGCSE indexes...');
-  const rootHtml = await fetch('https://www.physicsandmathstutor.com/past-papers/', { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
-  const sections = [...new Set([...rootHtml.matchAll(/href=["'](https:\/\/www\.physicsandmathstutor\.com\/(?:past-papers\/[^"']+|a-level-maths-papers\/))["']/gi)].map(m => m[1]))]
-    .filter(u => !/revision|solutionbank|tutor|courses/i.test(u));
+  const sections = PMT_EDEXCEL_HUBS;
 
   const subUrls = new Set();
   let pmtErrors = 0;
@@ -601,8 +644,10 @@ async function crawlPmt() {
         const u = normalizeHttpUrl(m[1], sUrl);
         if (!u || !u.includes('physicsandmathstutor.com')) continue;
         const low = u.toLowerCase();
-        if ((low.includes('edexcel') && (low.includes('ial') || low.includes('igcse') || low.includes('international')))
-          || (sUrl.includes('a-level-maths-papers') && /\/(?:c1|c2|c3|c4|c12|c34|p1|p2|p3|p4|m1|m2|m3|s1|s2|s3|fp1|fp2|fp3|d1)(?:-papers|\/|$)/i.test(low))) {
+        if (
+          (low.includes('edexcel') && (low.includes('ial') || low.includes('igcse') || low.includes('international') || /\/edexcel-unit-[1-6]\/?$/.test(low))) ||
+          (sUrl.includes('a-level-maths-papers') && /\/(?:c1|c2|c3|c4|c12|c34|p1|p2|p3|p4|m1|m2|m3|s1|s2|s3|fp1|fp2|fp3|d1)-(?:edexcel(?:-ial)?|papers)\/?$/i.test(low))
+        ) {
           subUrls.add(u);
         }
       }
@@ -611,15 +656,67 @@ async function crawlPmt() {
 
   const out = [];
   const list = [...subUrls];
-  for (let i = 0; i < list.length; i += 6) {
-    await Promise.all(list.slice(i, i + 6).map(async (u) => {
+  for (let i = 0; i < list.length; i += 4) {
+    await Promise.all(list.slice(i, i + 4).map(async (u) => {
       try {
-        const html = await fetch(u, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
-        const spec = /igcse/i.test(u) ? 'IGCSE' : 'IAL';
-        const title = u.includes('maths-papers') ? 'Math' : (u.split('/').filter(Boolean).pop() || '');
+        let html = '';
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const r = await fetch(u, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) });
+          if (r.ok) {
+            html = await r.text();
+            break;
+          }
+          await new Promise(res => setTimeout(res, 1200 * attempt));
+        }
+        if (!html) { pmtErrors++; return; }
+        const isGcseHub = /\/gcse-|igcse/i.test(u);
+        const spec = isGcseHub ? 'IGCSE' : 'IAL';
+        const urlParts = u.split('/').filter(Boolean);
+        const hubSlug = urlParts[urlParts.length - 2] || '';
+        const leafSlug = urlParts[urlParts.length - 1] || '';
+        const baseTitle = u.includes('maths-papers') ? 'Math' : hubSlug.replace(/^(?:a-level|gcse)-/i, '').replace(/-past-papers$/i, '');
         for (const m of html.matchAll(/href=["']([^"']+\.pdf[^"']*)["']/gi)) {
           const pdfUrl = normalizeHttpUrl(m[1], u);
-          if (pdfUrl) out.push({ source: 'PMT', spec, title, folderPath: '', name: decodeURIComponent(pdfUrl.split('?')[0].split('/').pop()), url: pdfUrl });
+          if (!pdfUrl) continue;
+          const decodedUrl = decodeURIComponent(pdfUrl);
+          if (spec === 'IAL' && !/edexcel-ial|international|\(ial\)/i.test(decodedUrl)) continue;
+          if (spec === 'IGCSE' && !/edexcel-igcse|international|\(igcse\)|\/igcse\//i.test(decodedUrl) && !/edexcel-igcse/i.test(u)) continue;
+          let title = baseTitle;
+          if (spec === 'IGCSE') {
+            if (/math/i.test(title)) {
+              if (/edexcel-igcse-further|spec-4pm/i.test(decodedUrl)) title = 'Further Pure Mathematics';
+              else if (/edexcel-igcse-b|spec-4mb/i.test(decodedUrl)) title = 'Mathematics B';
+              else title = 'Mathematics A';
+            } else if (/english[-_\s]*language/i.test(title)) {
+              title = /edexcel-igcse-b|spec-4eb/i.test(decodedUrl) ? 'English Language B' : 'English Language A';
+            }
+          }
+          const rawName = decodedUrl.split('?')[0].split('/').pop() || '';
+          let unitHint = leafSlug.replace(/^edexcel-/i, '').replace(/-edexcel.*$/i, '').replace(/-/g, ' ');
+          if (spec === 'IAL' && title === 'Math') {
+            const mm = decodedUrl.match(/\/Edexcel-IAL\/(?:[^/]+\/)?(P[1-4]|C12|C34|M[1-3]|S[1-3]|FP[1-3]|D1)\//i);
+            if (!mm) continue;
+            unitHint = mm[1].toUpperCase();
+          } else if (spec === 'IAL' && title !== 'Math') {
+            const um = decodedUrl.match(/(?:Unit|New-Spec-Paper|Paper)[-_ ]*([1-6])\b/i) || unitHint.match(/(?:unit|paper)\s*([1-6])\b/i);
+            if (um) unitHint = `Unit ${um[1]}`;
+          } else if (spec === 'IGCSE') {
+            const pm = decodedUrl.match(/\/Paper[-_ ]*([1-4][FH]?)\//i);
+            if (pm) {
+              const pCode = pm[1].toUpperCase();
+              const isReg = /\(R\)|\bR\b/i.test(rawName);
+              unitHint = `Paper ${pCode}${isReg && /[FH]$/.test(pCode) ? 'R' : ''}`;
+            }
+          }
+          const hasExplicitUnitInName = /\b(?:Paper|Unit)[-_ ]*[1-6][A-Z]?\b/i.test(rawName);
+          out.push({
+            source: 'PMT',
+            spec,
+            title,
+            folderPath: unitHint,
+            name: hasExplicitUnitInName ? `${title} - ${rawName}` : `${title} - ${unitHint} - ${rawName}`,
+            url: pdfUrl
+          });
         }
       } catch { pmtErrors++; }
     }));
@@ -868,6 +965,105 @@ async function crawlElevare(sinceYear) {
   return [...driveFiles, ...curatedExtras];
 }
 
+async function crawlBehEdexcel(sinceYear) {
+  console.log('[BEH-Edexcel] Scanning BestExamHelp Edexcel International IGCSE & IAL indexes...');
+  const base = 'https://bestexamhelp.com/exam';
+  const levels = [
+    { spec: 'IGCSE', slug: 'edexcel-international-gcse' },
+    { spec: 'IAL', slug: 'edexcel-international-a-level' }
+  ];
+  const subjects = [];
+  for (const lvl of levels) {
+    try {
+      const html = await fetch(`${base}/${lvl.slug}/index.php`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+      const cleanHtml = html.replace(/<!--[\s\S]*?-->/g, '');
+      for (const m of cleanHtml.matchAll(/href=["']([a-z0-9-]+)\/index\.php["'][^>]*>([^<]+)<\/a>/gi)) {
+        subjects.push({ spec: lvl.spec, levelSlug: lvl.slug, subSlug: m[1], title: decodeHtml(m[2]) });
+      }
+    } catch { /* ignore */ }
+  }
+  const sessionPages = [];
+  for (const sub of subjects) {
+    try {
+      const html = await fetch(`${base}/${sub.levelSlug}/${sub.subSlug}/index.php`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+      for (const m of html.matchAll(/href=["']((20\d{2})\/(january|march|summer|winter)\.php)["']/gi)) {
+        const yr = Number(m[2]);
+        if (sinceYear && yr < sinceYear) continue;
+        sessionPages.push({
+          ...sub,
+          year: yr,
+          season: m[3].toLowerCase(),
+          sessionUrl: `${base}/${sub.levelSlug}/${sub.subSlug}/${m[1]}`,
+          yearBaseUrl: `${base}/${sub.levelSlug}/${sub.subSlug}/${yr}`
+        });
+      }
+    } catch { /* ignore */ }
+  }
+  const out = [];
+  for (let i = 0; i < sessionPages.length; i += 6) {
+    await Promise.all(sessionPages.slice(i, i + 6).map(async (sp) => {
+      try {
+        const html = await fetch(sp.sessionUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+        const monFolder = sp.season === 'summer' ? 'June' : (sp.season === 'winter' ? 'January' : 'January');
+        for (const m of html.matchAll(/href=["']([a-z0-9]{4,6})-(m|s|w)(\d{2})-(qp|ms|er)(?:-([a-z0-9]+))?\.php["']/gi)) {
+          const pdfName = `${m[1].toLowerCase()}_${m[2].toLowerCase()}${m[3]}_${m[4].toLowerCase()}${m[5] ? `_${m[5].toLowerCase()}` : ''}.pdf`;
+          out.push({
+            source: 'BEH-Edexcel',
+            spec: sp.spec,
+            title: sp.title,
+            folderPath: `${sp.year} ${monFolder}`,
+            name: pdfName,
+            url: `${sp.yearBaseUrl}/${pdfName}`
+          });
+        }
+      } catch { /* ignore */ }
+    }));
+  }
+  console.log(`[BEH-Edexcel] Collected ${out.length} files across ${subjects.length} active subjects.`);
+  return out;
+}
+
+async function crawlAlmrEdexcel(sinceYear) {
+  console.log('[ALMR-Edexcel] Scanning ALevelMathsRevision Edexcel IAL Mathematics papers...');
+  const url = 'https://alevelmathsrevision.com/edexcel-ial-past-papers/';
+  let html = '';
+  try {
+    html = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => (r.ok ? r.text() : ''));
+  } catch {
+    return [];
+  }
+  const out = [];
+  const seen = new Set();
+  for (const m of html.matchAll(/\/pdf\/ial-exampapers\/edexcel\/((jan|jun|oct|nov)-(20\d{2})(r)?(-unused)?)\/([a-z0-9]+)\/\?type=(q|ms)\b/gi)) {
+    const seriesRaw = m[1].toLowerCase();
+    const monRaw = m[2].toLowerCase();
+    const yr = Number(m[3]);
+    const isR = Boolean(m[4]);
+    const isUnused = Boolean(m[5]);
+    const paperRaw = m[6].toLowerCase();
+    const typeRaw = m[7].toLowerCase();
+    if (isUnused) continue;
+    if (sinceYear && yr < sinceYear) continue;
+    const key = `${seriesRaw}|${paperRaw}|${typeRaw}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const monCap = monRaw === 'jan' ? 'Jan' : (monRaw === 'jun' ? 'Jun' : 'Oct');
+    const dt = typeRaw === 'ms' ? 'MS' : 'QP';
+    const fileUrl = `https://alevelmathsrevision.com/downloads/past-papers/edexcel-ial/${paperRaw}-${seriesRaw}${typeRaw === 'ms' ? '-ms' : ''}.pdf`;
+    const fileName = `Math_${paperRaw.toUpperCase()}_${yr}-${monCap}${isR ? '_R' : ''}_${dt}.pdf`;
+    out.push({
+      source: 'ALMR-Edexcel',
+      spec: 'IAL',
+      title: 'Math',
+      folderPath: `${yr} ${monCap}`,
+      name: fileName,
+      url: fileUrl
+    });
+  }
+  console.log(`[ALMR-Edexcel] Collected ${out.length} direct Edexcel IAL Math PDFs.`);
+  return out;
+}
+
 function planItems(rawItems, state, sinceYear) {
   const planned = [];
   const seenByKey = new Map();
@@ -1058,6 +1254,7 @@ async function crawlBehCambridge(sinceYear, syllabusFilter) {
   const levels = [
     { spec: 'CIE-AL', slug: 'cambridge-international-a-level' },
     { spec: 'CIE-IGCSE', slug: 'cambridge-igcse' },
+    { spec: 'CIE-IGCSE', slug: 'cambridge-igcse-9-1' },
     { spec: 'CIE-OL', slug: 'cambridge-o-level' }
   ];
 
@@ -1278,7 +1475,7 @@ async function crawlBsrCambridge(sinceYear, syllabusFilter) {
     headers: { 'User-Agent': UA },
     signal: AbortSignal.timeout(30000)
   }).then(r => r.text());
-  const roots = [];
+  const cards = [];
   for (const m of html.matchAll(/<div class="subject-card"([^>]*)>/gi)) {
     const attrs = m[1];
     const level = attrs.match(/data-level="([^"]*)"/)?.[1] || '';
@@ -1289,55 +1486,106 @@ async function crawlBsrCambridge(sinceYear, syllabusFilter) {
     if (!resolvedList.length) continue;
     if (syllabusFilter && syllabusFilter.size && !resolvedList.some(e => syllabusFilter.has(e.code))) continue;
     const slice = html.slice(m.index, m.index + 1400);
-    const driveUrl = slice.match(/openAuthModal\('([^']+)'\)/)?.[1] || '';
-    if (driveUrl) {
-      roots.push({
-        source: 'BSR-CIE',
-        spec: level === 'IAL' ? 'CIE-AL' : 'CIE-IGCSE',
-        title,
-        driveUrl,
-        allowGt: true
-      });
-    }
+    const driveUrl = slice.match(/openAuthModal\('(https:\/\/drive\.google\.com\/[^']+)'\)/)?.[1] || '';
+    const subHref = slice.match(/href=["'](\/past-papers\/[^"']+)["']/)?.[1] || '';
+    cards.push({
+      spec: level === 'IAL' ? 'CIE-AL' : 'CIE-IGCSE',
+      title,
+      driveUrl,
+      subHref
+    });
+  }
+  const roots = [];
+  const seenDrive = new Set();
+  for (let i = 0; i < cards.length; i += 8) {
+    await Promise.all(cards.slice(i, i + 8).map(async (c) => {
+      let dUrl = c.driveUrl;
+      if (!dUrl && c.subHref) {
+        try {
+          const subHtml = await fetch(`https://britishstudentroom.com${c.subHref}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+          dUrl = subHtml.match(/openAuthModal\('(https:\/\/drive\.google\.com\/[^']+)'\)/)?.[1] || '';
+        } catch { /* ignore */ }
+      }
+      if (dUrl && !seenDrive.has(dUrl)) {
+        seenDrive.add(dUrl);
+        roots.push({
+          source: 'BSR-CIE',
+          spec: c.spec,
+          title: c.title,
+          driveUrl: dUrl,
+          allowGt: true
+        });
+      }
+    }));
   }
   console.log(`[BSR-CIE] Found ${roots.length} matching Cambridge Drive roots; crawling folders...`);
   return crawlDriveTree(roots, sinceYear);
 }
 
 async function crawlPapaCambridge(sinceYear, syllabusFilter) {
+  console.log('[Papa-CIE] Discovering PapaCambridge CAIE syllabus slugs...');
+  const slugMap = { ...PAPA_CAMBRIDGE_SLUGS };
+  const hubUrls = [
+    'https://pastpapers.papacambridge.com/papers/caie/as-and-a-level',
+    'https://pastpapers.papacambridge.com/papers/caie/igcse',
+    'https://pastpapers.papacambridge.com/papers/caie/o-level'
+  ];
+  await Promise.all(hubUrls.map(async (u) => {
+    try {
+      const html = await fetch(u, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+      for (const m of html.matchAll(/papers\/caie\/([a-z0-9-]+-(\d{4}))["'/]/gi)) {
+        const slug = m[1];
+        const code = m[2];
+        const entry = resolveCambridgeSyllabus(code);
+        if (entry && !slugMap[entry.code]) {
+          slugMap[entry.code] = slug;
+        }
+      }
+    } catch { /* fallback to static PAPA_CAMBRIDGE_SLUGS */ }
+  }));
+
   const targetCodes = syllabusFilter && syllabusFilter.size
-    ? [...syllabusFilter].filter(c => PAPA_CAMBRIDGE_SLUGS[c])
-    : Object.keys(PAPA_CAMBRIDGE_SLUGS);
+    ? [...syllabusFilter].filter(c => slugMap[c])
+    : Object.keys(slugMap);
   if (!targetCodes.length) return [];
 
-  const minYr = Math.max(sinceYear || 2022, 2018);
-  const maxYr = new Date().getFullYear();
-  const seriesSlugs = ['feb-march', 'may-june', 'oct-nov'];
+  const minYr = sinceYear || 2000;
   const jobs = [];
-  for (const code of targetCodes) {
-    const entry = resolveCambridgeSyllabus(code);
-    if (!entry) continue;
-    const slug = PAPA_CAMBRIDGE_SLUGS[code];
-    for (let yr = minYr; yr <= maxYr; yr++) {
-      for (const sSlug of seriesSlugs) {
-        // Cambridge O-Level has no Feb/March session
-        if (entry.spec === 'CIE-OL' && sSlug === 'feb-march') continue;
-        jobs.push({
-          code: entry.code,
-          spec: entry.spec,
-          title: `${entry.name} (${entry.code})`,
-          year: yr,
-          url: `https://pastpapers.papacambridge.com/papers/caie/${slug}-${yr}-${sSlug}`
-        });
-      }
-    }
+  const seenJobUrls = new Set();
+  for (let i = 0; i < targetCodes.length; i += 6) {
+    await Promise.all(targetCodes.slice(i, i + 6).map(async (code) => {
+      const entry = resolveCambridgeSyllabus(code);
+      if (!entry) return;
+      const slug = slugMap[code];
+      const landingUrl = `https://pastpapers.papacambridge.com/papers/caie/${slug}`;
+      try {
+        const html = await fetch(landingUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+        const escSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`papers/caie/(${escSlug}-(20\\d{2})-[a-z0-9-]+)["'/]`, 'gi');
+        for (const m of html.matchAll(re)) {
+          const sessSlug = m[1];
+          const yr = Number(m[2]);
+          if (yr < minYr) continue;
+          const fullUrl = `https://pastpapers.papacambridge.com/papers/caie/${sessSlug}`;
+          if (seenJobUrls.has(fullUrl)) continue;
+          seenJobUrls.add(fullUrl);
+          jobs.push({
+            code: entry.code,
+            spec: entry.spec,
+            title: `${entry.name} (${entry.code})`,
+            year: yr,
+            url: fullUrl
+          });
+        }
+      } catch { /* ignore landing error */ }
+    }));
   }
 
   console.log(`[Papa-CIE] Checking ${jobs.length} session pages across ${targetCodes.length} syllabuses...`);
   const out = [];
   const seen = new Set();
-  for (let i = 0; i < jobs.length; i += 6) {
-    await Promise.all(jobs.slice(i, i + 6).map(async (job) => {
+  for (let i = 0; i < jobs.length; i += 8) {
+    await Promise.all(jobs.slice(i, i + 8).map(async (job) => {
       try {
         const res = await fetch(job.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) });
         if (!res.ok) return;
@@ -1360,6 +1608,259 @@ async function crawlPapaCambridge(sinceYear, syllabusFilter) {
     }));
   }
   console.log(`[Papa-CIE] Collected ${out.length} direct CAIE files.`);
+  return out;
+}
+
+const PMT_CAMBRIDGE_TARGETS = [
+  // Cambridge AS & A Level (CIE-AL)
+  { code: '9709', paper: 1, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-1/' },
+  { code: '9709', paper: 2, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-2/' },
+  { code: '9709', paper: 3, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-3/' },
+  { code: '9709', paper: 4, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-4/' },
+  { code: '9709', paper: 5, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-5/' },
+  { code: '9709', paper: 6, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-6/' },
+  { code: '9709', paper: 7, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-paper-7/' },
+  { code: '9231', paper: 1, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-fp1/' },
+  { code: '9231', paper: 2, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-fp2/' },
+  { code: '9231', paper: 3, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-fm/' },
+  { code: '9231', paper: 4, url: 'https://www.physicsandmathstutor.com/a-level-maths-papers/cie-fps/' },
+  { code: '9702', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-physics/cie-paper-1/' },
+  { code: '9702', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-physics/cie-paper-2/' },
+  { code: '9702', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-physics/cie-paper-3/' },
+  { code: '9702', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-physics/cie-paper-4/' },
+  { code: '9702', paper: 5, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-physics/cie-paper-5/' },
+  { code: '9701', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-chemistry/cie-paper-1/' },
+  { code: '9701', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-chemistry/cie-paper-2/' },
+  { code: '9701', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-chemistry/cie-paper-3/' },
+  { code: '9701', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-chemistry/cie-paper-4/' },
+  { code: '9701', paper: 5, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-chemistry/cie-paper-5/' },
+  { code: '9700', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-biology/cie-paper-1/' },
+  { code: '9700', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-biology/cie-paper-2/' },
+  { code: '9700', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-biology/cie-paper-3/' },
+  { code: '9700', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-biology/cie-paper-4/' },
+  { code: '9700', paper: 5, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-biology/cie-paper-5/' },
+  { code: '9708', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-economics/cie-paper-1/' },
+  { code: '9708', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-economics/cie-paper-2/' },
+  { code: '9708', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-economics/cie-paper-3/' },
+  { code: '9708', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-economics/cie-paper-4/' },
+  { code: '9618', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-computer-science/caie-paper-1/' },
+  { code: '9618', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-computer-science/caie-paper-2/' },
+  { code: '9618', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-computer-science/caie-paper-3/' },
+  { code: '9618', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-computer-science/caie-paper-4/' },
+  { code: '9696', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-geography/cie-paper-1/' },
+  { code: '9696', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-geography/cie-paper-2/' },
+  { code: '9696', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-geography/cie-paper-3/' },
+  { code: '9696', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-geography/cie-paper-4/' },
+  { code: '9990', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-psychology/cie-paper-1/' },
+  { code: '9990', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-psychology/cie-paper-2/' },
+  { code: '9990', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-psychology/cie-paper-3/' },
+  { code: '9990', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/a-level-psychology/cie-paper-4/' },
+  // Cambridge IGCSE (CIE-IGCSE)
+  { code: '0580', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-maths/cie-igcse-paper-1/' },
+  { code: '0580', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-maths/cie-igcse-paper-2/' },
+  { code: '0580', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-maths/cie-igcse-paper-3/' },
+  { code: '0580', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-maths/cie-igcse-paper-4/' },
+  { code: '0606', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-maths/cie-igcse-further-paper-1/' },
+  { code: '0606', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-maths/cie-igcse-further-paper-2/' },
+  { code: '0625', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-physics/cie-igcse-paper-1/' },
+  { code: '0625', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-physics/cie-igcse-paper-2/' },
+  { code: '0625', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-physics/cie-igcse-paper-3/' },
+  { code: '0625', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-physics/cie-igcse-paper-4/' },
+  { code: '0625', paper: 5, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-physics/cie-igcse-paper-5/' },
+  { code: '0625', paper: 6, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-physics/cie-igcse-paper-6/' },
+  { code: '0620', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/cie-igcse-paper-1/' },
+  { code: '0620', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/cie-igcse-paper-2/' },
+  { code: '0620', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/cie-igcse-paper-3/' },
+  { code: '0620', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/cie-igcse-paper-4/' },
+  { code: '0620', paper: 5, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/cie-igcse-paper-5/' },
+  { code: '0620', paper: 6, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-chemistry/cie-igcse-paper-6/' },
+  { code: '0610', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-biology/cie-igcse-paper-1/' },
+  { code: '0610', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-biology/cie-igcse-paper-2/' },
+  { code: '0610', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-biology/cie-igcse-paper-3/' },
+  { code: '0610', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-biology/cie-igcse-paper-4/' },
+  { code: '0610', paper: 5, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-biology/cie-igcse-paper-5/' },
+  { code: '0610', paper: 6, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-biology/cie-igcse-paper-6/' },
+  { code: '0455', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-economics/cie-igcse-paper-1/' },
+  { code: '0455', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-economics/cie-igcse-paper-2/' },
+  { code: '0478', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-computer-science/caie-paper-1/' },
+  { code: '0478', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-computer-science/caie-paper-2/' },
+  { code: '0460', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-geography/cie-igcse-paper-1/' },
+  { code: '0460', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-geography/cie-igcse-paper-2/' },
+  { code: '0460', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-geography/cie-igcse-paper-4/' },
+  { code: '0500', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-language/cie-igcse-paper-1/' },
+  { code: '0500', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-language/cie-igcse-paper-2/' },
+  { code: '0500', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-language/cie-igcse-paper-3/' },
+  { code: '0475', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-literature/cie-igcse-paper-1/' },
+  { code: '0475', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-literature/cie-igcse-paper-2/' },
+  { code: '0475', paper: 3, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-literature/cie-igcse-paper-3/' },
+  { code: '0475', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-english-literature/cie-igcse-paper-4/' },
+  { code: '0470', paper: 1, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-history/cie-igcse-paper-1/' },
+  { code: '0470', paper: 2, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-history/cie-igcse-paper-2/' },
+  { code: '0470', paper: 4, url: 'https://www.physicsandmathstutor.com/past-papers/gcse-history/cie-igcse-paper-4/' }
+];
+
+async function crawlPmtCambridge(sinceYear, syllabusFilter) {
+  const targets = PMT_CAMBRIDGE_TARGETS.filter(t => !syllabusFilter || !syllabusFilter.size || syllabusFilter.has(t.code));
+  if (!targets.length) return [];
+  console.log(`[PMT-CIE] Scanning ${targets.length} Physics & Maths Tutor Cambridge subpages...`);
+  const out = [];
+  for (let i = 0; i < targets.length; i += 6) {
+    await Promise.all(targets.slice(i, i + 6).map(async (target) => {
+      try {
+        const entry = resolveCambridgeSyllabus(target.code);
+        if (!entry) return;
+        const html = await fetch(target.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+        for (const m of html.matchAll(/href=["']([^"']+\.pdf[^"']*)["']/gi)) {
+          const pdfUrl = normalizeHttpUrl(m[1], target.url);
+          if (!pdfUrl) continue;
+          const rawBase = decodeURIComponent(pdfUrl.split('?')[0].split('/').pop() || '');
+          const pm = rawBase.match(/\b(Feb(?:ruary)?|Mar(?:ch)?|May|Jun(?:e)?|Summer|Oct(?:ober)?|Nov(?:ember)?|Winter)\s+(20\d{2})(?:\s*\(v(\d)\))?\s*(QP|MS|IN|CI|ER|GT)\.pdf$/i);
+          if (!pm) continue;
+          const moTxt = pm[1].toLowerCase();
+          const yr = Number(pm[2]);
+          if (sinceYear && yr < sinceYear) continue;
+          const vDigit = pm[3] || '';
+          const docCode = pm[4].toLowerCase();
+          const ser = /feb|mar/.test(moTxt) ? 'm' : (/oct|nov|win/.test(moTxt) ? 'w' : 's');
+          const yy = String(yr).slice(-2);
+          const comp = (docCode === 'er' || docCode === 'gt')
+            ? ''
+            : (vDigit ? `${target.paper}${vDigit}` : `0${target.paper}`);
+          const fileName = `${entry.code}_${ser}${yy}_${docCode}${comp ? `_${comp}` : ''}.pdf`;
+          out.push({
+            source: 'PMT-CIE',
+            spec: entry.spec,
+            title: `${entry.name} (${entry.code})`,
+            folderPath: `${yr}`,
+            name: fileName,
+            url: pdfUrl
+          });
+        }
+      } catch { /* ignore page error */ }
+    }));
+  }
+  console.log(`[PMT-CIE] Collected ${out.length} Cambridge PDF links.`);
+  return out;
+}
+
+async function crawlAlmrCambridge(sinceYear, syllabusFilter) {
+  if (syllabusFilter && syllabusFilter.size && !syllabusFilter.has('9709')) return [];
+  console.log('[ALMR-CIE] Scanning ALevelMathsRevision Cambridge A-Level Mathematics (9709) papers...');
+  const url = 'https://alevelmathsrevision.com/cambridge-ial-exam-papers/';
+  let html = '';
+  try {
+    html = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => (r.ok ? r.text() : ''));
+  } catch {
+    return [];
+  }
+  const entry = resolveCambridgeSyllabus('9709');
+  if (!entry) return [];
+  const out = [];
+  const seen = new Set();
+  for (const m of html.matchAll(/\/pdf\/cie-ial-exampapers\/(p1|p2|p3|m1|m2|s1|s2)\/(mar|jun|nov)\/(20\d{2})\/\?version=(\d)[^"']*resource=(qp|ms)\b/gi)) {
+    const unit = m[1].toLowerCase();
+    const mon = m[2].toLowerCase();
+    const yr = Number(m[3]);
+    const ver = m[4];
+    const res = m[5].toLowerCase();
+    if (sinceYear && yr < sinceYear) continue;
+    const ser = mon === 'mar' ? 'm' : (mon === 'jun' ? 's' : 'w');
+    let pNum = 1;
+    if (unit === 'p1') pNum = 1;
+    else if (unit === 'p2') pNum = 2;
+    else if (unit === 'p3') pNum = 3;
+    else if (unit === 'm1') pNum = 4;
+    else if (unit === 'm2') pNum = 5;
+    else if (unit === 's1') pNum = yr < 2020 ? 6 : 5;
+    else if (unit === 's2') pNum = yr < 2020 ? 7 : 6;
+    const isPreVariantEra = yr < 2009 || (yr === 2009 && ser === 's');
+    const comp = isPreVariantEra ? `0${pNum}` : `${pNum}${ver}`;
+    const yy = String(yr).slice(-2);
+    const fileName = `9709_${ser}${yy}_${res}_${comp}.pdf`;
+    if (seen.has(fileName)) continue;
+    seen.add(fileName);
+    const fileUrl = `https://alevelmathsrevision.com/downloads/past-papers/cambridge-ial/${mon}-${yr}-${unit}-v${ver}${res === 'ms' ? '-ms' : ''}.pdf`;
+    out.push({
+      source: 'ALMR-CIE',
+      spec: 'CIE-AL',
+      title: `${entry.name} (${entry.code})`,
+      folderPath: `${yr}`,
+      name: fileName,
+      url: fileUrl
+    });
+  }
+  console.log(`[ALMR-CIE] Collected ${out.length} direct 9709 Mathematics PDFs.`);
+  return out;
+}
+
+async function crawlCieOfficial(sinceYear, syllabusFilter) {
+  console.log('[CIE-Official] Scanning cambridgeinternational.org public past paper pages...');
+  const hubUrls = [
+    'https://www.cambridgeinternational.org/programmes-and-qualifications/cambridge-advanced/cambridge-international-as-and-a-level/subjects/',
+    'https://www.cambridgeinternational.org/programmes-and-qualifications/cambridge-upper-secondary/cambridge-igcse/subjects/',
+    'https://www.cambridgeinternational.org/programmes-and-qualifications/cambridge-upper-secondary/cambridge-o-level/subjects/'
+  ];
+  const syllabusPages = new Map();
+  await Promise.all(hubUrls.map(async (u) => {
+    try {
+      const html = await fetch(u, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+      for (const m of html.matchAll(/href=["']\/programmes-and-qualifications\/(?:view\/)?(cambridge-[^"'/?#]+-(\d{4}))\/?["']/gi)) {
+        const slug = m[1];
+        const rawCode = m[2];
+        const entry = resolveCambridgeSyllabus(rawCode);
+        if (!entry) continue;
+        if (syllabusFilter && syllabusFilter.size && !syllabusFilter.has(entry.code)) continue;
+        if (!syllabusPages.has(entry.code)) {
+          syllabusPages.set(entry.code, {
+            entry,
+            url: `https://www.cambridgeinternational.org/programmes-and-qualifications/${slug}/past-papers/`
+          });
+        }
+      }
+    } catch { /* ignore hub error */ }
+  }));
+
+  const targets = [...syllabusPages.values()];
+  const out = [];
+  for (let i = 0; i < targets.length; i += 6) {
+    await Promise.all(targets.slice(i, i + 6).map(async ({ entry, url }) => {
+      try {
+        const html = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
+        for (const m of html.matchAll(/href=["'](\/Images\/\d+-([^"']+)\.(pdf|zip|mp3))["']/gi)) {
+          const relUrl = m[1];
+          const slug = m[2].toLowerCase();
+          const ext = m[3].toLowerCase();
+          if (/specimen|syllabus/i.test(slug)) continue;
+          const sm = slug.match(/\b(march|february|may|june|october|november)-(20\d{2})-(question-paper|mark-scheme|examiner-report|grade-threshold[a-z-]*|insert|confidential-instructions)(?:-paper-(\d{1,2}))?\b/);
+          if (!sm) continue;
+          const mo = sm[1];
+          const yr = Number(sm[2]);
+          if (sinceYear && yr < sinceYear) continue;
+          const docRaw = sm[3];
+          const comp = sm[4] || '';
+          const ser = /mar|feb/.test(mo) ? 'm' : (/oct|nov/.test(mo) ? 'w' : 's');
+          let docCode = 'qp';
+          if (docRaw === 'mark-scheme') docCode = 'ms';
+          else if (docRaw === 'examiner-report') docCode = 'er';
+          else if (docRaw.startsWith('grade-threshold')) docCode = 'gt';
+          else if (docRaw === 'insert') docCode = 'in';
+          else if (docRaw === 'confidential-instructions') docCode = 'ci';
+          if ((docCode === 'qp' || docCode === 'ms') && !comp) continue;
+          const yy = String(yr).slice(-2);
+          const fileName = `${entry.code}_${ser}${yy}_${docCode}${comp ? `_${comp}` : ''}.${ext}`;
+          out.push({
+            source: 'CIE-Official',
+            spec: entry.spec,
+            title: `${entry.name} (${entry.code})`,
+            folderPath: `${yr}`,
+            name: fileName,
+            url: `https://www.cambridgeinternational.org${relUrl}`
+          });
+        }
+      } catch { /* ignore page error */ }
+    }));
+  }
+  console.log(`[CIE-Official] Collected ${out.length} official past paper files across ${targets.length} syllabuses.`);
   return out;
 }
 
@@ -1555,9 +2056,22 @@ async function run() {
         beh: (yr) => crawlBehCambridge(yr, opts.syllabuses),
         elevare: (yr) => crawlElevareCambridge(yr, opts.syllabuses),
         bsr: (yr) => crawlBsrCambridge(yr, opts.syllabuses),
+        pmt: (yr) => crawlPmtCambridge(yr, opts.syllabuses),
+        almr: (yr) => crawlAlmrCambridge(yr, opts.syllabuses),
+        cie: (yr) => crawlCieOfficial(yr, opts.syllabuses),
         papa: (yr) => crawlPapaCambridge(yr, opts.syllabuses)
       }
-    : { bsr: crawlBsr, dp: crawlDynamicPapers, igexams: crawlIgExams, ssc: crawlSsc, pmt: crawlPmt, pl: crawlPaperlords, elevare: crawlElevare };
+    : {
+        bsr: crawlBsr,
+        dp: crawlDynamicPapers,
+        igexams: crawlIgExams,
+        ssc: crawlSsc,
+        pmt: crawlPmt,
+        pl: crawlPaperlords,
+        elevare: crawlElevare,
+        beh: crawlBehEdexcel,
+        almr: crawlAlmrEdexcel
+      };
 
   const raw = [];
   for (const s of opts.sources) {
@@ -1570,6 +2084,10 @@ async function run() {
     ? planCambridgeItems(raw, state, opts.sinceYear, opts.syllabuses)
     : planItems(raw, state, opts.sinceYear)
   ).slice(0, opts.limit);
+  if (opts.dumpJson) {
+    fs.writeFileSync(opts.dumpJson, JSON.stringify(planned, null, 2));
+    console.log(`Dumped ${planned.length} planned items to ${opts.dumpJson}`);
+  }
   const bySubj = {};
   for (const p of planned) {
     const k = `${p.source} | ${p.spec} | ${p.subj}`;
