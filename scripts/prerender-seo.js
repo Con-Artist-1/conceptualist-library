@@ -988,10 +988,29 @@ function run() {
       console.log(`✅ Generated ${shardCount} fast route JSON shards in dist/shards/.`);
     }
 
+    // Detect lazy WelcomePage assets so ONLY `/` (dist/index.html) preloads them in round-trip 1
+    // (eliminating the 2-RTT 4G waterfall on home while keeping all 298 deep routes lean)
+    const distAssetsDir = path.join(DIST_DIR, 'assets');
+    const distAssetNames = fs.existsSync(distAssetsDir) ? fs.readdirSync(distAssetsDir) : [];
+    const welcomeJsAsset = distAssetNames.find((f) => /^WelcomePage-.*\.js$/i.test(f)) || '';
+    const welcomeCssAsset = distAssetNames.find((f) => /^WelcomePage-.*\.css$/i.test(f)) || '';
+    const homePreloadTags = [
+      welcomeJsAsset ? `    <link rel="modulepreload" crossorigin href="/assets/${welcomeJsAsset}">` : '',
+      welcomeCssAsset ? `    <link rel="stylesheet" crossorigin href="/assets/${welcomeCssAsset}">` : ''
+    ].filter(Boolean).join('\n');
+
     let prerenderedCount = 0;
     for (const route of routes) {
-      const renderedHtml = injectSeoIntoHtml(templateHtml, route, meta, indexLookup);
+      let renderedHtml = injectSeoIntoHtml(templateHtml, route, meta, indexLookup);
       if (route.path === '/') {
+        if (homePreloadTags) {
+          const entryCssRe = /(<link\s+rel="stylesheet"\s+crossorigin\s+href="\/assets\/index-[^"]+\.css"\s*\/?>)/i;
+          if (entryCssRe.test(renderedHtml)) {
+            renderedHtml = renderedHtml.replace(entryCssRe, `$1\n${homePreloadTags}`);
+          } else {
+            renderedHtml = renderedHtml.replace(/<\/head>/i, `${homePreloadTags}\n  </head>`);
+          }
+        }
         fs.writeFileSync(distIndexPath, renderedHtml, 'utf8');
         prerenderedCount++;
       } else {

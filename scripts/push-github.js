@@ -65,7 +65,6 @@ function collectRepoFiles(dir, baseDir = APP_DIR) {
       list = list.concat(collectRepoFiles(path.join(dir, entry.name), baseDir));
     } else {
       if (EXCLUDE_FILES.has(entry.name)) continue;
-      if (entry.name.startsWith('AI_INSTRUCTIONS_')) continue;
       if (entry.name.endsWith('.log') || entry.name.endsWith('.local')) continue;
       if (entry.name.startsWith('.env') && entry.name !== '.env.example') continue;
       const full = path.join(dir, entry.name);

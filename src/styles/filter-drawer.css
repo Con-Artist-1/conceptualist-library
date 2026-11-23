@@ -1,3 +1,23 @@
+/* ===================== FILTER DRAWER THEME TOKENS (LIGHT / DARK / PURE OLED) ===================== */
+:root,
+[data-theme='light'] {
+  --filter-select-bg: #FFFFFF;
+  --filter-select-border: #C8C4BC;
+  --filter-select-focus: #6F1D2B;
+}
+
+[data-theme='dark'] {
+  --filter-select-bg: #1B1E23;
+  --filter-select-border: #343A46;
+  --filter-select-focus: #8C1D2F;
+}
+
+[data-theme='oled'] {
+  --filter-select-bg: #111111;
+  --filter-select-border: #333333;
+  --filter-select-focus: #8C1D2F;
+}
+
 /* ===================== LAZY FILTER DRAWER STYLES ===================== */
 /* Loaded on demand exclusively when the collapsible FilterDrawer mounts. */
 

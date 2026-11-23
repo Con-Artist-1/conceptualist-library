@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v7.3.1',
+    date: '2026-11-23T07:45:00+06:00',
+    title: 'Zero-Waterfall Home Preload & Scoped Lazy CSS Tokens',
+    summary: 'Eliminated the 2-round-trip home waterfall on lazy WelcomePage while moving 342 WelcomePage and FilterDrawer theme token declarations out of entry CSS.',
+    changes: [
+      'Home-only WelcomePage preload: scripts/prerender-seo.js now injects <link rel="modulepreload"> and <link rel="stylesheet"> for WelcomePage assets strictly into dist/index.html (/) so the homepage loads in round-trip 1 while all 298 deep routes keep the lighter bundle.',
+      'Scoped lazy CSS tokens: Moved 111 WelcomePage theme tokens into src/styles/welcome.css and 3 FilterDrawer tokens into src/styles/filter-drawer.css (342 declarations removed from src/index.css with 0 unused and 0 undefined CSS custom properties).',
+      'Repository sync: Restored AI_INSTRUCTIONS_APP.md and AI_INSTRUCTIONS_LIBRARY.md to GitHub tracking via scripts/push-github.js.'
+    ]
+  },
+  {
     version: 'v7.3',
     date: '2026-11-23T06:00:00+06:00',
     title: 'Security, Accessibility, Performance & Reader Hardening',
