@@ -373,13 +373,20 @@ export function hydrateCatalogPayload(json) {
   }
 
   // Pass 2: Attach Cambridge session-wide ER & GT to every matching paper sitting (without polluting paper highSet search ranking)
+  const attachedSessionDocPaths = new Set();
   if (cieSessionDocs.size > 0) {
     for (const group of sittingMap.values()) {
       if (!isCambridgeSpec(group.spec) || !group.syllabusCode || !group.session) continue;
       const sBag = cieSessionDocs.get(`${group.spec}|${group.syllabusCode}|${group.session}`);
       if (!sBag) continue;
-      if (sBag.ER && !group.docs.ER) group.docs.ER = sBag.ER;
-      if (sBag.GT && !group.docs.GT) group.docs.GT = sBag.GT;
+      if (sBag.ER && !group.docs.ER) {
+        group.docs.ER = sBag.ER;
+        if (sBag.ER.path) attachedSessionDocPaths.add(sBag.ER.path);
+      }
+      if (sBag.GT && !group.docs.GT) {
+        group.docs.GT = sBag.GT;
+        if (sBag.GT.path) attachedSessionDocPaths.add(sBag.GT.path);
+      }
     }
   }
 
@@ -391,6 +398,9 @@ export function hydrateCatalogPayload(json) {
 
   for (let i = 0; i < unifiedFiles.length; i++) {
     const item = unifiedFiles[i];
+    if (!item.isUnifiedSitting && item.path && attachedSessionDocPaths.has(item.path)) {
+      item.isAttachedSessionDoc = true;
+    }
     if (item.isUnifiedSitting) {
       const docTypes = DOC_PRIORITY.filter((t) => Boolean(item.docs[t]));
       const primary = item.docs.QP || item.docs.MS || item.docs.ER || item.docs[docTypes[0]];
@@ -547,8 +557,23 @@ export function queryCatalogState(state, params) {
   const hasVariant = Boolean(filterVariant);
   const hasDocType = Boolean(filterDocType);
 
+  const effectiveBoard = hasBoard ? filterBoard : '';
+  const parsedSearch = parseSearchQuery(searchQuery, state.catalogVocab, { activeBoard: effectiveBoard });
+  const queryRequestsSessionDoc = Boolean(
+    parsedSearch.hasQuery &&
+    Array.isArray(parsedSearch.groups) &&
+    parsedSearch.groups.some((g) => (
+      g.primary === 'gt' ||
+      g.primary === 'er' ||
+      g.primary === 'threshold' ||
+      g.primary === 'thresholds' ||
+      (Array.isArray(g.alts) && g.alts.some((a) => a.val === 'gt' || a.val === 'er' || a.val === 'grade thresholds' || a.val === 'examiner report'))
+    ))
+  );
+  const hideAttachedSessionDocs = Boolean(useUnified && !hasDocType && !queryRequestsSessionDoc);
+
   let files;
-  if (!hasFolder && !hasBoard && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasVariant && !hasDocType) {
+  if (!hasFolder && !hasBoard && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasVariant && !hasDocType && !hideAttachedSessionDocs) {
     files = sourceFiles;
   } else {
     const filtered = [];
@@ -559,6 +584,7 @@ export function queryCatalogState(state, params) {
 
     for (let i = 0; i < len; i++) {
       const f = sourceFiles[i];
+      if (hideAttachedSessionDocs && f.isAttachedSessionDoc) continue;
 
       if (hasFolder) {
         if (useUnified) {
@@ -597,8 +623,8 @@ export function queryCatalogState(state, params) {
             continue;
           }
         } else if (useUnified) {
-          if (filterDocType === 'GT' && !hasUnit) {
-            if (f.docType !== 'GT') continue;
+          if ((filterDocType === 'GT' || (filterDocType === 'ER' && f.board === 'cambridge')) && !hasUnit) {
+            if (f.docType !== filterDocType) continue;
           } else if (!f.docs?.[filterDocType] && f.docType !== filterDocType) {
             continue;
           }
@@ -612,8 +638,6 @@ export function queryCatalogState(state, params) {
     files = filtered;
   }
 
-  const effectiveBoard = hasBoard ? filterBoard : '';
-  const parsedSearch = parseSearchQuery(searchQuery, state.catalogVocab, { activeBoard: effectiveBoard });
   const searchExec = parsedSearch.hasQuery
     ? executeSmartSearch(files, parsedSearch, { isUnified: useUnified })
     : {

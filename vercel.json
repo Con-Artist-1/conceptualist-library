@@ -298,6 +298,11 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/9691",
+      "destination": "/cambridge/a-level/computer-science-9618",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/9700",
       "destination": "/cambridge/a-level/biology-9700",
       "permanent": true

@@ -82,7 +82,7 @@ export const CAMBRIDGE_SYLLABUSES = {
     name: 'Computer Science',
     spec: 'CIE-AL',
     curriculum: 'Cambridge AS & A Level',
-    legacyCodes: ['9608'],
+    legacyCodes: ['9608', '9691'],
     hasDataFiles: true,
     papers: {
       1: 'Paper 1: Theory Fundamentals (AS)',
@@ -96,6 +96,7 @@ export const CAMBRIDGE_SYLLABUSES = {
     name: 'Information Technology',
     spec: 'CIE-AL',
     curriculum: 'Cambridge AS & A Level',
+    legacyCodes: ['9713'],
     hasDataFiles: true,
     papers: {
       1: 'Paper 1: Theory (AS)',
@@ -241,44 +242,150 @@ export const CAMBRIDGE_SYLLABUSES = {
     code: '9693',
     name: 'Marine Science',
     spec: 'CIE-AL',
-    curriculum: 'Cambridge AS & A Level'
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      1: 'Paper 1: AS Level Theory',
+      2: 'Paper 2: AS Data-Handling & Investigative Skills',
+      3: 'Paper 3: A Level Theory',
+      4: 'Paper 4: A Level Data-Handling & Investigative Skills'
+    }
   },
   '8291': {
     code: '8291',
     name: 'Environmental Management',
     spec: 'CIE-AL',
-    curriculum: 'Cambridge AS & A Level'
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      1: 'Paper 1: Principles of Environmental Management',
+      2: 'Paper 2: Management in Context'
+    }
   },
   '9607': {
     code: '9607',
     name: 'Media Studies',
     spec: 'CIE-AL',
-    curriculum: 'Cambridge AS & A Level'
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      2: 'Paper 2: Media Texts & Contexts (AS)',
+      4: 'Paper 4: Critical Perspectives (A2)'
+    }
   },
   '9239': {
     code: '9239',
     name: 'Global Perspectives & Research',
     spec: 'CIE-AL',
-    curriculum: 'Cambridge AS & A Level'
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      1: 'Paper 1: Written Examination'
+    }
   },
   '9705': {
     code: '9705',
     name: 'Design & Technology',
     spec: 'CIE-AL',
-    curriculum: 'Cambridge AS & A Level'
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      1: 'Paper 1: Product Design (AS)',
+      2: 'Paper 2: Design Project (AS)',
+      3: 'Paper 3: Design & Manufacture (A2)'
+    }
   },
   '9395': {
     code: '9395',
     name: 'Travel & Tourism',
     spec: 'CIE-AL',
-    curriculum: 'Cambridge AS & A Level'
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      1: 'Paper 1: The Industry (AS)',
+      3: 'Paper 3: Destination Marketing (A2)',
+      4: 'Paper 4: Destination Development & Management (A2)'
+    }
   },
-  '9716': { code: '9716', name: 'French', spec: 'CIE-AL', curriculum: 'Cambridge AS & A Level', hasAudio: true },
-  '9717': { code: '9717', name: 'German', spec: 'CIE-AL', curriculum: 'Cambridge AS & A Level', hasAudio: true },
-  '9719': { code: '9719', name: 'Spanish', spec: 'CIE-AL', curriculum: 'Cambridge AS & A Level', hasAudio: true },
-  '9680': { code: '9680', name: 'Arabic', spec: 'CIE-AL', curriculum: 'Cambridge AS & A Level' },
-  '9715': { code: '9715', name: 'Chinese', spec: 'CIE-AL', curriculum: 'Cambridge AS & A Level' },
-  '9686': { code: '9686', name: 'Urdu', spec: 'CIE-AL', curriculum: 'Cambridge AS & A Level' },
+  '9488': {
+    code: '9488',
+    name: 'Islamic Studies',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      1: 'Paper 1: Islamic Texts & Early History (AS)',
+      2: 'Paper 2: Islamic Thought & Civilization (AS)',
+      3: 'Paper 3: Beliefs, Practices & Contemporary Islam (A2)',
+      4: 'Paper 4: Islamic Texts & Scholarship (A2)'
+    }
+  },
+  '9716': {
+    code: '9716',
+    name: 'French',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading & Writing',
+      3: 'Paper 3: Essay',
+      4: 'Paper 4: Texts'
+    }
+  },
+  '9717': {
+    code: '9717',
+    name: 'German',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading & Writing',
+      3: 'Paper 3: Essay',
+      4: 'Paper 4: Texts'
+    }
+  },
+  '9719': {
+    code: '9719',
+    name: 'Spanish',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading & Writing',
+      3: 'Paper 3: Essay',
+      4: 'Paper 4: Texts'
+    }
+  },
+  '9680': {
+    code: '9680',
+    name: 'Arabic',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      2: 'Paper 2: Reading & Writing',
+      3: 'Paper 3: Essay',
+      4: 'Paper 4: Texts',
+      5: 'Paper 5: Prose'
+    }
+  },
+  '9715': {
+    code: '9715',
+    name: 'Chinese',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      2: 'Paper 2: Reading & Writing',
+      3: 'Paper 3: Essay',
+      4: 'Paper 4: Texts'
+    }
+  },
+  '9686': {
+    code: '9686',
+    name: 'Urdu',
+    spec: 'CIE-AL',
+    curriculum: 'Cambridge AS & A Level',
+    papers: {
+      2: 'Paper 2: Reading & Writing',
+      3: 'Paper 3: Essay',
+      4: 'Paper 4: Texts'
+    }
+  },
 
   // ─── Cambridge IGCSE (0xxx A*-G, linked to 09xx / 71xx 9-1 equivalents) ────────
   '0580': {
@@ -288,10 +395,10 @@ export const CAMBRIDGE_SYLLABUSES = {
     curriculum: 'Cambridge IGCSE',
     alt91: '0980',
     papers: {
-      1: 'Paper 1: Core (P1)',
-      2: 'Paper 2: Extended (P2)',
-      3: 'Paper 3: Core (P3)',
-      4: 'Paper 4: Extended (P4)'
+      1: 'Paper 1: Core',
+      2: 'Paper 2: Extended',
+      3: 'Paper 3: Core',
+      4: 'Paper 4: Extended'
     }
   },
   '0606': {
@@ -301,8 +408,8 @@ export const CAMBRIDGE_SYLLABUSES = {
     curriculum: 'Cambridge IGCSE',
     sharedOlCode: '4037',
     papers: {
-      1: 'Paper 1 (P1)',
-      2: 'Paper 2 (P2)'
+      1: 'Paper 1',
+      2: 'Paper 2'
     }
   },
   '0607': {
@@ -311,10 +418,10 @@ export const CAMBRIDGE_SYLLABUSES = {
     spec: 'CIE-IGCSE',
     curriculum: 'Cambridge IGCSE',
     papers: {
-      1: 'Paper 1: Core (P1)',
-      2: 'Paper 2: Extended (P2)',
-      3: 'Paper 3: Core (P3)',
-      4: 'Paper 4: Extended (P4)',
+      1: 'Paper 1: Core',
+      2: 'Paper 2: Extended',
+      3: 'Paper 3: Core',
+      4: 'Paper 4: Extended',
       5: 'Paper 5: Investigation (Core)',
       6: 'Paper 6: Investigation & Modelling (Extended)'
     }
@@ -564,23 +671,277 @@ export const CAMBRIDGE_SYLLABUSES = {
       2: 'Paper 2: Management in Context'
     }
   },
-  '0457': { code: '0457', name: 'Global Perspectives', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0495': { code: '0495', name: 'Sociology', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0520': { code: '0520', name: 'French', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE', alt91: '7156', hasAudio: true },
-  '0525': { code: '0525', name: 'German', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE', alt91: '7159', hasAudio: true },
-  '0530': { code: '0530', name: 'Spanish', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE', alt91: '7160', hasAudio: true },
-  '0508': { code: '0508', name: 'First Language Arabic', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE', alt91: '7180' },
-  '0544': { code: '0544', name: 'Foreign Language Arabic', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE', hasAudio: true },
-  '0547': { code: '0547', name: 'Mandarin Chinese', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE', hasAudio: true },
-  '0509': { code: '0509', name: 'First Language Chinese', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0493': { code: '0493', name: 'Islamiyat', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0448': { code: '0448', name: 'Pakistan Studies', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0449': { code: '0449', name: 'Bangladesh Studies', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0445': { code: '0445', name: 'Design & Technology', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0471': { code: '0471', name: 'Travel & Tourism', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0454': { code: '0454', name: 'Enterprise', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0648': { code: '0648', name: 'Food & Nutrition', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
-  '0413': { code: '0413', name: 'Physical Education', spec: 'CIE-IGCSE', curriculum: 'Cambridge IGCSE' },
+  '0457': {
+    code: '0457',
+    name: 'Global Perspectives',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Written Examination'
+    }
+  },
+  '0495': {
+    code: '0495',
+    name: 'Sociology',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Research Methods, Identity & Inequality',
+      2: 'Paper 2: Family, Education & Crime'
+    }
+  },
+  '0520': {
+    code: '0520',
+    name: 'French',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '7156',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading',
+      3: 'Paper 3: Speaking',
+      4: 'Paper 4: Writing'
+    }
+  },
+  '0525': {
+    code: '0525',
+    name: 'German',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '7159',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading',
+      3: 'Paper 3: Speaking',
+      4: 'Paper 4: Writing'
+    }
+  },
+  '0530': {
+    code: '0530',
+    name: 'Spanish',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '7160',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading',
+      3: 'Paper 3: Speaking',
+      4: 'Paper 4: Writing'
+    }
+  },
+  '0508': {
+    code: '0508',
+    name: 'First Language Arabic',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '7180',
+    legacyCodes: ['7184'],
+    papers: {
+      1: 'Paper 1: Reading',
+      2: 'Paper 2: Writing'
+    }
+  },
+  '0544': {
+    code: '0544',
+    name: 'Foreign Language Arabic',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading',
+      3: 'Paper 3: Speaking',
+      4: 'Paper 4: Writing'
+    }
+  },
+  '0547': {
+    code: '0547',
+    name: 'Mandarin Chinese',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening',
+      2: 'Paper 2: Reading',
+      3: 'Paper 3: Speaking',
+      4: 'Paper 4: Writing'
+    }
+  },
+  '0509': {
+    code: '0509',
+    name: 'First Language Chinese',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Reading, Directed Writing & Classical Chinese',
+      2: 'Paper 2: Writing'
+    }
+  },
+  '0501': {
+    code: '0501',
+    name: 'First Language French',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Reading & Directed Writing',
+      2: 'Paper 2: Writing'
+    }
+  },
+  '0502': {
+    code: '0502',
+    name: 'First Language Spanish',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Reading',
+      2: 'Paper 2: Directed Writing & Composition'
+    }
+  },
+  '0696': {
+    code: '0696',
+    name: 'First Language Malay',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Reading & Directed Writing',
+      2: 'Paper 2: Composition'
+    }
+  },
+  '0493': {
+    code: '0493',
+    name: 'Islamiyat',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: "Paper 1: Major Themes of the Qur'an & History",
+      2: 'Paper 2: Hadith, Caliphate & Articles of Faith'
+    }
+  },
+  '0448': {
+    code: '0448',
+    name: 'Pakistan Studies',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: History & Culture of Pakistan',
+      2: 'Paper 2: Environment of Pakistan'
+    }
+  },
+  '0449': {
+    code: '0449',
+    name: 'Bangladesh Studies',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: History & Culture of Bangladesh',
+      2: 'Paper 2: Environment & Development of Bangladesh'
+    }
+  },
+  '0445': {
+    code: '0445',
+    name: 'Design & Technology',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Product Design',
+      3: 'Paper 3: Resistant Materials',
+      4: 'Paper 4: Systems & Control',
+      5: 'Paper 5: Graphic Products'
+    }
+  },
+  '0471': {
+    code: '0471',
+    name: 'Travel & Tourism',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Key Terms & Concepts',
+      2: 'Paper 2: Managing & Marketing Destinations'
+    }
+  },
+  '0454': {
+    code: '0454',
+    name: 'Enterprise',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Case Study'
+    }
+  },
+  '0648': {
+    code: '0648',
+    name: 'Food & Nutrition',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Theory',
+      2: 'Paper 2: Practical Test'
+    }
+  },
+  '0413': {
+    code: '0413',
+    name: 'Physical Education',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '0995',
+    papers: {
+      1: 'Paper 1: Theory'
+    }
+  },
+  '0400': {
+    code: '0400',
+    name: 'Art & Design',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '0989',
+    papers: {
+      1: 'Paper 1: Coursework',
+      2: 'Paper 2: Externally Set Assignment'
+    }
+  },
+  '0410': {
+    code: '0410',
+    name: 'Music',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '0978',
+    hasAudio: true,
+    papers: {
+      1: 'Paper 1: Listening'
+    }
+  },
+  '0411': {
+    code: '0411',
+    name: 'Drama',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    alt91: '0994',
+    papers: {
+      1: 'Paper 1: Written Examination'
+    }
+  },
+  '0490': {
+    code: '0490',
+    name: 'Religious Studies',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Beliefs & Practices',
+      2: 'Paper 2: Religious Themes'
+    }
+  },
+  '0600': {
+    code: '0600',
+    name: 'Agriculture',
+    spec: 'CIE-IGCSE',
+    curriculum: 'Cambridge IGCSE',
+    papers: {
+      1: 'Paper 1: Theory'
+    }
+  },
 
   // ─── Cambridge O Level (1xxx–7xxx, strictly international) ───────────────────────
   '4024': {
@@ -589,8 +950,8 @@ export const CAMBRIDGE_SYLLABUSES = {
     spec: 'CIE-OL',
     curriculum: 'Cambridge O Level',
     papers: {
-      1: 'Paper 1: Non-Calculator (P1)',
-      2: 'Paper 2: Calculator (P2)'
+      1: 'Paper 1: Non-Calculator',
+      2: 'Paper 2: Calculator'
     }
   },
   '4037': {
@@ -600,8 +961,8 @@ export const CAMBRIDGE_SYLLABUSES = {
     curriculum: 'Cambridge O Level',
     sharedIgcseCode: '0606',
     papers: {
-      1: 'Paper 1 (P1)',
-      2: 'Paper 2 (P2)'
+      1: 'Paper 1',
+      2: 'Paper 2'
     }
   },
   '5054': {
@@ -675,6 +1036,7 @@ export const CAMBRIDGE_SYLLABUSES = {
     name: 'Computer Science',
     spec: 'CIE-OL',
     curriculum: 'Cambridge O Level',
+    legacyCodes: ['7010'],
     sharedIgcseCode: '0478',
     papers: {
       1: 'Paper 1: Computer Systems',
@@ -731,8 +1093,8 @@ export const CAMBRIDGE_SYLLABUSES = {
     spec: 'CIE-OL',
     curriculum: 'Cambridge O Level',
     papers: {
-      1: 'Paper 1 (P1)',
-      2: 'Paper 2 (P2)'
+      1: "Paper 1: Major Themes of the Qur'an & History",
+      2: 'Paper 2: Hadith, Caliphate & Articles of Faith'
     }
   },
   '2059': {
@@ -755,20 +1117,156 @@ export const CAMBRIDGE_SYLLABUSES = {
       2: 'Paper 2: Environment & Development of Bangladesh'
     }
   },
-  '3204': { code: '3204', name: 'Bengali', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '3247': { code: '3247', name: 'First Language Urdu', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '3248': { code: '3248', name: 'Second Language Urdu', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '2217': { code: '2217', name: 'Geography', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '2147': { code: '2147', name: 'History', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '2251': { code: '2251', name: 'Sociology', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '5014': { code: '5014', name: 'Environmental Management', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '2068': { code: '2068', name: 'Islamic Studies', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '2069': { code: '2069', name: 'Global Perspectives', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '7096': { code: '7096', name: 'Travel & Tourism', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '3180': { code: '3180', name: 'Arabic', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '3015': { code: '3015', name: 'French', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '3226': { code: '3226', name: 'Tamil', spec: 'CIE-OL', curriculum: 'Cambridge O Level' },
-  '3205': { code: '3205', name: 'Sinhala', spec: 'CIE-OL', curriculum: 'Cambridge O Level' }
+  '3204': {
+    code: '3204',
+    name: 'Bengali',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Composition',
+      2: 'Paper 2: Language Usage & Comprehension'
+    }
+  },
+  '3247': {
+    code: '3247',
+    name: 'First Language Urdu',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Reading & Writing',
+      2: 'Paper 2: Texts'
+    }
+  },
+  '3248': {
+    code: '3248',
+    name: 'Second Language Urdu',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Composition & Translation',
+      2: 'Paper 2: Language Usage, Summary & Comprehension'
+    }
+  },
+  '2217': {
+    code: '2217',
+    name: 'Geography',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Geographical Themes',
+      2: 'Paper 2: Geographical Skills',
+      3: 'Paper 3: Geographical Investigations'
+    }
+  },
+  '2147': {
+    code: '2147',
+    name: 'History',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Structured Questions',
+      2: 'Paper 2: Document Questions'
+    }
+  },
+  '2251': {
+    code: '2251',
+    name: 'Sociology',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Research Methods, Identity & Inequality',
+      2: 'Paper 2: Family, Education & Crime'
+    }
+  },
+  '5014': {
+    code: '5014',
+    name: 'Environmental Management',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Theory',
+      2: 'Paper 2: Management in Context'
+    }
+  },
+  '2068': {
+    code: '2068',
+    name: 'Islamic Studies',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: History & Scriptures',
+      2: 'Paper 2: Development, Sources, Beliefs & Observances'
+    }
+  },
+  '2069': {
+    code: '2069',
+    name: 'Global Perspectives',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Written Examination'
+    }
+  },
+  '7096': {
+    code: '7096',
+    name: 'Travel & Tourism',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Key Terms & Concepts',
+      2: 'Paper 2: Managing & Marketing Destinations'
+    }
+  },
+  '3180': {
+    code: '3180',
+    name: 'Arabic',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Composition',
+      2: 'Paper 2: Translation & Reading Comprehension'
+    }
+  },
+  '3015': {
+    code: '3015',
+    name: 'French',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Translation & Composition',
+      2: 'Paper 2: Reading Comprehension'
+    }
+  },
+  '3226': {
+    code: '3226',
+    name: 'Tamil',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Composition',
+      2: 'Paper 2: Translation & Reading Comprehension'
+    }
+  },
+  '3205': {
+    code: '3205',
+    name: 'Sinhala',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Composition',
+      2: 'Paper 2: Translation & Reading Comprehension'
+    }
+  },
+  '4040': {
+    code: '4040',
+    name: 'Statistics',
+    spec: 'CIE-OL',
+    curriculum: 'Cambridge O Level',
+    papers: {
+      1: 'Paper 1: Written Paper 1',
+      2: 'Paper 2: Written Paper 2'
+    }
+  }
 };
 
 // Map Cambridge IGCSE (9-1) codes -> Primary A*-G canonical syllabus code (identical exam papers)

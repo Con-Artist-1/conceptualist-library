@@ -1160,9 +1160,19 @@ function App() {
   const popularViewsVerDep = sortBy === 'popular' ? viewsVersion : 0;
 
   useEffect(() => {
-    if (catalogRevision === 0) return undefined;
     if (showWelcome || currentTab !== 'library' || isNotFound) {
       setFilesLoading(false);
+      return undefined;
+    }
+    const isTargetBoardHydrated = effectiveQueryBoard === 'all'
+      ? (loadedBoardsRef.current.has('edexcel') && loadedBoardsRef.current.has('cambridge'))
+      : (loadedBoardsRef.current.has(effectiveQueryBoard) || Boolean(hydratedShardPathRef.current));
+    if (catalogRevision === 0 || !isTargetBoardHydrated) {
+      setFilesLoading(true);
+      return undefined;
+    }
+    if (Boolean(searchQuery && searchQuery.trim()) && !deferredSearchQuery) {
+      setFilesLoading(true);
       return undefined;
     }
 
@@ -1242,6 +1252,7 @@ function App() {
     filterSession,
     filterVariant,
     filterDocType,
+    searchQuery,
     deferredSearchQuery,
     sortBy,
     popularViewsDep,

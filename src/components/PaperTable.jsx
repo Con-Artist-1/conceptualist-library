@@ -53,15 +53,20 @@ const PaperRow = React.memo(({
   const isPdf = activeDoc.ext === 'pdf';
   const siblings = file.siblings || null;
   const docs = file.docs || {};
+  const [scSplitFullLabel] = docs.SC ? getScDocumentLabel(docs.SC) : ['Insert', 'Insert'];
+  const isConfidentialInstruction = Boolean(
+    docs.SC && /(?:^|[/_-])ci(?:[._-]|$)|confidential/i.test(docs.SC.name || docs.SC.path || '')
+  );
   const canSplitMs = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
   const canSplitSc = Boolean(docs.QP?.ext === 'pdf' && docs.SC?.ext === 'pdf');
   const canSplit = canSplitMs || canSplitSc;
+  const autoSplitOnTitleClick = canSplitMs || (canSplitSc && !isConfidentialInstruction);
   const defaultViewMode =
     filterDocType === 'AUD' && (docs.AUD || activeDoc.docType === 'AUD')
       ? 'AUD'
       : filterDocType === 'GT' && (docs.GT || activeDoc.docType === 'GT')
       ? 'GT'
-      : canSplit
+      : autoSplitOnTitleClick
       ? 'split'
       : (docs.QP ? 'QP' : (activeDoc.docType || 'QP'));
   const eligibleForViews = isQuestionPaperEligibleForViews(file);
@@ -252,7 +257,7 @@ const PaperRow = React.memo(({
                 }}
                 className="unified-preview-btn split-btn"
                 aria-label={`Split View — ${displayTitle}`}
-                title={canSplitMs ? 'Open Question Paper and Mark Scheme side by side in Split View' : 'Open Question Paper and Insert side by side in Split View'}
+                title={canSplitMs ? 'Open Question Paper and Mark Scheme side by side in Split View' : `Open Question Paper and ${scSplitFullLabel} side by side in Split View`}
               >
                 <span className="btn-desktop-text">Split View</span>
                 <span className="btn-mobile-text" aria-hidden="true">Split</span>

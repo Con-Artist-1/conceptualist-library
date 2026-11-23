@@ -1,6 +1,18 @@
 import React from 'react';
 import '../styles/filter-drawer.css';
 import { formatSubjectDisplay } from '../lib/libraryHelpers.js';
+import { extractSyllabusCodeFromSubject, resolveCambridgeSyllabus } from '../data/cambridgeCatalog.js';
+
+function formatSubjectOptionLabel(subject, filterCurriculum) {
+  const base = formatSubjectDisplay(subject);
+  if (filterCurriculum) return base;
+  const code = extractSyllabusCodeFromSubject(subject);
+  if (!code) return base;
+  const entry = resolveCambridgeSyllabus(code);
+  if (!entry) return base;
+  const lvlShort = entry.spec === 'CIE-AL' ? 'A-Level' : entry.spec === 'CIE-OL' ? 'O Level' : 'IGCSE';
+  return base.replace(`(${code})`, `(${code} · ${lvlShort})`);
+}
 
 const BOARD_PILLS = [
   { value: 'edexcel', label: 'Edexcel' },
@@ -168,7 +180,7 @@ export default function FilterDrawer({
         >
           <option value="">All Subjects</option>
           {availableSubjects.map((s) => (
-            <option key={s} value={s}>{formatSubjectDisplay(s)}</option>
+            <option key={s} value={s}>{formatSubjectOptionLabel(s, filterCurriculum)}</option>
           ))}
         </select>
 

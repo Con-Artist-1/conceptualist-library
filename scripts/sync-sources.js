@@ -1069,7 +1069,7 @@ async function crawlBehCambridge(sinceYear, syllabusFilter) {
         headers: { 'User-Agent': UA },
         signal: AbortSignal.timeout(25000)
       }).then(r => (r.ok ? r.text() : ''));
-      for (const m of html.matchAll(/href=["']([^"'/?#]*-(\d{4}))\/(?:index\.php)?["']/gi)) {
+      for (const m of html.matchAll(/href=["']([^"'/?#]*-(\d{4}))\/[^"']*["']/gi)) {
         const subSlug = m[1];
         const rawCode = m[2];
         const entry = resolveCambridgeSyllabus(rawCode);
@@ -1081,19 +1081,6 @@ async function crawlBehCambridge(sinceYear, syllabusFilter) {
         }
       }
     } catch { errors++; }
-  }
-
-  // Ensure canonical BEH slugs like physics-0625 are checked if index formatting omits them
-  const fallbackSlugs = [
-    { spec: 'CIE-IGCSE', levelSlug: 'cambridge-igcse', subSlug: 'physics-0625', code: '0625' }
-  ];
-  for (const fb of fallbackSlugs) {
-    if (syllabusFilter && syllabusFilter.size && !syllabusFilter.has(fb.code)) continue;
-    const key = `${fb.levelSlug}/${fb.subSlug}`;
-    if (!subjects.has(key)) {
-      const entry = resolveCambridgeSyllabus(fb.code);
-      if (entry) subjects.set(key, { ...fb, title: `${entry.name} (${entry.code})` });
-    }
   }
 
   const sessionPages = [];

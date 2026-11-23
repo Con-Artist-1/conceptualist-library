@@ -244,7 +244,7 @@ export function getCambridgePaperLabel(syllabusCode, paperNum, year) {
       return entry.papers[paperNum];
     }
   }
-  return `Paper ${paperNum} (P${paperNum})`;
+  return `Paper ${paperNum}`;
 }
 
 export function extractCambridgeUnitInfo(pathStr = '', subject = '') {

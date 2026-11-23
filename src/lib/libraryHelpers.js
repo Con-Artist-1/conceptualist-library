@@ -173,12 +173,10 @@ export function getShortUnitDisplay(file) {
     const prefixRegex = new RegExp(`^(?:${escapeRegExp(file.subject)}|${escapeRegExp(subj)})\\s+`, 'i');
     u = u.replace(prefixRegex, '');
   }
-  const v = String(file.variant || '');
-  if (isCie && /^\d$/.test(v)) {
-    const pMatch = String(file.unitCode || '').match(/P(\d)$/i);
-    const compCode = pMatch ? `${pMatch[1]}${v}` : '';
-    return compCode ? `${u} (Var ${v} / ${compCode})` : `${u} (Variant ${v})`;
+  if (isCie) {
+    return u;
   }
+  const v = String(file.variant || '');
   if (v === 'R') {
     if (u.startsWith('Paper ')) u = `${u}R (Regional / R)`;
     else u = `${u} (Regional / R)`;
@@ -232,16 +230,22 @@ export function getDisplayTitle(file) {
     return cleanName;
   }
 
+  const isCie = file.board === 'cambridge' || isCambridgeSpec(file.spec);
   const subjStr = file.subject === 'Information Technology'
     ? 'IT'
     : (file.subject === 'Math' ? 'Mathematics' : (file.subject || ''));
 
   const shortUnit = getShortUnitDisplay(file);
   const badge = getDocTypeBadge(file.docType, file.category);
-  const docLabel = badge ? badge.fullLabel : '';
+  const docLabel = file.docType === 'SC'
+    ? getScDocumentLabel(file)[0]
+    : (badge ? badge.fullLabel : '');
 
   const mainParts = [subjStr, shortUnit].filter(Boolean).join(' — ');
   const suffixParts = [];
+  if (isCie && /^\d$/.test(String(file.variant || ''))) {
+    suffixParts.push(`Variant ${file.variant}`);
+  }
   if (docLabel) suffixParts.push(docLabel);
   if (file.session) suffixParts.push(file.session);
   else if (file.year) suffixParts.push(String(file.year));
@@ -255,14 +259,20 @@ export function getDisplayTitle(file) {
 
 // Generate clean unified sitting title (e.g. "Mathematics — Unit 1 (WMA11) • January 2025")
 export function getUnifiedSittingTitle(file) {
+  const isCie = file.board === 'cambridge' || isCambridgeSpec(file.spec);
   const subjStr = file.subject === 'Information Technology'
     ? 'IT'
     : (file.subject === 'Math' ? 'Mathematics' : (file.subject || ''));
   const shortUnit = getShortUnitDisplay(file);
   const mainParts = [subjStr, shortUnit].filter(Boolean).join(' — ');
+  const suffixParts = [];
+  if (isCie && /^\d$/.test(String(file.variant || ''))) {
+    suffixParts.push(`Variant ${file.variant}`);
+  }
   const timePart = file.session || (file.year ? String(file.year) : '');
+  if (timePart) suffixParts.push(timePart);
   if (!mainParts) return getDisplayTitle(file);
-  return timePart ? `${mainParts} • ${timePart}` : mainParts;
+  return suffixParts.length > 0 ? `${mainParts} • ${suffixParts.join(' • ')}` : mainParts;
 }
 
 export const HISTORY_STORAGE_KEY = 'cs_recent_papers_v1';

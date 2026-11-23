@@ -571,7 +571,7 @@ const PreviewModal = ({
                       title={effectiveSplitRight === 'SC' ? 'Switch second split pane to Mark Scheme' : `Switch second split pane to ${scSplitFullLabel}`}
                     >
                       <span className="btn-desktop-text">
-                        {effectiveSplitRight === 'SC' ? 'Pane: Insert' : `With ${scSplitShortLabel}`}
+                        {effectiveSplitRight === 'SC' ? `Pane: ${scSplitShortLabel}` : `With ${scSplitShortLabel}`}
                       </span>
                       <span className="btn-mobile-text" aria-hidden="true">
                         {effectiveSplitRight === 'SC' ? 'MS' : scSplitShortLabel}
