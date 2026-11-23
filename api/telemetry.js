@@ -3,9 +3,11 @@ import {
   COLLECTION_SESSIONS,
   hashIdentifier,
   isValidPaperKey,
+  isKnownPaperKey,
   isAllowedOrigin,
   getClientIp,
   checkSlidingRateLimit,
+  checkDistributedRateLimit,
   getMongoDatabase,
   readJsonBody,
   sendJsonResponse
@@ -39,7 +41,7 @@ function sanitizeBeaconEntries(rawEntries) {
     if (!item || typeof item !== 'object') continue;
     const paperKey = typeof item.paperKey === 'string' ? item.paperKey.trim() : '';
     const mode = typeof item.mode === 'string' ? item.mode.trim().toLowerCase() : '';
-    if (!isValidPaperKey(paperKey) || !ALLOWED_MODES.has(mode)) continue;
+    if (!isValidPaperKey(paperKey) || !isKnownPaperKey(paperKey) || !ALLOWED_MODES.has(mode)) continue;
 
     const deltaMs = clampDeltaMs(item.deltaMs);
     const sessions = item.sessions ? 1 : 0;
@@ -110,6 +112,15 @@ export default async function handler(req, res) {
   const rawSiteDeltaMs = clampDeltaMs(body?.siteDeltaMs);
   const paperEntries = sanitizeBeaconEntries(body?.paperEntries);
 
+  // SEC-06: Cap aggregate per-beacon paper study time to MAX_BEACON_DELTA_MS so 20 entries cannot inflate 40h/request
+  let remainingStudyBudget = rawSiteDeltaMs > 0 ? Math.min(MAX_BEACON_DELTA_MS, rawSiteDeltaMs) : MAX_BEACON_DELTA_MS;
+  for (const entry of paperEntries) {
+    if (entry.deltaMs > remainingStudyBudget) {
+      entry.deltaMs = remainingStudyBudget;
+    }
+    remainingStudyBudget = Math.max(0, remainingStudyBudget - entry.deltaMs);
+  }
+
   const totalPaperDeltaMs = paperEntries.reduce((acc, e) => acc + e.deltaMs, 0);
   const effectiveSiteDeltaMs = Math.min(MAX_BEACON_DELTA_MS, Math.max(rawSiteDeltaMs, totalPaperDeltaMs));
 
@@ -122,6 +133,16 @@ export default async function handler(req, res) {
 
   try {
     const db = await getMongoDatabase();
+    const distAllowed = await checkDistributedRateLimit(
+      db,
+      'telemetry_post',
+      clientIp,
+      RATE_WINDOW_MS,
+      MAX_TELEMETRY_PER_WINDOW
+    );
+    if (!distAllowed) {
+      return sendJsonResponse(res, 429, { ok: false, error: 'Too many requests' });
+    }
 
     // 1. Update per-paper study duration & mode breakdown (Split View vs Dedicated QP/MS/ER)
     if (paperEntries.length > 0) {

@@ -1,4 +1,5 @@
 import React from 'react';
+import '../styles/filter-drawer.css';
 import { formatSubjectDisplay } from '../lib/libraryHelpers.js';
 
 const CURRICULUM_PILLS = [
@@ -55,6 +56,7 @@ export default function FilterDrawer({
               <button
                 key={opt.label}
                 type="button"
+                aria-pressed={filterCurriculum === opt.value}
                 className={`filter-btn ${filterCurriculum === opt.value ? 'active' : ''}`}
                 onClick={() => onSelectCurriculum(opt.value)}
               >
@@ -70,6 +72,7 @@ export default function FilterDrawer({
             <button
               key={opt.label}
               type="button"
+              aria-pressed={filterDocType === opt.value}
               className={`filter-btn ${filterDocType === opt.value ? 'active' : ''}`}
               onClick={() => onSelectDocType(opt.value)}
             >
@@ -164,6 +167,7 @@ export default function FilterDrawer({
         <div className="view-mode-toggle" role="group" aria-label="Toggle Unified Sittings vs Individual Files">
           <button
             type="button"
+            aria-pressed={viewMode === 'unified'}
             className={`view-mode-btn ${viewMode === 'unified' ? 'active' : ''}`}
             onClick={() => onChangeViewMode('unified')}
             title="Combine QP, MS, and ER from the same sitting into one row"
@@ -172,6 +176,7 @@ export default function FilterDrawer({
           </button>
           <button
             type="button"
+            aria-pressed={viewMode === 'separate'}
             className={`view-mode-btn ${viewMode === 'separate' ? 'active' : ''}`}
             onClick={() => onChangeViewMode('separate')}
             title="Show every file as a separate row"

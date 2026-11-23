@@ -27,6 +27,7 @@ let lastQueryMeta = {
 };
 
 const decoder = new TextDecoder('utf-8');
+const activeAbortControllers = new Map();
 
 function applyJson(json, { isFull }) {
   if (!isFull && isFullLoaded) {
@@ -55,6 +56,14 @@ function applyJson(json, { isFull }) {
 
 self.onmessage = async (event) => {
   const { id, type, payload = {} } = event.data || {};
+  if (type === 'ABORT') {
+    const ctrl = activeAbortControllers.get(payload.targetId);
+    if (ctrl) {
+      ctrl.abort();
+      activeAbortControllers.delete(payload.targetId);
+    }
+    return;
+  }
   try {
     if (type === 'LOAD_BUFFER') {
       const { buffer, isFull = false, cacheUrl = '' } = payload;
@@ -73,33 +82,40 @@ self.onmessage = async (event) => {
 
     if (type === 'LOAD_SHARD') {
       const { shardUrl, cacheUrl, expectedMeta } = payload;
-      // Check Cache API for valid full index first
-      if (cacheUrl) {
-        const cached = await readCachedIndex(cacheUrl);
-        const isValid = cached && (
-          !expectedMeta ||
-          (cached.meta?.generatedAt === expectedMeta.generatedAt &&
-            cached.meta?.uniqueFiles === expectedMeta.uniqueFiles)
-        );
-        if (isValid) {
-          const result = applyJson(cached, { isFull: true });
-          self.postMessage({ id, ok: true, result: { ...result, fromFullCache: true } });
-          return;
+      const controller = new AbortController();
+      activeAbortControllers.set(id, controller);
+      try {
+        // Check Cache API for valid full index first
+        if (cacheUrl) {
+          const cached = await readCachedIndex(cacheUrl);
+          if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          const isValid = cached && (
+            !expectedMeta ||
+            (cached.meta?.generatedAt === expectedMeta.generatedAt &&
+              cached.meta?.uniqueFiles === expectedMeta.uniqueFiles)
+          );
+          if (isValid) {
+            const result = applyJson(cached, { isFull: true });
+            self.postMessage({ id, ok: true, result: { ...result, fromFullCache: true } });
+            return;
+          }
         }
-      }
 
-      const res = await fetch(shardUrl);
-      const ct = res.headers.get('content-type') || '';
-      if (!res.ok || !ct.includes('application/json')) {
-        throw new Error(`Shard unavailable (${res.status})`);
+        const res = await fetch(shardUrl, { signal: controller.signal });
+        const ct = res.headers.get('content-type') || '';
+        if (!res.ok || !ct.includes('application/json')) {
+          throw new Error(`Shard unavailable (${res.status})`);
+        }
+        const shardJson = await res.json();
+        if (!Array.isArray(shardJson?.files)) {
+          throw new Error('Malformed shard payload');
+        }
+        const result = applyJson(shardJson, { isFull: false });
+        self.postMessage({ id, ok: true, result });
+        return;
+      } finally {
+        activeAbortControllers.delete(id);
       }
-      const shardJson = await res.json();
-      if (!Array.isArray(shardJson?.files)) {
-        throw new Error('Malformed shard payload');
-      }
-      const result = applyJson(shardJson, { isFull: false });
-      self.postMessage({ id, ok: true, result });
-      return;
     }
 
     if (type === 'LOAD_FULL_INDEX') {
@@ -123,27 +139,34 @@ self.onmessage = async (event) => {
         return;
       }
 
-      if (!forceReload && cacheUrl) {
-        const cached = await readCachedIndex(cacheUrl);
-        const isValid = cached && (
-          !expectedMeta ||
-          (cached.meta?.generatedAt === expectedMeta.generatedAt &&
-            cached.meta?.uniqueFiles === expectedMeta.uniqueFiles)
-        );
-        if (isValid) {
-          const result = applyJson(cached, { isFull: true });
-          self.postMessage({ id, ok: true, result: { ...result, fromCache: true } });
-          return;
+      const controller = new AbortController();
+      activeAbortControllers.set(id, controller);
+      try {
+        if (!forceReload && cacheUrl) {
+          const cached = await readCachedIndex(cacheUrl);
+          if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          const isValid = cached && (
+            !expectedMeta ||
+            (cached.meta?.generatedAt === expectedMeta.generatedAt &&
+              cached.meta?.uniqueFiles === expectedMeta.uniqueFiles)
+          );
+          if (isValid) {
+            const result = applyJson(cached, { isFull: true });
+            self.postMessage({ id, ok: true, result: { ...result, fromCache: true } });
+            return;
+          }
         }
-      }
 
-      const res = await resilientFetch(urls, {}, 50000);
-      const clone = res.clone();
-      const json = await res.json();
-      if (cacheUrl) void writeCachedIndex(cacheUrl, clone);
-      const result = applyJson(json, { isFull: true });
-      self.postMessage({ id, ok: true, result });
-      return;
+        const res = await resilientFetch(urls, { signal: controller.signal }, 50000);
+        const clone = res.clone();
+        const json = await res.json();
+        if (cacheUrl) void writeCachedIndex(cacheUrl, clone);
+        const result = applyJson(json, { isFull: true });
+        self.postMessage({ id, ok: true, result });
+        return;
+      } finally {
+        activeAbortControllers.delete(id);
+      }
     }
 
     if (type === 'QUERY') {

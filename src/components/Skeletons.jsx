@@ -40,11 +40,11 @@ export const TableSkeletonLoader = ({ rows = 8, viewMode = 'unified' }) => (
     <table className="file-table">
       <thead>
         <tr>
-          <th className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
+          <th scope="col" className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
             {viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
           </th>
-          <th className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>Course &amp; Session</th>
-          <th className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
+          <th scope="col" className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>Course &amp; Session</th>
+          <th scope="col" className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
             {viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
           </th>
         </tr>

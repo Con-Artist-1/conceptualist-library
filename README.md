@@ -97,7 +97,7 @@ npm run subtitles
 
 ### IndexNow & Environment Credentials
 
-Deployment tokens and `INDEXNOW_KEY` live locally in `.env` (see `.env.example` for template keys) and are stored encrypted inside the password-protected AES-256-GCM vault in `AI_INSTRUCTIONS_LIBRARY.md`. Production deploys via `scripts/deploy-vercel.js` automatically verify the static key file and submit `public/sitemap.xml` URLs to IndexNow, or you can trigger a standalone ping:
+Deployment tokens and `INDEXNOW_KEY` live strictly locally in git-ignored `.env` (see `.env.example` for template keys; never commit credentials to the repository). Production deploys via `scripts/deploy-vercel.js` automatically verify the static key file and submit `public/sitemap.xml` URLs to IndexNow, or you can trigger a standalone ping:
 
 ```bash
 npm run indexnow

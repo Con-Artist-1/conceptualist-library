@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import '../styles/modal.css';
 import { setActivePaperTelemetry } from '../telemetry.js';
 import {
@@ -29,7 +29,8 @@ const PreviewModal = ({
   onClose,
   onViewModeChange,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  openerRef = null
 }) => {
   const siblings = useMemo(() => ({
     ...(file?.siblings || {}),
@@ -102,6 +103,8 @@ const PreviewModal = ({
   const [mobileSplitRatio, setMobileSplitRatio] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
 
+  const modalContainerRef = useRef(null);
+  const modalTitleRef = useRef(null);
   const modalBodyRef = useRef(null);
   const desktopRatioRef = useRef(desktopSplitRatio);
   const mobileRatioRef = useRef(mobileSplitRatio);
@@ -114,25 +117,102 @@ const PreviewModal = ({
     mobileRatioRef.current = mobileSplitRatio;
   }, [mobileSplitRatio]);
 
-  // Lock background body scroll while modal is active to prevent scroll bleed-through
-  useEffect(() => {
+  // Lock background body scroll, mark background siblings inert, focus modal heading, and restore opener focus on close (A11Y-01)
+  useLayoutEffect(() => {
+    const capturedActive = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null;
+    const opener = (openerRef?.current instanceof HTMLElement && openerRef.current.isConnected)
+      ? openerRef.current
+      : capturedActive;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
+
+    const inertSiblings = [];
+    const appRoot = document.querySelector('.app-container');
+    if (appRoot) {
+      for (const child of Array.from(appRoot.children)) {
+        if (!child.classList.contains('modal-backdrop') && !child.inert) {
+          child.inert = true;
+          child.setAttribute('aria-hidden', 'true');
+          inertSiblings.push(child);
+        }
+      }
+    }
+
+    const focusModal = () => {
+      if (modalTitleRef.current && typeof modalTitleRef.current.focus === 'function') {
+        modalTitleRef.current.focus({ preventScroll: true });
+      } else {
+        modalContainerRef.current?.focus({ preventScroll: true });
+      }
     };
-  }, []);
+    focusModal();
+    const focusTimer = requestAnimationFrame(focusModal);
+
+    return () => {
+      cancelAnimationFrame(focusTimer);
+      document.body.style.overflow = originalOverflow;
+      for (const el of inertSiblings) {
+        el.inert = false;
+        el.removeAttribute('aria-hidden');
+      }
+      if (opener && opener.isConnected && typeof opener.focus === 'function') {
+        const restoreFocus = () => {
+          if (!opener.isConnected) return;
+          try {
+            // Force style recalc so Chromium clears ancestor inertness before focusing
+            void opener.offsetWidth;
+            opener.focus({ preventScroll: true });
+          } catch {
+            // Ignore focus restore errors
+          }
+        };
+        restoreFocus();
+        requestAnimationFrame(() => {
+          if (opener.isConnected && document.activeElement === document.body) {
+            restoreFocus();
+          }
+        });
+      }
+    };
+  }, [openerRef]);
 
   useEffect(() => {
+    const FOCUSABLE_SEL =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), audio[controls], [tabindex]:not([tabindex="-1"])';
+
     const handleKey = (e) => {
+      if (e.key === 'Tab' && modalContainerRef.current) {
+        const focusables = Array.from(modalContainerRef.current.querySelectorAll(FOCUSABLE_SEL)).filter((el) => {
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey) {
+          if (active === first || !modalContainerRef.current.contains(active) || active === modalTitleRef.current) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !modalContainerRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+
       if (e.key === 'Escape') {
         if (!headerVisible) {
           setHeaderVisible(true);
         } else {
           onClose();
         }
-      } else if (e.key === 'h' || e.key === 'H') {
-        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      } else if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = e.target?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !e.target?.isContentEditable) {
           setHeaderVisible((prev) => !prev);
         }
       }
@@ -289,7 +369,7 @@ const PreviewModal = ({
     : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
   const downloadUrl = isSplit ? getDownloadUrl(siblings.QP?.path) : getDownloadUrl(currentDoc.path);
 
-  const renderSplitPdfPane = (docTypeKey, shouldFocus) => {
+  const renderSplitPdfPane = (docTypeKey) => {
     const targetSib = docTypeKey === 'QP' ? siblings.QP : siblings.MS;
     const labelText = docTypeKey === 'QP' ? 'Question Paper' : 'Mark Scheme';
     return (
@@ -303,33 +383,41 @@ const PreviewModal = ({
           isMobile={isMobile}
           initialPage={1}
           onDownload={true}
-          autoFocus={shouldFocus}
+          autoFocus={false}
         />
       </Suspense>
     );
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={modalTitle}>
-      <div className={`modal-container ${isSplit ? 'modal-split-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        ref={modalContainerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="preview-modal-title"
+        tabIndex={-1}
+        className={`modal-container ${isSplit ? 'modal-split-wide' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {!headerVisible && (
-          <div
+          <button
+            type="button"
             className="modal-docked-unhide-bar"
             onClick={() => setHeaderVisible(true)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHeaderVisible(true); } }}
             title="Click to restore header (or press H)"
           >
             <span className="unhide-bar-content">▼ Show Header Controls (Press H)</span>
-          </div>
+          </button>
         )}
 
         {headerVisible && (
           <div className="modal-header">
             <div className="modal-title-group">
               <div className="modal-title-row">
-                <span className="modal-title" title={modalTitle}>{modalTitle}</span>
+                <h2 id="preview-modal-title" ref={modalTitleRef} tabIndex={-1} className="modal-title" title={modalTitle}>
+                  {modalTitle}
+                </h2>
                 {file.curriculum && (
                   <span className="modal-header-badge curriculum">{file.curriculum}</span>
                 )}
@@ -344,7 +432,10 @@ const PreviewModal = ({
                   aria-label="Close preview"
                   title="Close Preview (Esc)"
                 >
-                  ✕
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
               {!isSplit && (
@@ -356,7 +447,27 @@ const PreviewModal = ({
             </div>
 
             <div className="modal-header-controls-bar">
-              <div className="modal-view-tabs" role="tablist" aria-label="Document views">
+              <div
+                className="modal-view-tabs"
+                role="tablist"
+                aria-label="Document views"
+                onKeyDown={(e) => {
+                  const tabs = Array.from(e.currentTarget.querySelectorAll('[role="tab"]'));
+                  if (tabs.length < 2) return;
+                  const curIdx = tabs.indexOf(document.activeElement);
+                  if (curIdx === -1) return;
+                  let nextIdx = -1;
+                  if (e.key === 'ArrowRight') nextIdx = (curIdx + 1) % tabs.length;
+                  else if (e.key === 'ArrowLeft') nextIdx = (curIdx - 1 + tabs.length) % tabs.length;
+                  else if (e.key === 'Home') nextIdx = 0;
+                  else if (e.key === 'End') nextIdx = tabs.length - 1;
+                  if (nextIdx >= 0) {
+                    e.preventDefault();
+                    tabs[nextIdx].focus();
+                    tabs[nextIdx].click();
+                  }
+                }}
+              >
                 {['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM'].map((type) => {
                   const sib = siblings[type];
                   if (!sib || (type === 'AUD' && canDockAudio)) return null;
@@ -378,6 +489,8 @@ const PreviewModal = ({
                       type="button"
                       role="tab"
                       aria-selected={isCurrent}
+                      aria-controls="preview-modal-tabpanel"
+                      tabIndex={isCurrent ? 0 : -1}
                       className={`modal-btn modal-view-btn ${type.toLowerCase()} ${isCurrent ? 'active' : ''}`}
                       onClick={() => handleSelectView(type)}
                       title={`View ${fullLabel}`}
@@ -393,6 +506,8 @@ const PreviewModal = ({
                     type="button"
                     role="tab"
                     aria-selected={isSplit}
+                    aria-controls="preview-modal-tabpanel"
+                    tabIndex={isSplit ? 0 : -1}
                     className={`modal-btn modal-view-btn split ${isSplit ? 'active' : ''}`}
                     onClick={() => handleSelectView('split')}
                     title="View Question Paper and Mark Scheme side-by-side"
@@ -491,7 +606,7 @@ const PreviewModal = ({
                 title={isSingleSolutionZip ? 'Download full Solution Bank archive (.zip)' : 'Download document'}
                 aria-label={isSingleSolutionZip ? 'Download full Solution Bank archive (.zip)' : 'Download document'}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
@@ -506,7 +621,10 @@ const PreviewModal = ({
                 aria-label="Close preview"
                 title="Close Preview (Esc)"
               >
-                ✕
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             </div>
           </div>
@@ -527,14 +645,29 @@ const PreviewModal = ({
         )}
 
         <div
+          id="preview-modal-tabpanel"
+          role="tabpanel"
+          aria-labelledby="preview-modal-title"
           ref={modalBodyRef}
-          className={`modal-body ${file.isPendingSkeleton ? 'single-container' : isSplit ? 'split-container' : 'single-container'} ${isDragging ? 'is-resizing' : ''} ${!headerVisible ? 'header-hidden' : ''}`}
+          className={`modal-body ${file.isPendingSkeleton || file.isNotFound ? 'single-container' : isSplit ? 'split-container' : 'single-container'} ${isDragging ? 'is-resizing' : ''} ${!headerVisible ? 'header-hidden' : ''}`}
           style={{
             '--desktop-split-pct': `${desktopSplitRatio}%`,
             '--mobile-split-pct': `${mobileSplitRatio}%`
           }}
         >
-          {file.isPendingSkeleton ? (
+          {file.isNotFound ? (
+            <div className="modal-resource-card">
+              <div className="modal-resource-box">
+                <h3>Document Not Found in Archive</h3>
+                <p>The requested study link could not be matched to a file in the current catalog ({file.path || file.name}).</p>
+                <div className="modal-sol-error-actions">
+                  <button type="button" className="modal-download-btn" onClick={onClose}>
+                    Return to Archive
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : file.isPendingSkeleton ? (
             <PdfPaneSkeleton
               title={`Loading ${modalTitle}...`}
               subtitle="Fetching examination paper directly into on-site reader"
@@ -542,7 +675,7 @@ const PreviewModal = ({
           ) : isSplit ? (
             <>
               <div className="modal-split-pane qp-pane">
-                {swapSplit ? renderSplitPdfPane('MS', true) : renderSplitPdfPane('QP', true)}
+                {swapSplit ? renderSplitPdfPane('MS') : renderSplitPdfPane('QP')}
               </div>
 
               {!isMobile && (
@@ -586,7 +719,7 @@ const PreviewModal = ({
               )}
 
               <div className="modal-split-pane ms-pane">
-                {swapSplit ? renderSplitPdfPane('QP', false) : renderSplitPdfPane('MS', false)}
+                {swapSplit ? renderSplitPdfPane('QP') : renderSplitPdfPane('MS')}
               </div>
             </>
           ) : (
@@ -633,7 +766,7 @@ const PreviewModal = ({
                     isMobile={isMobile}
                     initialPage={1}
                     onDownload={true}
-                    autoFocus={true}
+                    autoFocus={false}
                     allowTwoPage={true}
                     defaultTwoPage={!isMobile && isTextbookDoc}
                   />

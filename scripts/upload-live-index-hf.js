@@ -23,9 +23,9 @@ function loadEnv() {
 }
 loadEnv();
 
-const TOKEN = process.argv[2] || process.env.HF_TOKEN;
+const TOKEN = process.env.HF_TOKEN;
 if (!TOKEN) {
-  console.error('Missing HF_TOKEN. Set it in search-app/.env or pass as CLI arg.');
+  console.error('Missing HF_TOKEN. Set it in search-app/.env or environment variables.');
   process.exit(1);
 }
 const REPO_ID = 'Diavlon/mcmaster-docs-library';
@@ -54,8 +54,14 @@ async function main() {
     })
   });
 
+  if (!batchRes.ok) {
+    throw new Error(`LFS batch request failed: HTTP ${batchRes.status}`);
+  }
   const batchData = await batchRes.json();
-  const obj = batchData.objects[0];
+  const obj = batchData.objects?.[0];
+  if (!obj) {
+    throw new Error('LFS batch response missing objects[0].');
+  }
 
   if (obj.actions && obj.actions.upload) {
     const uploadUrl = obj.actions.upload.href;

@@ -12,6 +12,7 @@ export const DB_NAME_DEFAULT = 'conceptualist_library';
 export const COLLECTION_VIEWS = 'paper_views';
 export const COLLECTION_SESSIONS = 'site_sessions';
 export const COLLECTION_SUBTITLES = 'audio_subtitles';
+export const COLLECTION_RATE_LIMITS = 'rate_limits';
 
 export const PAPER_KEY_MAX_LEN = 220;
 export const PAPER_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&]+$/;
@@ -21,6 +22,92 @@ const MONGO_RETRY_BACKOFF_MS = 15 * 1000;
 let cachedMongoClientPromise = globalThis.__csMongoClientPromise || null;
 let lastMongoFailAt = globalThis.__csLastMongoFailAt || 0;
 let hasLoggedAtlasWarning = globalThis.__csHasLoggedAtlasWarning || false;
+let rateLimitTtlInitialized = globalThis.__csRateLimitTtlInitialized || false;
+let cachedCatalogAllowlist = globalThis.__csCatalogAllowlist || null;
+
+export function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
+  const ha = crypto.createHash('sha256').update(a).digest();
+  const hb = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+/**
+ * Lazy-loads catalog allowlist sets from public/index.json when present on disk so API endpoints
+ * can reject fabricated paperKeys or non-existent audio subtitle keys.
+ */
+export function getCatalogAllowlist() {
+  if (cachedCatalogAllowlist) return cachedCatalogAllowlist;
+  try {
+    const indexPath = path.join(PROJECT_ROOT, 'public', 'index.json');
+    if (!fs.existsSync(indexPath)) return null;
+    const raw = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    if (!raw || !Array.isArray(raw.keys) || !Array.isArray(raw.files)) return null;
+    const idxPath = raw.keys.indexOf('path');
+    const idxSpec = raw.keys.indexOf('spec');
+    const idxSubj = raw.keys.indexOf('subject');
+    const idxUnit = raw.keys.indexOf('unitCode');
+    const idxVar = raw.keys.indexOf('variant');
+    const idxSess = raw.keys.indexOf('session');
+    const idxDt = raw.keys.indexOf('docType');
+    const idxAlt = raw.keys.indexOf('altPaths');
+
+    const validPaperKeys = new Set();
+    const validAudioPaths = new Set();
+    const validAudioSittings = new Set();
+
+    for (const row of raw.files) {
+      const p = idxPath >= 0 ? row[idxPath] : '';
+      const spec = idxSpec >= 0 ? row[idxSpec] : '';
+      const subj = idxSubj >= 0 ? row[idxSubj] : '';
+      const unit = idxUnit >= 0 ? row[idxUnit] : '';
+      const variant = idxVar >= 0 ? row[idxVar] : '';
+      const sess = idxSess >= 0 ? row[idxSess] : '';
+      const dt = idxDt >= 0 ? row[idxDt] : '';
+      const alts = idxAlt >= 0 ? row[idxAlt] : null;
+
+      if (p) validPaperKeys.add(p);
+      if (spec && subj && sess) {
+        const sittingKey = `${spec}|${subj}|${unit || ''}|${variant || ''}|${sess}`;
+        validPaperKeys.add(sittingKey);
+        if (dt === 'AUD') validAudioSittings.add(sittingKey);
+      }
+      if (dt === 'AUD') {
+        if (p) validAudioPaths.add(p);
+        if (Array.isArray(alts)) {
+          for (const ap of alts) {
+            if (typeof ap === 'string' && ap) validAudioPaths.add(ap);
+          }
+        }
+      }
+    }
+
+    cachedCatalogAllowlist = { validPaperKeys, validAudioPaths, validAudioSittings };
+    globalThis.__csCatalogAllowlist = cachedCatalogAllowlist;
+    return cachedCatalogAllowlist;
+  } catch {
+    return null;
+  }
+}
+
+export function isKnownSubtitleTrackKey(trackKey) {
+  const allowlist = getCatalogAllowlist();
+  if (!allowlist) return true;
+  const key = String(trackKey || '').trim();
+  if (allowlist.validAudioPaths.has(key) || allowlist.validAudioSittings.has(key)) return true;
+  const hashIdx = key.indexOf('#');
+  if (hashIdx > 0) {
+    const base = key.slice(0, hashIdx);
+    if (allowlist.validAudioPaths.has(base) || allowlist.validAudioSittings.has(base)) return true;
+  }
+  return false;
+}
+
+export function isKnownPaperKey(paperKey) {
+  const allowlist = getCatalogAllowlist();
+  if (!allowlist) return true;
+  return allowlist.validPaperKeys.has(String(paperKey || '').trim());
+}
 
 export function parsePositiveInt(raw) {
   const num = Number(raw);
@@ -69,8 +156,8 @@ export function isAllowedOrigin(req, requireHeader = false) {
     const url = new URL(target);
     const host = url.hostname.toLowerCase();
     if (exactHosts.has(host)) return true;
-    // Allow only project-scoped Vercel preview deployment hostnames
-    if (/^(search-app|conceptualist)(-[a-z0-9-]+)?\.vercel\.app$/i.test(host)) {
+    // Allow only project/team-scoped Vercel preview deployments
+    if (/^conceptualist-library-[a-z0-9-]+-con-artist-1s-projects\.vercel\.app$/i.test(host)) {
       return true;
     }
     return false;
@@ -80,11 +167,48 @@ export function isAllowedOrigin(req, requireHeader = false) {
 }
 
 export function getClientIp(req) {
-  return (
-    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.socket?.remoteAddress ||
-    'unknown'
-  );
+  const vercelFwd = req.headers['x-vercel-forwarded-for'];
+  if (typeof vercelFwd === 'string' && vercelFwd.trim()) {
+    const parts = vercelFwd.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return realIp.trim();
+  }
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.trim()) {
+    const parts = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+export async function checkDistributedRateLimit(db, bucket, key, windowMs = 60000, maxRequests = 45) {
+  if (!db) return true;
+  try {
+    const col = db.collection(COLLECTION_RATE_LIMITS);
+    if (!rateLimitTtlInitialized) {
+      rateLimitTtlInitialized = true;
+      globalThis.__csRateLimitTtlInitialized = true;
+      void col.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, background: true }).catch(() => {
+        rateLimitTtlInitialized = false;
+        globalThis.__csRateLimitTtlInitialized = false;
+      });
+    }
+    const windowBucket = Math.floor(Date.now() / windowMs);
+    const id = `${bucket}:${hashIdentifier(key)}:${windowBucket}`;
+    const expiresAt = new Date((windowBucket + 2) * windowMs);
+    const res = await col.findOneAndUpdate(
+      { _id: id },
+      { $inc: { count: 1 }, $setOnInsert: { expiresAt } },
+      { upsert: true, returnDocument: 'after', projection: { count: 1 } }
+    );
+    const doc = res?.value !== undefined ? res.value : res;
+    return !doc || Number(doc.count) <= maxRequests;
+  } catch {
+    return true;
+  }
 }
 
 export function checkSlidingRateLimit(rateMap, key, windowMs = 60000, maxRequests = 45) {
@@ -216,23 +340,59 @@ export async function getMongoDatabase() {
 export async function readJsonBody(req, maxBytes = 8192) {
   let body = req.body;
   if (body && typeof body === 'object' && !Buffer.isBuffer(body)) {
+    const serializedLen = Buffer.byteLength(JSON.stringify(body), 'utf8');
+    if (serializedLen > maxBytes) {
+      throw new Error('Payload too large');
+    }
     return body;
   }
   const raw =
     typeof body === 'string'
-      ? body
+      ? (() => {
+          if (Buffer.byteLength(body, 'utf8') > maxBytes) {
+            throw new Error('Payload too large');
+          }
+          return body;
+        })()
       : Buffer.isBuffer(body)
-        ? body.toString('utf8')
+        ? (() => {
+            if (body.byteLength > maxBytes) {
+              throw new Error('Payload too large');
+            }
+            return body.toString('utf8');
+          })()
         : await new Promise((resolve, reject) => {
             let data = '';
+            let byteLen = 0;
+            let settled = false;
             req.on('data', (chunk) => {
-              data += chunk;
-              if (Buffer.byteLength(data, 'utf8') > maxBytes) {
+              if (settled) return;
+              const chunkBytes = Buffer.isBuffer(chunk) ? chunk.byteLength : Buffer.byteLength(String(chunk), 'utf8');
+              byteLen += chunkBytes;
+              if (byteLen > maxBytes) {
+                settled = true;
+                try {
+                  if (typeof req.destroy === 'function') req.destroy();
+                } catch {
+                  // Ignore destroy error
+                }
                 reject(new Error('Payload too large'));
+                return;
+              }
+              data += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+            });
+            req.on('end', () => {
+              if (!settled) {
+                settled = true;
+                resolve(data);
               }
             });
-            req.on('end', () => resolve(data));
-            req.on('error', reject);
+            req.on('error', (err) => {
+              if (!settled) {
+                settled = true;
+                reject(err);
+              }
+            });
           });
   if (!raw) return {};
   const parsed = JSON.parse(raw);

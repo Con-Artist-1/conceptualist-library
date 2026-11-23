@@ -32,10 +32,26 @@ const DATA_DIR = path.join(APP_DIR, '.data');
 const SHA_CACHE_PATH = path.join(DATA_DIR, 'library_sha_cache.json');
 const INDEX_PATH = path.join(APP_DIR, 'public', 'index.json');
 
+function loadEnv() {
+  const envPath = path.join(APP_DIR, '.env');
+  if (!fs.existsSync(envPath)) return;
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq > 0) {
+      const k = trimmed.slice(0, eq).trim();
+      const v = trimmed.slice(eq + 1).trim();
+      if (!process.env[k]) process.env[k] = v;
+    }
+  }
+}
+loadEnv();
+
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-const DP_PASSWORD = process.env.DP_PASSWORD || '159357';
+const DP_PASSWORD = process.env.DP_PASSWORD || '';
 const PL_API_BASE = 'https://lldrclumayqoegzfxdcb.supabase.co/rest/v1/papers';
-const PL_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsZHJjbHVtYXlxb2VnemZ4ZGNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNDEwNjEsImV4cCI6MjA4MzcxNzA2MX0.lb7hAjOku_mcU_-o9EJlhA-74eSpMm3U27ssoQW5c5o';
+const PL_ANON_KEY = process.env.PL_ANON_KEY || '';
 
 const MONTH_FOLDER = { Jan: 'January', Jun: 'May-June', OctNov: 'Oct-Nov' };
 const SUBDIR_FOR_DT = { QP: 'Question-paper', MS: 'Mark-scheme', ER: 'Examiner-report', AUD: 'Audio', DF: 'Data-files', SC: 'Other' };
@@ -120,7 +136,7 @@ function walkDir(dirPath, out = []) {
 function loadShaRegistry() {
   let prev = {};
   if (fs.existsSync(SHA_CACHE_PATH)) {
-    try { prev = JSON.parse(fs.readFileSync(SHA_CACHE_PATH, 'utf8')).files || {}; } catch {}
+    try { prev = JSON.parse(fs.readFileSync(SHA_CACHE_PATH, 'utf8')).files || {}; } catch (err) { console.warn('[SHA] Cache read skipped:', err?.message || err); }
   }
   const files = walkDir(PAST_PAPERS);
   const nextCache = {};
@@ -410,6 +426,10 @@ async function crawlBsr(sinceYear) {
 }
 
 async function crawlDynamicPapers() {
+  if (!DP_PASSWORD) {
+    console.warn('[DP] Skipping dynamicpapers.com (set DP_PASSWORD in search-app/.env to enable).');
+    return [];
+  }
   console.log('[DP] Authenticating dynamicpapers.com...');
   const loginRes = await fetch('https://dynamicpapers.com/wp-login.php?action=postpass', {
     method: 'POST',
@@ -426,6 +446,7 @@ async function crawlDynamicPapers() {
     { spec: 'IAL', url: 'https://dynamicpapers.com/edexcel-recent-papers/international-a-level/' }
   ];
   const subPages = new Map();
+  let dpErrors = 0;
   for (const h of hubs) {
     try {
       const body = await fetch(h.url, { headers: { 'User-Agent': UA, Cookie: cookies }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
@@ -437,7 +458,7 @@ async function crawlDynamicPapers() {
         if (h.spec === 'IAL' && !u.includes('/international-a-level')) continue;
         subPages.set(u, { spec: h.spec, title: txt || u.split('/').filter(Boolean).pop() });
       }
-    } catch {}
+    } catch { dpErrors++; }
   }
 
   const out = [];
@@ -452,10 +473,10 @@ async function crawlDynamicPapers() {
           const name = decodeURIComponent(fileUrl.split('?')[0].split('/').pop() || '');
           out.push({ source: 'DP', spec: info.spec, title: info.title, folderPath: '', name, url: fileUrl, cookie: cookies });
         }
-      } catch {}
+      } catch { dpErrors++; }
     }));
   }
-  console.log(`[DP] Collected ${out.length} links across ${entries.length} pages.`);
+  console.log(`[DP] Collected ${out.length} links across ${entries.length} pages${dpErrors ? ` (${dpErrors} page errors)` : ''}.`);
   return out;
 }
 
@@ -466,13 +487,14 @@ async function crawlIgExams(sinceYear) {
     { spec: 'IAL', url: 'https://igexams.com/past-paper/edexcel-as-ial-past-papers/' }
   ];
   const pages = new Map();
+  let igErrors = 0;
   for (const h of hubs) {
     try {
       const html = await fetch(h.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
       for (const m of html.matchAll(/href=["'](https?:\/\/igexams\.com\/past_papers\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
         pages.set(m[1], { spec: h.spec, title: decodeHtml(m[2].replace(/<[^>]+>/g, ' ')) });
       }
-    } catch {}
+    } catch { igErrors++; }
   }
   const driveRoots = [];
   const direct = [];
@@ -486,10 +508,10 @@ async function crawlIgExams(sinceYear) {
         const u = normalizeHttpUrl(m[1], url);
         if (u) direct.push({ source: 'IGExams', spec: info.spec, title: info.title, folderPath: '', name: decodeURIComponent(u.split('/').pop()), url: u });
       }
-    } catch {}
+    } catch { igErrors++; }
   }
   const driveFiles = await crawlDriveTree(driveRoots, sinceYear);
-  console.log(`[IGExams] Collected ${direct.length} direct + ${driveFiles.length} Drive files.`);
+  console.log(`[IGExams] Collected ${direct.length} direct + ${driveFiles.length} Drive files${igErrors ? ` (${igErrors} page errors)` : ''}.`);
   return [...direct, ...driveFiles];
 }
 
@@ -500,6 +522,7 @@ async function crawlSsc(sinceYear) {
     { spec: 'IAL', url: 'https://smartstudycampus.com/pages/as-edexcel-subject' }
   ];
   const subPages = new Map();
+  let sscErrors = 0;
   for (const h of hubs) {
     try {
       const html = await fetch(h.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
@@ -507,7 +530,7 @@ async function crawlSsc(sinceYear) {
         const u = normalizeHttpUrl(m[1], h.url);
         if (u && !u.endsWith('-subject')) subPages.set(u, { spec: h.spec, title: decodeHtml(m[2].replace(/<[^>]+>/g, ' ')) });
       }
-    } catch {}
+    } catch { sscErrors++; }
   }
   const driveRoots = [];
   const direct = [];
@@ -521,10 +544,10 @@ async function crawlSsc(sinceYear) {
         const u = normalizeHttpUrl(m[1], url);
         if (u) direct.push({ source: 'SSC', spec: info.spec, title: info.title, folderPath: '', name: decodeURIComponent(u.split('?')[0].split('/').pop()), url: u });
       }
-    } catch {}
+    } catch { sscErrors++; }
   }
   const driveFiles = await crawlDriveTree(driveRoots, sinceYear);
-  console.log(`[SSC] Collected ${direct.length} direct + ${driveFiles.length} Drive files.`);
+  console.log(`[SSC] Collected ${direct.length} direct + ${driveFiles.length} Drive files${sscErrors ? ` (${sscErrors} page errors)` : ''}.`);
   return [...direct, ...driveFiles];
 }
 
@@ -535,6 +558,7 @@ async function crawlPmt() {
     .filter(u => !/revision|solutionbank|tutor|courses/i.test(u));
 
   const subUrls = new Set();
+  let pmtErrors = 0;
   for (const sUrl of sections) {
     try {
       const html = await fetch(sUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
@@ -547,7 +571,7 @@ async function crawlPmt() {
           subUrls.add(u);
         }
       }
-    } catch {}
+    } catch { pmtErrors++; }
   }
 
   const out = [];
@@ -562,14 +586,18 @@ async function crawlPmt() {
           const pdfUrl = normalizeHttpUrl(m[1], u);
           if (pdfUrl) out.push({ source: 'PMT', spec, title, folderPath: '', name: decodeURIComponent(pdfUrl.split('?')[0].split('/').pop()), url: pdfUrl });
         }
-      } catch {}
+      } catch { pmtErrors++; }
     }));
   }
-  console.log(`[PMT] Collected ${out.length} PDF links across ${list.length} pages.`);
+  console.log(`[PMT] Collected ${out.length} PDF links across ${list.length} pages${pmtErrors ? ` (${pmtErrors} page errors)` : ''}.`);
   return out;
 }
 
 async function crawlPaperlords() {
+  if (!PL_ANON_KEY) {
+    console.warn('[Paperlords] Skipping paperlords.org (set PL_ANON_KEY in search-app/.env to enable).');
+    return [];
+  }
   console.log('[Paperlords] Querying IGCSE & IAL REST endpoints...');
   const out = [];
   for (const cat of ['IGCSE', 'IAL']) {
@@ -757,7 +785,7 @@ function findQpdfExecutable(explicitPath) {
   try {
     const whichOut = execFileSync('where.exe', ['qpdf'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split(/\r?\n/)[0];
     if (whichOut && fs.existsSync(whichOut)) return whichOut;
-  } catch {}
+  } catch { /* qpdf not installed on PATH */ }
   return '';
 }
 
@@ -777,7 +805,9 @@ function packLargePdf(qpdfExe, absPath, tmpPack) {
     if (pOld === pNew && outBuf.slice(0, 2048).includes('/Linearized')) {
       fs.writeFileSync(absPath, outBuf);
     }
-  } catch {}
+  } catch (err) {
+    console.warn(`[qpdf] Skipped optimization for ${path.basename(absPath)}:`, err?.message || err);
+  }
 }
 
 async function run() {
@@ -811,8 +841,8 @@ async function run() {
 
   const { shaToPaths } = loadShaRegistry();
   const qpdfExe = opts.skipPack ? '' : findQpdfExecutable(opts.qpdfPath);
-  const tmpFile = path.join(DATA_DIR, 'sync_curl.tmp');
-  const tmpPack = path.join(DATA_DIR, 'sync_qpdf.pdf');
+  const tmpFile = path.join(DATA_DIR, `sync_curl_${process.pid}.tmp`);
+  const tmpPack = path.join(DATA_DIR, `sync_qpdf_${process.pid}.pdf`);
   const retryCurl = [];
   const failReasons = {};
   let saved = 0, skippedDup = 0, copiedShared = 0, failed = 0;

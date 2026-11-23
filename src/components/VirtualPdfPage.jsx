@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { computePageTargetWidth } from '../lib/pdfLayoutMath.js';
 
 /**
@@ -22,6 +22,7 @@ export const VirtualPdfPage = React.memo(({
 }) => {
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
+  const loadedPageRef = useRef(null);
   const [aspectRatio, setAspectRatio] = useState(null);
   const [rendered, setRendered] = useState(false);
 
@@ -32,18 +33,31 @@ export const VirtualPdfPage = React.memo(({
     return rotation % 180 === 90 && !aspectRatio ? 1 / base : base;
   }, [aspectRatio, defaultAspectRatio, rotation]);
 
-  // Release GPU texture memory when page scrolls far out of active viewport buffer
-  useEffect(() => {
-    if (!shouldMountCanvas && canvasRef.current) {
-      try {
-        canvasRef.current.width = 1;
-        canvasRef.current.height = 1;
-      } catch {
-        // Ignore detached canvas errors
+  // Release GPU texture memory & PDF.js page resources BEFORE <canvas> detaches from DOM
+  useLayoutEffect(() => {
+    if (!shouldMountCanvas) return undefined;
+    const canvas = canvasRef.current;
+    return () => {
+      if (canvas) {
+        try {
+          canvas.width = 1;
+          canvas.height = 1;
+        } catch {
+          // Ignore detached canvas errors
+        }
+      }
+      const pageObj = loadedPageRef.current;
+      loadedPageRef.current = null;
+      if (pageObj && typeof pageObj.cleanup === 'function') {
+        try {
+          pageObj.cleanup();
+        } catch {
+          // Ignore page cleanup errors
+        }
       }
       setRendered(false);
-    }
-  }, [shouldMountCanvas]);
+    };
+  }, [shouldMountCanvas, pdfDoc, pageNum]);
 
   // Two-pass progressive offscreen rendering: instant draft canvas first, then idle HiDPI upgrade
   useEffect(() => {
@@ -139,7 +153,13 @@ export const VirtualPdfPage = React.memo(({
     };
 
     pdfDoc.getPage(pageNum).then((page) => {
-      if (!active || !canvasRef.current) return;
+      if (!active || !canvasRef.current) {
+        if (page && typeof page.cleanup === 'function') {
+          try { page.cleanup(); } catch { /* noop */ }
+        }
+        return;
+      }
+      loadedPageRef.current = page;
 
       const totalRotation = ((page.rotate || 0) + rotation) % 360;
       const unscaledViewport = page.getViewport({ scale: 1, rotation: totalRotation });

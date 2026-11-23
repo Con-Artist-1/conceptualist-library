@@ -49,7 +49,7 @@ export const STATIC_SEARCH_VOCAB = [
   '4aa1', '4fr1', '4gn1', '4sp1', '4hi1', '4rs1', '4gl1', '4is1',
   '4be0', '4bn0', '4bn1', '4cn0', '4cn1', '4fa0', '4fa1', '4gk1', '4mg0', '4gu0', '4hn0',
   '4is0', '4pa1', '4sc0', '4sd0', '4wsd1', '4ss0', '4si0', '4sw0', '4sw1', '4ta0', '4tu0', '4ur0',
-  '4wbi1', '4wch1', '4wph1', '4wac1', '4wcm1', '4wec1', '4wes1', '4wea1', '4wet1', '4wge1', '4whi1', '4wma1', '4wrs1'
+  '4wbi1', '4wch1', '4wph1', '4wac1', '4wcm1', '4wec1', '4wes1', '4wea1', '4wet1', '4wge1', '4whi1', '4wma1', '4wm1f', '4wm1h', '4wm2f', '4wm2h', '4wrs1'
 ];
 
 export const SHORT_VOCAB_3CHAR = new Set([
@@ -252,9 +252,13 @@ export const RAW_ATOMIC_SYNONYMS = {
   wma02: ['wma02', 'c34', 'core mathematics 34'],
 
   // IGCSE syllabus codes -> exact subject + specification bindings
-  '4ma1': ['4ma1', 'mathematics a', '4ma0', '4wma1', '4400'],
+  '4ma1': ['4ma1', 'mathematics a', '4ma0', '4wma1', '4wm1f', '4wm1h', '4wm2f', '4wm2h', '4400'],
   '4ma0': ['4ma0', 'mathematics a', '4ma1'],
-  '4wma1': ['4wma1', '4ma1', 'mathematics a'],
+  '4wma1': ['4wma1', '4wm1f', '4wm1h', '4wm2f', '4wm2h', '4ma1', 'mathematics a'],
+  '4wm1f': ['4wm1f', '4wma1', '4ma1', 'mathematics a', 'modular'],
+  '4wm1h': ['4wm1h', '4wma1', '4ma1', 'mathematics a', 'modular'],
+  '4wm2f': ['4wm2f', '4wma1', '4ma1', 'mathematics a', 'modular'],
+  '4wm2h': ['4wm2h', '4wma1', '4ma1', 'mathematics a', 'modular'],
   '4400': ['4400', 'mathematics a', '4ma0', '4ma1'],
   '4mb1': ['4mb1', 'mathematics b', '4mb0'],
   '4pm1': ['4pm1', 'further pure mathematics', '4pm0'],
@@ -387,7 +391,7 @@ export const IGCSE_CODE_BY_SUBJECT = {
   'Information Technology': ['4it1', '4it0'],
   'Islamic Studies': ['4is1'],
   'Islamiyat': ['4is0'],
-  'Mathematics A': ['4ma1', '4ma0', '4wma1', '4400'],
+  'Mathematics A': ['4ma1', '4ma0', '4wma1', '4wm1f', '4wm1h', '4wm2f', '4wm2h', '4400'],
   'Mathematics B': ['4mb1', '4mb0'],
   'Modern Greek': ['4mg0'],
   'Pakistan Studies': ['4pa1'],

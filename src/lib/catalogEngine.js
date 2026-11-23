@@ -298,7 +298,7 @@ export function hydrateCatalogPayload(json) {
       unifiedFiles.push(group);
     }
 
-    if (!group.docs[f.docType] || scoreFile(f) > scoreFile(group.docs[f.docType])) {
+    if (preferSiblingCandidate(group.docs[f.docType], f)) {
       group.docs[f.docType] = f;
     }
     if (f.docType === 'AUD') {

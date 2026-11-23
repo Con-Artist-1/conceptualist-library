@@ -2,11 +2,11 @@
 import { consumePrewarmedRangeBootstrap } from './pdfPrewarm.js';
 
 export const LARGE_PDF_STREAM_THRESHOLD = 5 * 1024 * 1024; // Inspect byte-range strategy for >= 5 MB PDFs
-export const UNLINEARIZED_SINGLE_STREAM_MAX = 15 * 1024 * 1024; // Fetch non-linearized <= 15 MB PDFs progressively without 206 storms
+const UNLINEARIZED_SINGLE_STREAM_MAX = 15 * 1024 * 1024; // Fetch non-linearized <= 15 MB PDFs progressively without 206 storms
 export const STREAM_BOOTSTRAP_BYTES = 131072; // 128 KB header probe aligned to chunk boundary (avoids duplicate 0-128 KB fetch)
 export const STREAM_CHUNK_SIZE = 131072; // 128 KB HTTP/2 range chunks for linearized PDFs
-export const UNLINEARIZED_BOOK_CHUNK_SIZE = 262144; // 256 KB chunks for huge un-linearized textbooks
-export const MAX_CONCURRENT_RANGE_FETCHES = 6;
+const UNLINEARIZED_BOOK_CHUNK_SIZE = 262144; // 256 KB chunks for huge un-linearized textbooks
+const MAX_CONCURRENT_RANGE_FETCHES = 6;
 
 function bufferSliceContainsAscii(u8, needle) {
   const limit = Math.min(u8.byteLength, 2048);
@@ -147,7 +147,17 @@ export async function createLargePdfRangeTransport(pdfjsLib, url, signal, onByte
             }
             const ab = await res.arrayBuffer();
             if (this.aborted) return;
-            const chunk = new Uint8Array(ab);
+            const rawChunk = new Uint8Array(ab);
+            let chunk = rawChunk;
+            if (res.status === 200) {
+              // Proxy/CDN ignored Range header and sent full document; slice requested window cleanly
+              if (begin >= rawChunk.byteLength) {
+                throw new Error(`Unexpected HTTP 200 range payload (${rawChunk.byteLength} B for offset ${begin})`);
+              }
+              chunk = rawChunk.subarray(begin, Math.min(end, rawChunk.byteLength));
+            } else if (res.status !== 206) {
+              throw new Error(`Unexpected HTTP ${res.status} on range request`);
+            }
             const rangeKey = `${begin}:${end}`;
             if (!this.seenRanges.has(rangeKey)) {
               this.seenRanges.add(rangeKey);

@@ -1,6 +1,6 @@
 // DOM-free resilient fetch and Cache API helpers shared between main thread and Web Worker.
 
-export const INDEX_CACHE_NAME = 'cs_index_cache';
+const INDEX_CACHE_NAME = 'cs_index_cache';
 
 export function buildIndexCacheUrl(appVersion, buildTimestamp) {
   return `https://cs-cache.local/index_${appVersion}_${encodeURIComponent(buildTimestamp)}.json`;
@@ -8,16 +8,29 @@ export function buildIndexCacheUrl(appVersion, buildTimestamp) {
 
 export async function resilientFetch(urls, options = {}, timeoutMs = 45000) {
   let lastErr = null;
+  const externalSignal = options?.signal || null;
   for (const url of urls) {
+    if (externalSignal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
     const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timer);
+      if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
       if (res.ok) return res;
       lastErr = new Error(`HTTP ${res.status} for ${url}`);
     } catch (err) {
       clearTimeout(timer);
+      if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
+      if (externalSignal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       lastErr = err;
     }
   }

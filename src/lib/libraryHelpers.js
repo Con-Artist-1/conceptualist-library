@@ -126,13 +126,17 @@ export function formatFallbackBookTitle(rawName = '') {
     .trim();
 }
 
+function escapeRegExp(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Strip redundant subject prefix from unitName (e.g. "Accounting Unit 1 (WAC11)" -> "Unit 1 (WAC11)")
 export function getShortUnitDisplay(file) {
   let u = file.unitName || (file.unitCode ? `Unit ${file.unitCode}` : '');
   if (!u) return '';
   if (file.subject) {
     const subj = file.subject === 'Information Technology' ? 'IT' : file.subject;
-    const prefixRegex = new RegExp(`^(?:${file.subject}|${subj})\\s+`, 'i');
+    const prefixRegex = new RegExp(`^(?:${escapeRegExp(file.subject)}|${escapeRegExp(subj)})\\s+`, 'i');
     u = u.replace(prefixRegex, '');
   }
   const v = file.variant || '';
@@ -227,15 +231,15 @@ export function getUnifiedSittingTitle(file) {
 }
 
 export const HISTORY_STORAGE_KEY = 'cs_recent_papers_v1';
-export const VIEWS_CACHE_STORAGE_KEY = 'cs_paper_views_cache_v1';
-export const VIEW_COOLDOWN_STORAGE_KEY = 'cs_paper_view_cooldown_v1';
-export const VIEWER_ID_STORAGE_KEY = 'cs_viewer_id_v1';
+const VIEWS_CACHE_STORAGE_KEY = 'cs_paper_views_cache_v1';
+const VIEW_COOLDOWN_STORAGE_KEY = 'cs_paper_view_cooldown_v1';
+const VIEWER_ID_STORAGE_KEY = 'cs_viewer_id_v1';
 export const ACTIVE_MODAL_PAPER_SESSION_KEY = 'cs_active_modal_paper_v1';
 export const PAPER_VIEW_COOLDOWN_MS = 30 * 1000;
 export const MAX_HISTORY_ITEMS = 8;
 const inMemoryCooldownMap = new Map();
 
-export function sanitizeViewsMap(rawMap) {
+function sanitizeViewsMap(rawMap) {
   const clean = {};
   if (!rawMap || typeof rawMap !== 'object') return clean;
   for (const [k, v] of Object.entries(rawMap)) {

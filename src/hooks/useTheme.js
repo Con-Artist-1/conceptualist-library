@@ -104,7 +104,9 @@ export function useTheme({ isPreviewOpen = false } = {}) {
     if (!hasExplicitThemeRef.current) return;
     try {
       localStorage.setItem('cs_theme', theme);
-      document.cookie = `cs_theme=${theme}; max-age=31536000; path=/; SameSite=Lax`;
+      const secureFlag =
+        typeof window !== 'undefined' && window.location?.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `cs_theme=${theme}; max-age=31536000; path=/; SameSite=Lax${secureFlag}`;
     } catch {
       // Ignore storage errors
     }

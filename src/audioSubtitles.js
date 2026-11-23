@@ -55,22 +55,25 @@ function hydrateSubtitleRecord(raw) {
   return null;
 }
 
-export async function loadStaticSubtitlesManifest() {
+async function loadStaticSubtitlesManifest() {
   if (staticManifestData) return staticManifestData;
   if (!staticManifestPromise) {
     staticManifestPromise = fetch(`/subtitles/manifest.json?v=${SUBTITLE_CACHE_VERSION}`)
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((json) => {
         if (json && typeof json.keys === 'object') {
           staticManifestData = json;
-        } else {
-          staticManifestData = { keys: {}, shards: [] };
+          return staticManifestData;
         }
-        return staticManifestData;
+        staticManifestPromise = null;
+        return { keys: {}, shards: [] };
       })
       .catch(() => {
-        staticManifestData = { keys: {}, shards: [] };
-        return staticManifestData;
+        staticManifestPromise = null;
+        return { keys: {}, shards: [] };
       });
   }
   return staticManifestPromise;
@@ -82,16 +85,18 @@ async function loadSubtitleShard(shardName) {
   if (inflightShardPromises.has(shardName)) return inflightShardPromises.get(shardName);
 
   const task = fetch(`/subtitles/${encodeURIComponent(shardName)}.json?v=${SUBTITLE_CACHE_VERSION}`)
-    .then((res) => (res.ok ? res.json() : null))
-    .then((json) => {
-      const tracks = json && typeof json.tracks === 'object' ? json.tracks : {};
-      loadedShardsCache.set(shardName, tracks);
-      return tracks;
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
     })
-    .catch(() => {
-      loadedShardsCache.set(shardName, {});
+    .then((json) => {
+      if (json && typeof json.tracks === 'object') {
+        loadedShardsCache.set(shardName, json.tracks);
+        return json.tracks;
+      }
       return {};
     })
+    .catch(() => ({}))
     .finally(() => {
       inflightShardPromises.delete(shardName);
     });
@@ -100,7 +105,7 @@ async function loadSubtitleShard(shardName) {
   return task;
 }
 
-export async function loadStaticSubtitlesIndex() {
+async function loadStaticSubtitlesIndex() {
   if (legacySubtitlesData) return legacySubtitlesData;
   if (!legacySubtitlesPromise) {
     legacySubtitlesPromise = fetch(`/audio-subtitles.json?v=${SUBTITLE_CACHE_VERSION}`)
@@ -286,8 +291,9 @@ function writeLocalSubtitleCache(key, entry) {
   }
 }
 
-export async function resolveExistingSubtitles(candidateKeys) {
+export async function resolveExistingSubtitles(candidateKeys, { signal } = {}) {
   if (!Array.isArray(candidateKeys) || candidateKeys.length === 0) return null;
+  if (signal?.aborted) return null;
 
   // 0. Check in-memory session overlay (tracks just transcribed or fetched this session)
   for (const key of candidateKeys) {
@@ -299,7 +305,9 @@ export async function resolveExistingSubtitles(candidateKeys) {
 
   // 1a. Check sharded static /subtitles/manifest.json + lazy subject shard
   const manifest = await loadStaticSubtitlesManifest();
-  if (manifest?.keys) {
+  if (signal?.aborted) return null;
+  const hasShardedManifest = Boolean(manifest?.keys && Object.keys(manifest.keys).length > 0);
+  if (hasShardedManifest) {
     for (const key of candidateKeys) {
       const ref = manifest.keys[key];
       if (!ref || typeof ref !== 'string') continue;
@@ -308,19 +316,21 @@ export async function resolveExistingSubtitles(candidateKeys) {
       const shardName = ref.slice(0, slashIdx);
       const trackId = ref.slice(slashIdx + 1);
       const shardTracks = await loadSubtitleShard(shardName);
+      if (signal?.aborted) return null;
       const hydrated = hydrateSubtitleRecord(shardTracks?.[trackId]);
       if (hydrated) {
         return { ...hydrated, resolvedKey: key, tier: 'static' };
       }
     }
-  }
-
-  // 1b. Legacy fallback to /audio-subtitles.json if manifest didn't have this key
-  const legacyDb = await loadStaticSubtitlesIndex();
-  for (const key of candidateKeys) {
-    const hydrated = hydrateSubtitleRecord(legacyDb?.tracks?.[key]);
-    if (hydrated) {
-      return { ...hydrated, resolvedKey: key, tier: 'static' };
+  } else {
+    // 1b. Legacy fallback to /audio-subtitles.json only when sharded manifest is unavailable
+    const legacyDb = await loadStaticSubtitlesIndex();
+    if (signal?.aborted) return null;
+    for (const key of candidateKeys) {
+      const hydrated = hydrateSubtitleRecord(legacyDb?.tracks?.[key]);
+      if (hydrated) {
+        return { ...hydrated, resolvedKey: key, tier: 'static' };
+      }
     }
   }
 
@@ -340,7 +350,8 @@ export async function resolveExistingSubtitles(candidateKeys) {
     if (altQueryKeys.length > 0) {
       qs.set('alts', altQueryKeys.join(','));
     }
-    const res = await fetch(`/api/views?${qs.toString()}`);
+    const res = await fetch(`/api/views?${qs.toString()}`, { signal });
+    if (signal?.aborted) return null;
     if (res.ok) {
       const data = await res.json();
       const hydrated = hydrateSubtitleRecord(data?.subtitle);
@@ -385,7 +396,7 @@ export async function saveSubtitlesToCloud(primaryKey, aliasKeys, subtitleEntry)
 }
 
 // Adaptive RMS Voice Activity Detector (strips exam pauses cleanly across quiet & loud recordings)
-export function detectSpeechSegments(samples, sampleRate = 16000) {
+function detectSpeechSegments(samples, sampleRate = 16000) {
   const frameSamples = Math.floor(sampleRate * 0.05); // 50ms frames
   const totalFrames = Math.floor(samples.length / frameSamples);
   if (totalFrames === 0) return [];
@@ -469,7 +480,7 @@ async function getWhisperTranscriber(onStatus) {
   return whisperPipelinePromise;
 }
 
-export function inferWhisperLanguage(subject) {
+function inferWhisperLanguage(subject) {
   const s = String(subject || '').toLowerCase();
   if (s.includes('chinese')) return 'chinese';
   if (s.includes('swahili')) return 'swahili';
@@ -486,17 +497,18 @@ export async function generateLiveWhisperSubtitles({
   trackIndex = 0,
   getCurrentTime,
   onProgress,
-  shouldCancel
+  shouldCancel,
+  signal
 }) {
   const lang = inferWhisperLanguage(subject);
   if (onProgress) {
     onProgress({ phase: 'decoding', percent: 5, segments: [], message: 'Decoding audio stream for speech detection...' });
   }
 
-  const res = await fetch(audioUrl);
+  const res = await fetch(audioUrl, signal ? { signal } : undefined);
   if (!res.ok) throw new Error(`Failed to fetch audio (${res.status})`);
   const arrayBuf = await res.arrayBuffer();
-  if (shouldCancel?.()) return null;
+  if (signal?.aborted || shouldCancel?.()) return null;
 
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   const audioCtx = new AudioCtx({ sampleRate: 16000 });
@@ -512,7 +524,46 @@ export async function generateLiveWhisperSubtitles({
   }
   if (shouldCancel?.()) return null;
 
-  const float32 = decoded.getChannelData(0);
+  let float32 = decoded.getChannelData(0);
+  if (decoded.sampleRate && decoded.sampleRate !== 16000) {
+    const targetLen = Math.max(1, Math.ceil(decoded.duration * 16000));
+    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (typeof OfflineCtx === 'function') {
+      try {
+        const offline = new OfflineCtx(1, targetLen, 16000);
+        const src = offline.createBufferSource();
+        src.buffer = decoded;
+        src.connect(offline.destination);
+        src.start(0);
+        const rendered = await offline.startRendering();
+        float32 = rendered.getChannelData(0);
+      } catch {
+        const ratio = decoded.sampleRate / 16000;
+        const resampled = new Float32Array(targetLen);
+        for (let i = 0; i < targetLen; i++) {
+          const srcIdx = i * ratio;
+          const lo = Math.floor(srcIdx);
+          const hi = Math.min(float32.length - 1, lo + 1);
+          const frac = srcIdx - lo;
+          resampled[i] = float32[lo] * (1 - frac) + float32[hi] * frac;
+        }
+        float32 = resampled;
+      }
+    } else {
+      const ratio = decoded.sampleRate / 16000;
+      const resampled = new Float32Array(targetLen);
+      for (let i = 0; i < targetLen; i++) {
+        const srcIdx = i * ratio;
+        const lo = Math.floor(srcIdx);
+        const hi = Math.min(float32.length - 1, lo + 1);
+        const frac = srcIdx - lo;
+        resampled[i] = float32[lo] * (1 - frac) + float32[hi] * frac;
+      }
+      float32 = resampled;
+    }
+  }
+  if (shouldCancel?.()) return null;
+
   const speechIntervals = detectSpeechSegments(float32, 16000);
   if (speechIntervals.length === 0) {
     return {

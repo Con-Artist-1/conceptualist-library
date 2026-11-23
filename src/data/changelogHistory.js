@@ -1,9 +1,18 @@
-import { BUILD_TIMESTAMP } from '../lib/appMeta.js';
-
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v7.3',
+    date: '2026-11-23T06:00:00+06:00',
+    title: 'Security, Accessibility, Performance & Reader Hardening',
+    summary: 'Completed a comprehensive 4-pass security, accessibility, performance, SEO, and runtime audit—hardening CSP/API endpoints, modal focus management and WCAG contrast, self-hosted PDF CMaps, IAL Maths branch shards, and reader reliability.',
+    changes: [
+      'Security & self-hosted assets: Replaced script-src unsafe-inline with a strict SHA-256 CSP hash, extracted API subtitle handlers with distributed Mongo rate limits and allowlist guards, stopped CDN-caching transient subtitle misses, and self-hosted all 168 PDF.js CMap tables locally under /pdfjs/cmaps/.',
+      'Accessibility & WCAG AA polish: Added full PreviewModal focus trapping, background inerting, opener focus restoration, roving tablist navigation, skip-to-main navigation, accessible mobile action labels, WCAG AA Dark/OLED Mark Scheme contrast, >= 24px interactive target heights, and high-contrast OLED resizer focus rings.',
+      'Performance, SEO & runtime reliability: Split IAL Maths cold-landing shards by branch and deferred Welcome/Filter CSS out of entry CSS, removed dead compactTree metadata and redundant /api/views re-fetches, added 16 kHz audio resampling and AbortController teardown, fixed #paper= not-found states and modular IGCSE Maths search aliases (4WM1/4WM2), and derived per-route sitemap lastmod dates.'
+    ]
+  },
+  {
     version: 'v7.2',
-    date: BUILD_TIMESTAMP,
+    date: '2026-11-23T01:30:00+06:00',
     title: '100% Full-Archive Pre-Indexed Audio Subtitles (All 272 IAL & IGCSE Listening Resources)',
     summary: 'Expanded sharded static subtitles to cover 100% of every listening audio file across both Edexcel IAL and IGCSE — 367 unique tracks and 50,363 timed segments across 9 lazy subject shards with zero device-side loading wait.',
     changes: [

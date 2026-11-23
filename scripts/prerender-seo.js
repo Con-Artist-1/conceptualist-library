@@ -11,6 +11,7 @@ import {
   getUnitCodeFromLabel,
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
+  getIalMathBranchShardName,
   getShardPathForRoute,
   getSeoMetadata,
   buildJsonLd,
@@ -125,6 +126,10 @@ function writeDistShards(rawIndex) {
     const subjSlug = getSubjectSlug(item.subject);
     if (currSlug && subjSlug) {
       pushToBucket(`${currSlug}-${subjSlug}.json`, tuple);
+      if (currSlug === 'ial' && subjSlug === 'mathematics') {
+        const branchShard = getIalMathBranchShardName(`${item.cleanUnitLabel || ''} ${item.unitCode || ''} ${item.name || ''}`);
+        pushToBucket(branchShard, tuple);
+      }
     }
     if (item.category === 'Books' || item.category === 'IAL Books' || item.category === 'IGCSE Books') {
       pushToBucket('textbooks.json', tuple);
@@ -751,8 +756,8 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
     `<meta name="keywords" content="${escapeHtml(seo.keywords)}" />`
   );
 
-  // Replace or inject canonical only when indexable (avoid noindex + cross-canonical conflict)
-  if (String(seo.robots || '').includes('noindex')) {
+  // Replace or inject canonical when indexable or when a thin route provides a consolidating parent canonical
+  if (String(seo.robots || '').includes('noindex') && !seo.consolidatingCanonical) {
     html = html.replace(/\s*<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/gi, '');
   } else {
     html = setOrInsertTag(
@@ -789,8 +794,8 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
     `<meta name="twitter:description" content="${escapeHtml(seo.description)}" />`
   );
 
-  // Inject JSON-LD before </head>
-  const jsonLdScript = `  <script id="seo-json-ld" type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n  </head>`;
+  // Inject JSON-LD before </head> (escape '<' so embedded strings can never terminate the script element)
+  const jsonLdScript = `  <script id="seo-json-ld" type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n  </head>`;
   html = html.replace(/<\/head>/i, jsonLdScript);
 
   // Inject crawlable semantic HTML directly inside <div id="root">...</div> (without <noscript>!)
@@ -806,8 +811,8 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
 }
 
 function generateLlmsTxt(meta, indexLookup) {
-  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16079;
-  const totalFiles = meta?.totalFiles || 19940;
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16021;
+  const totalFiles = meta?.totalFiles || 19882;
   const booksCount = indexLookup?.booksAll?.length || Object.keys(BOOK_CATALOG_BY_PATH).length || 73;
   const audioCount = indexLookup?.audioAll?.length || 272;
   const dfCount = indexLookup?.dfAll?.length || 46;
@@ -817,7 +822,7 @@ function generateLlmsTxt(meta, indexLookup) {
   const lines = [
     '# Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library',
     '',
-    `> Conceptualist Systems (${SITE_URL}) is a free, zero-ad academic study archive indexing ${uniqueFiles.toLocaleString()} unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), ${booksCount} Student Textbooks & Worked Solution Banks, ${audioCount} Listening Audio tracks with synced closed captions (CC), and ${dfCount} IT & Computer Science practical Data Files (${totalFiles.toLocaleString()} total archived files covering January 2003 through June 2026).`,
+    `> Independent study archive; not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel. Conceptualist Systems (${SITE_URL}) is a free, zero-ad academic study archive indexing ${uniqueFiles.toLocaleString()} unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), ${booksCount} Student Textbooks & Worked Solution Banks, ${audioCount} Listening Audio tracks with synced closed captions (CC), and ${dfCount} IT & Computer Science practical Data Files (${totalFiles.toLocaleString()} total archived files covering January 2003 through June 2026).`,
     '',
     '## Core Platform Capabilities',
     '- **Side-by-Side Split View Reader:** Open any paired Question Paper (QP) and Mark Scheme (MS) side by side in the browser with synchronized zoom and draggable split divider.',
@@ -862,7 +867,42 @@ function generateLlmsTxt(meta, indexLookup) {
   return lines.join('\n');
 }
 
-function generateSitemapXml(routes, lastmodDate, meta) {
+function computeRouteLastmod(route, defaultLastmod, indexLookup) {
+  const clampDate = (isoDate) => (isoDate && isoDate <= defaultLastmod ? isoDate : defaultLastmod);
+  const st = route.state || {};
+  if (st.currentTab === 'changelog') {
+    const latestChangelog = CHANGELOG_HISTORY[0]?.date;
+    if (typeof latestChangelog === 'string' && /^\d{4}-\d{2}-\d{2}/.test(latestChangelog)) {
+      return clampDate(latestChangelog.slice(0, 10));
+    }
+    return defaultLastmod;
+  }
+  if (st.filterDocType === 'Book' && st.filterSubject) {
+    const curr = inferCurriculumForSubject(st.filterSubject, st.filterCurriculum);
+    const books = indexLookup?.booksByCurrSubj?.get(`${curr}::${st.filterSubject}`) || [];
+    const maxYear = books.reduce((mx, b) => Math.max(mx, Number(b.year) || 0), 0);
+    if (maxYear >= 2000 && maxYear <= 2100) {
+      return clampDate(`${maxYear}-09-01`);
+    }
+    return defaultLastmod;
+  }
+  if (st.filterSubject && !st.filterDocType) {
+    const curr = inferCurriculumForSubject(st.filterSubject, st.filterCurriculum);
+    let items = indexLookup?.byCurrSubj?.get(`${curr}::${st.filterSubject}`) || [];
+    if (st.filterUnit) {
+      items = items.filter((item) => item.cleanUnitLabel === st.filterUnit);
+    }
+    const maxSortKey = items.reduce((mx, item) => Math.max(mx, Number(item.sortKey) || 0), 0);
+    if (maxSortKey >= 200000) {
+      const yr = Math.floor(maxSortKey / 100);
+      const mo = Math.max(1, Math.min(12, (maxSortKey % 100) || 6));
+      return clampDate(`${yr}-${String(mo).padStart(2, '0')}-01`);
+    }
+  }
+  return defaultLastmod;
+}
+
+function generateSitemapXml(routes, defaultLastmod, meta, indexLookup) {
   const sitemapRoutes = routes.filter((r) => {
     if (!r.includeInSitemap) return false;
     const seo = getSeoMetadata({ ...r.state, meta });
@@ -870,9 +910,10 @@ function generateSitemapXml(routes, lastmodDate, meta) {
   });
   const urlEntries = sitemapRoutes.map(r => {
     const loc = r.path === '/' ? `${SITE_URL}/` : `${SITE_URL}${r.path}`;
+    const routeLastmod = computeRouteLastmod(r, defaultLastmod, indexLookup);
     return `  <url>
     <loc>${escapeXml(loc)}</loc>
-    <lastmod>${lastmodDate}</lastmod>
+    <lastmod>${routeLastmod}</lastmod>
     <changefreq>${r.changefreq}</changefreq>
     <priority>${r.priority}</priority>
   </url>`;
@@ -920,7 +961,7 @@ function run() {
   }
 
   // 1. Write public/sitemap.xml & public/llms.txt
-  const sitemapXml = generateSitemapXml(routes, lastmodDate, meta);
+  const sitemapXml = generateSitemapXml(routes, lastmodDate, meta, indexLookup);
   const publicSitemapPath = path.join(PUBLIC_DIR, 'sitemap.xml');
   fs.writeFileSync(publicSitemapPath, sitemapXml, 'utf8');
   const sitemapCount = (sitemapXml.match(/<url>/g) || []).length;

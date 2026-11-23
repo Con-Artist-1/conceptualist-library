@@ -10,7 +10,7 @@ const AUDIO_MIME_BY_EXT = {
   ogg: 'audio/ogg'
 };
 
-const MAX_CACHED_ZIPS = 6;
+const MAX_CACHED_ZIPS = 2;
 const zipExtractionCache = new Map();
 const inFlightExtractions = new Map();
 
@@ -174,8 +174,8 @@ async function parseZipBufferForAudioEntries(bytes, depth = 0, onStatus = null) 
   return extractedAudio;
 }
 
-async function fetchZipWithProgress(url, onProgress) {
-  const response = await fetch(url);
+async function fetchZipWithProgress(url, onProgress, signal = null) {
+  const response = await fetch(url, signal ? { signal } : undefined);
   if (!response.ok) {
     throw new Error(`Failed to fetch audio archive (${response.status})`);
   }
@@ -191,6 +191,10 @@ async function fetchZipWithProgress(url, onProgress) {
   let loaded = 0;
 
   while (true) {
+    if (signal?.aborted) {
+      try { await reader.cancel(); } catch { /* ignore cancel error */ }
+      throw new DOMException('Aborted', 'AbortError');
+    }
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
@@ -234,8 +238,9 @@ function evictOldestCacheEntriesIfNeeded() {
   }
 }
 
-export async function extractZipAudioTracks(url, onProgress = null) {
+export async function extractZipAudioTracks(url, onProgress = null, { signal } = {}) {
   if (!url) throw new Error('Missing audio archive URL.');
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   const cached = zipExtractionCache.get(url);
   if (cached) {
@@ -245,81 +250,119 @@ export async function extractZipAudioTracks(url, onProgress = null) {
     return cached.tracks;
   }
 
-  if (inFlightExtractions.has(url)) {
-    return inFlightExtractions.get(url);
+  let entry = inFlightExtractions.get(url);
+  if (!entry) {
+    const progressListeners = new Set();
+    const controller = new AbortController();
+    const notify = (status) => {
+      progressListeners.forEach((fn) => {
+        try {
+          fn(status);
+        } catch {
+          // Ignore listener errors
+        }
+      });
+    };
+
+    const task = (async () => {
+      try {
+        const zipBytes = await fetchZipWithProgress(url, notify, controller.signal);
+        const rawTracks = await parseZipBufferForAudioEntries(zipBytes, 0, notify);
+
+        if (rawTracks.length === 0) {
+          throw new Error('No playable audio tracks (.mp3 / .wav) found inside this archive.');
+        }
+
+        rawTracks.sort((a, b) =>
+          a.entryPath.localeCompare(b.entryPath, undefined, { numeric: true, sensitivity: 'base' })
+        );
+
+        const trackDrafts = rawTracks.map((item, idx) => ({
+          item,
+          idx,
+          labels: buildTrackLabels(item.entryPath, idx, rawTracks.length)
+        }));
+        const isCombinedUnitArchive =
+          trackDrafts.some((d) => d.labels.isUnitTrack) ||
+          (trackDrafts.some((d) => d.labels.unitHint === 'U2') &&
+            trackDrafts.some((d) => d.labels.unitHint === 'U4') &&
+            !trackDrafts.every((d) => d.labels.isTrackedPart));
+
+        const tracks = trackDrafts.map(({ item, idx, labels }) => {
+          const blob = new Blob([item.bytes], { type: item.mimeType });
+          const blobUrl =
+            typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+              ? URL.createObjectURL(blob)
+              : '';
+          return {
+            id: `${idx}-${item.fileName}`,
+            index: idx,
+            fileName: item.fileName,
+            entryPath: item.entryPath,
+            ext: item.ext,
+            mimeType: item.mimeType,
+            size: item.size,
+            shortLabel: labels.shortLabel,
+            title: labels.title,
+            unitHint: labels.unitHint,
+            isUnitTrack: labels.isUnitTrack,
+            isTrackedPart: labels.isTrackedPart,
+            isCombinedUnitArchive,
+            blobUrl
+          };
+        });
+
+        evictOldestCacheEntriesIfNeeded();
+        zipExtractionCache.set(url, { tracks, createdAt: Date.now() });
+        return tracks;
+      } finally {
+        inFlightExtractions.delete(url);
+      }
+    })();
+
+    entry = { task, progressListeners, controller, refCount: 0 };
+    inFlightExtractions.set(url, entry);
   }
 
-  const progressListeners = new Set();
-  if (onProgress) progressListeners.add(onProgress);
+  entry.refCount += 1;
+  if (onProgress) entry.progressListeners.add(onProgress);
 
-  const notify = (status) => {
-    progressListeners.forEach((fn) => {
-      try {
-        fn(status);
-      } catch {
-        // Ignore listener errors
-      }
-    });
+  const detach = () => {
+    if (onProgress) entry.progressListeners.delete(onProgress);
+    entry.refCount = Math.max(0, entry.refCount - 1);
+    if (entry.refCount === 0 && inFlightExtractions.get(url) === entry) {
+      entry.controller.abort();
+    }
   };
 
-  const task = (async () => {
-    try {
-      const zipBytes = await fetchZipWithProgress(url, notify);
-      const rawTracks = await parseZipBufferForAudioEntries(zipBytes, 0, notify);
+  if (!signal) {
+    return entry.task.finally(() => {
+      if (onProgress) entry.progressListeners.delete(onProgress);
+      entry.refCount = Math.max(0, entry.refCount - 1);
+    });
+  }
 
-      if (rawTracks.length === 0) {
-        throw new Error('No playable audio tracks (.mp3 / .wav) found inside this archive.');
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      detach();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    entry.task.then(
+      (tracks) => {
+        signal.removeEventListener('abort', onAbort);
+        if (onProgress) entry.progressListeners.delete(onProgress);
+        entry.refCount = Math.max(0, entry.refCount - 1);
+        resolve(tracks);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        if (onProgress) entry.progressListeners.delete(onProgress);
+        entry.refCount = Math.max(0, entry.refCount - 1);
+        reject(err);
       }
-
-      rawTracks.sort((a, b) =>
-        a.entryPath.localeCompare(b.entryPath, undefined, { numeric: true, sensitivity: 'base' })
-      );
-
-      const trackDrafts = rawTracks.map((item, idx) => ({
-        item,
-        idx,
-        labels: buildTrackLabels(item.entryPath, idx, rawTracks.length)
-      }));
-      const isCombinedUnitArchive =
-        trackDrafts.some((d) => d.labels.isUnitTrack) ||
-        (trackDrafts.some((d) => d.labels.unitHint === 'U2') &&
-          trackDrafts.some((d) => d.labels.unitHint === 'U4') &&
-          !trackDrafts.every((d) => d.labels.isTrackedPart));
-
-      const tracks = trackDrafts.map(({ item, idx, labels }) => {
-        const blob = new Blob([item.bytes], { type: item.mimeType });
-        const blobUrl =
-          typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
-            ? URL.createObjectURL(blob)
-            : '';
-        return {
-          id: `${idx}-${item.fileName}`,
-          index: idx,
-          fileName: item.fileName,
-          entryPath: item.entryPath,
-          ext: item.ext,
-          mimeType: item.mimeType,
-          size: item.size,
-          shortLabel: labels.shortLabel,
-          title: labels.title,
-          unitHint: labels.unitHint,
-          isUnitTrack: labels.isUnitTrack,
-          isTrackedPart: labels.isTrackedPart,
-          isCombinedUnitArchive,
-          blobUrl
-        };
-      });
-
-      evictOldestCacheEntriesIfNeeded();
-      zipExtractionCache.set(url, { tracks, createdAt: Date.now() });
-      return tracks;
-    } finally {
-      inFlightExtractions.delete(url);
-    }
-  })();
-
-  inFlightExtractions.set(url, task);
-  return task;
+    );
+  });
 }
 
 export { isPlayableAudioEntry };

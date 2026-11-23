@@ -230,27 +230,6 @@ function buildWizardMeta(dedupedList) {
   return wizard;
 }
 
-function isYearOrSessionDir(name) {
-  if (/^\d{4}$/.test(name)) return true;
-  if (/^\d{4}[-_\s]+[A-Za-z]+$/i.test(name)) return true;
-  if (/^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|summer|winter|spring)[-_\s]*\d{0,4}$/i.test(name)) return true;
-  return false;
-}
-
-// Compact tree representation [name, children] pruned of year/session directories (~6 KB)
-function getCompactTree(node, depth = 0) {
-  if (!node) return null;
-  if (depth > 2 && isYearOrSessionDir(node.name)) return null;
-
-  const dirChildren = (node.children || [])
-    .filter(c => c.children && !isYearOrSessionDir(c.name))
-    .map(c => getCompactTree(c, depth + 1))
-    .filter(Boolean);
-
-  if (dirChildren.length === 0) return node.name;
-  return [node.name, dirChildren];
-}
-
 console.log('Generating index for', TARGET_DIR);
 const tree = buildTree(TARGET_DIR, TARGET_DIR);
 tree.name = 'The Library';
@@ -279,8 +258,6 @@ const maxDate = dates[dates.length - 1];
 const coverageRangeStr = minDate && maxDate
   ? `${minDate.label} – ${maxDate.label}`
   : 'January 2003 – June 2026';
-
-const compactTree = getCompactTree(tree);
 
 const keys = [
   'name', 'path', 'size', 'subject', 'docType', 'year', 'session', 'sortKey',
@@ -331,14 +308,12 @@ const metaInfo = {
 };
 
 const output = {
-  compactTree,
   keys,
   files,
   meta: metaInfo
 };
 
 const metaOutput = {
-  compactTree,
   meta: metaInfo
 };
 

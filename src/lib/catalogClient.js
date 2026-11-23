@@ -46,21 +46,47 @@ function createWorkerClient() {
     }
   }
 
-  const callWorker = (type, payload, transferables = []) => {
+  const callWorker = (type, payload, transferables = [], signal = null) => {
     if (!worker) return null;
+    if (signal?.aborted) {
+      return Promise.reject(new DOMException('Aborted', 'AbortError'));
+    }
     const id = nextReqId++;
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      const onAbort = () => {
+        if (!pending.has(id)) return;
+        pending.delete(id);
+        try {
+          worker?.postMessage({ id: 0, type: 'ABORT', payload: { targetId: id } });
+        } catch {
+          // Ignore worker postMessage errors during abort
+        }
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal) {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+      pending.set(id, {
+        resolve: (val) => {
+          if (signal) signal.removeEventListener('abort', onAbort);
+          resolve(val);
+        },
+        reject: (err) => {
+          if (signal) signal.removeEventListener('abort', onAbort);
+          reject(err);
+        }
+      });
       try {
         worker.postMessage({ id, type, payload }, transferables);
       } catch (err) {
+        if (signal) signal.removeEventListener('abort', onAbort);
         pending.delete(id);
         reject(err);
       }
     });
   };
 
-  const runFallback = async (type, payload) => {
+  const runFallback = async (type, payload, signal = null) => {
     const eng = await getFallbackEngine();
     if (type === 'LOAD_BUFFER') {
       const text = new TextDecoder('utf-8').decode(new Uint8Array(payload.buffer));
@@ -76,7 +102,7 @@ function createWorkerClient() {
       return { skipped: false, isFull: fallbackIsFull, generatedAt: json.meta?.generatedAt || '', counts: fallbackState.counts, meta: json.meta?.isShard ? null : (json.meta || null) };
     }
     if (type === 'LOAD_SHARD') {
-      const res = await fetch(payload.shardUrl);
+      const res = await fetch(payload.shardUrl, signal ? { signal } : undefined);
       if (!res.ok) throw new Error(`Shard unavailable (${res.status})`);
       const json = await res.json();
       if (!fallbackIsFull) {
@@ -87,13 +113,16 @@ function createWorkerClient() {
     if (type === 'LOAD_FULL_INDEX') {
       let json = null;
       for (const url of payload.urls || []) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
         try {
-          const res = await fetch(url);
+          const res = await fetch(url, signal ? { signal } : undefined);
           if (res.ok) {
             json = await res.json();
             break;
           }
-        } catch { /* try next */ }
+        } catch (err) {
+          if (signal?.aborted) throw err;
+        }
       }
       if (!json) throw new Error('Failed to fetch catalog index');
       fallbackState = eng.hydrateCatalogPayload(json);
@@ -130,29 +159,29 @@ function createWorkerClient() {
     return null;
   };
 
-  const dispatch = async (type, payload, transferables = []) => {
+  const dispatch = async (type, payload, transferables = [], signal = null) => {
     if (worker) {
       try {
-        return await callWorker(type, payload, transferables);
+        return await callWorker(type, payload, transferables, signal);
       } catch (err) {
-        if (!worker) {
-          return runFallback(type, payload);
+        if (!worker && !signal?.aborted) {
+          return runFallback(type, payload, signal);
         }
         throw err;
       }
     }
-    return runFallback(type, payload);
+    return runFallback(type, payload, signal);
   };
 
   return {
     loadBuffer(buffer, { isFull = false, cacheUrl = '' } = {}) {
       return dispatch('LOAD_BUFFER', { buffer, isFull, cacheUrl }, [buffer]);
     },
-    loadShard({ shardUrl, cacheUrl, expectedMeta }) {
-      return dispatch('LOAD_SHARD', { shardUrl, cacheUrl, expectedMeta });
+    loadShard({ shardUrl, cacheUrl, expectedMeta, signal = null }) {
+      return dispatch('LOAD_SHARD', { shardUrl, cacheUrl, expectedMeta }, [], signal);
     },
-    loadFullIndex({ urls, cacheUrl, expectedMeta, forceReload = false }) {
-      return dispatch('LOAD_FULL_INDEX', { urls, cacheUrl, expectedMeta, forceReload });
+    loadFullIndex({ urls, cacheUrl, expectedMeta, forceReload = false, signal = null }) {
+      return dispatch('LOAD_FULL_INDEX', { urls, cacheUrl, expectedMeta, forceReload }, [], signal);
     },
     query(params) {
       return dispatch('QUERY', params);

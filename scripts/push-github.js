@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const APP_DIR = path.resolve(__dirname, '..');
-const LIBRARY_ROOT = path.resolve(APP_DIR, '..');
 
 function loadEnv() {
   const envPath = path.join(APP_DIR, '.env');
@@ -24,7 +23,7 @@ function loadEnv() {
 }
 loadEnv();
 
-const TOKEN = process.env.GITHUB_TOKEN || process.argv[3];
+const TOKEN = process.env.GITHUB_TOKEN;
 const REPO = process.env.GITHUB_REPO || 'Con-Artist-1/conceptualist-library';
 const COMMIT_MSG = process.argv[2] || 'Update Conceptualist Systems library web app and index';
 
@@ -66,6 +65,7 @@ function collectRepoFiles(dir, baseDir = APP_DIR) {
       list = list.concat(collectRepoFiles(path.join(dir, entry.name), baseDir));
     } else {
       if (EXCLUDE_FILES.has(entry.name)) continue;
+      if (entry.name.startsWith('AI_INSTRUCTIONS_')) continue;
       if (entry.name.endsWith('.log') || entry.name.endsWith('.local')) continue;
       if (entry.name.startsWith('.env') && entry.name !== '.env.example') continue;
       const full = path.join(dir, entry.name);
@@ -127,21 +127,6 @@ async function main() {
   console.log(`=== Pushing to GitHub (${REPO}) ===`);
 
   const files = collectRepoFiles(APP_DIR);
-  const candidateNames = ['AI_INSTRUCTIONS_LIBRARY.md', 'AI_INSTRUCTIONS_README.md'];
-  for (const name of candidateNames) {
-    const aiReadmePath = path.join(LIBRARY_ROOT, name);
-    if (fs.existsSync(aiReadmePath)) {
-      const buf = fs.readFileSync(aiReadmePath);
-      files.push({
-        full: aiReadmePath,
-        rel: name,
-        buf,
-        gitSha: computeGitBlobSha(buf),
-        size: buf.length
-      });
-      break;
-    }
-  }
 
   console.log(`Collected ${files.length} clean repository files (${(files.reduce((s, f) => s + f.size, 0) / 1024).toFixed(1)} KB total).`);
 

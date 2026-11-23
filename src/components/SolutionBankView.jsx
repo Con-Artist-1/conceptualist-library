@@ -41,6 +41,7 @@ export default function SolutionBankView({
     }
 
     let cancelled = false;
+    const ctrl = new AbortController();
     setSolDirLoading(true);
     setSolDirError(null);
     setSolDirectory(null);
@@ -48,7 +49,7 @@ export default function SolutionBankView({
     setActiveSolPdf(null);
     setSolNavExpanded(true);
 
-    listZipPdfEntries(solZipUrl, currentDoc.size || 0)
+    listZipPdfEntries(solZipUrl, currentDoc.size || 0, { signal: ctrl.signal })
       .then((dirData) => {
         if (cancelled) return;
         setSolDirectory(dirData);
@@ -56,13 +57,14 @@ export default function SolutionBankView({
         setSolDirLoading(false);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || err?.name === 'AbortError') return;
         setSolDirError(err?.message || 'Unable to read Solution Bank chapters');
         setSolDirLoading(false);
       });
 
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [solZipUrl, currentDoc.size, solDirRetry]);
 
@@ -91,24 +93,26 @@ export default function SolutionBankView({
     }
 
     let cancelled = false;
+    const ctrl = new AbortController();
     setSolPdfLoading(true);
     setSolPdfError(null);
     setActiveSolPdf(null);
 
-    extractZipPdfEntry(solZipUrl, selectedSolEntry, currentDoc.size || 0)
+    extractZipPdfEntry(solZipUrl, selectedSolEntry, currentDoc.size || 0, { signal: ctrl.signal })
       .then((pdfResult) => {
         if (cancelled) return;
         setActiveSolPdf(pdfResult);
         setSolPdfLoading(false);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || err?.name === 'AbortError') return;
         setSolPdfError(err?.message || 'Unable to unpack selected PDF');
         setSolPdfLoading(false);
       });
 
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [solZipUrl, selectedSolEntry, currentDoc.size, solPdfRetry]);
 
@@ -171,15 +175,40 @@ export default function SolutionBankView({
 
           {solNavExpanded && (
             <>
-              <div className="modal-sol-pill-row" role="tablist" aria-label="Chapters">
-                {solDirectory.groups.map((grp) => {
+              <div
+                className="modal-sol-pill-row"
+                role="tablist"
+                aria-label="Chapters"
+                onKeyDown={(e) => {
+                  const groups = solDirectory.groups || [];
+                  if (groups.length < 2) return;
+                  const curIdx = groups.findIndex((g) => g.key === activeSolGroup?.key);
+                  let nextIdx = -1;
+                  if (e.key === 'ArrowRight') nextIdx = (curIdx + 1) % groups.length;
+                  else if (e.key === 'ArrowLeft') nextIdx = (curIdx - 1 + groups.length) % groups.length;
+                  else if (e.key === 'Home') nextIdx = 0;
+                  else if (e.key === 'End') nextIdx = groups.length - 1;
+                  if (nextIdx >= 0) {
+                    e.preventDefault();
+                    const targetGrp = groups[nextIdx];
+                    if (targetGrp?.items?.[0]) setSelectedSolPath(targetGrp.items[0].entryPath);
+                    const tabs = e.currentTarget.querySelectorAll('[role="tab"]');
+                    tabs[nextIdx]?.focus();
+                  }
+                }}
+              >
+                {solDirectory.groups.map((grp, grpIdx) => {
                   const isActiveGroup = activeSolGroup?.key === grp.key;
+                  const tabId = `sol-chapter-tab-${grpIdx}`;
                   return (
                     <button
                       key={grp.key}
+                      id={tabId}
                       type="button"
                       role="tab"
                       aria-selected={isActiveGroup}
+                      aria-controls="sol-chapter-panel"
+                      tabIndex={isActiveGroup ? 0 : -1}
                       className={`modal-sol-pill chapter ${isActiveGroup ? 'active' : ''}`}
                       onClick={() => {
                         if (grp.items[0]) setSelectedSolPath(grp.items[0].entryPath);
@@ -193,7 +222,12 @@ export default function SolutionBankView({
               </div>
 
               {activeSolGroup?.items?.length > 0 && (
-                <div className="modal-sol-pill-row exercises" role="group" aria-label={`${activeSolGroup.label} exercises`}>
+                <div
+                  id="sol-chapter-panel"
+                  className="modal-sol-pill-row exercises"
+                  role="tabpanel"
+                  aria-label={`${activeSolGroup.label} exercises`}
+                >
                   {activeSolGroup.items.map((item) => {
                     const isActiveItem = selectedSolEntry?.entryPath === item.entryPath;
                     return (

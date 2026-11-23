@@ -26,9 +26,9 @@ function loadEnv() {
 loadEnv();
 
 const REPO_ID = 'Diavlon/mcmaster-docs-library';
-const TOKEN = process.argv[2] || process.env.HF_TOKEN;
+const TOKEN = process.env.HF_TOKEN;
 if (!TOKEN) {
-  console.error('Missing HF_TOKEN. Set it in search-app/.env or pass as CLI arg.');
+  console.error('Missing HF_TOKEN. Set it in search-app/.env or environment variables.');
   process.exit(1);
 }
 const ALLOWED_ROOT_DIRS = ['Past Papers', 'IAL Books', 'IGCSE Books'];
@@ -63,6 +63,7 @@ function walkDir(dirPath) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue;
+    if (/toaz\.info/i.test(entry.name)) continue;
     const fullPath = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
       results = results.concat(walkDir(fullPath));

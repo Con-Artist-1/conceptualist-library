@@ -16,7 +16,7 @@ import {
 
 export * from '../data/curriculumCatalog.js';
 
-export function subjectHasBooks(curriculum, subject) {
+function subjectHasBooks(curriculum, subject) {
   if (!subject) return false;
   const curr = curriculum || inferCurriculumForSubject(subject, 'Edexcel IAL');
   return Boolean(SUBJECTS_WITH_BOOKS_MAP[curr]?.has(subject));
@@ -40,7 +40,7 @@ export function getLegacyEquivalentsForState({ filterCurriculum = '', filterSubj
   return '';
 }
 
-export function slugify(text) {
+function slugify(text) {
   if (!text) return '';
   return String(text)
     .toLowerCase()
@@ -85,7 +85,7 @@ export function getUnitCodeFromLabel(unitLabel) {
   return parenMatch ? parenMatch[1].toUpperCase() : '';
 }
 
-export function resolveSubjectFromSlug(slug, curriculum, meta) {
+function resolveSubjectFromSlug(slug, curriculum, meta) {
   if (!slug) return '';
   const clean = slug.toLowerCase().trim();
   if (clean === 'mathematics' || clean === 'math' || clean === 'maths') {
@@ -116,7 +116,7 @@ export function resolveSubjectFromSlug(slug, curriculum, meta) {
   return '';
 }
 
-export function resolveUnitFromSlug(unitSlug, curriculum, subject, meta) {
+function resolveUnitFromSlug(unitSlug, curriculum, subject, meta) {
   if (!unitSlug || !subject) return '';
   const clean = unitSlug.toLowerCase().trim();
   const curr = curriculum || 'Edexcel IAL';
@@ -168,10 +168,19 @@ export function inferCurriculumForSubject(subject, fallbackCurriculum = '') {
   return igcseOnly.includes(subject) ? 'Edexcel IGCSE' : 'Edexcel IAL';
 }
 
+export function getIalMathBranchShardName(unitLabelOrSlug = '') {
+  const s = String(unitLabelOrSlug || '').toLowerCase();
+  if (/mechanics|wme0|667[7-9]/.test(s)) return 'ial-mathematics-mechanics.json';
+  if (/statistics|wst0|6683|6684|6691/.test(s)) return 'ial-mathematics-statistics.json';
+  if (/further|decision|wfm0|wdm|666[7-9]|6689/.test(s)) return 'ial-mathematics-further.json';
+  return 'ial-mathematics-pure.json';
+}
+
 export function getShardPathForRoute({
   currentTab = 'library',
   filterCurriculum = '',
   filterSubject = '',
+  filterUnit = '',
   filterDocType = null,
   notFound = false
 } = {}) {
@@ -183,6 +192,9 @@ export function getShardPathForRoute({
     const curr = inferCurriculumForSubject(filterSubject, filterCurriculum);
     const currSlug = getCurriculumSlug(curr);
     const subjSlug = getSubjectSlug(filterSubject);
+    if (currSlug === 'ial' && subjSlug === 'mathematics' && filterUnit) {
+      return `/shards/${getIalMathBranchShardName(getUnitSlug(filterUnit))}`;
+    }
     if (currSlug && subjSlug) return `/shards/${currSlug}-${subjSlug}.json`;
   }
   return '';
@@ -678,8 +690,16 @@ export function getSeoMetadata({
 
     const unitObj = meta?.wizard?.[filterCurriculum || 'Edexcel IAL']?.[filterSubject]?.units?.[filterUnit];
     const docCount = unitObj?.count || 60;
+    let unitCanonicalUrl = canonicalUrl;
+    let consolidatingCanonical = false;
     if (unitObj && typeof unitObj.count === 'number' && unitObj.count < 3 && !hasSearchQuery) {
       robots = 'noindex, follow';
+      const parentCurrSlug = getCurriculumSlug(filterCurriculum || 'Edexcel IAL');
+      const parentSubjSlug = getSubjectSlug(filterSubject);
+      if (parentCurrSlug && parentSubjSlug) {
+        unitCanonicalUrl = `${SITE_URL}/${parentCurrSlug}/${parentSubjSlug}`;
+        consolidatingCanonical = true;
+      }
     }
     const years = unitObj?.years || [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019];
     const minYr = years[years.length - 1] || 2014;
@@ -723,7 +743,8 @@ export function getSeoMetadata({
       title,
       description,
       keywords,
-      canonicalUrl,
+      canonicalUrl: unitCanonicalUrl,
+      consolidatingCanonical,
       robots,
       h1: `${currShort} ${subjDisplay} — ${unitWithCode} Past Papers (${yrSpan})`,
       subtitle: `${docCount} verified Question Papers, Mark Schemes, and Examiner Reports covering ${yrSpan}. Click any sitting to study side-by-side in Split View.`

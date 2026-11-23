@@ -1,5 +1,10 @@
 {
   "trailingSlash": false,
+  "functions": {
+    "api/*.js": {
+      "includeFiles": "public/index.json"
+    }
+  },
   "rewrites": [],
   "headers": [
     {
@@ -101,7 +106,7 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "value": "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400"
         }
       ]
     },
@@ -119,7 +124,16 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400"
+          "value": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/(og-card\\.png|favicon\\.svg|favicon\\.ico)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
     },
@@ -148,7 +162,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-ntCNnIAb18i6cV58/fzVRYbfP4r3Y+/82VoqFCXgBe4=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     }

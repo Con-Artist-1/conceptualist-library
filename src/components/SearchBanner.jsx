@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 
 const FilterDrawer = lazy(() => import('./FilterDrawer.jsx'));
 
@@ -28,6 +28,21 @@ export function SearchBanner({
   onClearFilters,
   filterDrawerProps
 }) {
+  const filterToggleBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (!showFilters) return undefined;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onToggleFilters();
+        filterToggleBtnRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showFilters, onToggleFilters]);
+
   return (
     <div className="search-banner">
       <div className="search-row">
@@ -35,7 +50,7 @@ export function SearchBanner({
           <label htmlFor="search-input" className="sr-only">
             Search repository by course code, subject, unit or year
           </label>
-          <svg className="search-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg aria-hidden="true" className="search-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -57,7 +72,10 @@ export function SearchBanner({
               onClick={onClearSearch}
               aria-label="Clear search query"
             >
-              ✕
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           ) : (
             <kbd className="search-shortcut-hint" title="Press / to search">/</kbd>
@@ -70,6 +88,7 @@ export function SearchBanner({
               <button
                 key={opt.label}
                 type="button"
+                aria-pressed={filterCurriculum === opt.value}
                 className={`quick-curr-btn ${filterCurriculum === opt.value ? 'active' : ''}`}
                 onClick={() => onSelectCurriculum(opt.value)}
               >
@@ -79,6 +98,7 @@ export function SearchBanner({
           </div>
 
           <button
+            ref={filterToggleBtnRef}
             type="button"
             className={`filter-drawer-toggle ${showFilters ? 'active' : ''}`}
             onClick={onToggleFilters}

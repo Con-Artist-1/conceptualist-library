@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -28,11 +28,11 @@
     <meta name="twitter:image" content="https://www.conceptualist.uk/og-card.png?v=2" />
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
-    <!-- Preconnect & Critical Preloads -->
-    <link rel="preconnect" href="https://huggingface.co" crossorigin />
-    <link rel="preconnect" href="https://us.aws.cdn.hf.co" crossorigin />
+    <!-- DNS Prefetch & Critical Preload (Hugging Face preconnect injected lazily on paper hover) -->
+    <link rel="dns-prefetch" href="https://huggingface.co" />
+    <link rel="dns-prefetch" href="https://us.aws.cdn.hf.co" />
     <link rel="preload" href="/fonts/roboto-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/roboto-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="cs-boot" data-bt="__CS_BUILD_TIME__" data-ver="__CS_APP_VERSION__" data-shard="__CS_ROUTE_SHARD__" data-full="__CS_ROUTE_NEEDS_FULL__" />
     <script>
       (function() {
         document.documentElement.classList.add('js-enabled');
@@ -66,12 +66,13 @@
         // Parallel early fetch: download /meta.json + active route shard (or /index.json on /papers)
         // simultaneously with CSS & JS bundles to eliminate the startup network waterfall.
         try {
-          var bt = '__CS_BUILD_TIME__';
+          var bootEl = document.querySelector('meta[name="cs-boot"]');
+          var bt = bootEl ? (bootEl.getAttribute('data-bt') || '') : '';
           if (bt && bt.indexOf('__CS_') !== 0 && typeof fetch === 'function') {
             var q = encodeURIComponent(bt);
-            var shard = '__CS_ROUTE_SHARD__';
+            var shard = bootEl ? (bootEl.getAttribute('data-shard') || '') : '';
             if (shard.indexOf('__CS_') === 0) shard = '';
-            var needsFull = '__CS_ROUTE_NEEDS_FULL__' === '1';
+            var needsFull = (bootEl ? bootEl.getAttribute('data-full') : '') === '1';
             if (!shard && !needsFull) {
               var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
               var segs = p.split('/').filter(Boolean);
@@ -79,6 +80,13 @@
               else if (p === '/audio') shard = '/shards/audio.json';
               else if (p === '/data-files') shard = '/shards/data-files.json';
               else if (segs[0] === 'textbooks' && segs.length === 3) shard = '/shards/' + segs[1].toLowerCase() + '-' + segs[2].toLowerCase() + '.json';
+              else if (segs[0] === 'ial' && segs[1] && segs[1].toLowerCase() === 'mathematics' && segs.length >= 3) {
+                var uSlug = segs[2].toLowerCase();
+                if (/mechanics|wme0|667[7-9]/.test(uSlug)) shard = '/shards/ial-mathematics-mechanics.json';
+                else if (/statistics|wst0|6683|6684|6691/.test(uSlug)) shard = '/shards/ial-mathematics-statistics.json';
+                else if (/further|decision|wfm0|wdm|666[7-9]|6689/.test(uSlug)) shard = '/shards/ial-mathematics-further.json';
+                else shard = '/shards/ial-mathematics-pure.json';
+              }
               else if ((segs[0] === 'ial' || segs[0] === 'igcse') && segs.length >= 2) shard = '/shards/' + segs[0] + '-' + segs[1].toLowerCase() + '.json';
               else if (p === '/papers' || p === '/ial' || p === '/igcse' || (location.search && location.search.indexOf('q=') !== -1)) needsFull = true;
             }
@@ -89,12 +97,12 @@
               shardBufferPromise: null,
               fullBufferPromise: null
             };
-            ef.metaPromise = fetch('/meta.json?v=' + q, { cache: 'no-cache' })
+            ef.metaPromise = fetch('/meta.json?v=' + q)
               .then(function(r) { return r.ok ? r.json() : null; })
               .catch(function() { return null; });
 
             if (shard || needsFull) {
-              var appVer = '__CS_APP_VERSION__';
+              var appVer = bootEl ? (bootEl.getAttribute('data-ver') || '') : '';
               var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v7.0';
               var cacheKey = 'https://cs-cache.local/index_' + verTag + '_' + q + '.json';
               var checkCache = (typeof caches !== 'undefined')

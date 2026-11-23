@@ -419,7 +419,7 @@ export const PdfViewerPane = ({
     }
     setPdfDoc((prev) => {
       if (prev) {
-        try { prev.destroy(); } catch { }
+        try { prev.destroy(); } catch { /* ignore teardown error */ }
       }
       return null;
     });
@@ -440,14 +440,14 @@ export const PdfViewerPane = ({
             (rangeErr) => {
               if (!active) return;
               console.error('[WebPDF] Streaming failure for URL', url, rangeErr);
-              try { activeTransport?.abort(); } catch { }
-              try { loadingTask?.destroy(); } catch { }
+              try { activeTransport?.abort(); } catch { /* ignore abort error */ }
+              try { loadingTask?.destroy(); } catch { /* ignore teardown error */ }
               setLoadError(rangeErr?.message || 'Failed to stream PDF preview');
               setLoading(false);
             }
           );
           if (!active) {
-            try { streamSetup?.transport?.abort(); } catch { }
+            try { streamSetup?.transport?.abort(); } catch { /* ignore abort error */ }
             return;
           }
           if (streamSetup?.transport) {
@@ -479,6 +479,8 @@ export const PdfViewerPane = ({
 
       const pdfVerbosity = pdfjsLib.VerbosityLevel?.ERRORS ?? 0;
       const inMemoryData = pdfData ? pdfData.slice() : prewarmedBytes;
+      const localCmapUrl =
+        typeof window !== 'undefined' ? `${window.location.origin}/pdfjs/cmaps/` : '/pdfjs/cmaps/';
       loadingTask = pdfjsLib.getDocument(
         activeTransport
           ? {
@@ -487,7 +489,7 @@ export const PdfViewerPane = ({
             rangeChunkSize: activeTransport.chunkSize || STREAM_CHUNK_SIZE,
             disableAutoFetch: true,
             disableStream: true,
-            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+            cMapUrl: localCmapUrl,
             cMapPacked: true,
             enableXfa: false,
             verbosity: pdfVerbosity
@@ -495,14 +497,14 @@ export const PdfViewerPane = ({
           : inMemoryData
             ? {
               data: inMemoryData,
-              cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+              cMapUrl: localCmapUrl,
               cMapPacked: true,
               enableXfa: false,
               verbosity: pdfVerbosity
             }
             : {
               url,
-              cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+              cMapUrl: localCmapUrl,
               cMapPacked: true,
               enableXfa: false,
               disableAutoFetch: false,
@@ -523,7 +525,7 @@ export const PdfViewerPane = ({
 
       loadingTask.promise.then(async (doc) => {
         if (!active) {
-          try { doc.destroy(); } catch { }
+          try { doc.destroy(); } catch { /* ignore teardown error */ }
           return;
         }
         if (activeTransport) {
@@ -536,7 +538,7 @@ export const PdfViewerPane = ({
         try {
           const p1 = await doc.getPage(1);
           if (!active) {
-            try { doc.destroy(); } catch { }
+            try { doc.destroy(); } catch { /* ignore teardown error */ }
             return;
           }
           const vp = p1.getViewport({ scale: 1 });
@@ -587,15 +589,15 @@ export const PdfViewerPane = ({
 
     return () => {
       active = false;
-      try { bootCtrl.abort(); } catch { }
+      try { bootCtrl.abort(); } catch { /* ignore abort error */ }
       if (activeTransport) {
-        try { activeTransport.abort(); } catch { }
+        try { activeTransport.abort(); } catch { /* ignore abort error */ }
       }
       if (loadingTask) {
-        try { loadingTask.destroy(); } catch { }
+        try { loadingTask.destroy(); } catch { /* ignore teardown error */ }
       }
       if (loadedDoc) {
-        try { loadedDoc.destroy(); } catch { }
+        try { loadedDoc.destroy(); } catch { /* ignore teardown error */ }
       }
     };
   }, [url, pdfData, fileSize]);
@@ -907,11 +909,14 @@ export const PdfViewerPane = ({
     const paneId = paneIdRef.current;
     const handleKeyDown = (e) => {
       if (e.defaultPrevented) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (mountedPaneIds.size > 1 && activePaneId !== paneId) return;
       const activeEl = document.activeElement;
       const tag = activeEl?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || activeEl?.isContentEditable) return;
       if (activeEl?.getAttribute?.('role') === 'separator') return;
+      if (activeEl?.getAttribute?.('role') === 'tab' || activeEl?.closest?.('.modal-header')) return;
+      if ((tag === 'BUTTON' || tag === 'A') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End')) return;
 
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
@@ -978,6 +983,8 @@ export const PdfViewerPane = ({
     <div
       ref={containerRef}
       tabIndex={-1}
+      role="region"
+      aria-label={`PDF Viewer: ${title || docType}`}
       className={`custom-pdf-pane ${isMobile ? 'mobile-mode' : ''} ${isTwoPageActive ? 'two-page-mode' : ''} ${isDraggingSpread ? 'is-resizing-spread' : ''}`}
       onMouseEnter={markPaneActive}
       onPointerDown={markPaneActive}
@@ -1114,7 +1121,7 @@ export const PdfViewerPane = ({
             title={`Rotate Page 90° (${rotation}°)`}
             aria-label="Rotate Page 90 Degrees"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-2.64-6.36" />
               <polyline points="21 3 21 9 15 9" />
             </svg>
@@ -1129,7 +1136,7 @@ export const PdfViewerPane = ({
               title={downloadName ? `Download ${downloadName}` : 'Download PDF'}
               aria-label={downloadName ? `Download ${downloadName}` : 'Download PDF'}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />

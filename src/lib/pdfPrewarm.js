@@ -9,10 +9,25 @@ const LARGE_PDF_STREAM_THRESHOLD = 5 * 1024 * 1024;
 const STREAM_BOOTSTRAP_BYTES = 131072;
 const PREWARM_TTL_MS = 12000;
 const MAX_PREWARM_SLOTS = 2;
+const PDFJS_ASSET_VERSION = '4.10.38';
 
 let readerChunksPreloaded = false;
+let hfPreconnected = false;
 let pdfjsModulePromise = null;
 const prewarmCache = new Map(); // url -> { kind: 'range' | 'full', promise, ctrl, ts }
+
+function injectHfPreconnectOnce() {
+  if (hfPreconnected || typeof document === 'undefined' || !document.head) return;
+  hfPreconnected = true;
+  for (const href of ['https://huggingface.co', 'https://us.aws.cdn.hf.co']) {
+    if (document.head.querySelector(`link[rel="preconnect"][href="${href}"]`)) continue;
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = href;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  }
+}
 
 function isConstrainedNetwork() {
   try {
@@ -30,9 +45,10 @@ function isConstrainedNetwork() {
 export function preloadPdfJsModule() {
   if (!pdfjsModulePromise && typeof window !== 'undefined') {
     const base = window.location.origin;
-    pdfjsModulePromise = import(/* @vite-ignore */ `${base}/pdfjs/pdf.min.mjs`)
+    const ver = encodeURIComponent(PDFJS_ASSET_VERSION);
+    pdfjsModulePromise = import(/* @vite-ignore */ `${base}/pdfjs/pdf.min.mjs?v=${ver}`)
       .then((mod) => {
-        mod.GlobalWorkerOptions.workerSrc = `${base}/pdfjs/pdf.worker.min.mjs`;
+        mod.GlobalWorkerOptions.workerSrc = `${base}/pdfjs/pdf.worker.min.mjs?v=${ver}`;
         return mod;
       })
       .catch((err) => {
@@ -48,6 +64,7 @@ export function preloadReaderChunksOnce() {
   if (readerChunksPreloaded || typeof window === 'undefined') return;
   if (isConstrainedNetwork()) return;
   readerChunksPreloaded = true;
+  injectHfPreconnectOnce();
   void import('../components/PreviewModal.jsx').catch(() => {
     readerChunksPreloaded = false;
   });

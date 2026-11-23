@@ -69,7 +69,7 @@ export function buildRouteFaqEntries({
   if (filterDocType === 'DF') {
     faqs.push({
       q: 'Which Edexcel practical exams require source data files (.zip)?',
-      a: `The archive hosts ${dfCount} official practical examination data file archives for Edexcel IAL Information Technology Unit 2 (WIT12) and Unit 4 (WIT14), Edexcel IGCSE ICT Paper 2 (4IT1), and Edexcel IGCSE Computer Science Paper 2 (4CP0).`
+      a: `The archive hosts ${dfCount} practical examination source data file archives for Edexcel IAL Information Technology Unit 2 (WIT12) and Unit 4 (WIT14), Edexcel IGCSE ICT Paper 2 (4IT1), and Edexcel IGCSE Computer Science Paper 2 (4CP0).`
     });
     return faqs;
   }
@@ -275,11 +275,24 @@ export function buildJsonLd({
       return true;
     });
     if (matchingBooks.length > 0) {
+      const parseAuthors = (rawAuthors) => {
+        if (!rawAuthors) return null;
+        const parts = String(rawAuthors)
+          .split(/\s*,\s*|\s*&\s*|\s+and\s+/i)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (parts.length === 0) return null;
+        const toEntity = (name) => {
+          const isOrg = /\b(pearson|edexcel|education|press|publishing|limited|ltd|editorial)\b/i.test(name);
+          return { '@type': isOrg ? 'Organization' : 'Person', name };
+        };
+        return parts.length === 1 ? toEntity(parts[0]) : parts.map(toEntity);
+      };
       graph.push({
         '@type': 'ItemList',
         name: seo.h1,
         numberOfItems: matchingBooks.length,
-        itemListElement: matchingBooks.slice(0, 35).map(([bookPath, bMeta], idx) => {
+        itemListElement: matchingBooks.map(([bookPath, bMeta], idx) => {
           const isZip = bookPath.toLowerCase().endsWith('.zip');
           const itemNode = {
             '@type': isZip ? 'CreativeWork' : 'Book',
@@ -287,7 +300,8 @@ export function buildJsonLd({
             inLanguage: 'en',
             url: `${seo.canonicalUrl}#paper=${encodeURIComponent(bookPath)}&view=${isZip ? 'SOL' : 'Book'}`
           };
-          if (bMeta.authors) itemNode.author = { '@type': 'Person', name: bMeta.authors };
+          const parsedAuthor = parseAuthors(bMeta.authors);
+          if (parsedAuthor) itemNode.author = parsedAuthor;
           if (bMeta.publisher) itemNode.publisher = { '@type': 'Organization', name: bMeta.publisher };
           if (bMeta.year) itemNode.datePublished = String(bMeta.year);
           if (bMeta.isbn) itemNode.isbn = bMeta.isbn;

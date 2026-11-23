@@ -1,6 +1,6 @@
 # Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library
 
-> Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic study archive indexing 16,021 unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 46 IT & Computer Science practical Data Files (19,882 total archived files covering January 2003 through June 2026).
+> Independent study archive; not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel. Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic study archive indexing 16,021 unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 46 IT & Computer Science practical Data Files (19,882 total archived files covering January 2003 through June 2026).
 
 ## Core Platform Capabilities
 - **Side-by-Side Split View Reader:** Open any paired Question Paper (QP) and Mark Scheme (MS) side by side in the browser with synchronized zoom and draggable split divider.

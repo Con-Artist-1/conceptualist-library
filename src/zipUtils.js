@@ -17,32 +17,51 @@ export function findEocdOffset(bytes, view) {
   return -1;
 }
 
+const MAX_INFLATE_PREALLOC_BYTES = 150 * 1024 * 1024;
+
 export async function inflateRawBytes(compressedBytes, uncompressedSize = 0) {
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('Browser does not support DecompressionStream for in-browser ZIP unpacking.');
   }
   const ds = new DecompressionStream('deflate-raw');
   const writer = ds.writable.getWriter();
-  writer
+  let writeError = null;
+  const writeDone = writer
     .write(compressedBytes)
     .then(() => writer.close())
-    .catch(() => {});
+    .catch((err) => {
+      writeError = err || new Error('ZIP decompression write stream failed.');
+      try {
+        ds.readable.cancel(writeError).catch(() => {});
+      } catch {
+        // Ignore readable cancel errors
+      }
+    });
 
   const reader = ds.readable.getReader();
-  const expectedLen = Number(uncompressedSize) > 0 ? Number(uncompressedSize) : 0;
+  const rawExpectedLen = Number(uncompressedSize) > 0 ? Math.floor(Number(uncompressedSize)) : 0;
+  const expectedLen = rawExpectedLen > 0 && rawExpectedLen <= MAX_INFLATE_PREALLOC_BYTES ? rawExpectedLen : 0;
   const out = expectedLen > 0 ? new Uint8Array(expectedLen) : null;
   let offset = 0;
   const overflow = [];
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (out && offset + value.byteLength <= out.byteLength) {
-      out.set(value, offset);
-    } else {
-      overflow.push(value);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (out && offset + value.byteLength <= out.byteLength) {
+        out.set(value, offset);
+      } else {
+        overflow.push(value);
+      }
+      offset += value.byteLength;
     }
-    offset += value.byteLength;
+  } finally {
+    await writeDone;
+  }
+
+  if (writeError) {
+    throw writeError;
   }
 
   if (out && overflow.length === 0 && offset === out.byteLength) {

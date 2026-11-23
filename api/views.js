@@ -3,18 +3,19 @@ import path from 'path';
 import {
   PROJECT_ROOT,
   COLLECTION_VIEWS,
-  COLLECTION_SUBTITLES,
   parsePositiveInt,
   hashIdentifier,
   isValidPaperKey,
-  isValidSubtitleKey,
+  isKnownPaperKey,
   isAllowedOrigin,
   getClientIp,
   checkSlidingRateLimit,
+  checkDistributedRateLimit,
   getMongoDatabase,
   readJsonBody,
   sendJsonResponse
 } from './_shared.js';
+import { handleGetSubtitles, handleSaveSubtitles } from './_subtitles.js';
 
 const COLLECTION_NAME = COLLECTION_VIEWS;
 
@@ -32,71 +33,6 @@ const paperCooldownMap = globalThis.__csPaperCooldownMap || (globalThis.__csPape
 // Server-side persistent fallback store (used if MongoDB is temporarily unreachable and synced once reachable)
 const LOCAL_STORE_DIR = path.join(PROJECT_ROOT, '.data');
 const LOCAL_STORE_FILE = path.join(LOCAL_STORE_DIR, 'paper_views.json');
-const LOCAL_SUBTITLES_FILE = path.join(LOCAL_STORE_DIR, 'audio_subtitles.json');
-let memorySubtitlesStore = globalThis.__csMemorySubtitlesStore || null;
-
-function loadLocalSubtitlesStore() {
-  if (memorySubtitlesStore) return memorySubtitlesStore;
-  try {
-    if (fs.existsSync(LOCAL_SUBTITLES_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(LOCAL_SUBTITLES_FILE, 'utf-8'));
-      if (parsed && typeof parsed.tracks === 'object') {
-        memorySubtitlesStore = parsed.tracks;
-        globalThis.__csMemorySubtitlesStore = memorySubtitlesStore;
-        return memorySubtitlesStore;
-      }
-    }
-  } catch {
-    // Ignore local filesystem read errors
-  }
-  memorySubtitlesStore = Object.create(null);
-  globalThis.__csMemorySubtitlesStore = memorySubtitlesStore;
-  return memorySubtitlesStore;
-}
-
-function saveLocalSubtitlesStore(tracksMap) {
-  try {
-    if (!fs.existsSync(LOCAL_STORE_DIR)) {
-      fs.mkdirSync(LOCAL_STORE_DIR, { recursive: true });
-    }
-    fs.writeFileSync(
-      LOCAL_SUBTITLES_FILE,
-      JSON.stringify({ tracks: tracksMap, updatedAt: new Date().toISOString() }, null, 2),
-      'utf-8'
-    );
-  } catch {
-    // Ignore read-only filesystem errors
-  }
-}
-
-function sanitizeSubtitlePayload(raw) {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.segments)) return null;
-  const cleanSegments = [];
-  for (const seg of raw.segments.slice(0, 1200)) {
-    if (!seg || typeof seg !== 'object') continue;
-    const start = Number(seg.start);
-    const end = Number(seg.end);
-    const text = String(seg.text || '').trim().slice(0, 360);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || !text) continue;
-    const item = {
-      start: Number(start.toFixed(1)),
-      end: Number(end.toFixed(1)),
-      text
-    };
-    if (seg.passage && typeof seg.passage === 'string') {
-      item.passage = seg.passage.trim().slice(0, 80);
-    }
-    cleanSegments.push(item);
-  }
-  if (cleanSegments.length === 0) return null;
-  return {
-    duration: Number.isFinite(Number(raw.duration)) ? Number(Number(raw.duration).toFixed(1)) : 0,
-    source: typeof raw.source === 'string' ? raw.source.slice(0, 40) : 'whisper-ai',
-    language: typeof raw.language === 'string' ? raw.language.slice(0, 24) : 'french',
-    updatedAt: new Date().toISOString(),
-    segments: cleanSegments
-  };
-}
 let memoryViewsStore = globalThis.__csMemoryViewsStore || null;
 let inflightHydratePromise = globalThis.__csInflightViewsHydrate || null;
 let lastHydratedAt = globalThis.__csLastViewsHydratedAt || 0;
@@ -334,72 +270,7 @@ export default async function handler(req, res) {
         : (urlObj.searchParams.get('subtitles') || '').trim();
 
     if (subtitlesKeyParam) {
-      if (!isValidSubtitleKey(subtitlesKeyParam)) {
-        res.setHeader('Cache-Control', 'no-store, max-age=0');
-        return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle trackKey' });
-      }
-      const rawAltsParam =
-        typeof req.query?.alts === 'string'
-          ? req.query.alts
-          : urlObj.searchParams.get('alts') || '';
-      const validAlts = rawAltsParam
-        .split(',')
-        .map((k) => k.trim())
-        .filter((k) => k && k !== subtitlesKeyParam && isValidSubtitleKey(k))
-        .slice(0, 4);
-      const lookupKeys = [subtitlesKeyParam, ...validAlts];
-
-      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
-      const localSubs = loadLocalSubtitlesStore();
-      try {
-        const db = await getMongoDatabase();
-        const subCol = db.collection(COLLECTION_SUBTITLES);
-        const docs = await subCol
-          .find(
-            { $or: [{ _id: { $in: lookupKeys } }, { aliasKeys: { $in: lookupKeys } }] },
-            { projection: { _id: 1, aliasKeys: 1, subtitle: 1 } }
-          )
-          .limit(6)
-          .toArray();
-        let bestDoc = null;
-        let matchedKey = subtitlesKeyParam;
-        for (const k of lookupKeys) {
-          const found = docs.find(
-            (d) => d._id === k || (Array.isArray(d.aliasKeys) && d.aliasKeys.includes(k))
-          );
-          if (found?.subtitle && Array.isArray(found.subtitle.segments)) {
-            bestDoc = found;
-            matchedKey = k;
-            break;
-          }
-        }
-        if (bestDoc) {
-          localSubs[matchedKey] = bestDoc.subtitle;
-          return sendJsonResponse(res, 200, {
-            ok: true,
-            source: 'mongodb',
-            matchedKey,
-            subtitle: bestDoc.subtitle
-          });
-        }
-      } catch {
-        // Fallback to local subtitles store
-      }
-      for (const k of lookupKeys) {
-        if (localSubs[k]) {
-          return sendJsonResponse(res, 200, {
-            ok: true,
-            source: 'server-store',
-            matchedKey: k,
-            subtitle: localSubs[k]
-          });
-        }
-      }
-      return sendJsonResponse(res, 200, {
-        ok: true,
-        source: 'server-store',
-        subtitle: null
-      });
+      return handleGetSubtitles(req, res, urlObj, subtitlesKeyParam);
     }
 
     const paperKeyParam =
@@ -412,6 +283,9 @@ export default async function handler(req, res) {
         : typeof req.query?.search === 'string'
           ? req.query.search.trim()
           : (urlObj.searchParams.get('q') || urlObj.searchParams.get('search') || '').trim();
+    const rawLimit =
+      typeof req.query?.limit === 'string' ? req.query.limit : urlObj.searchParams.get('limit');
+    const requestedLimit = rawLimit ? Math.min(25000, Math.max(1, parsePositiveInt(rawLimit))) : 0;
 
     if (paperKeyParam && !isValidPaperKey(paperKeyParam)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -443,10 +317,22 @@ export default async function handler(req, res) {
     }
 
     const snapshot = await hydrateViewsFromDatabase(store);
+    const filteredViews = filterViewsByQuery(snapshot.views, searchParam);
+    let responseViews = filteredViews;
+    const totalCount = Object.keys(filteredViews).length;
+    if (requestedLimit > 0 && totalCount > requestedLimit) {
+      const sliced = Object.create(null);
+      const sortedEntries = Object.entries(filteredViews)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, requestedLimit);
+      for (const [k, v] of sortedEntries) sliced[k] = v;
+      responseViews = sliced;
+    }
+    res.setHeader('X-Views-Count', String(Object.keys(responseViews).length));
     return sendJsonResponse(res, 200, {
       ok: true,
       source: snapshot.source,
-      views: filterViewsByQuery(snapshot.views, searchParam)
+      views: responseViews
     });
   }
 
@@ -469,117 +355,27 @@ export default async function handler(req, res) {
     }
 
     if (body?.action === 'save_subtitles') {
-      const trackKey = typeof body?.trackKey === 'string' ? body.trackKey.trim() : '';
-      if (!isValidSubtitleKey(trackKey)) {
-        return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle trackKey' });
-      }
-      const cleanSubtitle = sanitizeSubtitlePayload(body?.subtitle);
-      if (!cleanSubtitle) {
-        return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle segments' });
-      }
-      const rawAliasKeys = Array.isArray(body?.aliasKeys)
-        ? body.aliasKeys.map((k) => String(k || '').trim()).filter((k) => k && k !== trackKey && isValidSubtitleKey(k)).slice(0, 4)
-        : [];
-      const adminKey = process.env.ADMIN_API_KEY || '';
-      const isAdminOverwrite = Boolean(adminKey && req.headers['x-admin-key'] === adminKey);
-
-      const localSubs = loadLocalSubtitlesStore();
-      const hasExistingLocal = Boolean(
-        localSubs[trackKey] &&
-        Array.isArray(localSubs[trackKey].segments) &&
-        localSubs[trackKey].segments.length > 0
-      );
-
-      try {
-        const db = await getMongoDatabase();
-        const subCol = db.collection(COLLECTION_SUBTITLES);
-
-        // Guard against unauthenticated overwrite of existing subtitles or cross-track aliasKey hijacking
-        const conflictKeys = [trackKey, ...rawAliasKeys];
-        const existingDocs = await subCol
-          .find(
-            { $or: [{ _id: { $in: conflictKeys } }, { aliasKeys: { $in: conflictKeys } }] },
-            { projection: { _id: 1, aliasKeys: 1, 'subtitle.segments': { $slice: 1 } } }
-          )
-          .toArray();
-
-        const claimedByOther = new Set();
-        let primaryExists = false;
-        for (const doc of existingDocs) {
-          const hasSegs = Array.isArray(doc?.subtitle?.segments) && doc.subtitle.segments.length > 0;
-          if (doc._id === trackKey || (Array.isArray(doc.aliasKeys) && doc.aliasKeys.includes(trackKey))) {
-            if (hasSegs) primaryExists = true;
-          } else {
-            claimedByOther.add(doc._id);
-            if (Array.isArray(doc.aliasKeys)) {
-              for (const ak of doc.aliasKeys) claimedByOther.add(ak);
-            }
-          }
-        }
-
-        if (primaryExists && !isAdminOverwrite) {
-          return sendJsonResponse(res, 200, {
-            ok: true,
-            source: 'mongodb',
-            trackKey,
-            preservedExisting: true
-          });
-        }
-
-        const safeAliasKeys = rawAliasKeys.filter((ak) => !claimedByOther.has(ak) && !localSubs[ak]);
-        if (!hasExistingLocal || isAdminOverwrite) {
-          localSubs[trackKey] = cleanSubtitle;
-          for (const ak of safeAliasKeys) localSubs[ak] = cleanSubtitle;
-          saveLocalSubtitlesStore(localSubs);
-        }
-
-        if (isAdminOverwrite) {
-          await subCol.updateOne(
-            { _id: trackKey },
-            {
-              $set: {
-                subtitle: cleanSubtitle,
-                aliasKeys: safeAliasKeys,
-                updatedAt: cleanSubtitle.updatedAt
-              },
-              $setOnInsert: { createdAt: cleanSubtitle.updatedAt }
-            },
-            { upsert: true }
-          );
-        } else {
-          await subCol.updateOne(
-            { _id: trackKey },
-            {
-              $setOnInsert: {
-                subtitle: cleanSubtitle,
-                aliasKeys: safeAliasKeys,
-                createdAt: cleanSubtitle.updatedAt,
-                updatedAt: cleanSubtitle.updatedAt
-              }
-            },
-            { upsert: true }
-          );
-        }
-        return sendJsonResponse(res, 200, { ok: true, source: 'mongodb', trackKey });
-      } catch {
-        if (hasExistingLocal && !isAdminOverwrite) {
-          return sendJsonResponse(res, 200, {
-            ok: true,
-            source: 'server-store',
-            trackKey,
-            preservedExisting: true
-          });
-        }
-        const safeLocalAliases = rawAliasKeys.filter((ak) => !localSubs[ak]);
-        localSubs[trackKey] = cleanSubtitle;
-        for (const ak of safeLocalAliases) localSubs[ak] = cleanSubtitle;
-        saveLocalSubtitlesStore(localSubs);
-        return sendJsonResponse(res, 200, { ok: true, source: 'server-store', trackKey });
-      }
+      return handleSaveSubtitles(req, res, body, clientIp);
     }
 
-    if (!isValidPaperKey(paperKey)) {
+    if (!isValidPaperKey(paperKey) || !isKnownPaperKey(paperKey)) {
       return sendJsonResponse(res, 400, { ok: false, error: 'Invalid paperKey' });
+    }
+
+    try {
+      const db = await getMongoDatabase();
+      const distAllowed = await checkDistributedRateLimit(
+        db,
+        'views_post',
+        clientIp,
+        RATE_WINDOW_MS,
+        MAX_POSTS_PER_WINDOW
+      );
+      if (!distAllowed) {
+        return sendJsonResponse(res, 429, { ok: false, error: 'Too many requests' });
+      }
+    } catch {
+      // Allow local fallback store if Mongo is temporarily unreachable
     }
 
     const now = Date.now();

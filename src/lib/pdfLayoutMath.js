@@ -1,6 +1,6 @@
 // Pure layout & spread calculation helpers for WebPDF viewer panes.
 
-export const SPREAD_RESIZER_WIDTH = 8;
+const SPREAD_RESIZER_WIDTH = 8;
 export const SPREAD_MIN_PCT = 22;
 export const SPREAD_MAX_PCT = 78;
 

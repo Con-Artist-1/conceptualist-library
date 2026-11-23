@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import '../styles/welcome.css';
 import {
   getCurriculumSlug,
   getSubjectSlug,
@@ -123,14 +124,8 @@ const WelcomePage = ({
     if (wizardMeta && wizardMeta[curriculum] && wizardMeta[curriculum][name]) {
       return wizardMeta[curriculum][name].allYears || [];
     }
-    let files = data.flatFiles.filter(
-      f => f.subject === name && (!curriculum || f.curriculum === curriculum)
-    );
-    if (selectedUnit) {
-      files = files.filter(f => (f.cleanUnitLabel || getCleanUnitLabel(f)) === selectedUnit);
-    }
-    return Array.from(new Set(files.map(f => f.year).filter(Boolean))).sort((a, b) => b - a);
-  }, [wizardMeta, availableUnitsMap, data.flatFiles, selectedSubject, selectedUnit]);
+    return [];
+  }, [wizardMeta, availableUnitsMap, selectedSubject, selectedUnit]);
 
   const handleSubjectClick = (subjectName, curriculum) => {
     onWizardSubjectChange({ name: subjectName, curriculum });
@@ -350,7 +345,7 @@ const WelcomePage = ({
                     <div className="history-card-title">{title}</div>
                   </a>
 
-                  <div className="history-card-actions" aria-label={`Quick links for ${title}`}>
+                  <div className="history-card-actions" role="group" aria-label={`Quick links for ${title}`}>
                     {hasQP && (
                       <a
                         href={getOnSitePaperUrl ? getOnSitePaperUrl(item, 'QP') : '#'}
@@ -459,6 +454,7 @@ const WelcomePage = ({
                           e.stopPropagation();
                           onOpenPaper(item, 'split');
                         }}
+                        aria-label={`Split View (Question Paper & Mark Scheme) — ${title}`}
                         title="Open Question Paper and Mark Scheme side by side in Split View"
                       >
                         <span className="btn-desktop-text">Split View</span>
@@ -564,6 +560,7 @@ const WelcomePage = ({
                 {availableYears.map(year => (
                   <button
                     key={year}
+                    type="button"
                     className="wizard-option-btn year"
                     onClick={() => handleYearClick(year)}
                   >
@@ -578,7 +575,7 @@ const WelcomePage = ({
         /* STEP 1: ALL SUBJECT CARDS */
         <>
           <div className="section-header-row">
-            <div className="section-title">Edexcel International A-Level (IAL)</div>
+            <h2 className="section-title">Edexcel International A-Level (IAL)</h2>
             <span className="section-count-badge">{ialSubjects.length} Subjects</span>
           </div>
           <div className="subject-grid" style={{ marginBottom: '32px' }}>
@@ -612,7 +609,7 @@ const WelcomePage = ({
           </div>
 
           <div className="section-header-row">
-            <div className="section-title igcse">Edexcel International GCSE (IGCSE)</div>
+            <h2 className="section-title igcse">Edexcel International GCSE (IGCSE)</h2>
             <span className="section-count-badge igcse">{igcseSubjects.length} Subjects</span>
           </div>
           <div className="subject-grid" style={{ marginBottom: '32px' }}>

@@ -63,13 +63,14 @@ export default function AudioPlayerDock({
     }
 
     let cancelled = false;
+    const ctrl = new AbortController();
     setZipLoading(true);
     setZipError(null);
     setZipProgress({ phase: 'downloading', percent: 0 });
 
     extractZipAudioTracks(activeZipUrl, (status) => {
       if (!cancelled) setZipProgress(status);
-    })
+    }, { signal: ctrl.signal })
       .then((tracks) => {
         if (cancelled) return;
         setZipTracks(tracks);
@@ -90,13 +91,14 @@ export default function AudioPlayerDock({
         setZipLoading(false);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || err?.name === 'AbortError') return;
         setZipError(err?.message || 'Failed to unpack audio archive');
         setZipLoading(false);
       });
 
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [activeZipUrl, effectiveUnitCode]);
 
@@ -250,13 +252,14 @@ export default function AudioPlayerDock({
     }
 
     let cancelled = false;
+    const ctrl = new AbortController();
     const candidateKeys = buildCandidateSubtitleKeys(activeAudioContext);
 
     setSubtitleLoading(true);
     setSubtitleError(null);
     setSubtitleUncached(false);
 
-    resolveExistingSubtitles(candidateKeys)
+    resolveExistingSubtitles(candidateKeys, { signal: ctrl.signal })
       .then(async (existing) => {
         if (cancelled) return;
         if (existing && Array.isArray(existing.segments) && existing.segments.length > 0) {
@@ -288,6 +291,7 @@ export default function AudioPlayerDock({
           trackIndex: activeAudioContext.trackIndex,
           getCurrentTime: () => audioCurrentTimeRef.current,
           shouldCancel: () => cancelled,
+          signal: ctrl.signal,
           onProgress: (st) => {
             if (cancelled) return;
             setSubtitleProgress(st);
@@ -312,7 +316,7 @@ export default function AudioPlayerDock({
         }
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || err?.name === 'AbortError') return;
         setSubtitleError(err?.message || 'Unable to load subtitles');
         setSubtitleLoading(false);
         setSubtitleProgress(null);
@@ -320,6 +324,7 @@ export default function AudioPlayerDock({
 
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [activeAudioIdentity, activeAudioContext, subtitlesEnabled, whisperApprovedIdentity, whisperRetryCount]);
 
@@ -451,9 +456,16 @@ export default function AudioPlayerDock({
               </span>
             )}
             {subtitleLoading && subtitleProgress && (
-              <span className="modal-subtitle-progress-tag" role="status" aria-live="polite">
-                {subtitleProgress.message || `Transcribing (${subtitleProgress.percent || 0}%)...`}
-              </span>
+              <>
+                <span className="modal-subtitle-progress-tag" aria-hidden="true">
+                  {subtitleProgress.message || `Transcribing (${subtitleProgress.percent || 0}%)...`}
+                </span>
+                <span className="sr-only" role="status" aria-live="polite">
+                  {subtitleProgress.phase === 'transcribing'
+                    ? `Transcribing subtitles ${Math.floor((Number(subtitleProgress.percent) || 0) / 10) * 10}%`
+                    : (subtitleProgress.message || 'Loading subtitles')}
+                </span>
+              </>
             )}
           </div>
 
@@ -560,29 +572,28 @@ export default function AudioPlayerDock({
         ) : null}
 
         {transcriptExpanded && subtitleSegments.length > 0 && (
-          <div
+          <ul
             ref={transcriptListRef}
             className="modal-subtitle-drawer"
-            role="list"
             aria-label="Full timestamped transcript"
           >
             {subtitleSegments.map((seg, idx) => (
-              <button
-                key={`${seg.start}-${idx}`}
-                type="button"
-                role="listitem"
-                data-seg-idx={idx}
-                className={`modal-subtitle-seg-btn ${idx === activeSubtitleIdx ? 'active' : ''}`}
-                onClick={() => handleSeekToSubtitle(seg.start)}
-                title={`Jump audio to ${formatSubtitleTimestamp(seg.start)}`}
-              >
-                <span className="modal-subtitle-seg-time">
-                  {formatSubtitleTimestamp(seg.start)}
-                </span>
-                <span className="modal-subtitle-seg-text">{seg.text}</span>
-              </button>
+              <li key={`${seg.start}-${idx}`} className="modal-subtitle-drawer-item">
+                <button
+                  type="button"
+                  data-seg-idx={idx}
+                  className={`modal-subtitle-seg-btn ${idx === activeSubtitleIdx ? 'active' : ''}`}
+                  onClick={() => handleSeekToSubtitle(seg.start)}
+                  title={`Jump audio to ${formatSubtitleTimestamp(seg.start)}`}
+                >
+                  <span className="modal-subtitle-seg-time">
+                    {formatSubtitleTimestamp(seg.start)}
+                  </span>
+                  <span className="modal-subtitle-seg-text">{seg.text}</span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
     );
@@ -618,6 +629,7 @@ export default function AudioPlayerDock({
               <button
                 key={track.id}
                 type="button"
+                aria-pressed={!useFullSingleAudio && safeTrackIdx === idx}
                 className={`modal-audio-track-pill ${!useFullSingleAudio && safeTrackIdx === idx ? 'active' : ''}`}
                 onClick={() => {
                   setUseFullSingleAudio(false);
@@ -631,6 +643,7 @@ export default function AudioPlayerDock({
             {audSingleSib && (
               <button
                 type="button"
+                aria-pressed={useFullSingleAudio}
                 className={`modal-audio-track-pill ${useFullSingleAudio ? 'active' : ''}`}
                 onClick={() => setUseFullSingleAudio(true)}
                 title={`Play full combined audio (${audSingleSib.name})`}
@@ -641,9 +654,20 @@ export default function AudioPlayerDock({
           </div>
         )}
 
-        {zipLoading && !useFullSingleAudio && !activeZipTrack ? (
+        {zipLoading && !useFullSingleAudio && !activeZipTrack && audSingleSib && (
           <div className="modal-audio-dock-status" role="status" aria-live="polite">
-            <span className="pdf-skeleton-spinner" />
+            <span className="pdf-skeleton-spinner" aria-hidden="true" />
+            <span className="modal-audio-dock-status-text">
+              {zipProgress?.phase === 'unpacking'
+                ? `Loading chapter tracks (${zipProgress.currentTrack}/${zipProgress.totalTracks}) — playing full audio...`
+                : `Loading chapter tracks${zipProgress?.percent ? ` (${zipProgress.percent}%)` : '...'} — playing full audio`}
+            </span>
+          </div>
+        )}
+
+        {zipLoading && !useFullSingleAudio && !activeZipTrack && !audSingleSib ? (
+          <div className="modal-audio-dock-status" role="status" aria-live="polite">
+            <span className="pdf-skeleton-spinner" aria-hidden="true" />
             <span className="modal-audio-dock-status-text">
               {zipProgress?.phase === 'unpacking'
                 ? `Unpacking ${zipProgress.entryName || 'track'} (${zipProgress.currentTrack}/${zipProgress.totalTracks})...`
@@ -790,6 +814,7 @@ export default function AudioPlayerDock({
                       <button
                         key={track.id}
                         type="button"
+                        aria-pressed={safeTrackIdx === idx}
                         className={`modal-zip-track-btn ${safeTrackIdx === idx ? 'active' : ''}`}
                         onClick={() => setSelectedTrackIdx(idx)}
                       >

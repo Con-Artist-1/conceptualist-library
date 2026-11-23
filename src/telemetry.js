@@ -33,7 +33,7 @@ const createTelemetrySessionId = () => {
   try {
     if (typeof sessionStorage !== 'undefined') {
       const existing = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (existing && /^[a-zA-Z0-9_-]{8,80}$/.test(existing)) {
+      if (existing && /^[a-zA-Z0-9_-]{8,64}$/.test(existing)) {
         return existing;
       }
     }
@@ -183,9 +183,9 @@ const flushTelemetry = () => {
         return window.innerWidth <= 768 ? 'mobile' : 'desktop';
       }
     } catch {
-      // Fallback to desktop
+      // Fallback to last recorded device state
     }
-    return 'desktop';
+    return state.device || 'desktop';
   };
 
   const viewerId = typeof state.getViewerId === 'function' ? state.getViewerId() : '';
@@ -221,7 +221,7 @@ const commitPaperClose = () => {
   flushTelemetry();
 };
 
-export const updateTelemetryDevice = (isMobile) => {
+const updateTelemetryDevice = (isMobile) => {
   state.device = isMobile ? 'mobile' : 'desktop';
 };
 

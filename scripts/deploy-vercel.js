@@ -26,10 +26,9 @@ loadEnv();
 const args = process.argv.slice(2);
 const INDEXNOW_ONLY = args.includes('--indexnow-only');
 const SKIP_INDEXNOW = args.includes('--skip-indexnow');
-const cliToken = args.find(arg => !arg.startsWith('--'));
-const TOKEN = cliToken || process.env.VERCEL_TOKEN;
+const TOKEN = process.env.VERCEL_TOKEN;
 if (!INDEXNOW_ONLY && !TOKEN) {
-  console.error('Missing VERCEL_TOKEN. Set it in search-app/.env or pass as CLI arg.');
+  console.error('Missing VERCEL_TOKEN. Set it in search-app/.env or environment variables.');
   process.exit(1);
 }
 const PROJECT_ID = 'prj_aoqCf7hkChGqzoRb3WGb9cf2KAgp';
@@ -52,6 +51,7 @@ const EXCLUDE = new Set([
 
 function isExcludedName(name) {
   if (EXCLUDE.has(name)) return true;
+  if (name.startsWith('AI_INSTRUCTIONS_')) return true;
   if (name === '.env' || name.startsWith('.env.') || name.endsWith('.env')) return true;
   return false;
 }

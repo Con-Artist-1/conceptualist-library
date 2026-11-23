@@ -33,13 +33,13 @@ export const Breadcrumbs = React.memo(({
 }) => (
   <div className={`breadcrumb-container ${classNameAdd}`}>
     <div className="breadcrumb-trail">
-      <a href="/" className="breadcrumb-link home" onClick={navigateToHome}>
+      <a href="/" className="breadcrumb-link home" aria-label="Library Home" onClick={navigateToHome}>
         <span className="btn-desktop-text">← Library Home</span>
         <span className="btn-mobile-text" aria-hidden="true">← Home</span>
       </a>
       {filterCurriculum && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearCurriculum} title="Click to remove curriculum filter">
             {filterCurriculum} ×
           </button>
@@ -47,7 +47,7 @@ export const Breadcrumbs = React.memo(({
       )}
       {filterSubject && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearSubject} title="Click to remove subject filter">
             {formatSubjectDisplay(filterSubject)} ×
           </button>
@@ -55,7 +55,7 @@ export const Breadcrumbs = React.memo(({
       )}
       {filterUnit && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearUnit} title="Click to remove unit filter">
             {filterUnit} ×
           </button>
@@ -63,7 +63,7 @@ export const Breadcrumbs = React.memo(({
       )}
       {filterYear && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearYear} title="Click to remove year filter">
             {filterYear} ×
           </button>
@@ -71,7 +71,7 @@ export const Breadcrumbs = React.memo(({
       )}
       {filterSession && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearSession} title="Click to remove session filter">
             {filterSession} ×
           </button>
@@ -79,7 +79,7 @@ export const Breadcrumbs = React.memo(({
       )}
       {filterDocType && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearDocType} title="Click to remove document type filter">
             {DOC_TYPE_INFO[filterDocType]?.fullLabel || filterDocType} ×
           </button>
@@ -87,7 +87,7 @@ export const Breadcrumbs = React.memo(({
       )}
       {breadcrumbParts.map((part, i) => (
         <React.Fragment key={i}>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button
             type="button"
             className="breadcrumb-link"
@@ -99,7 +99,7 @@ export const Breadcrumbs = React.memo(({
       ))}
       {searchQuery && (
         <>
-          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-separator" aria-hidden="true">/</span>
           <button type="button" className="breadcrumb-link" onClick={onClearSearch} title="Clear search query">
             Search: &ldquo;{searchQuery}&rdquo; ×
           </button>
@@ -111,7 +111,7 @@ export const Breadcrumbs = React.memo(({
       {filesLoading ? (
         <span>Loading full catalog...</span>
       ) : loadError && catalogTotalCount === 0 ? (
-        <span style={{ color: '#8A2030', fontWeight: 600 }}>Reconnecting to archive...</span>
+        <span style={{ color: 'var(--text-error)', fontWeight: 600 }}>Reconnecting to archive...</span>
       ) : totalMatchedCount > visibleFilesCount ? (
         <>
           Showing <strong>{visibleFilesCount}</strong> of <strong>{totalMatchedCount.toLocaleString()}</strong>{' '}

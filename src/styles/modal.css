@@ -391,8 +391,8 @@
   --modal-tab-ms-hover-bg: #3B2E14;
   --modal-tab-ms-hover-border: #9A7722;
   --modal-tab-ms-hover-text: #F5D982;
-  --modal-tab-ms-active-bg: #A88226;
-  --modal-tab-ms-active-border: #C29832;
+  --modal-tab-ms-active-bg: #856314;
+  --modal-tab-ms-active-border: #A67E1E;
 
   --modal-tab-er-bg: #2E2008;
   --modal-tab-er-border: #6E4E10;
@@ -574,8 +574,8 @@
   --pdf-badge-qp-bg: #252932;
   --pdf-badge-qp-border: #383F4C;
   --pdf-badge-qp-text: #E2E6ED;
-  --pdf-badge-ms-bg: #A88226;
-  --pdf-badge-ms-border: #C29832;
+  --pdf-badge-ms-bg: #856314;
+  --pdf-badge-ms-border: #A67E1E;
   --pdf-badge-er-bg: #2E2008;
   --pdf-badge-er-border: #6E4E10;
   --pdf-badge-er-text: #FFD33D;
@@ -709,8 +709,8 @@
   --modal-tab-ms-hover-bg: #33260B;
   --modal-tab-ms-hover-border: #8C6D20;
   --modal-tab-ms-hover-text: #FFE48A;
-  --modal-tab-ms-active-bg: #8C6D20;
-  --modal-tab-ms-active-border: #C29832;
+  --modal-tab-ms-active-bg: #856314;
+  --modal-tab-ms-active-border: #A67E1E;
 
   --modal-tab-er-bg: #241908;
   --modal-tab-er-border: #5E4012;
@@ -768,7 +768,7 @@
   --modal-mob-resizer-active-bg: #8C1D2F;
   --modal-mob-resizer-active-border: #FF5370;
   --modal-mob-resizer-grip: #64748B;
-  --modal-mob-resizer-grip-active: #64748B;
+  --modal-mob-resizer-grip-active: #FFFFFF;
 
   --modal-box-bg: #050505;
   --modal-box-border: #222222;
@@ -892,8 +892,8 @@
   --pdf-badge-qp-bg: #181818;
   --pdf-badge-qp-border: #333333;
   --pdf-badge-qp-text: #F0F2F5;
-  --pdf-badge-ms-bg: #8C6D20;
-  --pdf-badge-ms-border: #A68228;
+  --pdf-badge-ms-bg: #856314;
+  --pdf-badge-ms-border: #A67E1E;
   --pdf-badge-er-bg: #2E2008;
   --pdf-badge-er-border: #6E4E10;
   --pdf-badge-er-text: #FFD33D;
@@ -1038,6 +1038,7 @@
 }
 
 .modal-title {
+  margin: 0;
   font-weight: 800;
   font-size: clamp(13px, 1.15vw, 15px);
   color: var(--modal-title-text);
@@ -1045,6 +1046,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+}
+
+.modal-title:focus {
+  outline: none;
+}
+
+.modal-title:focus-visible {
+  outline: 2px solid var(--focus-ring-color, #C9A45C);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .modal-header-badge {
@@ -1675,9 +1686,13 @@
 
 /* Docked Top Unhide Bar (Zero Overlap with PDF toolbars) */
 .modal-docked-unhide-bar {
-  height: 22px;
+  height: 24px;
   width: 100%;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
   background: var(--modal-unhide-bg);
+  border: none;
   border-bottom: 1px solid var(--modal-unhide-border);
   display: flex;
   align-items: center;
@@ -1792,11 +1807,16 @@
 }
 
 .modal-split-resizer:hover,
-.modal-split-resizer.dragging,
+.modal-split-resizer.dragging {
+  background: var(--modal-resizer-active-bg);
+  border-color: var(--modal-resizer-active-border);
+}
+
 .modal-split-resizer:focus-visible {
   background: var(--modal-resizer-active-bg);
   border-color: var(--modal-resizer-active-border);
-  outline: none;
+  outline: 2px solid var(--focus-ring-color, #C9A45C);
+  outline-offset: -2px;
 }
 
 .resizer-handle-grip {
@@ -2325,10 +2345,18 @@
   gap: 4px;
   max-height: 175px;
   overflow-y: auto;
+  list-style: none;
+  margin: 0;
   padding: 6px;
   border-radius: 4px;
   background: var(--sub-card-bg);
   border: 1px solid var(--sub-card-border);
+}
+
+.modal-subtitle-drawer-item {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .modal-subtitle-bar.card-variant .modal-subtitle-drawer {
@@ -2410,8 +2438,13 @@
   height: auto;
 }
 
-.custom-pdf-pane:focus {
+.custom-pdf-pane:focus:not(:focus-visible) {
   outline: none;
+}
+
+.custom-pdf-pane:focus-visible {
+  outline: 2px solid var(--focus-ring-color, #C9A45C);
+  outline-offset: -2px;
 }
 
 .pdf-pane-toolbar {
@@ -2783,11 +2816,16 @@
 }
 
 .pdf-spread-resizer:hover,
-.pdf-spread-resizer.dragging,
+.pdf-spread-resizer.dragging {
+  background: var(--modal-resizer-active-bg);
+  border-color: var(--modal-resizer-active-border);
+}
+
 .pdf-spread-resizer:focus-visible {
   background: var(--modal-resizer-active-bg);
   border-color: var(--modal-resizer-active-border);
-  outline: none;
+  outline: 2px solid var(--focus-ring-color, #C9A45C);
+  outline-offset: -2px;
 }
 
 .pdf-spread-resizer:hover .resizer-handle-grip,
@@ -3151,10 +3189,10 @@
     --modal-header-border: #1F1F1F;
     --modal-mob-resizer-bg: #080808;
     --modal-mob-resizer-border: #1F1F1F;
-    --modal-mob-resizer-active-bg: #1C1C1C;
-    --modal-mob-resizer-active-border: #383838;
-    --modal-mob-resizer-grip: #383838;
-    --modal-mob-resizer-grip-active: #383838;
+    --modal-mob-resizer-active-bg: #8C1D2F;
+    --modal-mob-resizer-active-border: #FF5370;
+    --modal-mob-resizer-grip: #64748B;
+    --modal-mob-resizer-grip-active: #FFFFFF;
     --pdf-toolbar-border: #1F1F1F;
     --pdf-tool-bg: #080808;
     --pdf-tool-border: #1F1F1F;
@@ -3508,11 +3546,16 @@
   }
 
   .modal-mobile-split-resizer:active,
-  .modal-mobile-split-resizer.dragging,
+  .modal-mobile-split-resizer.dragging {
+    background: var(--modal-mob-resizer-active-bg);
+    border-color: var(--modal-mob-resizer-active-border);
+  }
+
   .modal-mobile-split-resizer:focus-visible {
     background: var(--modal-mob-resizer-active-bg);
     border-color: var(--modal-mob-resizer-active-border);
-    outline: none;
+    outline: 2px solid var(--focus-ring-color, #FFD33D);
+    outline-offset: -2px;
   }
 
   .mobile-resizer-grip {

@@ -5,12 +5,6 @@ import {
   parseRouteFromLocation,
   getSeoMetadata,
   getShardPathForRoute,
-  getLegacyEquivalentsForState,
-  inferCurriculumForSubject,
-  getCurriculumSlug,
-  getSubjectSlug,
-  getUnitSlug,
-  DEFAULT_UNIT_LABELS,
   IAL_SUBJECTS_DEFAULT,
   IGCSE_SUBJECTS_DEFAULT
 } from './lib/routeCore.js';
@@ -19,28 +13,17 @@ import {
   APP_VERSION,
   BUILD_TIMESTAMP,
   META_CACHE_KEY,
-  DAILY_CACHE_TTL_MS,
-  softReloadKeepingUrl
+  DAILY_CACHE_TTL_MS
 } from './lib/appMeta.js';
 import { resilientFetch, buildIndexCacheUrl } from './lib/networkUtils.js';
 import {
   useIsMobile,
-  SUBJECTS_WITH_BOOKS,
-  IAL_AUDIO_SUBJECTS,
-  IGCSE_AUDIO_SUBJECTS,
-  hasDataFilesForCourse,
   formatSubjectDisplay,
-  getUnifiedSittingTitle,
   HISTORY_STORAGE_KEY,
   ACTIVE_MODAL_PAPER_SESSION_KEY,
   MAX_HISTORY_ITEMS,
-  readLocalViewsCache,
-  isLocalViewsCacheStale,
-  writeLocalViewsCache,
-  updateSinglePaperInLocalViewsCache,
   getOrCreateViewerId,
   isBrowserReloadNavigation,
-  canCountPaperViewNow,
   getPaperViewKey,
   isQuestionPaperEligibleForViews,
   getPaperTotalViews,
@@ -48,9 +31,14 @@ import {
   serializePaperForHistory,
   getInitialRecentHistory
 } from './lib/libraryHelpers.js';
+import { buildArchiveContextInfo } from './lib/archiveContext.js';
 import { getCatalogClient } from './lib/catalogClient.js';
 import { preloadReaderChunksOnce } from './lib/pdfPrewarm.js';
 import { useTheme } from './hooks/useTheme.js';
+import { useViewsState } from './hooks/useViewsState.js';
+import { useDeployRefresh } from './hooks/useDeployRefresh.js';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
+import { useSeoHeadSync } from './hooks/useSeoHeadSync.js';
 import { AppErrorBoundary, CrashRecoveryScreen } from './components/CrashRecoveryScreen.jsx';
 import { Header } from './components/Header.jsx';
 import { SearchBanner } from './components/SearchBanner.jsx';
@@ -58,14 +46,15 @@ import { PaperTable } from './components/PaperTable.jsx';
 import { ArchiveContextStrip } from './components/ArchiveContextStrip.jsx';
 import { Footer } from './components/Footer.jsx';
 import { PdfPaneSkeleton } from './components/Skeletons.jsx';
-import WelcomePage from './components/WelcomePage.jsx';
 
+const WelcomePage = lazy(() => import('./components/WelcomePage.jsx'));
 const PreviewModal = lazy(() => import('./components/PreviewModal.jsx'));
 const AboutPage = lazy(() => import('./components/AboutPage.jsx'));
 const ChangelogPage = lazy(() => import('./components/ChangelogPage.jsx'));
 const NotFoundCard = lazy(() => import('./components/NotFoundCard.jsx'));
 
 const PAGE_SIZE = 50;
+const SEARCH_DEBOUNCE_MS = 80;
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
@@ -109,6 +98,23 @@ function getInitialCachedMeta() {
   return null;
 }
 
+function SecondaryPageSkeleton({ label }) {
+  return (
+    <div
+      className="about-card"
+      style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: 14, padding: '28px 32px' }}
+      aria-busy="true"
+      aria-label={label}
+    >
+      <div className="skeleton-shimmer" style={{ width: '42%', height: 28, borderRadius: 4 }} />
+      <div className="skeleton-shimmer" style={{ width: '78%', height: 16, borderRadius: 4 }} />
+      <div className="skeleton-shimmer" style={{ width: '66%', height: 16, borderRadius: 4 }} />
+      <div className="skeleton-shimmer" style={{ width: '100%', height: 140, borderRadius: 6, marginTop: 12 }} />
+      <div className="skeleton-shimmer" style={{ width: '100%', height: 140, borderRadius: 6 }} />
+    </div>
+  );
+}
+
 // ─── Main Application ────────────────────────────────────────────
 function App() {
   const isMobile = useIsMobile();
@@ -137,7 +143,7 @@ function App() {
   const [wizardUnit, setWizardUnit] = useState(() => (
     initialHistoryState?.wizardStep === 'year' ? (initialHistoryState.unit || null) : null
   ));
-  const [viewsMap, setViewsMap] = useState(() => readLocalViewsCache() || {});
+  const { viewsMap, viewsVersion, recordPaperView } = useViewsState();
   const [recentHistory, setRecentHistory] = useState(() => getInitialRecentHistory());
 
   const [meta, setMeta] = useState(() => initialCache?.meta || DEFAULT_META);
@@ -154,7 +160,8 @@ function App() {
   const [loadError, setLoadError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState(initialRoute.searchQuery || '');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(initialRoute.searchQuery || '');
+  const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
   const [selectedPath, setSelectedPath] = useState('');
   const [currentTab, setCurrentTab] = useState(initialRoute.currentTab || 'library');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -184,65 +191,34 @@ function App() {
   const [showFilters, setShowFilters] = useState(false);
 
   const searchInputRef = useRef(null);
+  const modalOpenerRef = useRef(null);
   const isPopStateRef = useRef(false);
+  const popStateReqIdRef = useRef(0);
   const isFullIndexLoadedRef = useRef(false);
   const isHydratedRef = useRef(false);
   const hydratedShardPathRef = useRef(null);
   const latestLoadedGenAtRef = useRef('');
   const dataMetaRef = useRef(meta);
   dataMetaRef.current = meta;
-  const previewFileRef = useRef(previewFile);
-  previewFileRef.current = previewFile;
-  const searchQueryRef = useRef(searchQuery);
-  searchQueryRef.current = searchQuery;
-  const pendingAutoReloadRef = useRef(false);
   const fullIndexPromiseRef = useRef(null);
   const ensureFullIndexRef = useRef(null);
-  const viewsInflightRef = useRef(null);
-  const didInitialSeoSyncRef = useRef(false);
   const queryReqIdRef = useRef(0);
   const lastQueryBaseKeyRef = useRef('');
   const lastVisibleCountRef = useRef(PAGE_SIZE);
 
-  const refreshViewsFromApi = useCallback(() => {
-    if (viewsInflightRef.current) {
-      return viewsInflightRef.current;
-    }
-    const req = fetch('/api/views', {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store'
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((payload) => {
-        if (!payload || !payload.ok) return null;
-        const mapObj = payload.views && typeof payload.views === 'object' ? payload.views : payload.counts;
-        if (!mapObj || typeof mapObj !== 'object') return null;
-        const saved = writeLocalViewsCache(mapObj);
-        setViewsMap(saved);
-        return saved;
-      })
-      .catch(() => null)
-      .finally(() => {
-        viewsInflightRef.current = null;
-      });
-    viewsInflightRef.current = req;
-    return req;
-  }, []);
-
+  // Debounce live search queries before dispatching to Web Worker (immediate on clear)
   useEffect(() => {
-    try {
-      localStorage.removeItem('cs_paper_views_v1');
-      localStorage.removeItem('cs_paper_views_db_v2');
-    } catch {
-      // Ignore storage errors
+    if (!searchQuery) {
+      setDebouncedSearchQuery('');
+      return undefined;
     }
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    if (readLocalViewsCache() === null || isLocalViewsCacheStale()) {
-      void refreshViewsFromApi();
-    }
-  }, [refreshViewsFromApi]);
-
+  // Deferred idle telemetry bootstrap
   useEffect(() => {
     let cancelled = false;
     let cleanup = null;
@@ -275,45 +251,8 @@ function App() {
   }, []);
 
   const recordPaperInteraction = useCallback((fileObj, preferredView = '', options = {}) => {
-    if (!fileObj || fileObj.isPendingSkeleton) return;
-    const vKey = getPaperViewKey(fileObj);
-    if (vKey) {
-      try {
-        sessionStorage.setItem(ACTIVE_MODAL_PAPER_SESSION_KEY, vKey);
-      } catch {
-        // Ignore sessionStorage errors
-      }
-    }
-
-    if (vKey && isQuestionPaperEligibleForViews(fileObj)) {
-      const allowedToCount = canCountPaperViewNow(vKey, options);
-      if (allowedToCount) {
-        const viewerId = getOrCreateViewerId();
-        fetch('/api/views', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paperKey: vKey, viewerId }),
-          keepalive: true
-        })
-          .then((res) => (res.ok ? res.json() : null))
-          .then((payload) => {
-            if (payload && payload.ok && typeof payload.views === 'number') {
-              const latestCount = Math.floor(payload.views);
-              setViewsMap((prev) => ({
-                ...prev,
-                [vKey]: Math.max(Number(prev[vKey]) || 0, latestCount)
-              }));
-              updateSinglePaperInLocalViewsCache(vKey, latestCount);
-              if (payload.incremented) {
-                void refreshViewsFromApi();
-              }
-            }
-          })
-          .catch(() => {
-            // Do not fake increment if database request fails
-          });
-      }
-    }
+    if (!fileObj || fileObj.isPendingSkeleton || fileObj.isNotFound) return;
+    recordPaperView(fileObj, options);
 
     const isBook =
       fileObj.category === 'Books' ||
@@ -334,7 +273,7 @@ function App() {
         });
       }
     }
-  }, [refreshViewsFromApi]);
+  }, [recordPaperView]);
 
   const handleClearHistory = useCallback(() => {
     setRecentHistory([]);
@@ -347,6 +286,9 @@ function App() {
 
   const openOnSiteReader = useCallback((fileObj, preferredView = '') => {
     if (!fileObj) return;
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+      modalOpenerRef.current = document.activeElement;
+    }
     setPendingPaperParam('');
     setPreviewInitialView(preferredView);
     setPreviewFile(fileObj);
@@ -357,6 +299,7 @@ function App() {
   useEffect(() => {
     const handlePopState = (event) => {
       isPopStateRef.current = true;
+      const popReqId = ++popStateReqIdRef.current;
       const navState = (event && event.state) || window.history.state || null;
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, dataMetaRef.current, window.location.hash);
 
@@ -396,8 +339,12 @@ function App() {
         void getCatalogClient()
           .resolvePaper(parsed.paperParam)
           .then((found) => {
+            if (popReqId !== popStateReqIdRef.current) return;
             if (found) {
               setPreviewFile(found);
+              setPendingPaperParam('');
+            } else if (isFullIndexLoadedRef.current) {
+              setPreviewFile({ isNotFound: true, path: parsed.paperParam, name: parsed.paperParam });
               setPendingPaperParam('');
             }
           })
@@ -444,7 +391,7 @@ function App() {
 
   // Resolve #paper= / ?paper= deep link once worker catalog finishes loading
   useEffect(() => {
-    if (!pendingPaperParam || catalogRevision === 0) return;
+    if (!pendingPaperParam || catalogRevision === 0) return undefined;
     let cancelled = false;
     void getCatalogClient()
       .resolvePaper(pendingPaperParam)
@@ -463,6 +410,7 @@ function App() {
           recordPaperInteraction(found, previewInitialView || 'QP', { isPageReload });
           setPendingPaperParam('');
         } else if (isFullIndexLoadedRef.current) {
+          setPreviewFile({ isNotFound: true, path: pendingPaperParam, name: pendingPaperParam });
           setPendingPaperParam('');
         }
       })
@@ -497,7 +445,7 @@ function App() {
     filterYear,
     filterDocType,
     searchQuery: deferredSearchQuery,
-    paperParam: previewFile ? (previewFile.id || previewFile.path) : pendingPaperParam,
+    paperParam: previewFile && !previewFile.isNotFound ? (previewFile.id || previewFile.path) : pendingPaperParam,
     forceShowTable,
     notFound: currentTab === 'library' && isNotFound,
     meta
@@ -516,133 +464,7 @@ function App() {
     meta
   ]);
 
-  // Synchronize route state to browser URL and dynamic SEO <head> + lazy Schema.org JSON-LD
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const pathSegments = (window.location.pathname || '/').split('/').filter(Boolean);
-    const waitingForUnitHydration = pathSegments.length >= 3 && pathSegments[0] !== 'textbooks' && !filterUnit && !wizardUnit && !meta?.wizard;
-    const activeNotFound = currentTab === 'library' && isNotFound;
-
-    if (!waitingForUnitHydration && !activeNotFound) {
-      const nextUrl = buildRoutePath({
-        currentTab,
-        filterCurriculum: effectiveRouteCurriculum,
-        filterSubject: effectiveRouteSubject,
-        filterUnit: effectiveRouteUnit,
-        filterYear,
-        filterDocType,
-        searchQuery: deferredSearchQuery,
-        previewFile,
-        pendingPaperParam,
-        previewMode: previewInitialView,
-        forceShowTable,
-        useHashForPaper: true
-      });
-      const nextHistoryState = (isWizardRouteActive && wizardSubject)
-        ? {
-            wizardStep: wizardUnit ? 'year' : 'unit',
-            curriculum: wizardSubject.curriculum,
-            subject: wizardSubject.name,
-            unit: wizardUnit || null
-          }
-        : { wizardStep: isWizardRouteActive ? 'home' : 'table' };
-      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      const prevState = window.history.state;
-      const prevWizardStep = prevState?.wizardStep || null;
-      const stateChanged =
-        prevWizardStep !== nextHistoryState.wizardStep ||
-        (prevState?.subject || '') !== (nextHistoryState.subject || '') ||
-        (prevState?.curriculum || '') !== (nextHistoryState.curriculum || '') ||
-        (prevState?.unit || '') !== (nextHistoryState.unit || '');
-
-      if (currentUrl !== nextUrl || stateChanged) {
-        const isLegacyPaperMigration = window.location.search.includes('paper=') && nextUrl.includes('#paper=');
-        const isInitialColdStateTag = currentUrl === nextUrl && prevState === null;
-        if (isPopStateRef.current) {
-          isPopStateRef.current = false;
-        } else if (deferredSearchQuery || isLegacyPaperMigration || isInitialColdStateTag) {
-          window.history.replaceState(nextHistoryState, '', nextUrl);
-        } else {
-          window.history.pushState(nextHistoryState, '', nextUrl);
-        }
-      } else {
-        isPopStateRef.current = false;
-      }
-    }
-
-    const pageTitle = previewFile
-      ? `${getUnifiedSittingTitle(previewFile)} — Past Paper & Mark Scheme | Conceptualist Systems`
-      : seoMeta.title;
-    document.title = pageTitle;
-
-    const setMetaTag = (selector, attrName, attrVal, contentVal) => {
-      let el = document.querySelector(selector);
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute(attrName, attrVal);
-        document.head.appendChild(el);
-      }
-      el.setAttribute('content', contentVal);
-    };
-
-    const robotsVal = seoMeta.robots || 'index, follow';
-    setMetaTag('meta[name="description"]', 'name', 'description', seoMeta.description);
-    setMetaTag('meta[name="keywords"]', 'name', 'keywords', seoMeta.keywords);
-    setMetaTag('meta[name="robots"]', 'name', 'robots', robotsVal);
-    setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
-    setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
-    setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
-    setMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
-
-    let canonicalEl = document.querySelector('link[rel="canonical"]');
-    if (robotsVal.includes('noindex')) {
-      if (canonicalEl) canonicalEl.remove();
-    } else {
-      if (!canonicalEl) {
-        canonicalEl = document.createElement('link');
-        canonicalEl.setAttribute('rel', 'canonical');
-        document.head.appendChild(canonicalEl);
-      }
-      canonicalEl.setAttribute('href', seoMeta.canonicalUrl);
-    }
-
-    // On initial cold mount, prerender-seo.js has already embedded the exact JSON-LD in <head>.
-    // Only lazily import seoRoutes.js (with bookCatalog ISBNs & FAQs) on SPA navigations or if absent.
-    const existingLd = document.getElementById('seo-json-ld');
-    const isColdWithPrerenderedLd = !didInitialSeoSyncRef.current && Boolean(existingLd?.textContent) && !previewFile && !deferredSearchQuery;
-    didInitialSeoSyncRef.current = true;
-    if (isColdWithPrerenderedLd) return undefined;
-
-    let cancelled = false;
-    void import('./seoRoutes.js')
-      .then(({ buildJsonLd }) => {
-        if (cancelled) return;
-        let ldScript = document.getElementById('seo-json-ld');
-        if (!ldScript) {
-          ldScript = document.createElement('script');
-          ldScript.id = 'seo-json-ld';
-          ldScript.type = 'application/ld+json';
-          document.head.appendChild(ldScript);
-        }
-        const jsonLdObj = buildJsonLd({
-          currentTab,
-          filterCurriculum: effectiveRouteCurriculum,
-          filterSubject: effectiveRouteSubject,
-          filterUnit: effectiveRouteUnit,
-          filterDocType,
-          forceShowTable,
-          seo: seoMeta,
-          meta
-        });
-        ldScript.textContent = JSON.stringify(jsonLdObj);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  useSeoHeadSync({
     currentTab,
     isNotFound,
     isWizardRouteActive,
@@ -651,8 +473,6 @@ function App() {
     effectiveRouteCurriculum,
     effectiveRouteSubject,
     effectiveRouteUnit,
-    filterCurriculum,
-    filterSubject,
     filterUnit,
     filterYear,
     filterDocType,
@@ -662,8 +482,18 @@ function App() {
     previewInitialView,
     forceShowTable,
     seoMeta,
-    meta
-  ]);
+    meta,
+    isPopStateRef
+  });
+
+  useKeyboardShortcuts({ searchInputRef, isPreviewOpen: Boolean(previewFile) });
+
+  useDeployRefresh({
+    previewFile,
+    searchQuery,
+    latestLoadedGenAtRef,
+    dataMetaRef
+  });
 
   const getOnSitePaperUrl = useCallback((fileObj, preferredView = '') => {
     return buildRoutePath({
@@ -680,31 +510,15 @@ function App() {
     });
   }, [filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, deferredSearchQuery, forceShowTable]);
 
-  // Global keyboard shortcut: '/' or Ctrl+K / Cmd+K focuses search input
-  useEffect(() => {
-    const handleGlobalKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (
-        e.key === '/' &&
-        document.activeElement?.tagName !== 'INPUT' &&
-        document.activeElement?.tagName !== 'TEXTAREA' &&
-        document.activeElement?.tagName !== 'SELECT'
-      ) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
-
   // Multi-stage zero-waterfall catalog hydration via Web Worker
   useEffect(() => {
     let cancelled = false;
+    const abortController = new AbortController();
     const buildQuery = encodeURIComponent(BUILD_TIMESTAMP);
-    const initialShardRoute = getShardPathForRoute(initialRoute);
+    const activeRoute = retryCount > 0 && typeof window !== 'undefined'
+      ? parseRouteFromLocation(window.location.pathname, window.location.search, dataMetaRef.current, window.location.hash)
+      : initialRoute;
+    const initialShardRoute = getShardPathForRoute(activeRoute);
     const catalogClient = getCatalogClient();
 
     try {
@@ -772,7 +586,6 @@ function App() {
         setLoadError(null);
 
         try {
-          // If <head> already downloaded /index.json as ArrayBuffer (e.g., on /papers), transfer zero-copy to Worker
           if (!forceReload && earlyFetch?.fullBufferPromise) {
             const p = earlyFetch.fullBufferPromise;
             earlyFetch.fullBufferPromise = null;
@@ -788,11 +601,12 @@ function App() {
             urls: candidateIndexUrls,
             cacheUrl: INDEX_CACHE_URL,
             expectedMeta: freshMeta,
-            forceReload
+            forceReload,
+            signal: abortController.signal
           });
           markWorkerHydrated(res, { isFull: true });
         } catch (err) {
-          if (!cancelled) {
+          if (!cancelled && err?.name !== 'AbortError') {
             console.error('Failed to load index from all candidate sources:', err);
             setLoading(false);
             setFilesLoading(false);
@@ -826,42 +640,41 @@ function App() {
         const res = await catalogClient.loadShard({
           shardUrl: `${initialShardRoute}?v=${buildQuery}`,
           cacheUrl: INDEX_CACHE_URL,
-          expectedMeta: latestMeta
+          expectedMeta: latestMeta,
+          signal: abortController.signal
         });
         markWorkerHydrated(res, { isFull: Boolean(res?.isFull), shardPath: initialShardRoute });
-      } catch {
+      } catch (err) {
+        if (cancelled || err?.name === 'AbortError') return;
         shardFailed = true;
-        if (!cancelled) {
-          void loadFullIndex(latestMeta);
-        }
+        void loadFullIndex(latestMeta);
       }
     };
 
     const initialDemand = Boolean(
-      (initialRoute.currentTab && initialRoute.currentTab !== 'library') ||
-      initialRoute.notFound ||
-      initialRoute.filterCurriculum ||
-      initialRoute.filterDocType ||
-      initialRoute.filterSubject ||
-      initialRoute.filterUnit ||
-      initialRoute.filterYear ||
-      initialRoute.filterSession ||
-      initialRoute.searchQuery ||
-      initialRoute.forceShowTable ||
-      initialRoute.paperParam
+      (activeRoute.currentTab && activeRoute.currentTab !== 'library') ||
+      activeRoute.notFound ||
+      activeRoute.filterCurriculum ||
+      activeRoute.filterDocType ||
+      activeRoute.filterSubject ||
+      activeRoute.filterUnit ||
+      activeRoute.filterYear ||
+      activeRoute.filterSession ||
+      activeRoute.searchQuery ||
+      activeRoute.forceShowTable ||
+      activeRoute.paperParam
     );
 
     if (initialShardRoute) {
       void hydrateInitialShard();
-    } else if (initialDemand && !initialRoute.notFound && initialRoute.currentTab === 'library') {
-      // Kick off full index load immediately in parallel with /meta.json on /papers, /ial, /igcse!
+    } else if (initialDemand && !activeRoute.notFound && activeRoute.currentTab === 'library') {
       void loadFullIndex(latestMeta, { showLoader: true });
     }
 
-    // Validate against fresh /meta.json in parallel (reusing <head> early fetch promise when present)
+    // Validate against /meta.json in parallel (reusing <head> early fetch promise when present)
     const metaPromise = earlyFetch?.metaPromise
-      ? earlyFetch.metaPromise.then((json) => json || resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { cache: 'no-cache' }, 25000).then((r) => r.json()))
-      : resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { cache: 'no-cache' }, 25000).then((r) => r.json());
+      ? earlyFetch.metaPromise.then((json) => json || resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { signal: abortController.signal }, 25000).then((r) => r.json()))
+      : resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { signal: abortController.signal }, 25000).then((r) => r.json());
 
     metaPromise
       .then((json) => {
@@ -886,6 +699,7 @@ function App() {
         }
       })
       .catch((err) => {
+        if (cancelled || err?.name === 'AbortError') return;
         console.warn('Meta fetch error, proceeding to cached or remote full index:', err);
         if (initialShardRoute && shardFailed) {
           void loadFullIndex(null);
@@ -894,88 +708,15 @@ function App() {
 
     return () => {
       cancelled = true;
+      abortController.abort();
       fullIndexPromiseRef.current = null;
     };
   }, [initialCache, initialRoute, retryCount]);
 
-  // Automatic 24-hour full reload + live new-catalog detection (defers safely while reading or searching)
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const pageBootAt = Date.now();
-    let lastProbeAt = pageBootAt;
-    const PROBE_INTERVAL_MS = 10 * 60 * 1000;
-
-    const triggerOrDeferReload = () => {
-      if (previewFileRef.current || (searchQueryRef.current && searchQueryRef.current.trim())) {
-        pendingAutoReloadRef.current = true;
-        return;
-      }
-      softReloadKeepingUrl();
-    };
-
-    const checkFreshness = async () => {
-      if (document.visibilityState !== 'visible') return;
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-
-      const now = Date.now();
-      if (now - pageBootAt >= DAILY_CACHE_TTL_MS) {
-        triggerOrDeferReload();
-        return;
-      }
-
-      if (now - lastProbeAt < PROBE_INTERVAL_MS) return;
-      lastProbeAt = now;
-      try {
-        const res = await fetch(`/meta.json?t=${now}`, { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = await res.json();
-        const remoteMeta = json?.meta;
-        if (!remoteMeta) return;
-        const loadedGenAt = latestLoadedGenAtRef.current || dataMetaRef.current?.generatedAt || '';
-        const loadedUnique = dataMetaRef.current?.uniqueFiles || 0;
-        const hasNewCatalog = Boolean(
-          (loadedGenAt && remoteMeta.generatedAt && remoteMeta.generatedAt !== loadedGenAt) ||
-          (loadedUnique && remoteMeta.uniqueFiles && remoteMeta.uniqueFiles !== loadedUnique)
-        );
-        if (hasNewCatalog) {
-          triggerOrDeferReload();
-        }
-      } catch {
-        // Ignore transient offline errors
-      }
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void checkFreshness();
-    };
-    const handleFocus = () => {
-      void checkFreshness();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleFocus);
-    const intervalId = window.setInterval(() => {
-      void checkFreshness();
-    }, 30 * 60 * 1000);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleFocus);
-      window.clearInterval(intervalId);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!previewFile && pendingAutoReloadRef.current && !(searchQuery && searchQuery.trim())) {
-      pendingAutoReloadRef.current = false;
-      softReloadKeepingUrl();
-    }
-  }, [previewFile, searchQuery]);
-
   // Reset pagination when filters/search change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, filterSession, searchQuery, sortBy, viewMode]);
+  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, filterSession, deferredSearchQuery, sortBy, viewMode]);
 
   const handleSubjectSelect = useCallback((subject, curriculum = '') => {
     setCurrentTab('library');
@@ -1125,14 +866,12 @@ function App() {
   const isRoot = selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
-  // Dynamic subject list based on selected curriculum
   const availableSubjectsForFilter = useMemo(() => {
     if (filterCurriculum === 'Edexcel IAL') return meta?.ialSubjects || meta?.subjects || [];
     if (filterCurriculum === 'Edexcel IGCSE') return meta?.igcseSubjects || meta?.subjects || [];
     return meta?.subjects || [];
   }, [filterCurriculum, meta]);
 
-  // Dynamic unit list for filter bar when a subject is selected
   const hasWizardUnits = useMemo(() => {
     if (!filterSubject || !meta?.wizard) return false;
     const currs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
@@ -1157,7 +896,6 @@ function App() {
     return queryResult.fallbackUnits || [];
   }, [filterSubject, filterCurriculum, meta, queryResult.fallbackUnits]);
 
-  // Dynamic year list for filter bar
   const availableYearsForFilter = useMemo(() => {
     const wizard = meta?.wizard;
     if (filterSubject && wizard) {
@@ -1181,6 +919,7 @@ function App() {
 
   // Execute off-thread filtering, smart fuzzy search, sorting, and pagination slicing inside the Web Worker
   const popularViewsDep = sortBy === 'popular' ? viewsMap : null;
+  const popularViewsVerDep = sortBy === 'popular' ? viewsVersion : 0;
 
   useEffect(() => {
     if (catalogRevision === 0) return undefined;
@@ -1200,9 +939,9 @@ function App() {
       filterYear,
       filterSession,
       filterDocType,
-      searchQuery,
+      deferredSearchQuery,
       sortBy,
-      popularViewsDep ? Object.keys(popularViewsDep).length : 0
+      popularViewsVerDep
     ]);
 
     const canFastSlice = baseKey === lastQueryBaseKeyRef.current && visibleCount !== lastVisibleCountRef.current;
@@ -1221,7 +960,7 @@ function App() {
           filterYear,
           filterSession,
           filterDocType,
-          searchQuery,
+          searchQuery: deferredSearchQuery,
           sortBy,
           viewsMap: popularViewsDep,
           visibleCount,
@@ -1259,9 +998,10 @@ function App() {
     filterYear,
     filterSession,
     filterDocType,
-    searchQuery,
+    deferredSearchQuery,
     sortBy,
     popularViewsDep,
+    popularViewsVerDep,
     visibleCount,
     hasWizardUnits
   ]);
@@ -1311,6 +1051,7 @@ function App() {
       currentTab,
       filterCurriculum,
       filterSubject,
+      filterUnit,
       filterDocType,
       notFound: currentTab === 'library' && isNotFound
     });
@@ -1339,6 +1080,7 @@ function App() {
     currentTab,
     filterCurriculum,
     filterSubject,
+    filterUnit,
     filterDocType,
     isNotFound,
     showWelcome,
@@ -1347,248 +1089,28 @@ function App() {
     selectedPath
   ]);
 
-  const archiveContextInfo = useMemo(() => {
-    if (currentTab !== 'library' || isNotFound || showWelcome) return null;
-    const effCurr = filterCurriculum || inferCurriculumForSubject(filterSubject, '');
-    const legacyInfo = getLegacyEquivalentsForState({
-      filterCurriculum: effCurr,
-      filterSubject,
-      filterUnit
-    });
-    const currSlug = effCurr ? getCurriculumSlug(effCurr) : '';
-    const subjSlug = filterSubject ? getSubjectSlug(filterSubject) : '';
-    const subjDisplay = filterSubject ? formatSubjectDisplay(filterSubject) : '';
+  const archiveContextActions = useMemo(() => ({
+    clearFilters,
+    setIsNotFound,
+    setFilterCurriculum,
+    setFilterSubject,
+    setFilterUnit,
+    setFilterYear,
+    setFilterDocType,
+    setForceShowTable
+  }), [clearFilters]);
 
-    const links = [];
-    const seenHrefs = new Set();
-    const pushLink = (item) => {
-      if (!item?.href || seenHrefs.has(item.href)) return;
-      seenHrefs.add(item.href);
-      links.push(item);
-    };
-
-    if (filterSubject && currSlug && subjSlug) {
-      if (filterUnit) {
-        pushLink({
-          href: `/${currSlug}/${subjSlug}`,
-          label: `All ${subjDisplay} Units & Papers`,
-          onClick: () => { setIsNotFound(false); setFilterUnit(''); setForceShowTable(true); }
-        });
-      }
-      const hasBooks = Boolean(SUBJECTS_WITH_BOOKS[effCurr]?.has(filterSubject));
-      if (hasBooks && filterDocType !== 'Book') {
-        const isMath = effCurr === 'Edexcel IAL' && filterSubject === 'Math';
-        pushLink({
-          href: `/textbooks/${currSlug}/${subjSlug}`,
-          label: `${subjDisplay} Textbooks${isMath ? ' & Solution Banks' : ''}`,
-          onClick: () => {
-            setIsNotFound(false);
-            setFilterCurriculum(effCurr);
-            setFilterDocType('Book');
-            setFilterUnit('');
-            setFilterYear('');
-            setForceShowTable(true);
-          }
-        });
-      } else if (filterDocType === 'Book') {
-        pushLink({
-          href: `/${currSlug}/${subjSlug}`,
-          label: `${subjDisplay} Past Papers & Mark Schemes`,
-          onClick: () => {
-            setIsNotFound(false);
-            setFilterDocType(null);
-            setForceShowTable(true);
-          }
-        });
-      }
-      if (hasDataFilesForCourse(effCurr, filterSubject) && filterDocType !== 'DF') {
-        pushLink({
-          href: '/data-files',
-          label: 'IT & CS Data Files (.zip)',
-          onClick: () => {
-            clearFilters({ pushUrl: false });
-            setFilterDocType('DF');
-            setForceShowTable(true);
-          }
-        });
-      }
-      if (
-        filterDocType !== 'AUD' &&
-        ((effCurr === 'Edexcel IAL' && IAL_AUDIO_SUBJECTS.has(filterSubject)) ||
-          (effCurr === 'Edexcel IGCSE' && IGCSE_AUDIO_SUBJECTS.has(filterSubject)))
-      ) {
-        pushLink({
-          href: '/audio',
-          label: `${effCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} Listening Audio (MP3)`,
-          onClick: () => {
-            clearFilters({ pushUrl: false });
-            setFilterDocType('AUD');
-            setForceShowTable(true);
-          }
-        });
-      }
-
-      if (filterDocType !== 'Book') {
-        const unitsObj = meta?.wizard?.[effCurr]?.[filterSubject]?.units;
-        const unitList = (unitsObj
-          ? Object.keys(unitsObj)
-          : (DEFAULT_UNIT_LABELS[effCurr]?.[filterSubject] || [])
-        ).slice().sort((a, b) => compareUnitLabels(a, b, filterSubject));
-        for (const uLabel of unitList) {
-          if (uLabel === filterUnit) continue;
-          const uSlug = getUnitSlug(uLabel);
-          if (!uSlug) continue;
-          pushLink({
-            href: `/${currSlug}/${subjSlug}/${uSlug}`,
-            label: uLabel,
-            onClick: () => {
-              setIsNotFound(false);
-              setFilterCurriculum(effCurr);
-              setFilterSubject(filterSubject);
-              setFilterUnit(uLabel);
-              setFilterDocType(null);
-              setForceShowTable(true);
-            }
-          });
-        }
-      }
-    } else if (filterDocType === 'Book') {
-      if (filterCurriculum !== 'Edexcel IAL') {
-        pushLink({
-          href: '/textbooks/ial',
-          label: 'Edexcel IAL Textbooks & Solution Banks',
-          onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IAL'); setFilterDocType('Book'); setForceShowTable(true); }
-        });
-      }
-      if (filterCurriculum !== 'Edexcel IGCSE') {
-        pushLink({
-          href: '/textbooks/igcse',
-          label: 'Edexcel IGCSE (9-1) Textbooks',
-          onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IGCSE'); setFilterDocType('Book'); setForceShowTable(true); }
-        });
-      }
-      const bookCurrs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
-      for (const bCurr of bookCurrs) {
-        const bCurrSlug = getCurriculumSlug(bCurr);
-        const bSubjects = Array.from(SUBJECTS_WITH_BOOKS[bCurr] || []).sort();
-        for (const bSubj of bSubjects) {
-          pushLink({
-            href: `/textbooks/${bCurrSlug}/${getSubjectSlug(bSubj)}`,
-            label: `${bCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} ${formatSubjectDisplay(bSubj)} Books`,
-            onClick: () => {
-              setIsNotFound(false);
-              setFilterCurriculum(bCurr);
-              setFilterSubject(bSubj);
-              setFilterUnit('');
-              setFilterYear('');
-              setFilterDocType('Book');
-              setForceShowTable(true);
-            }
-          });
-        }
-      }
-    } else if (filterDocType === 'DF') {
-      pushLink({
-        href: '/ial/information-technology',
-        label: 'IAL Information Technology',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Information Technology'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/igcse/computer-science',
-        label: 'IGCSE Computer Science',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Computer Science'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/igcse/information-technology',
-        label: 'IGCSE Information Technology',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Information Technology'); setForceShowTable(true); }
-      });
-    } else if (filterDocType === 'AUD') {
-      pushLink({
-        href: '/ial/french',
-        label: 'IAL French Papers',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('French'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/ial/german',
-        label: 'IAL German Papers',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('German'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/ial/spanish',
-        label: 'IAL Spanish Papers',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Spanish'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/igcse/english-as-a-second-language',
-        label: 'IGCSE ESL Papers',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('English as a Second Language'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/igcse/french',
-        label: 'IGCSE French Papers',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('French'); setForceShowTable(true); }
-      });
-    } else if (filterCurriculum) {
-      pushLink({
-        href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
-        label: `${filterCurriculum} Textbooks`,
-        onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/data-files',
-        label: 'IT & CS Data Files',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/audio',
-        label: 'Listening Audio Archive',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
-      });
-      const subjPool = filterCurriculum === 'Edexcel IGCSE'
-        ? (meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT)
-        : (meta?.ialSubjects || IAL_SUBJECTS_DEFAULT);
-      for (const sName of subjPool) {
-        pushLink({
-          href: `/${currSlug}/${getSubjectSlug(sName)}`,
-          label: formatSubjectDisplay(sName),
-          onClick: () => {
-            setIsNotFound(false);
-            setFilterCurriculum(filterCurriculum);
-            setFilterSubject(sName);
-            setFilterUnit('');
-            setFilterDocType(null);
-            setForceShowTable(true);
-          }
-        });
-      }
-    }
-
-    let note = 'Every sitting pairs Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for instant on-site Split View inspection.';
-    if (filterDocType === 'Book') {
-      note = `Archived Edexcel student books${filterCurriculum === 'Edexcel IAL' || filterSubject === 'Math' ? ' and worked Solution Banks' : ''} with range-streamed WebPDF viewing.`;
-    } else if (filterDocType === 'DF') {
-      note = 'Practical examination source archives (.zip) for IT and Computer Science coding, spreadsheet, database, and web tasks.';
-    } else if (filterDocType === 'AUD') {
-      note = 'Edexcel IAL & IGCSE listening examination audio tracks (MP3/ZIP) with synchronized transcripts and in-app playback alongside question papers.';
-    }
-
-    if (!legacyInfo && links.length === 0 && !filterCurriculum && !filterSubject) return null;
-
-    const heading = filterUnit
-      ? `${effCurr} ${subjDisplay} — ${filterUnit}`
-      : filterSubject
-        ? `${effCurr} ${subjDisplay} Specification & Resources`
-        : filterDocType === 'Book'
-          ? 'Edexcel Student Textbooks & Worked Solution Banks'
-          : filterDocType === 'DF'
-            ? 'Practical Examination Source Files (.zip)'
-            : filterDocType === 'AUD'
-              ? 'IAL & IGCSE Listening Audio Tracks (.mp3)'
-              : `${filterCurriculum || 'Edexcel Archive'} Resource Guide`;
-
-    return { heading, legacyInfo, note, links };
-  }, [currentTab, isNotFound, showWelcome, filterCurriculum, filterSubject, filterUnit, filterDocType, clearFilters, meta]);
+  const archiveContextInfo = useMemo(() => buildArchiveContextInfo({
+    currentTab,
+    isNotFound,
+    showWelcome,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterDocType,
+    meta,
+    actions: archiveContextActions
+  }), [currentTab, isNotFound, showWelcome, filterCurriculum, filterSubject, filterUnit, filterDocType, meta, archiveContextActions]);
 
   const welcomeDataProp = useMemo(() => ({ meta }), [meta]);
 
@@ -1750,6 +1272,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <Header
         isMobile={isMobile}
         showWelcome={showWelcome}
@@ -1783,13 +1306,13 @@ function App() {
       )}
 
       <div className="main-layout">
-        <main className="content-area">
+        <main id="main-content" className="content-area" tabIndex={-1}>
           {currentTab === 'about' ? (
-            <Suspense fallback={<div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading About...</div>}>
+            <Suspense fallback={<SecondaryPageSkeleton label="Loading About page" />}>
               <AboutPage onGoHome={() => handleOpenTab('library')} />
             </Suspense>
           ) : currentTab === 'changelog' ? (
-            <Suspense fallback={<div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Loading Changelog...</div>}>
+            <Suspense fallback={<SecondaryPageSkeleton label="Loading Changelog page" />}>
               <ChangelogPage onGoHome={() => handleOpenTab('library')} />
             </Suspense>
           ) : isNotFound ? (
@@ -1801,23 +1324,25 @@ function App() {
               />
             </Suspense>
           ) : showWelcome ? (
-            <WelcomePage
-              data={welcomeDataProp}
-              recentHistory={recentHistory}
-              selectedSubject={wizardSubject}
-              selectedUnit={wizardUnit}
-              onWizardSubjectChange={setWizardSubject}
-              onWizardUnitChange={setWizardUnit}
-              onOpenPaper={openOnSiteReader}
-              onClearHistory={handleClearHistory}
-              getOnSitePaperUrl={getOnSitePaperUrl}
-              onSubjectSelect={handleSubjectSelect}
-              onViewAll={handleViewAll}
-              onBrowseTextbooks={handleBrowseTextbooks}
-              onBrowseAudio={handleBrowseAudio}
-              onTrySampleAudio={handleTrySampleAudio}
-              onSelectFinalFilter={handleSelectFinalFilter}
-            />
+            <Suspense fallback={<SecondaryPageSkeleton label="Loading Library Home" />}>
+              <WelcomePage
+                data={welcomeDataProp}
+                recentHistory={recentHistory}
+                selectedSubject={wizardSubject}
+                selectedUnit={wizardUnit}
+                onWizardSubjectChange={setWizardSubject}
+                onWizardUnitChange={setWizardUnit}
+                onOpenPaper={openOnSiteReader}
+                onClearHistory={handleClearHistory}
+                getOnSitePaperUrl={getOnSitePaperUrl}
+                onSubjectSelect={handleSubjectSelect}
+                onViewAll={handleViewAll}
+                onBrowseTextbooks={handleBrowseTextbooks}
+                onBrowseAudio={handleBrowseAudio}
+                onTrySampleAudio={handleTrySampleAudio}
+                onSelectFinalFilter={handleSelectFinalFilter}
+              />
+            </Suspense>
           ) : (
             <>
               <PaperTable
@@ -1855,20 +1380,26 @@ function App() {
       {previewFile && (
         <Suspense
           fallback={(
-            <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Loading Study Reader">
-              <div className="modal-container" style={{ background: 'var(--bg-surface)', width: '96vw', height: '94vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal-backdrop">
+              <div
+                className="modal-container"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Loading Study Reader"
+                style={{ background: 'var(--bg-surface)', width: '96vw', height: '94vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
                 <PdfPaneSkeleton title="Opening Study Reader..." />
               </div>
             </div>
           )}
         >
           <PreviewModal
-            key={`${previewFile.isPendingSkeleton ? 'pending-' : ''}${previewFile.id || previewFile.path}`}
+            key={`${previewFile.isPendingSkeleton ? 'pending-' : ''}${previewFile.isNotFound ? 'missing-' : ''}${previewFile.id || previewFile.path}`}
             file={previewFile}
             initialView={previewInitialView}
             onViewModeChange={(nextMode) => setPreviewInitialView(nextMode)}
-            showViews={isQuestionPaperEligibleForViews(previewFile)}
-            viewsCount={isQuestionPaperEligibleForViews(previewFile) ? getPaperTotalViews(previewFile, viewsMap) : 0}
+            showViews={!previewFile.isNotFound && isQuestionPaperEligibleForViews(previewFile)}
+            viewsCount={!previewFile.isNotFound && isQuestionPaperEligibleForViews(previewFile) ? getPaperTotalViews(previewFile, viewsMap) : 0}
             onClose={() => {
               setPreviewFile(null);
               setPendingPaperParam('');
@@ -1880,6 +1411,7 @@ function App() {
             }}
             theme={theme}
             onToggleTheme={toggleTheme}
+            openerRef={modalOpenerRef}
           />
         </Suspense>
       )}

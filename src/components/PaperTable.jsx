@@ -150,6 +150,7 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
                     onOpenReader(file, key);
                   }}
                   className={`unified-doc-btn ${cls}`}
+                  aria-label={`${desc} — ${displayTitle}`}
                   title={`${desc} — ${doc.name} (${formatBytes(doc.size)})`}
                 >
                   <span className="btn-desktop-text">{desktop}</span>
@@ -183,6 +184,7 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
                     onOpenReader(file, extraType);
                   }}
                   className={`unified-doc-btn ${extraType === 'AUD' ? 'aud' : 'extra'}`}
+                  aria-label={`Open ${labelMap[extraType] || extraType} — ${displayTitle}`}
                   title={`Open ${extraType === 'SC' ? scFullLabel : (DOC_TYPE_INFO[extraType]?.fullLabel || extraType)} on-site — ${extraDoc.name}`}
                 >
                   <span className="btn-desktop-text">{labelMap[extraType] || extraType}</span>
@@ -204,6 +206,7 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
                   onOpenReader(file, 'split');
                 }}
                 className="unified-preview-btn split-btn"
+                aria-label={`Split View (Question Paper & Mark Scheme) — ${displayTitle}`}
                 title="Open Question Paper and Mark Scheme side by side in Split View"
               >
                 <span className="btn-desktop-text">Split View</span>
@@ -226,6 +229,7 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
                   onOpenReader(file, file.docType || 'Book');
                 }}
                 className={`unified-doc-btn ${badge?.cls === 'book' || badge?.cls === 'sol' ? 'book' : (badge?.cls || 'extra')}`}
+                aria-label={`${badge?.cls === 'book' ? 'Open Textbook' : badge?.cls === 'sol' ? 'Worked Solutions' : `Open ${badge?.fullLabel || 'Resource'}`} — ${displayTitle}`}
               >
                 <span className="btn-desktop-text">
                   {badge?.cls === 'book'
@@ -401,15 +405,15 @@ export function PaperTable({
           <table className="file-table">
             <thead>
               <tr>
-                <th className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
+                <th scope="col" className="col-sitting" style={{ width: viewMode === 'unified' ? '40%' : '50%' }}>
                   {filterDocType === 'Book'
                     ? 'Textbook / Solution Resource'
                     : viewMode === 'unified' ? 'Exam Sitting / Resource' : 'Document'}
                 </th>
-                <th className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>
+                <th scope="col" className="col-series" style={{ width: viewMode === 'unified' ? '19%' : '26%' }}>
                   {filterDocType === 'Book' ? 'Course & Category' : viewMode === 'unified' ? 'Series' : 'Course & Session'}
                 </th>
-                <th className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
+                <th scope="col" className="col-actions" style={{ width: viewMode === 'unified' ? '41%' : '24%' }}>
                   {filterDocType === 'Book'
                     ? 'Open Textbook / Resource'
                     : viewMode === 'unified' ? 'Open Paper / Mark Scheme / Report' : 'Type & Quick Links'}
@@ -434,7 +438,7 @@ export function PaperTable({
           {totalMatchedCount > visibleFiles.length && (
             <div className="pagination-bar">
               <span className="pagination-info">
-                Showing <strong>{visibleFiles.length}</strong> of <strong>{totalMatchedCount.toLocaleString()}</strong> matching documents
+                Showing <strong>{visibleFiles.length}</strong> of <strong>{totalMatchedCount.toLocaleString()}</strong> {viewMode === 'unified' ? 'matching exam sittings' : 'matching documents'}
               </span>
               <div className="pagination-actions">
                 <button

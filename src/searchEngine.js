@@ -368,7 +368,7 @@ export function buildCatalogVocab(flatFiles = []) {
 /**
  * Fast bounded Damerau-Levenshtein distance using reusable typed arrays.
  */
-export function damerauLevenshtein(a, b, maxDist = 2) {
+function damerauLevenshtein(a, b, maxDist = 2) {
   const lenA = a.length;
   const lenB = b.length;
   if (Math.abs(lenA - lenB) > maxDist) return maxDist + 1;

@@ -1,7 +1,7 @@
 // Shared unit normalization, variant parsing, and filename metadata utilities
 // Used across Node build scripts (scripts/generate-index.js) and the browser SPA (src/App.jsx)
 
-export const UNIT_FRIENDLY_NAMES = {
+const UNIT_FRIENDLY_NAMES = {
   // Math
   'WME01': 'Mechanics 1 (WME01)',
   'WME02': 'Mechanics 2 (WME02)',
@@ -107,7 +107,7 @@ export const UNIT_FRIENDLY_NAMES = {
   'WSP04': 'Spanish Unit 4 (WSP04)'
 };
 
-export const CODE_ALIAS_MAP = {
+const CODE_ALIAS_MAP = {
   'WMA11R': 'WMA11',
   'WMA12R': 'WMA12',
   'WMA13R': 'WMA13',
@@ -134,7 +134,7 @@ export const CODE_ALIAS_MAP = {
   '6BI06': 'WBI16'
 };
 
-export const SUBJECT_UNIT_CODE_MAP = {
+const SUBJECT_UNIT_CODE_MAP = {
   'Accounting': { 1: 'WAC11', 2: 'WAC12' },
   'Arabic': { 1: 'WAA01', 2: 'WAA02' },
   'Biology': { 1: 'WBI11', 2: 'WBI12', 3: 'WBI13', 4: 'WBI14', 5: 'WBI15', 6: 'WBI16' },
@@ -155,7 +155,7 @@ export const SUBJECT_UNIT_CODE_MAP = {
   'Spanish': { 1: 'WSP01', 2: 'WSP02', 3: 'WSP03', 4: 'WSP04' }
 };
 
-export const MATH_UNIT_CODE_MAP = {
+const MATH_UNIT_CODE_MAP = {
   'P1': 'WMA11', 'P1A': 'WMA11', 'P1R': 'WMA11',
   'P2': 'WMA12', 'P2A': 'WMA12', 'P2R': 'WMA12',
   'P3': 'WMA13', 'P3A': 'WMA13', 'P3R': 'WMA13',
@@ -178,7 +178,7 @@ export const MATH_UNIT_CODE_MAP = {
   'D1': 'WDM11', 'D1A': 'WDM11', 'D1R': 'WDM11'
 };
 
-export const MONTH_MAP = {
+const MONTH_MAP = {
   'jan': { num: 1, full: 'January' },
   'january': { num: 1, full: 'January' },
   'feb': { num: 2, full: 'February' },
@@ -211,7 +211,7 @@ export const MONTH_MAP = {
   'december': { num: 12, full: 'December' }
 };
 
-export const SUBJECT_FOLDER_NORMALIZER = {
+const SUBJECT_FOLDER_NORMALIZER = {
   'accounting': 'Accounting',
   'arabic': 'Arabic',
   'art & design': 'Art and Design',
@@ -381,7 +381,7 @@ const SUBJECT_CLEAN_UNIT_LABELS = {
 
 export { isLegacyIalUnitLabel, compareUnitLabels } from './lib/unitSort.js';
 
-export function getCurriculum(file) {
+function getCurriculum(file) {
   const p = file.path || '';
   const cat = file.category || '';
   const spec = file.spec || '';
@@ -391,7 +391,7 @@ export function getCurriculum(file) {
   return 'Edexcel IAL';
 }
 
-export function normalizeCode(rawCode) {
+function normalizeCode(rawCode) {
   const upper = String(rawCode || '').toUpperCase();
   return CODE_ALIAS_MAP[upper] || upper;
 }
@@ -422,9 +422,9 @@ export function detectDocType(name, pathStr) {
   }
 
   // Explicit Pearson filename code suffixes take precedence over potentially misfiled folder names
-  if (/[-_](?:rms|msc|mcs|eams)[-_.]/.test(name)) return 'MS';
-  if (/[-_](?:pef|perf)(?:[-_.]|$)/.test(name)) return 'ER';
-  if (/[-_]que[-_.]/.test(name)) return 'QP';
+  if (/[-_](?:rms|msc|mcs|eams)[-_.]/i.test(name)) return 'MS';
+  if (/[-_](?:pef|perf)(?:[-_.]|$)/i.test(name)) return 'ER';
+  if (/[-_]que[-_.]/i.test(name)) return 'QP';
 
   // Standard Past Paper types (QP, MS, ER)
   if (/question[-_\s]?paper|(?:^|[^a-z0-9])qp(?:[^a-z0-9]|\d|$)|[-_]que[-_.]|modified[-_\s]*papers?|externally[-_\s]*(?:assessed|set)/i.test(combined)) return 'QP';
@@ -762,7 +762,7 @@ export function getCleanUnitLabel(file) {
   if (curr === 'Edexcel IGCSE') {
     const mP = code.match(/^P([1-6])$/) || name.match(/^PAPER ([1-6])$/);
     if (mP) return `Paper ${mP[1]} (P${mP[1]})`;
-    return (file.unitName && !file.unitName.includes('.pdf') && !file.unitName.includes('_177'))
+    return (file.unitName && !file.unitName.includes('.pdf') && !/_\d{10,}/.test(file.unitName))
       ? file.unitName
       : null;
   }

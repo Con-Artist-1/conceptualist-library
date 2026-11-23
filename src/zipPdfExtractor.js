@@ -297,10 +297,11 @@ function buildGroupedSolutionEntries(rawEntries) {
   return { groups, entries: flatEntries };
 }
 
-async function refreshArchiveCdnUrl(archiveState) {
+async function refreshArchiveCdnUrl(archiveState, signal = null) {
   if (!archiveState.refreshPromise) {
     archiveState.refreshPromise = fetch(archiveState.originalUrl, {
-      headers: { Range: 'bytes=0-0' }
+      headers: { Range: 'bytes=0-0' },
+      signal: signal || undefined
     })
       .then(async (res) => {
         if (res.url) archiveState.cdnUrl = res.url;
@@ -317,14 +318,16 @@ async function refreshArchiveCdnUrl(archiveState) {
   return archiveState.refreshPromise;
 }
 
-async function fetchArchiveRange(archiveState, begin, endInclusive) {
+async function fetchArchiveRange(archiveState, begin, endInclusive, signal = null) {
   const runFetch = async (attempt = 0) => {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
       const res = await fetch(archiveState.cdnUrl, {
-        headers: { Range: `bytes=${begin}-${endInclusive}` }
+        headers: { Range: `bytes=${begin}-${endInclusive}` },
+        signal: signal || undefined
       });
       if ((res.status === 401 || res.status === 403) && attempt === 0 && archiveState.cdnUrl !== archiveState.originalUrl) {
-        await refreshArchiveCdnUrl(archiveState);
+        await refreshArchiveCdnUrl(archiveState, signal);
         return runFetch(1);
       }
       if (!res.ok) {
@@ -334,6 +337,7 @@ async function fetchArchiveRange(archiveState, begin, endInclusive) {
       const bytes = new Uint8Array(await res.arrayBuffer());
       return { status: res.status, bytes, contentRange: res.headers.get('content-range') || '' };
     } catch (err) {
+      if (signal?.aborted || err?.name === 'AbortError') throw err;
       if (attempt === 0 && archiveState.cdnUrl !== archiveState.originalUrl) {
         archiveState.cdnUrl = archiveState.originalUrl;
         return runFetch(1);
@@ -344,7 +348,7 @@ async function fetchArchiveRange(archiveState, begin, endInclusive) {
   return runFetch(0);
 }
 
-async function loadZipDirectory(url, knownSize = 0) {
+async function loadZipDirectory(url, knownSize = 0, signal = null) {
   const state = {
     originalUrl: url,
     cdnUrl: url,
@@ -358,7 +362,7 @@ async function loadZipDirectory(url, knownSize = 0) {
 
   if (state.totalLength > 0) {
     const start = Math.max(0, state.totalLength - TAIL_PROBE_BYTES);
-    const probe = await fetchArchiveRange(state, start, state.totalLength - 1);
+    const probe = await fetchArchiveRange(state, start, state.totalLength - 1, signal);
     if (probe.status !== 206) {
       state.fullBytes = probe.bytes;
       state.totalLength = probe.bytes.byteLength;
@@ -367,7 +371,7 @@ async function loadZipDirectory(url, knownSize = 0) {
       if (cr && cr.total > 0 && cr.total !== state.totalLength) {
         state.totalLength = cr.total;
         const realStart = Math.max(0, state.totalLength - TAIL_PROBE_BYTES);
-        const realTail = await fetchArchiveRange(state, realStart, state.totalLength - 1);
+        const realTail = await fetchArchiveRange(state, realStart, state.totalLength - 1, signal);
         if (realTail.status !== 206) {
           state.fullBytes = realTail.bytes;
           state.totalLength = realTail.bytes.byteLength;
@@ -381,7 +385,7 @@ async function loadZipDirectory(url, knownSize = 0) {
       }
     }
   } else {
-    const head = await fetchArchiveRange(state, 0, 0);
+    const head = await fetchArchiveRange(state, 0, 0, signal);
     if (head.status !== 206) {
       state.fullBytes = head.bytes;
       state.totalLength = head.bytes.byteLength;
@@ -392,7 +396,7 @@ async function loadZipDirectory(url, knownSize = 0) {
       }
       state.totalLength = cr.total;
       tailStart = Math.max(0, state.totalLength - TAIL_PROBE_BYTES);
-      const tailRes = await fetchArchiveRange(state, tailStart, state.totalLength - 1);
+      const tailRes = await fetchArchiveRange(state, tailStart, state.totalLength - 1, signal);
       if (tailRes.status !== 206) {
         state.fullBytes = tailRes.bytes;
         state.totalLength = tailRes.bytes.byteLength;
@@ -425,7 +429,7 @@ async function loadZipDirectory(url, knownSize = 0) {
       const relStart = cdOffset - tailStart;
       cdBytes = tailBytes.subarray(relStart, relStart + cdSize);
     } else {
-      const cdRes = await fetchArchiveRange(state, cdOffset, cdOffset + cdSize - 1);
+      const cdRes = await fetchArchiveRange(state, cdOffset, cdOffset + cdSize - 1, signal);
       cdBytes = cdRes.bytes;
     }
   }
@@ -443,8 +447,9 @@ async function loadZipDirectory(url, knownSize = 0) {
   };
 }
 
-export async function listZipPdfEntries(url, knownSize = 0) {
+export async function listZipPdfEntries(url, knownSize = 0, { signal } = {}) {
   if (!url) throw new Error('Missing archive URL.');
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   const cached = zipIndexCache.get(url);
   if (cached) {
@@ -456,7 +461,7 @@ export async function listZipPdfEntries(url, knownSize = 0) {
     return inFlightIndexes.get(url);
   }
 
-  const task = loadZipDirectory(url, knownSize)
+  const task = loadZipDirectory(url, knownSize, signal)
     .then((result) => {
       setLruCache(zipIndexCache, url, result, MAX_CACHED_INDEXES);
       return result;
@@ -469,8 +474,9 @@ export async function listZipPdfEntries(url, knownSize = 0) {
   return task;
 }
 
-export async function extractZipPdfEntry(url, entry, knownSize = 0) {
+export async function extractZipPdfEntry(url, entry, knownSize = 0, { signal } = {}) {
   if (!url || !entry) throw new Error('Missing archive entry.');
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const cacheKey = `${url}::${entry.entryPath}`;
 
   const cached = zipPdfCache.get(cacheKey);
@@ -493,7 +499,7 @@ export async function extractZipPdfEntry(url, entry, knownSize = 0) {
 
   const task = (async () => {
     try {
-      const indexInfo = await listZipPdfEntries(url, knownSize);
+      const indexInfo = await listZipPdfEntries(url, knownSize, { signal });
       let sliceBytes = null;
 
       if (indexInfo.fullBytes) {
@@ -503,7 +509,7 @@ export async function extractZipPdfEntry(url, entry, knownSize = 0) {
           indexInfo.totalLength - 1,
           entry.localHeaderOffset + 30 + (entry.cdNameLen || 256) + LOCAL_EXTRA_BUFFER_BYTES + entry.compressedSize - 1
         );
-        const firstSlice = await fetchArchiveRange(indexInfo, entry.localHeaderOffset, estimatedEnd);
+        const firstSlice = await fetchArchiveRange(indexInfo, entry.localHeaderOffset, estimatedEnd, signal);
         if (firstSlice.status !== 206 && firstSlice.bytes.byteLength >= indexInfo.totalLength) {
           indexInfo.fullBytes = firstSlice.bytes;
           sliceBytes = indexInfo.fullBytes.subarray(entry.localHeaderOffset);
@@ -529,7 +535,7 @@ export async function extractZipPdfEntry(url, entry, knownSize = 0) {
         // Rare: local extra field exceeded buffer; fetch missing tail bytes once
         const missingBegin = entry.localHeaderOffset + sliceBytes.byteLength;
         const missingEnd = entry.localHeaderOffset + dataEnd - 1;
-        const tailRes = await fetchArchiveRange(indexInfo, missingBegin, missingEnd);
+        const tailRes = await fetchArchiveRange(indexInfo, missingBegin, missingEnd, signal);
         const combined = new Uint8Array(sliceBytes.byteLength + tailRes.bytes.byteLength);
         combined.set(sliceBytes, 0);
         combined.set(tailRes.bytes, sliceBytes.byteLength);
