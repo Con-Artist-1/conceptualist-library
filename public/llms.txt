@@ -1,6 +1,6 @@
 # Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library
 
-> Independent study archive; not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel. Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic study archive indexing 16,021 unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 46 IT & Computer Science practical Data Files (19,882 total archived files covering January 2003 through June 2026).
+> Independent study archive; not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel. Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic study archive indexing 16,051 unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 46 IT & Computer Science practical Data Files (19,912 total archived files covering January 2003 through June 2026).
 
 ## Core Platform Capabilities
 - **Side-by-Side Split View Reader:** Open any paired Question Paper (QP) and Mark Scheme (MS) side by side in the browser with synchronized zoom and draggable split divider.
@@ -10,7 +10,7 @@
 
 ## Primary Archive Hubs
 - [Library Homepage](https://www.conceptualist.uk/): Interactive subject, unit, and examination year navigator.
-- [All Past Papers Catalog](https://www.conceptualist.uk/papers): Full searchable catalog of 16,021 unique Edexcel resources.
+- [All Past Papers Catalog](https://www.conceptualist.uk/papers): Full searchable catalog of 16,051 unique Edexcel resources.
 - [Edexcel IAL Past Papers](https://www.conceptualist.uk/ial): 19 International A-Level subjects (2003-2026).
 - [Edexcel IGCSE Past Papers](https://www.conceptualist.uk/igcse): 43 International GCSE (9-1, Regional R, and Modular 4W*) subjects.
 - [Textbooks & Worked Solution Banks](https://www.conceptualist.uk/textbooks): 73 student books, answer PDFs, lab books, and IAL Maths Solution Banks.
@@ -22,7 +22,7 @@
 ## Edexcel International A-Level (IAL) Subjects (19)
 - [Edexcel IAL Accounting](https://www.conceptualist.uk/ial/accounting): 264 unique files across 2 units.
 - [Edexcel IAL Arabic](https://www.conceptualist.uk/ial/arabic): 102 unique files across 2 units.
-- [Edexcel IAL Biology](https://www.conceptualist.uk/ial/biology): 780 unique files across 12 units.
+- [Edexcel IAL Biology](https://www.conceptualist.uk/ial/biology): 783 unique files across 12 units.
 - [Edexcel IAL Business](https://www.conceptualist.uk/ial/business): 409 unique files across 8 units.
 - [Edexcel IAL Chemistry](https://www.conceptualist.uk/ial/chemistry): 764 unique files across 13 units.
 - [Edexcel IAL Economics](https://www.conceptualist.uk/ial/economics): 510 unique files across 11 units.
@@ -36,7 +36,7 @@
 - [Edexcel IAL Information Technology](https://www.conceptualist.uk/ial/information-technology): 135 unique files across 4 units.
 - [Edexcel IAL Law](https://www.conceptualist.uk/ial/law): 118 unique files across 2 units.
 - [Edexcel IAL Mathematics](https://www.conceptualist.uk/ial/mathematics): 2317 unique files across 20 units.
-- [Edexcel IAL Physics](https://www.conceptualist.uk/ial/physics): 844 unique files across 12 units.
+- [Edexcel IAL Physics](https://www.conceptualist.uk/ial/physics): 845 unique files across 12 units.
 - [Edexcel IAL Psychology](https://www.conceptualist.uk/ial/psychology): 295 unique files across 4 units.
 - [Edexcel IAL Spanish](https://www.conceptualist.uk/ial/spanish): 186 unique files across 4 units.
 
@@ -51,7 +51,7 @@
 - [Edexcel IGCSE Chemistry (4CH1 / 4WCH1)](https://www.conceptualist.uk/igcse/chemistry): 323 unique files.
 - [Edexcel IGCSE Chinese (4CN1)](https://www.conceptualist.uk/igcse/chinese): 217 unique files.
 - [Edexcel IGCSE Commerce (4CM1 / 4WCM1)](https://www.conceptualist.uk/igcse/commerce): 187 unique files.
-- [Edexcel IGCSE Computer Science (4CP0)](https://www.conceptualist.uk/igcse/computer-science): 80 unique files.
+- [Edexcel IGCSE Computer Science (4CP0)](https://www.conceptualist.uk/igcse/computer-science): 82 unique files.
 - [Edexcel IGCSE Economics (4EC1 / 4WEC1)](https://www.conceptualist.uk/igcse/economics): 241 unique files.
 - [Edexcel IGCSE English Language A (4EA1 / 4WEA1)](https://www.conceptualist.uk/igcse/english-language-a): 357 unique files.
 - [Edexcel IGCSE English Language B (4EB1)](https://www.conceptualist.uk/igcse/english-language-b): 158 unique files.
@@ -65,7 +65,7 @@
 - [Edexcel IGCSE Greek (First Language) (4GK1)](https://www.conceptualist.uk/igcse/greek-first-language): 41 unique files.
 - [Edexcel IGCSE Gujarati (4GU0)](https://www.conceptualist.uk/igcse/gujarati): 27 unique files.
 - [Edexcel IGCSE Hindi (4HN0)](https://www.conceptualist.uk/igcse/hindi): 18 unique files.
-- [Edexcel IGCSE History (4HI1 / 4WHI1)](https://www.conceptualist.uk/igcse/history): 169 unique files.
+- [Edexcel IGCSE History (4HI1 / 4WHI1)](https://www.conceptualist.uk/igcse/history): 193 unique files.
 - [Edexcel IGCSE Human Biology (4HB1)](https://www.conceptualist.uk/igcse/human-biology): 260 unique files.
 - [Edexcel IGCSE Information Technology (4IT1)](https://www.conceptualist.uk/igcse/information-technology): 171 unique files.
 - [Edexcel IGCSE Islamic Studies (4IS1)](https://www.conceptualist.uk/igcse/islamic-studies): 20 unique files.

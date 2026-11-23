@@ -7,7 +7,7 @@
  * packs >= 5 MB PDFs lacking /ObjStm via qpdf (when installed), and runs generate-index.js.
  *
  * Usage:
- *   sync-sources.js [--apply] [--sources=bsr,dp,igexams,ssc,pmt,pl] [--since=2025]
+ *   sync-sources.js [--apply] [--sources=bsr,dp,igexams,ssc,pmt,pl,elevare] [--since=2025]
  *                   [--qpdf=<path-to-qpdf.exe>] [--skip-pack] [--skip-index] [--limit=N]
  */
 import fs from 'fs';
@@ -66,7 +66,7 @@ function parseArgs(argv) {
   const opts = {
     apply: false,
     verbose: false,
-    sources: ['bsr', 'dp', 'igexams', 'ssc', 'pmt', 'pl'],
+    sources: ['bsr', 'dp', 'igexams', 'ssc', 'pmt', 'pl', 'elevare'],
     sinceYear: 0,
     qpdfPath: '',
     skipPack: false,
@@ -114,6 +114,7 @@ function normalizeHttpUrl(rawUrl, baseUrl = '') {
 function sanitizeFileName(name) {
   return decodeHtml(name)
     .replace(/[<>:"/\\|?*]+/g, '-')
+    .replace(/(\.[a-z0-9]{2,5})\1$/i, '$1')
     .replace(/_\d{12,15}(?=\.[^.]+$)/, '')
     .replace(/\s+/g, ' ')
     .replace(/\s+\(\d+\)(?=\.[^.]+$)/, '')
@@ -217,6 +218,9 @@ function buildLibraryDedupState() {
       const fh = v.startsWith('F') ? 'F' : (v.startsWith('H') ? 'H' : '');
       looseKeys.add(`${f.spec}|${f.subject}|ANY_ER|${fh}|${rv}|${sk}|ER`);
       looseKeys.add(`${f.spec}|${f.subject}|ANY_ER||${rv}|${sk}|ER`);
+      if (/^ER[2-9]\d*$/i.test(v)) {
+        looseKeys.add(`${f.spec}|${f.subject}|ANY_ER||R|${sk}|ER`);
+      }
     }
   }
   return { exactKeys, looseKeys, usedPaths, histVariants };
@@ -382,6 +386,7 @@ async function crawlDriveTree(roots, sinceYear) {
         if (ent.isFolder) {
           const folderYr = Number(ent.name.match(/\b(20\d{2})\b/)?.[1] || 0);
           if (sinceYear && folderYr && folderYr < sinceYear) continue;
+          if (/textbook|solution[-_\s]*bank|grade[-_\s]*(?:bound|thresh|charact)|syllabus|spec(?:ification)?\b/i.test(ent.name)) continue;
           if (node.spec === 'IAL' && /\b200\d\b|old\s*spec\s*\(6|gce\s*2008/i.test(ent.name)) continue;
           if (node.depth < 4) {
             queue.push({
@@ -637,6 +642,202 @@ async function crawlPaperlords() {
   return out;
 }
 
+// Safely parses a JS object literal (double-quoted strings + unquoted identifier keys) into JSON without eval/vm.
+function parseJsObjectLiteral(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  let inStr = false;
+  let esc = false;
+  while (i < n) {
+    const ch = src[i];
+    if (inStr) {
+      out += ch;
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = true;
+      out += ch;
+      i++;
+      continue;
+    }
+    // Quote unquoted object keys after '{' or ','
+    if (/[A-Za-z_$]/.test(ch)) {
+      let j = i;
+      while (j < n && /[A-Za-z0-9_$]/.test(src[j])) j++;
+      const word = src.slice(i, j);
+      let k = j;
+      while (k < n && /\s/.test(src[k])) k++;
+      if (src[k] === ':') {
+        out += `"${word}"`;
+        i = j;
+        continue;
+      }
+      out += word;
+      i = j;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return JSON.parse(out);
+}
+
+function extractAssignedObjectLiteral(code, marker) {
+  const idx = code.indexOf(marker);
+  if (idx === -1) return null;
+  const start = code.indexOf('{', idx + marker.length);
+  if (start === -1) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < code.length; i++) {
+    const ch = code[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return parseJsObjectLiteral(code.slice(start, i + 1));
+    }
+  }
+  return null;
+}
+
+function normalizeElevarePaperTag(spec, paperLabel = '') {
+  let tag = String(paperLabel || '').trim();
+  if (!tag) return '';
+  // Normalize parenthesized variants like "Unit 1 (R)" -> "U1R", "Paper 1 (HR)" -> "Paper 1HR", "D1 (A)" -> "D1A"
+  tag = tag
+    .replace(/\bUnit\s+([1-6])\s*\(([A-Za-z]+)\)/gi, 'U$1$2')
+    .replace(/\bUnit\s+([1-6])\b/gi, spec === 'IGCSE' ? 'Unit $1 Modular' : 'U$1')
+    .replace(/\bPaper\s+([1-4])\s*\(([A-Za-z]+)\)/gi, 'Paper $1$2')
+    .replace(/\b(P[1-4]|C12|C34|C[1-4]|M[1-3]|S[1-3]|FP[1-3]|D1)\s*\(([A-Za-z]+)\)/gi, '$1$2')
+    .replace(/\s+/g, '_');
+  return tag;
+}
+
+async function crawlElevare(sinceYear) {
+  console.log('[Elevare] Fetching https://elevareisonline.com/papers ...');
+  const baseUrl = 'https://elevareisonline.com/';
+  let pastPapersUrl = `${baseUrl}past-papers.js`;
+  let workspaceUrl = `${baseUrl}papers-workspace.js`;
+  try {
+    const html = await fetch(`${baseUrl}papers`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
+    const ppMatch = html.match(/src=["']([^"']*past-papers\.js[^"']*)["']/i);
+    if (ppMatch) pastPapersUrl = normalizeHttpUrl(ppMatch[1], `${baseUrl}papers`) || pastPapersUrl;
+    const wsMatch = html.match(/src=["']([^"']*papers-workspace\.js[^"']*)["']/i);
+    if (wsMatch) workspaceUrl = normalizeHttpUrl(wsMatch[1], `${baseUrl}papers`) || workspaceUrl;
+  } catch (err) {
+    console.warn('[Elevare] /papers discovery failed, using default asset paths:', err?.message || err);
+  }
+
+  // 1. Discover Edexcel IAL & IGCSE Google Drive roots from past-papers.js (strictly excluding Cambridge)
+  const driveRoots = [];
+  try {
+    const ppCode = await fetch(pastPapersUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
+    const ppObj = extractAssignedObjectLiteral(ppCode, 'var s=');
+    const edexcel = ppObj?.Edexcel || {};
+    for (const spec of ['IAL', 'IGCSE']) {
+      for (const [title, driveUrl] of Object.entries(edexcel[spec] || {})) {
+        if (typeof driveUrl === 'string' && driveUrl.includes('drive.google.com')) {
+          driveRoots.push({ source: 'Elevare', spec, title, driveUrl });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Elevare] past-papers.js parse skipped:', err?.message || err);
+  }
+
+  console.log(`[Elevare] Found ${driveRoots.length} Edexcel IAL/IGCSE Drive roots; crawling folders...`);
+  const driveFiles = await crawlDriveTree(driveRoots, sinceYear);
+  // Prefer canonical Edexcel_* filenames before short duplicates within the same Drive folder
+  driveFiles.sort((a, b) => {
+    const aEd = /^Edexcel_/i.test(a.name) ? 0 : 1;
+    const bEd = /^Edexcel_/i.test(b.name) ? 0 : 1;
+    return aEd - bEd || a.name.localeCompare(b.name);
+  });
+
+  const seenDriveIds = new Set(driveFiles.map(f => f.id).filter(Boolean));
+
+  // 2. Supplement from curated edexcel_ial.js & edexcel_igcse.js catalogs for any Drive IDs missed by folder walk
+  const catalogTargets = [
+    { spec: 'IAL', file: 'edexcel_ial.js', marker: 'window.EDEXCEL_IAL_PAPERS=' },
+    { spec: 'IGCSE', file: 'edexcel_igcse.js', marker: 'window.EDEXCEL_IGCSE_PAPERS=' }
+  ];
+  try {
+    const wsCode = await fetch(workspaceUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) }).then(r => r.text());
+    const catMatch = wsCode.match(/catalogFiles\s*=\s*\{[\s\S]{0,300}Edexcel\s*:\s*\{([^}]+)\}/);
+    if (catMatch) {
+      const ialF = catMatch[1].match(/IAL\s*:\s*["']([^"']+)["']/)?.[1];
+      const igF = catMatch[1].match(/IGCSE\s*:\s*["']([^"']+)["']/)?.[1];
+      if (ialF) catalogTargets[0].file = ialF;
+      if (igF) catalogTargets[1].file = igF;
+    }
+  } catch { /* fallback to default catalog filenames */ }
+
+  const curatedExtras = [];
+  for (const target of catalogTargets) {
+    try {
+      const code = await fetch(`${baseUrl}${target.file}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(45000) }).then(r => r.text());
+      const catalog = extractAssignedObjectLiteral(code, target.marker);
+      if (!catalog) continue;
+      for (const subjEntry of Object.values(catalog)) {
+        if (subjEntry?.board && !/^edexcel$/i.test(subjEntry.board)) continue;
+        const spec = /^igcse$/i.test(subjEntry?.level || '') ? 'IGCSE' : target.spec;
+        const title = subjEntry?.subject || '';
+        for (const sess of (subjEntry?.sessions || [])) {
+          const yr = Number(sess?.year || 0);
+          if (sinceYear && yr && yr < sinceYear) continue;
+          const sessLabel = sess?.session_title || `${sess?.year || ''} ${sess?.season || ''}`.trim();
+          for (const p of (sess?.papers || [])) {
+            const pLabel = String(p?.paper || '').trim();
+            if (/grade\s*thresh|grade\s*bound|syllabus|spec/i.test(pLabel)) continue;
+            const paperTag = normalizeElevarePaperTag(spec, pLabel);
+            const cleanSubj = title.replace(/\s+/g, '_');
+            const cleanSess = sessLabel.replace(/\s*\/\s*/g, '-').replace(/\s+/g, '_');
+            const emit = (id, dtTag, explicitName = '') => {
+              if (!id || seenDriveIds.has(id)) return;
+              seenDriveIds.add(id);
+              const fileName = explicitName || `Edexcel_${spec}_${cleanSubj}_${cleanSess}_${paperTag}_${dtTag}.pdf`;
+              curatedExtras.push({
+                source: 'Elevare',
+                spec,
+                title,
+                folderPath: sessLabel,
+                id,
+                name: fileName,
+                url: `https://drive.google.com/uc?export=download&id=${id}`
+              });
+            };
+            emit(p?.qp, 'QP');
+            emit(p?.ms, 'MS');
+            emit(p?.er, 'ER');
+            if (p?.zip) {
+              const zName = p.zip_name || `Edexcel_${spec}_${cleanSubj}_${cleanSess}_${paperTag}_DATA.zip`;
+              emit(p.zip, 'DF', zName);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[Elevare] ${target.file} parse skipped:`, err?.message || err);
+    }
+  }
+
+  console.log(`[Elevare] Collected ${driveFiles.length} Drive files + ${curatedExtras.length} curated-only files.`);
+  return [...driveFiles, ...curatedExtras];
+}
+
 function planItems(rawItems, state, sinceYear) {
   const planned = [];
   const seenByKey = new Map();
@@ -649,7 +850,7 @@ function planItems(rawItems, state, sinceYear) {
     const folderPath = decodeHtml(item.folderPath || '');
     const fullPath = folderPath ? `${folderPath}/${name}` : name;
 
-    if (/grade[-_\s]?bound|grade[-_\s]?charact|syllabus|spec(?:ification)?\b|formula|timetabl|coursework|teacher[-_\s]*guide|revision|\bnotes?\b|toaz\.info|4IT1_02_DATA_FILES_2311\/|(?:^|[^a-z0-9])(?:aqa|ocr|cie|cambridge|wjec|eduqas)(?:[^a-z0-9]|$)/i.test(fullPath)) {
+    if (/grade[-_\s]?bound|grade[-_\s]?thresh|grade[-_\s]?charact|syllabus|spec(?:ification)?\b|formula|timetabl|coursework|teacher[-_\s]*guide|revision|\bnotes?\b|toaz\.info|4IT1_02_DATA_FILES_2311\/|(?:^|[^a-z0-9])(?:aqa|ocr|cie|cambridge|wjec|eduqas)(?:[^a-z0-9]|$)/i.test(fullPath)) {
       continue;
     }
     if (item.spec === 'IGCSE' && /(?:^|[^a-z0-9])1[a-z]{2}\d(?:[^a-z0-9]|$)/i.test(fullPath)) {
@@ -664,6 +865,7 @@ function planItems(rawItems, state, sinceYear) {
     if (item.spec === 'IAL' && !isStrictTrueIal(subj, fullPath, sessKey)) continue;
 
     let dt = detectDocType(name, folderPath);
+    if (!dt && (ext === 'zip' || ext === 'rar') && /(?:^|[^a-z0-9])data(?:[^a-z0-9]|$)/i.test(fullPath)) dt = 'DF';
     if (!dt && (/^(?:4\d{4}|W4\d{4}|53\d{3})/.test(name) || /IAL_Geography WGE\d{2}/i.test(name))) dt = 'QP';
     if (!dt || dt === 'SAM') continue;
 
@@ -673,7 +875,20 @@ function planItems(rawItems, state, sinceYear) {
     const probePath = `Past Papers/${item.spec}/${subj}/${yrStr}/${moFolder}/${subFolder}/${fullPath.replace(/\//g, '_')}_${name}`;
     let u = extractUnitInfo(probePath, subj, item.spec).unitCode;
     if (item.spec === 'IAL' && subj === 'Law' && /yla1[-_\s]*02/i.test(fullPath)) u = 'YLA2';
-    const v = extractVariant({ path: probePath, name, subject: subj, spec: item.spec });
+    if (item.spec === 'IAL' && !u) {
+      const glued = name.match(/(W[A-Z]{2}\d{2})/i);
+      if (glued) u = glued[1].toUpperCase();
+    }
+    if (item.spec === 'IGCSE' && !u) {
+      const mFallback = name.match(/(?:^|[^A-Z0-9])(?:(?:Mark[-_\s]*Scheme|Question[-_\s]*Paper)[-_\s]+0?([1-4])[A-Z]*|([1-4])(?:[FBCPH]R?|R[FH])|Paper[-_\s]*([1-4])R[FH]|4[A-Z]{2}[01I][-_\s]*0?([1-4])[A-Z]*)(?:[^A-Z0-9]|$)/i);
+      if (mFallback) u = `P${mFallback[1] || mFallback[2] || mFallback[3] || mFallback[4]}`;
+    }
+    let v = extractVariant({ path: probePath, name, subject: subj, spec: item.spec });
+    if (item.spec === 'IGCSE' && !v) {
+      if (/(?:^|[^A-Z0-9])(?:Paper[-_\s]*)?[12]RF(?:[^A-Z0-9]|$)/i.test(name)) v = 'F-R';
+      else if (/(?:^|[^A-Z0-9])(?:Paper[-_\s]*)?[1-4]RH(?:[^A-Z0-9]|$)/i.test(name)) v = 'H-R';
+      else if (/(?:^|[^A-Z0-9])(?:Mark[-_\s]*Scheme|Question[-_\s]*Paper)[-_\s]+[1-4][BCP]?R(?:[^A-Z0-9]|$)/i.test(name)) v = 'R';
+    }
 
     if (isAlreadyCovered(state, item.spec, subj, u, v, sessKey, dt)) continue;
     const dedupKey = `${item.spec}|${subj}|${(u || '').toUpperCase()}|${normVarKey(item.spec, subj, v)}|${sessKey}|${dt}`;
@@ -704,6 +919,8 @@ function planItems(rawItems, state, sinceYear) {
     const entry = {
       ...item,
       subj,
+      u,
+      v,
       yrStr,
       moCode,
       dt,
@@ -812,7 +1029,7 @@ function packLargePdf(qpdfExe, absPath, tmpPack) {
 
 async function run() {
   const opts = parseArgs(process.argv.slice(2));
-  const crawlers = { bsr: crawlBsr, dp: crawlDynamicPapers, igexams: crawlIgExams, ssc: crawlSsc, pmt: crawlPmt, pl: crawlPaperlords };
+  const crawlers = { bsr: crawlBsr, dp: crawlDynamicPapers, igexams: crawlIgExams, ssc: crawlSsc, pmt: crawlPmt, pl: crawlPaperlords, elevare: crawlElevare };
   const raw = [];
   for (const s of opts.sources) {
     if (!crawlers[s]) { console.warn(`Unknown source ignored: ${s}`); continue; }
@@ -830,8 +1047,9 @@ async function run() {
   console.log(`\n=== SYNC PLAN (${planned.length} new candidates across ${opts.sources.join(',')}) ===`);
   for (const [k, v] of Object.entries(bySubj).sort()) console.log(`  ${k}: ${v}`);
   if (opts.verbose && planned.length) {
-    console.log('\nSample planned items:');
-    for (const p of planned.slice(0, 25)) console.log(`  ${p.relDest}  <--  ${p.url}`);
+    const cap = Math.min(planned.length, 300);
+    console.log(`\nPlanned items (showing ${cap} of ${planned.length}):`);
+    for (const p of planned.slice(0, cap)) console.log(`  [${p.u || '-'}|${p.v || '-'}|${p.dt}] ${p.relDest}  (folder="${p.folderPath}")  <--  ${p.url}`);
   }
 
   if (!opts.apply) {

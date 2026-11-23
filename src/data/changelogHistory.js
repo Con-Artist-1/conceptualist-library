@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v7.3.3',
+    date: '2026-11-23T09:15:00+06:00',
+    title: 'Elevare Source Integration & IGCSE History / CS Variant Coverage',
+    summary: 'Added Elevare as a 7th verified Edexcel sync source, refined IGCSE History (4HI1) and Computer Science (4CP0) variant parsing, and filled 30 missing exam papers across 19,912 archived files.',
+    changes: [
+      'Elevare multi-source sync (scripts/sync-sources.js): Added elevareisonline.com/papers as a verified Edexcel-only source covering all 34 IAL/IGCSE Drive roots plus curated catalog fallbacks (strictly excluding Cambridge) with safe object-literal parsing and improved short-name/regional ER deduplication.',
+      'IGCSE History & Computer Science variant parsing (src/unitParser.js): Extended extractVariant to recognize 4HI1 split-option codes (1A/1B/1AR/1BR/2A/2B/2AR/2BR -> OptA/OptB/OptA-R/OptB-R) and 4CP0 language mark schemes (4CP0_2A/2B/2C -> P2A/P2B/P2C), unlocking 24 missing 2021–2022 IGCSE History papers and 2 Oct-Nov 2020 Computer Science mark schemes.',
+      'Archive completeness: Added 30 newly verified Edexcel PDFs in total (including 4 June 2017 IAL Biology/Physics modified-print grids and the WBI05 Scientific Article), bringing the archive to 19,912 total files (16,051 unique records).'
+    ]
+  },
+  {
     version: 'v7.3.2',
     date: '2026-11-23T08:35:00+06:00',
     title: 'Single-Stream Audio Lifecycle & ZIP Track Swap Fix',

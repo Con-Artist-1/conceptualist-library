@@ -689,12 +689,16 @@ export function extractVariant(file) {
   }
 
   if (file.subject === 'History') {
+    const mIgcseHist = p.match(/(?:^|[^A-Z0-9])(?:4HI1[-_\s]*|Paper[-_\s]*|P)[12]([AB])(R)?(?:[^A-Z0-9]|$)/i);
+    if ((file.spec === 'IGCSE' || file.curriculum === 'Edexcel IGCSE' || /IGCSE|4HI1/i.test(p)) && mIgcseHist) {
+      return `Opt${mIgcseHist[1].toUpperCase()}${mIgcseHist[2] ? '-R' : ''}`;
+    }
     const mHist = n.match(/(?:(?:Unit|Paper)[-_\s]*[1-4]|WH[I1]0[1-4][-_\s]*1)([A-D])(?:[^A-Z0-9]|$)/i);
     if (mHist) return `Opt${mHist[1].toUpperCase()}`;
   }
 
   if (file.subject === 'Computer Science') {
-    const mCs = p.match(/(?:^|[^A-Z0-9])P2([A-C])(?:[^A-Z0-9]|$)/i);
+    const mCs = p.match(/(?:^|[^A-Z0-9])(?:P2|Paper[-_\s]*2[-_\s]*|4CP0[-_\s]*0?2)([A-C])(?:[^A-Z0-9]|$)/i);
     if (mCs) return `P2${mCs[1].toUpperCase()}`;
   }
 
