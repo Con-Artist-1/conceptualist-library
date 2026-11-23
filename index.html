@@ -32,7 +32,7 @@
     <link rel="dns-prefetch" href="https://huggingface.co" />
     <link rel="dns-prefetch" href="https://us.aws.cdn.hf.co" />
     <link rel="preload" href="/fonts/roboto-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <meta name="cs-boot" data-bt="__CS_BUILD_TIME__" data-ver="__CS_APP_VERSION__" data-shard="__CS_ROUTE_SHARD__" data-full="__CS_ROUTE_NEEDS_FULL__" />
+    <meta name="cs-boot" data-bt="__CS_BUILD_TIME__" data-ver="__CS_APP_VERSION__" data-shard="__CS_ROUTE_SHARD__" data-full="__CS_ROUTE_NEEDS_FULL__" data-board="__CS_ROUTE_BOARD__" />
     <script>
       (function() {
         document.documentElement.classList.add('js-enabled');
@@ -63,7 +63,7 @@
           document.documentElement.setAttribute('data-theme', fallback);
         }
 
-        // Parallel early fetch: download /meta.json + active route shard (or /index.json on /papers)
+        // Parallel early fetch: download /meta.json + active route shard (or board index)
         // simultaneously with CSS & JS bundles to eliminate the startup network waterfall.
         try {
           var bootEl = document.querySelector('meta[name="cs-boot"]');
@@ -73,13 +73,21 @@
             var shard = bootEl ? (bootEl.getAttribute('data-shard') || '') : '';
             if (shard.indexOf('__CS_') === 0) shard = '';
             var needsFull = (bootEl ? bootEl.getAttribute('data-full') : '') === '1';
+            var board = bootEl ? (bootEl.getAttribute('data-board') || '') : '';
+            if (board.indexOf('__CS_') === 0) board = '';
+            var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+            var segs = p.split('/').filter(Boolean);
+            if (!board) {
+              board = (segs[0] === 'cambridge' || segs[0] === 'caie' || segs[0] === 'cie') ? 'cambridge' : 'edexcel';
+            }
             if (!shard && !needsFull) {
-              var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
-              var segs = p.split('/').filter(Boolean);
               if (p === '/textbooks' || p === '/textbooks/ial' || p === '/textbooks/igcse') shard = '/shards/textbooks.json';
               else if (p === '/audio') shard = '/shards/audio.json';
               else if (p === '/data-files') shard = '/shards/data-files.json';
               else if (segs[0] === 'textbooks' && segs.length === 3) shard = '/shards/' + segs[1].toLowerCase() + '-' + segs[2].toLowerCase() + '.json';
+              else if (segs[0] === 'cambridge' && (segs[1] === 'a-level' || segs[1] === 'igcse' || segs[1] === 'o-level') && segs.length >= 3) {
+                shard = '/shards/cambridge-' + segs[1].toLowerCase() + '-' + segs[2].toLowerCase() + '.json';
+              }
               else if (segs[0] === 'ial' && segs[1] && segs[1].toLowerCase() === 'mathematics' && segs.length >= 3) {
                 var uSlug = segs[2].toLowerCase();
                 if (/mechanics|wme0|667[7-9]/.test(uSlug)) shard = '/shards/ial-mathematics-mechanics.json';
@@ -88,10 +96,15 @@
                 else shard = '/shards/ial-mathematics-pure.json';
               }
               else if ((segs[0] === 'ial' || segs[0] === 'igcse') && segs.length >= 2) shard = '/shards/' + segs[0] + '-' + segs[1].toLowerCase() + '.json';
-              else if (p === '/papers' || p === '/ial' || p === '/igcse' || (location.search && location.search.indexOf('q=') !== -1)) needsFull = true;
+              else if (
+                p === '/papers' || p === '/ial' || p === '/igcse' ||
+                p === '/cambridge/papers' || p === '/cambridge/a-level' || p === '/cambridge/igcse' || p === '/cambridge/o-level' ||
+                (location.search && location.search.indexOf('q=') !== -1)
+              ) needsFull = true;
             }
             var ef = {
               buildTime: bt,
+              board: board,
               shardPath: shard,
               metaPromise: null,
               shardBufferPromise: null,
@@ -103,8 +116,9 @@
 
             if (shard || needsFull) {
               var appVer = bootEl ? (bootEl.getAttribute('data-ver') || '') : '';
-              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v7.0';
-              var cacheKey = 'https://cs-cache.local/index_' + verTag + '_' + q + '.json';
+              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v8.0.0';
+              var cacheKey = 'https://cs-cache.local/index_' + verTag + '_' + q + '_' + board + '.json';
+              var indexFile = board === 'cambridge' ? '/index-cambridge.json' : '/index.json';
               var checkCache = (typeof caches !== 'undefined')
                 ? caches.open('cs_index_cache')
                     .then(function(c) { return c.match(cacheKey); })
@@ -124,7 +138,7 @@
               } else if (needsFull) {
                 ef.fullBufferPromise = checkCache.then(function(hit) {
                   if (hit) return null;
-                  return fetch('/index.json?v=' + q, { priority: 'low' })
+                  return fetch(indexFile + '?v=' + q, { priority: 'low' })
                     .then(function(r) { return r.ok ? r.arrayBuffer() : null; })
                     .catch(function() { return null; });
                 });

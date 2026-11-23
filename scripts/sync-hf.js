@@ -31,13 +31,21 @@ if (!TOKEN) {
   console.error('Missing HF_TOKEN. Set it in search-app/.env or environment variables.');
   process.exit(1);
 }
-const ALLOWED_ROOT_DIRS = ['Past Papers', 'IAL Books', 'IGCSE Books'];
+const ALLOWED_ROOT_DIRS = ['Past Papers', 'IAL Books', 'IGCSE Books', 'Cambridge Books'];
 
-async function fetchWithRetry(url, options = {}, attempts = 6) {
+async function fetchWithRetry(url, options = {}, attempts = 8) {
   let lastErr;
   for (let i = 1; i <= attempts; i++) {
     try {
-      return await fetch(url, options);
+      const res = await fetch(url, options);
+      if (res.status === 429 && i < attempts) {
+        const retryAfter = Number(res.headers.get('retry-after') || 0);
+        const waitMs = Math.max(retryAfter * 1000, 35000);
+        console.log(`  [HF 429] Rate limited; waiting ${Math.round(waitMs / 1000)}s before retry ${i + 1}/${attempts}...`);
+        await new Promise(r => setTimeout(r, waitMs));
+        continue;
+      }
+      return res;
     } catch (err) {
       lastErr = err;
       if (i === attempts) throw err;
@@ -88,7 +96,7 @@ async function fetchAllRemoteFiles() {
 
   while (nextUrl) {
     page++;
-    const res = await fetch(nextUrl, {
+    const res = await fetchWithRetry(nextUrl, {
       headers: { 'Authorization': `Bearer ${TOKEN}` }
     });
     if (!res.ok) {

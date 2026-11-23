@@ -1,9 +1,10 @@
 // Dedicated ES Module Web Worker for Conceptualist Systems Library.
-// Handles 4.1 MB index.json fetching/caching, JSON parsing, 16,021-record hydration,
+// Handles partitioned board index fetching/caching (Edexcel & Cambridge), hydration,
 // smart fuzzy search, sorting, and pagination slicing completely off the main UI thread.
 
 import {
   hydrateCatalogPayload,
+  mergeHydratedStates,
   queryCatalogState,
   resolvePaperFromState,
   serializeItemForUi,
@@ -15,9 +16,13 @@ import {
   writeCachedIndex
 } from '../lib/networkUtils.js';
 
-let catalogState = null;
-let isFullLoaded = false;
-let loadedGenAt = '';
+const boardStates = new Map();
+const boardFullLoaded = new Set();
+const boardGenAt = new Map();
+let shardState = null;
+let shardBoard = '';
+let mergedCache = null;
+
 let lastSortedFiles = [];
 let lastQueryMeta = {
   isPartialFallback: false,
@@ -29,29 +34,68 @@ let lastQueryMeta = {
 const decoder = new TextDecoder('utf-8');
 const activeAbortControllers = new Map();
 
-function applyJson(json, { isFull }) {
-  if (!isFull && isFullLoaded) {
+function getStateForBoard(filterBoard = '') {
+  if (filterBoard === 'edexcel' || filterBoard === 'cambridge') {
+    const full = boardStates.get(filterBoard);
+    if (full) return full;
+    if (shardState && (!shardBoard || shardBoard === filterBoard)) return shardState;
+    return null;
+  }
+  if (boardStates.size === 0) return shardState;
+  if (boardStates.size === 1) return boardStates.values().next().value;
+  if (!mergedCache) {
+    mergedCache = mergeHydratedStates(Array.from(boardStates.values()));
+  }
+  return mergedCache;
+}
+
+function applyJson(json, { isFull, board = 'edexcel' }) {
+  const bKey = String(board || json.meta?.board || 'edexcel').toLowerCase();
+  if (!isFull && boardFullLoaded.has(bKey)) {
+    const existing = boardStates.get(bKey);
     return {
       skipped: true,
       isFull: true,
-      generatedAt: loadedGenAt,
-      counts: catalogState?.counts || null,
-      meta: catalogState?.meta || null
+      board: bKey,
+      generatedAt: boardGenAt.get(bKey) || '',
+      counts: existing?.counts || null,
+      meta: existing?.meta || null
     };
   }
-  catalogState = hydrateCatalogPayload(json);
+  const hydrated = hydrateCatalogPayload(json);
   if (isFull) {
-    isFullLoaded = true;
-    loadedGenAt = json.meta?.generatedAt || '';
+    boardStates.set(bKey, hydrated);
+    boardFullLoaded.add(bKey);
+    boardGenAt.set(bKey, json.meta?.generatedAt || '');
+    mergedCache = null;
+    if (shardBoard === bKey) {
+      shardState = null;
+      shardBoard = '';
+    }
+  } else {
+    shardState = hydrated;
+    shardBoard = bKey;
   }
   lastSortedFiles = [];
   return {
     skipped: false,
-    isFull: isFullLoaded,
+    isFull: boardFullLoaded.has(bKey),
+    board: bKey,
     generatedAt: json.meta?.generatedAt || '',
-    counts: catalogState.counts,
+    counts: hydrated.counts,
     meta: json.meta?.isShard ? null : (json.meta || null)
   };
+}
+
+function isCacheFresh(cached, expectedMeta, boardKey) {
+  if (!cached) return false;
+  if (!expectedMeta) return true;
+  if (cached.meta?.generatedAt !== expectedMeta.generatedAt) return false;
+  const expectedBoardCount = expectedMeta.boards?.[boardKey]?.uniqueFiles;
+  if (expectedBoardCount != null && cached.meta?.partitionUniqueFiles != null) {
+    return cached.meta.partitionUniqueFiles === expectedBoardCount;
+  }
+  return cached.meta?.uniqueFiles === expectedMeta.uniqueFiles;
 }
 
 self.onmessage = async (event) => {
@@ -66,7 +110,7 @@ self.onmessage = async (event) => {
   }
   try {
     if (type === 'LOAD_BUFFER') {
-      const { buffer, isFull = false, cacheUrl = '' } = payload;
+      const { buffer, isFull = false, cacheUrl = '', board = 'edexcel' } = payload;
       const text = decoder.decode(new Uint8Array(buffer));
       const json = JSON.parse(text);
       if (isFull && cacheUrl) {
@@ -75,27 +119,38 @@ self.onmessage = async (event) => {
           new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8' } })
         );
       }
-      const result = applyJson(json, { isFull });
+      const result = applyJson(json, { isFull, board });
       self.postMessage({ id, ok: true, result });
       return;
     }
 
     if (type === 'LOAD_SHARD') {
-      const { shardUrl, cacheUrl, expectedMeta } = payload;
+      const { shardUrl, cacheUrl, expectedMeta, board = 'edexcel' } = payload;
+      const bKey = String(board || 'edexcel').toLowerCase();
       const controller = new AbortController();
       activeAbortControllers.set(id, controller);
       try {
-        // Check Cache API for valid full index first
+        if (boardFullLoaded.has(bKey)) {
+          self.postMessage({
+            id,
+            ok: true,
+            result: {
+              skipped: true,
+              isFull: true,
+              board: bKey,
+              generatedAt: boardGenAt.get(bKey) || '',
+              counts: boardStates.get(bKey)?.counts || null,
+              meta: null
+            }
+          });
+          return;
+        }
+        // Check Cache API for valid full board index first
         if (cacheUrl) {
           const cached = await readCachedIndex(cacheUrl);
           if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-          const isValid = cached && (
-            !expectedMeta ||
-            (cached.meta?.generatedAt === expectedMeta.generatedAt &&
-              cached.meta?.uniqueFiles === expectedMeta.uniqueFiles)
-          );
-          if (isValid) {
-            const result = applyJson(cached, { isFull: true });
+          if (isCacheFresh(cached, expectedMeta, bKey)) {
+            const result = applyJson(cached, { isFull: true, board: bKey });
             self.postMessage({ id, ok: true, result: { ...result, fromFullCache: true } });
             return;
           }
@@ -110,7 +165,7 @@ self.onmessage = async (event) => {
         if (!Array.isArray(shardJson?.files)) {
           throw new Error('Malformed shard payload');
         }
-        const result = applyJson(shardJson, { isFull: false });
+        const result = applyJson(shardJson, { isFull: false, board: bKey });
         self.postMessage({ id, ok: true, result });
         return;
       } finally {
@@ -119,11 +174,12 @@ self.onmessage = async (event) => {
     }
 
     if (type === 'LOAD_FULL_INDEX') {
-      const { urls, cacheUrl, expectedMeta, forceReload = false } = payload;
+      const { urls, cacheUrl, expectedMeta, forceReload = false, board = 'edexcel' } = payload;
+      const bKey = String(board || 'edexcel').toLowerCase();
       if (
         !forceReload &&
-        isFullLoaded &&
-        (!expectedMeta || loadedGenAt === expectedMeta.generatedAt)
+        boardFullLoaded.has(bKey) &&
+        (!expectedMeta || boardGenAt.get(bKey) === expectedMeta.generatedAt)
       ) {
         self.postMessage({
           id,
@@ -131,8 +187,9 @@ self.onmessage = async (event) => {
           result: {
             skipped: true,
             isFull: true,
-            generatedAt: loadedGenAt,
-            counts: catalogState?.counts || null,
+            board: bKey,
+            generatedAt: boardGenAt.get(bKey) || '',
+            counts: boardStates.get(bKey)?.counts || null,
             meta: null
           }
         });
@@ -145,13 +202,8 @@ self.onmessage = async (event) => {
         if (!forceReload && cacheUrl) {
           const cached = await readCachedIndex(cacheUrl);
           if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-          const isValid = cached && (
-            !expectedMeta ||
-            (cached.meta?.generatedAt === expectedMeta.generatedAt &&
-              cached.meta?.uniqueFiles === expectedMeta.uniqueFiles)
-          );
-          if (isValid) {
-            const result = applyJson(cached, { isFull: true });
+          if (isCacheFresh(cached, expectedMeta, bKey)) {
+            const result = applyJson(cached, { isFull: true, board: bKey });
             self.postMessage({ id, ok: true, result: { ...result, fromCache: true } });
             return;
           }
@@ -161,7 +213,7 @@ self.onmessage = async (event) => {
         const clone = res.clone();
         const json = await res.json();
         if (cacheUrl) void writeCachedIndex(cacheUrl, clone);
-        const result = applyJson(json, { isFull: true });
+        const result = applyJson(json, { isFull: true, board: bKey });
         self.postMessage({ id, ok: true, result });
         return;
       } finally {
@@ -170,13 +222,14 @@ self.onmessage = async (event) => {
     }
 
     if (type === 'QUERY') {
-      const { visibleCount = 80 } = payload;
-      const { sortedFiles, meta } = queryCatalogState(catalogState, payload);
+      const { visibleCount = 80, filterBoard = '' } = payload;
+      const targetState = getStateForBoard(filterBoard);
+      const { sortedFiles, meta } = queryCatalogState(targetState, payload);
       lastSortedFiles = sortedFiles;
       lastQueryMeta = meta;
       const slice = sortedFiles.slice(0, visibleCount).map(serializeItemForUi);
       const fallbackUnits = payload.needFallbackUnits
-        ? getFallbackUnitsFromState(catalogState, payload.filterSubject, payload.filterCurriculum)
+        ? getFallbackUnitsFromState(targetState, payload.filterSubject, payload.filterCurriculum)
         : null;
       self.postMessage({
         id,
@@ -207,13 +260,24 @@ self.onmessage = async (event) => {
     }
 
     if (type === 'RESOLVE_PAPER') {
-      const paper = resolvePaperFromState(catalogState, payload.paperParam);
+      let paper = null;
+      for (const st of boardStates.values()) {
+        paper = resolvePaperFromState(st, payload.paperParam);
+        if (paper) break;
+      }
+      if (!paper && shardState) {
+        paper = resolvePaperFromState(shardState, payload.paperParam);
+      }
       self.postMessage({ id, ok: true, result: paper });
       return;
     }
 
     if (type === 'RESOLVE_SAMPLE_AUDIO') {
-      const sample = catalogState?.sampleAudio ? serializeItemForUi(catalogState.sampleAudio) : null;
+      const prefBoard = payload.board || 'edexcel';
+      const preferredState = boardStates.get(prefBoard) || getStateForBoard('all');
+      const sample = preferredState?.sampleAudio
+        ? serializeItemForUi(preferredState.sampleAudio)
+        : (boardStates.get('edexcel')?.sampleAudio ? serializeItemForUi(boardStates.get('edexcel').sampleAudio) : null);
       self.postMessage({ id, ok: true, result: sample });
       return;
     }

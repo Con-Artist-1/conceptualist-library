@@ -33,50 +33,71 @@ export function constantTimeEqual(a, b) {
 }
 
 /**
- * Lazy-loads catalog allowlist sets from public/index.json when present on disk so API endpoints
- * can reject fabricated paperKeys or non-existent audio subtitle keys.
+ * Lazy-loads catalog allowlist sets from public/allowlist.json (preferred compact multi-board file)
+ * or falls back to public/index.json + public/index-cambridge.json so API endpoints can reject
+ * fabricated paperKeys or non-existent audio subtitle keys.
  */
 export function getCatalogAllowlist() {
   if (cachedCatalogAllowlist) return cachedCatalogAllowlist;
   try {
-    const indexPath = path.join(PROJECT_ROOT, 'public', 'index.json');
-    if (!fs.existsSync(indexPath)) return null;
-    const raw = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-    if (!raw || !Array.isArray(raw.keys) || !Array.isArray(raw.files)) return null;
-    const idxPath = raw.keys.indexOf('path');
-    const idxSpec = raw.keys.indexOf('spec');
-    const idxSubj = raw.keys.indexOf('subject');
-    const idxUnit = raw.keys.indexOf('unitCode');
-    const idxVar = raw.keys.indexOf('variant');
-    const idxSess = raw.keys.indexOf('session');
-    const idxDt = raw.keys.indexOf('docType');
-    const idxAlt = raw.keys.indexOf('altPaths');
+    const allowlistPath = path.join(PROJECT_ROOT, 'public', 'allowlist.json');
+    if (fs.existsSync(allowlistPath)) {
+      const raw = JSON.parse(fs.readFileSync(allowlistPath, 'utf8'));
+      if (raw && Array.isArray(raw.paperKeys)) {
+        cachedCatalogAllowlist = {
+          validPaperKeys: new Set(raw.paperKeys),
+          validAudioPaths: new Set(Array.isArray(raw.audioPaths) ? raw.audioPaths : []),
+          validAudioSittings: new Set(Array.isArray(raw.audioSittings) ? raw.audioSittings : [])
+        };
+        globalThis.__csCatalogAllowlist = cachedCatalogAllowlist;
+        return cachedCatalogAllowlist;
+      }
+    }
+
+    const indexCandidates = [
+      path.join(PROJECT_ROOT, 'public', 'index.json'),
+      path.join(PROJECT_ROOT, 'public', 'index-cambridge.json')
+    ].filter((p) => fs.existsSync(p));
+    if (indexCandidates.length === 0) return null;
 
     const validPaperKeys = new Set();
     const validAudioPaths = new Set();
     const validAudioSittings = new Set();
 
-    for (const row of raw.files) {
-      const p = idxPath >= 0 ? row[idxPath] : '';
-      const spec = idxSpec >= 0 ? row[idxSpec] : '';
-      const subj = idxSubj >= 0 ? row[idxSubj] : '';
-      const unit = idxUnit >= 0 ? row[idxUnit] : '';
-      const variant = idxVar >= 0 ? row[idxVar] : '';
-      const sess = idxSess >= 0 ? row[idxSess] : '';
-      const dt = idxDt >= 0 ? row[idxDt] : '';
-      const alts = idxAlt >= 0 ? row[idxAlt] : null;
+    for (const indexPath of indexCandidates) {
+      const raw = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+      if (!raw || !Array.isArray(raw.keys) || !Array.isArray(raw.files)) continue;
+      const idxPath = raw.keys.indexOf('path');
+      const idxSpec = raw.keys.indexOf('spec');
+      const idxSubj = raw.keys.indexOf('subject');
+      const idxUnit = raw.keys.indexOf('unitCode');
+      const idxVar = raw.keys.indexOf('variant');
+      const idxSess = raw.keys.indexOf('session');
+      const idxDt = raw.keys.indexOf('docType');
+      const idxAlt = raw.keys.indexOf('altPaths');
 
-      if (p) validPaperKeys.add(p);
-      if (spec && subj && sess) {
-        const sittingKey = `${spec}|${subj}|${unit || ''}|${variant || ''}|${sess}`;
-        validPaperKeys.add(sittingKey);
-        if (dt === 'AUD') validAudioSittings.add(sittingKey);
-      }
-      if (dt === 'AUD') {
-        if (p) validAudioPaths.add(p);
-        if (Array.isArray(alts)) {
-          for (const ap of alts) {
-            if (typeof ap === 'string' && ap) validAudioPaths.add(ap);
+      for (const row of raw.files) {
+        const p = idxPath >= 0 ? row[idxPath] : '';
+        const spec = idxSpec >= 0 ? row[idxSpec] : '';
+        const subj = idxSubj >= 0 ? row[idxSubj] : '';
+        const unit = idxUnit >= 0 ? row[idxUnit] : '';
+        const variant = idxVar >= 0 ? row[idxVar] : '';
+        const sess = idxSess >= 0 ? row[idxSess] : '';
+        const dt = idxDt >= 0 ? row[idxDt] : '';
+        const alts = idxAlt >= 0 ? row[idxAlt] : null;
+
+        if (p) validPaperKeys.add(p);
+        if (spec && subj && sess) {
+          const sittingKey = `${spec}|${subj}|${unit || ''}|${variant || ''}|${sess}`;
+          validPaperKeys.add(sittingKey);
+          if (dt === 'AUD') validAudioSittings.add(sittingKey);
+        }
+        if (dt === 'AUD') {
+          if (p) validAudioPaths.add(p);
+          if (Array.isArray(alts)) {
+            for (const ap of alts) {
+              if (typeof ap === 'string' && ap) validAudioPaths.add(ap);
+            }
           }
         }
       }

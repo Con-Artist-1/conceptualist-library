@@ -3,7 +3,7 @@
 export const BUILD_TIMESTAMP =
   typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '2026-11-22T00:00:00.000Z';
 
-export const APP_VERSION = 'v7.3.3';
+export const APP_VERSION = 'v8.0.0';
 export const META_CACHE_KEY = `cs_library_meta_${APP_VERSION}_${BUILD_TIMESTAMP}`;
 export const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AUTO_RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
@@ -27,7 +27,7 @@ export function formatUpdateTimestamp(isoStr) {
 // Global utility to purge all cached index/chunk entries while preserving theme, study history & viewer ID
 export function forcePurgeCacheAndReload() {
   try {
-    const preserveKeys = ['cs_theme', 'cs_recent_papers_v1', 'cs_viewer_id_v1'];
+    const preserveKeys = ['cs_theme', 'cs_board', 'cs_recent_papers_v1', 'cs_viewer_id_v1'];
     const preserved = {};
     preserveKeys.forEach((k) => {
       const val = localStorage.getItem(k);

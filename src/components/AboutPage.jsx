@@ -48,15 +48,15 @@ const AboutPage = ({ onGoHome }) => {
         <div className="about-section">
           <h2>Our Mission</h2>
           <p>
-            Navigating past papers, mark schemes, examiner reports, and reference books should be effortless.
-            Our platform indexes thousands of documents across Edexcel GCE, International A-Level (IAL) and International GCSE (IGCSE) qualifications into a high-speed, searchable catalog.
+            Navigating past papers, mark schemes, examiner reports, grade thresholds, inserts, and reference books should be effortless.
+            Our platform indexes international examination qualifications — including Pearson Edexcel International A-Level (IAL) &amp; IGCSE and Cambridge International (CAIE) AS &amp; A Level, IGCSE, and O Level — into a fast, board-isolated study catalog.
           </p>
         </div>
 
         <div className="about-section">
           <h2>Non-Affiliation &amp; Educational Notice</h2>
           <p>
-            Conceptualist Systems is an independent student study index and reader and is not affiliated with, endorsed by, sponsored by, or officially connected to Pearson plc or Edexcel. All trademarks and examination materials remain the property of their respective copyright holders and are provided strictly for personal revision and educational reference. Rights holders may contact us below for prompt removal.
+            Conceptualist Systems is an independent student study index and reader and is not affiliated with, endorsed by, sponsored by, or officially connected to Pearson plc / Edexcel or Cambridge University Press &amp; Assessment (CAIE). All trademarks and examination materials remain the property of their respective copyright holders and are provided strictly for personal revision and educational reference. Rights holders may contact us below for prompt removal.
           </p>
         </div>
 

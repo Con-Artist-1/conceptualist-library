@@ -1,4 +1,5 @@
 // Canonical DOM-free paper key and view count helpers shared between React UI and Web Worker.
+import { isBookCategory } from '../data/boards.js';
 
 export function getPaperViewKey(file) {
   if (!file) return '';
@@ -11,12 +12,7 @@ export function getPaperViewKey(file) {
 
 export function isQuestionPaperEligibleForViews(file) {
   if (!file) return false;
-  if (
-    file.category === 'Books' ||
-    file.category === 'IAL Books' ||
-    file.category === 'IGCSE Books' ||
-    file.docType === 'Book'
-  ) {
+  if (isBookCategory(file.category) || file.docType === 'Book') {
     return true;
   }
   if (file.isUnifiedSitting) return Boolean(file.docs?.QP || file.docType === 'QP' || file.isPendingSkeleton);

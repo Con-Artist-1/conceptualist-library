@@ -1,5 +1,17 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.0.0',
+    date: '2026-11-24T02:00:00+06:00',
+    title: 'Multi-Board International Archive & Cambridge International (CAIE) Launch',
+    summary: 'Launched a pluggable international-only multi-board architecture adding Cambridge International (AS & A Level, IGCSE, and O Level) alongside Pearson Edexcel with an isolated header board switcher, Grade Thresholds (GT), QP + Insert Split View, and 2,979 verified Cambridge exam files.',
+    changes: [
+      'Isolated Board Switcher & Partitioned Indexes: Added an institutional Edexcel | Cambridge switcher in the header (persisted in cs_board with dedicated /cambridge/... canonical routes), backed by partitioned per-board indexes (index-edexcel.json, index-cambridge.json, plus allowlist.json) so switching boards stays instant and never bloats Edexcel startup.',
+      'Cambridge International (CAIE) Pilot Archive: Ingested and verified 2,979 Cambridge files across 20 subjects spanning all three international qualifications—6 AS & A Level (9709, 9702, 9701, 9700, 9618, 9708), 7 IGCSE (0625, 0620, 0610, 0580, 0500, 0478, 0417), and 7 O Level (4024, 5054, 5070, 5090, 1123, 2058, 2059)—covering Feb/March 2024 – May/June 2026 while keeping all 19,912 Edexcel files (16,051 unique records) untouched.',
+      'Board-Isolated Search & Smart Nudges: Built a dedicated Cambridge parser and search layer supporting 4-digit syllabus codes, 2-digit Paper+Variant tokens (e.g. "0625 22" without colliding with year 2022), 9–1 to A*–G equivalences (0972 -> 0625, 0980 -> 0580), Feb/March / May/June / Oct/Nov sessions, Variant pills (v1/v2/v3), and 1-click Cross-Board Smart Nudges when querying a code from the other board.',
+      'Grade Thresholds (GT) & QP + Insert Split View: Extended the WebPDF reader and sitting table with first-class Grade Thresholds (GT) tabs/actions and a flexible Split View right-pane toggle letting students view Question Papers side-by-side with either Mark Schemes or Inserts (such as 0500 First Language English and 1123 O Level English).'
+    ]
+  },
+  {
     version: 'v7.3.3',
     date: '2026-11-23T09:15:00+06:00',
     title: 'Elevare Source Integration & IGCSE History / CS Variant Coverage',

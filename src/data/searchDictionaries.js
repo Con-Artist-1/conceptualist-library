@@ -1,30 +1,37 @@
 // Static search vocabulary, synonym maps, course codes, and document-type token dictionaries.
+// Supports Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE, O Level).
 
 export const STATIC_SEARCH_VOCAB = [
   // Curated subjects (including 3-char academic abbreviations for short-token typo tolerance)
-  'accounting', 'acc', 'arabic', 'ara', 'art', 'design', 'bangla', 'ban', 'bengali', 'bangladesh',
+  'accounting', 'acc', 'additional', 'arabic', 'ara', 'art', 'design', 'bangla', 'ban', 'bengali', 'bangladesh',
   'biology', 'bio', 'business', 'bus', 'chemistry', 'chem', 'che', 'chinese', 'mandarin', 'cantonese',
-  'commerce', 'comm', 'computer', 'science', 'sciences', 'double', 'single', 'award', 'compsci', 'economics', 'econ', 'eco',
-  'english', 'eng', 'esl', 'second', 'language', 'literature', 'lit', 'french', 'fre',
-  'further', 'pure', 'mathematics', 'math', 'maths', 'geography', 'geog', 'geo',
-  'german', 'ger', 'global', 'citizenship', 'greek', 'modern', 'gujarati', 'hindi', 'history', 'human',
-  'information', 'technology', 'ict', 'islamic', 'islamiyat', 'studies', 'law', 'pakistan',
-  'physics', 'phys', 'phy', 'psychology', 'psych', 'religious', 'sinhala', 'spanish', 'spa', 'swahili',
-  'tamil', 'turkish', 'urdu',
-  // Units, paper tiers & formats
-  'mechanics', 'mech', 'statistics', 'stat', 'stats', 'decision', 'core', 'solomon',
-  'unit', 'paper', 'papers', 'regional', 'foundation', 'higher', 'modular',
+  'combined', 'commerce', 'comm', 'computer', 'coordinated', 'science', 'sciences', 'double', 'single', 'award', 'compsci',
+  'economics', 'econ', 'eco', 'english', 'eng', 'enterprise', 'environmental', 'management', 'esl', 'second', 'language', 'literature', 'lit',
+  'food', 'nutrition', 'french', 'fre', 'further', 'pure', 'mathematics', 'math', 'maths', 'geography', 'geog', 'geo',
+  'german', 'ger', 'global', 'citizenship', 'perspectives', 'greek', 'modern', 'gujarati', 'hindi', 'history', 'human',
+  'information', 'technology', 'ict', 'islamic', 'islamiyat', 'studies', 'law', 'marine', 'media', 'pakistan',
+  'physical', 'education', 'physics', 'phys', 'phy', 'psychology', 'psych', 'religious', 'sinhala', 'sociology',
+  'spanish', 'spa', 'swahili', 'tamil', 'travel', 'tourism', 'turkish', 'urdu',
+  // Units, paper tiers, variants & formats
+  'mechanics', 'mech', 'statistics', 'stat', 'stats', 'decision', 'core', 'extended', 'solomon',
+  'unit', 'paper', 'papers', 'regional', 'foundation', 'higher', 'modular', 'variant', 'variants',
+  'mcq', 'atp', 'alternative', 'multiple', 'choice', 'theory',
   'question', 'questions', 'mark', 'scheme', 'schemes', 'markscheme', 'markschemes',
   'examiner', 'examiners', 'report', 'reports', 'pef',
+  'threshold', 'thresholds', 'grade', 'boundaries', 'boundary', 'gt',
+  'insert', 'inserts', 'confidential', 'instructions', 'prerelease', 'tapescript',
   'textbook', 'textbooks', 'book', 'books', 'solutions', 'solution', 'solutionbank', 'worked',
   'specimen', 'specimens', 'syllabus', 'syllabuses', 'sample', 'samples',
   'listening', 'audio', 'mp3', 'recording', 'recordings', 'track', 'tracks', 'subtitles', 'captions', 'transcript', 'transcripts',
   'file', 'files', 'datafile', 'datafiles', 'practical', 'source', 'sources', 'student', 'workbook', 'revision', 'guide', 'lab', 'answers', 'answer',
-  'c1', 'c2', 'c3', 'c4', 'c12', 'c34', 'fp1', 'fp2', 'fp3', 'p1', 'p2', 'p3', 'p4', 'm1', 'm2', 'm3', 's1', 's2', 's3', 'd1', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6',
-  // Sessions & curricula
-  'january', 'jan', 'february', 'feb', 'june', 'jun', 'may', 'summer',
-  'october', 'oct', 'november', 'nov', 'autumn', 'winter', 'edexcel', 'igcse', 'ial',
-  // IAL + IGCSE course codes
+  'c1', 'c2', 'c3', 'c4', 'c12', 'c34', 'fp1', 'fp2', 'fp3', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7',
+  'pure1', 'pure2', 'pure3', 'pure4', 'm1', 'm2', 'm3', 's1', 's2', 's3', 'd1', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6',
+  'v1', 'v2', 'v3', 'v4', 'v5', 'v6',
+  // Sessions & curricula / boards
+  'january', 'jan', 'february', 'feb', 'march', 'mar', 'febmarch', 'june', 'jun', 'may', 'mayjune', 'summer',
+  'october', 'oct', 'november', 'nov', 'octnov', 'autumn', 'winter',
+  'edexcel', 'pearson', 'igcse', 'ial', 'cambridge', 'caie', 'cie', 'olevel', 'olevels', 'alevel', 'alevels',
+  // IAL + IGCSE Edexcel course codes
   'wph01', 'wph02', 'wph03', 'wph04', 'wph05', 'wph06', 'wph07',
   '6ph01', '6ph02', '6ph03', '6ph04', '6ph05', '6ph06',
   '6bi01', '6bi02', '6bi03', '6bi04', '6bi05', '6bi06',
@@ -53,8 +60,8 @@ export const STATIC_SEARCH_VOCAB = [
 ];
 
 export const SHORT_VOCAB_3CHAR = new Set([
-  'acc', 'ara', 'aud', 'ban', 'bio', 'bus', 'che', 'eco', 'eng', 'esl', 'feb',
-  'fre', 'geo', 'ger', 'ict', 'jan', 'jun', 'law', 'lit', 'may', 'nov',
+  'acc', 'ara', 'atp', 'aud', 'ban', 'bio', 'bus', 'che', 'cie', 'eco', 'eng', 'esl', 'ext', 'feb',
+  'fre', 'geo', 'ger', 'ict', 'jan', 'jun', 'law', 'lit', 'mar', 'may', 'mcq', 'nov',
   'oct', 'pef', 'phy', 'sam', 'sol', 'spa'
 ]);
 
@@ -63,22 +70,34 @@ export const STATIC_SEARCH_VOCAB_SET = new Set(STATIC_SEARCH_VOCAB);
 export const VOCAB_STOPWORDS = new Set([
   'pdf', 'zip', 'rar', 'mp3', 'wav', 'm4a', 'ogg', 'txt', 'doc', 'docx',
   'and', 'the', 'for', 'with', 'from', 'past', 'papers', 'file', 'files',
-  'jan', 'june', 'may', 'oct', 'nov', 'new', 'old', 'ial', 'igcse', 'gce'
+  'jan', 'june', 'may', 'oct', 'nov', 'new', 'old', 'ial', 'igcse', 'gce', 'cie', 'caie'
 ]);
 
 // Atomic synonyms: multi-word items stay phrases instead of leaking loose words like "1" or "science"
 export const RAW_ATOMIC_SYNONYMS = {
+  // Boards & Levels
+  caie: ['caie', 'cie', 'cambridge'],
+  cie: ['cie', 'caie', 'cambridge'],
+  cambridge: ['cambridge', 'caie', 'cie'],
+  olevel: ['olevel', 'o level', 'cie-ol'],
+  olevels: ['olevel', 'o level', 'cie-ol'],
+  alevel: ['alevel', 'a level', 'as & a level', 'cie-al'],
+  alevels: ['alevel', 'a level', 'as & a level', 'cie-al'],
+  pearson: ['pearson', 'edexcel'],
+
   // Subjects
   math: ['math', 'mathematics', 'maths'],
   maths: ['math', 'mathematics', 'maths'],
   mathematics: ['math', 'mathematics', 'maths'],
-  fmath: ['further mathematics', 'further pure mathematics', 'wfm01', 'wfm02', 'wfm03', '4pm1'],
-  furthermath: ['further mathematics', 'further pure mathematics', 'wfm01', 'wfm02', 'wfm03', '4pm1'],
-  furthermaths: ['further mathematics', 'further pure mathematics', 'wfm01', 'wfm02', 'wfm03', '4pm1'],
-  it: ['it', 'ict', 'information technology', 'wit11', 'wit12', 'wit13', 'wit14', '4it1'],
-  ict: ['it', 'ict', 'information technology', 'wit11', 'wit12', 'wit13', 'wit14', '4it1'],
-  cs: ['cs', 'computer science', '4cp0'],
-  compsci: ['cs', 'computer science', '4cp0'],
+  addmath: ['additional mathematics', '0606', '4037'],
+  addmaths: ['additional mathematics', '0606', '4037'],
+  fmath: ['further mathematics', 'further pure mathematics', 'wfm01', 'wfm02', 'wfm03', '4pm1', '9231'],
+  furthermath: ['further mathematics', 'further pure mathematics', 'wfm01', 'wfm02', 'wfm03', '4pm1', '9231'],
+  furthermaths: ['further mathematics', 'further pure mathematics', 'wfm01', 'wfm02', 'wfm03', '4pm1', '9231'],
+  it: ['it', 'ict', 'information technology', 'wit11', 'wit12', 'wit13', 'wit14', '4it1', '0417', '9626'],
+  ict: ['it', 'ict', 'information technology', 'wit11', 'wit12', 'wit13', 'wit14', '4it1', '0417', '9626'],
+  cs: ['cs', 'computer science', '4cp0', '0478', '2210', '9618', '9608'],
+  compsci: ['cs', 'computer science', '4cp0', '0478', '2210', '9618', '9608'],
   bio: ['bio', 'biology'],
   humanbio: ['human biology', '4hb1'],
   hb: ['human biology', '4hb1'],
@@ -99,10 +118,11 @@ export const RAW_ATOMIC_SYNONYMS = {
   geog: ['geo', 'geog', 'geography'],
   geo: ['geo', 'geog', 'geography'],
   eng: ['eng', 'english'],
-  esl: ['esl', 'english as a second language', '4es1', '4es0', '4wes1', '4357'],
+  esl: ['esl', 'english as a second language', '4es1', '4es0', '4wes1', '4357', '0510', '0511', '0993', '0991'],
+  fle: ['first language english', '0500', '0990'],
   lit: ['lit', 'literature'],
-  englit: ['english literature', 'wet01', 'wet02', 'wet03', 'wet04', '4et1', '4wet1'],
-  englang: ['english language', 'wen01', 'wen02', 'wen03', 'wen04', '4ea1', '4eb1', '4wea1'],
+  englit: ['english literature', 'literature in english', 'wet01', 'wet02', 'wet03', 'wet04', '4et1', '4wet1', '0475', '2010', '9695'],
+  englang: ['english language', 'wen01', 'wen02', 'wen03', 'wen04', '4ea1', '4eb1', '4wea1', '1123', '9093'],
   comm: ['comm', 'commerce'],
   fre: ['fre', 'french'],
   ger: ['ger', 'german'],
@@ -110,20 +130,21 @@ export const RAW_ATOMIC_SYNONYMS = {
   ara: ['ara', 'arabic'],
   hist: ['hist', 'history'],
   rs: ['rs', 'religious studies', '4rs1', '4rs0', '4wrs1'],
-  islamic: ['islamic', 'islamic studies', '4is1'],
-  islamiyat: ['islamiyat', '4is0', 'islamic studies'],
+  islamic: ['islamic', 'islamic studies', '4is1', '2068'],
+  islamiyat: ['islamiyat', '4is0', '2058', '0493', 'islamic studies'],
   gc: ['global citizenship', '4gl1'],
+  gp: ['global perspectives', '0457', '2069', '9239', '8021'],
   solomon: ['solomon', 'solomon papers', 'sol'],
-  ban: ['ban', 'bangla', 'bengali', '4ba0', '4be0'],
-  bengali: ['bangla', 'bengali', '4ba0', '4be0'],
-  mandarin: ['chinese', '4cn1', '4cn0', 'mandarin'],
+  ban: ['ban', 'bangla', 'bengali', '4ba0', '4be0', '3204'],
+  bengali: ['bangla', 'bengali', '4ba0', '4be0', '3204'],
+  mandarin: ['chinese', '4cn1', '4cn0', '0547', 'mandarin'],
   cantonese: ['chinese', '4cn1', '4cn0', 'cantonese'],
   artdesign: ['art and design', '4fa1', '4fa0'],
-  banstudies: ['bangladesh studies', '4bn1', '4bn0'],
-  pakstudies: ['pakistan studies', '4pa1'],
+  banstudies: ['bangladesh studies', '4bn1', '4bn0', '7094', '0449'],
+  pakstudies: ['pakistan studies', '4pa1', '2059', '0448'],
   modgreek: ['modern greek', '4mg0'],
-  doubleaward: ['sciences (double award)', '4sd0', '4sc0', '4wsd1'],
-  doublescience: ['sciences (double award)', '4sd0', '4sc0', '4wsd1'],
+  doubleaward: ['sciences (double award)', 'co-ordinated sciences (double award)', '4sd0', '4sc0', '4wsd1', '0654', '0973'],
+  doublescience: ['sciences (double award)', 'co-ordinated sciences (double award)', '4sd0', '4sc0', '4wsd1', '0654', '0973'],
   singleaward: ['sciences (single award)', '4ss0'],
   singlescience: ['sciences (single award)', '4ss0'],
   mech: ['mech', 'mechanics'],
@@ -145,6 +166,9 @@ export const RAW_ATOMIC_SYNONYMS = {
   examinerreport: ['er', 'examiner report', 'pef'],
   examinerreports: ['er', 'examiner report', 'pef'],
   pef: ['er', 'examiner report', 'pef'],
+  gt: ['gt', 'grade thresholds', 'threshold', 'thresholds'],
+  threshold: ['gt', 'grade thresholds', 'threshold', 'thresholds'],
+  thresholds: ['gt', 'grade thresholds', 'threshold', 'thresholds'],
   book: ['book', 'books', 'textbook', 'textbooks', 'student book'],
   books: ['book', 'books', 'textbook', 'textbooks', 'student book'],
   textbook: ['book', 'books', 'textbook', 'textbooks', 'student book'],
@@ -154,7 +178,8 @@ export const RAW_ATOMIC_SYNONYMS = {
   solution: ['sol', 'solution', 'solutions', 'solutionbank', 'worked solutions'],
   solutions: ['sol', 'solution', 'solutions', 'solutionbank', 'worked solutions'],
   solutionbank: ['sol', 'solution', 'solutions', 'solutionbank', 'worked solutions'],
-  df: ['df', 'data file', 'data files', 'datafile', 'datafiles', 'practical'],
+  df: ['df', 'sf', 'data file', 'data files', 'source files', 'datafile', 'datafiles', 'practical'],
+  sf: ['sf', 'df', 'source files', 'data file', 'data files'],
   datafile: ['df', 'data file', 'data files', 'datafile', 'datafiles', 'practical'],
   datafiles: ['df', 'data file', 'data files', 'datafile', 'datafiles', 'practical'],
   practical: ['df', 'data file', 'data files', 'practical'],
@@ -162,12 +187,30 @@ export const RAW_ATOMIC_SYNONYMS = {
   audio: ['aud', 'audio', 'listening', 'mp3', 'subtitles', 'transcript'],
   listening: ['aud', 'audio', 'listening', 'mp3', 'subtitles', 'transcript'],
   mp3: ['aud', 'audio', 'listening', 'mp3'],
-  sc: ['sc', 'source', 'source file', 'transcript', 'insert'],
+  sc: ['sc', 'source', 'source file', 'transcript', 'insert', 'confidential'],
   source: ['sc', 'source', 'source file', 'transcript'],
+  insert: ['insert', 'in', 'sc'],
+  inserts: ['insert', 'in', 'sc'],
+  in: ['in', 'insert'],
+  ci: ['ci', 'confidential', 'confidential instructions'],
+  confidential: ['ci', 'confidential', 'confidential instructions'],
+  tn: ['tn', 'transcript', 'tapescript'],
+  tapescript: ['tn', 'transcript', 'tapescript'],
+  pm: ['pm', 'prerelease', 'pre release'],
   sam: ['sam', 'specimen', 'syllabus', 'sample'],
   specimen: ['sam', 'specimen', 'syllabus'],
 
-  // Unit & Math paper codes (atomic phrases only — never standalone digits)
+  // Cambridge paper types
+  atp: ['atp', 'alternative to practical'],
+  mcq: ['mcq', 'multiple choice'],
+  ext: ['extended'],
+
+  // Unit & Math paper codes (board-neutral pure1..pure4 so both Edexcel WMA11-14 and Cambridge 9709 P1-P3 match cleanly)
+  pure1: ['pure1', 'pure mathematics 1', 'wma11'],
+  pure2: ['pure2', 'pure mathematics 2', 'wma12'],
+  pure3: ['pure3', 'pure mathematics 3', 'wma13'],
+  pure4: ['pure4', 'pure mathematics 4', 'wma14'],
+
   u1: [
     'u1', 'unit 1', 'wma11', 'wbi11', 'wch11', 'wph11', 'wac11', 'wec11', 'wbs11',
     'wen01', 'wet01', 'wge01', 'whi01', 'wps01', 'wit11', 'wfr01', 'wgn01', 'wsp01',
@@ -195,10 +238,14 @@ export const RAW_ATOMIC_SYNONYMS = {
   p2: ['p2', 'p2a', 'p2r', 'paper 2', 'pure mathematics 2', 'wma12', '2p', '2h', '2f', '2hr', '2fr'],
   p3: ['p3', 'p3a', 'p3r', 'paper 3', 'pure mathematics 3', 'wma13', '3p'],
   p4: ['p4', 'p4a', 'p4r', 'paper 4', 'pure mathematics 4', 'wma14', '4p'],
-  wma11: ['wma11', 'pure mathematics 1', 'wma11r', 'wma11a'],
-  wma12: ['wma12', 'pure mathematics 2', 'wma12r', 'wma12a'],
-  wma13: ['wma13', 'pure mathematics 3', 'wma13r', 'wma13a'],
-  wma14: ['wma14', 'pure mathematics 4', 'wma14r', 'wma14a'],
+  p5: ['p5', 'paper 5'],
+  p6: ['p6', 'paper 6'],
+  p7: ['p7', 'paper 7'],
+
+  wma11: ['wma11', 'wma11r', 'wma11a'],
+  wma12: ['wma12', 'wma12r', 'wma12a'],
+  wma13: ['wma13', 'wma13r', 'wma13a'],
+  wma14: ['wma14', 'wma14r', 'wma14a'],
 
   '1r': ['1r', 'p1r', 'paper 1r', '1hr', '1fr'],
   '2r': ['2r', 'p2r', 'paper 2r', '2hr', '2fr'],
@@ -218,16 +265,16 @@ export const RAW_ATOMIC_SYNONYMS = {
   m1: ['m1', 'm1a', 'm1r', 'wme01', 'mechanics 1'],
   m2: ['m2', 'm2a', 'm2r', 'wme02', 'mechanics 2'],
   m3: ['m3', 'm3a', 'm3r', 'wme03', 'mechanics 3'],
-  wme01: ['wme01', 'm1', 'mechanics 1'],
-  wme02: ['wme02', 'm2', 'mechanics 2'],
-  wme03: ['wme03', 'm3', 'mechanics 3'],
+  wme01: ['wme01'],
+  wme02: ['wme02'],
+  wme03: ['wme03'],
 
   s1: ['s1', 's1a', 's1r', 'wst01', 'statistics 1'],
   s2: ['s2', 's2a', 's2r', 'wst02', 'statistics 2'],
   s3: ['s3', 's3a', 's3r', 'wst03', 'statistics 3'],
-  wst01: ['wst01', 's1', 'statistics 1'],
-  wst02: ['wst02', 's2', 'statistics 2'],
-  wst03: ['wst03', 's3', 'statistics 3'],
+  wst01: ['wst01'],
+  wst02: ['wst02'],
+  wst03: ['wst03'],
 
   f1: ['f1', 'fp1', 'fp1a', 'fp1r', 'wfm01', 'further pure 1', 'further pure mathematics 1'],
   f2: ['f2', 'fp2', 'fp2a', 'fp2r', 'wfm02', 'further pure 2', 'further pure mathematics 2'],
@@ -235,9 +282,9 @@ export const RAW_ATOMIC_SYNONYMS = {
   fp1: ['fp1', 'f1', 'fp1a', 'fp1r', 'wfm01', 'further pure 1', 'further pure mathematics 1'],
   fp2: ['fp2', 'f2', 'fp2a', 'fp2r', 'wfm02', 'further pure 2', 'further pure mathematics 2'],
   fp3: ['fp3', 'f3', 'fp3a', 'fp3r', 'wfm03', 'further pure 3', 'further pure mathematics 3'],
-  wfm01: ['wfm01', 'fp1', 'further pure mathematics 1'],
-  wfm02: ['wfm02', 'fp2', 'further pure mathematics 2'],
-  wfm03: ['wfm03', 'fp3', 'further pure mathematics 3'],
+  wfm01: ['wfm01'],
+  wfm02: ['wfm02'],
+  wfm03: ['wfm03'],
 
   d1: ['d1', 'd1a', 'd1r', 'wdm11', 'wdm01', 'decision 1', 'decision mathematics 1'],
   wdm11: ['wdm11', 'wdm01', 'd1', 'decision mathematics 1'],
@@ -251,7 +298,7 @@ export const RAW_ATOMIC_SYNONYMS = {
   wma01: ['wma01', 'c12', 'core mathematics 12'],
   wma02: ['wma02', 'c34', 'core mathematics 34'],
 
-  // IGCSE syllabus codes -> exact subject + specification bindings
+  // Edexcel IGCSE syllabus codes -> exact subject + specification bindings
   '4ma1': ['4ma1', 'mathematics a', '4ma0', '4wma1', '4wm1f', '4wm1h', '4wm2f', '4wm2h', '4400'],
   '4ma0': ['4ma0', 'mathematics a', '4ma1'],
   '4wma1': ['4wma1', '4wm1f', '4wm1h', '4wm2f', '4wm2h', '4ma1', 'mathematics a'],
@@ -331,23 +378,31 @@ export const RAW_ATOMIC_SYNONYMS = {
   '4tu0': ['4tu0', 'turkish'],
   '4ur0': ['4ur0', 'urdu'],
 
-  // Interchangeable exam session equivalents (May <-> June <-> Summer, Oct <-> Nov, Jan <-> Feb)
-  may: ['may', 'jun', 'june', 'summer'],
-  jun: ['june', 'may', 'jun', 'summer'],
-  june: ['june', 'may', 'jun', 'summer'],
-  mayjune: ['may', 'jun', 'june', 'summer'],
-  summer: ['june', 'may', 'jun', 'summer'],
-  oct: ['oct', 'october', 'nov', 'november', 'autumn'],
-  october: ['october', 'oct', 'nov', 'november', 'autumn'],
-  nov: ['nov', 'november', 'oct', 'october', 'autumn'],
-  november: ['november', 'oct', 'october', 'nov', 'autumn'],
-  octnov: ['oct', 'october', 'nov', 'november', 'autumn'],
-  autumn: ['autumn', 'oct', 'october', 'nov', 'november'],
-  jan: ['jan', 'january', 'feb', 'february', 'winter'],
-  january: ['january', 'jan', 'feb', 'february', 'winter'],
-  feb: ['feb', 'february', 'jan', 'january', 'winter'],
-  february: ['february', 'jan', 'january', 'feb', 'winter'],
-  winter: ['winter', 'jan', 'january', 'feb', 'february'],
+  // Board-isolated exam session aliases (winter & feb are indexed per board inside buildFileSearchData to prevent Edexcel Jan <-> Cambridge Oct/Nov clashes)
+  may: ['may', 'jun', 'june', 'summer', 'mayjune'],
+  jun: ['june', 'may', 'jun', 'summer', 'mayjune'],
+  june: ['june', 'may', 'jun', 'summer', 'mayjune'],
+  mayjune: ['mayjune', 'may', 'jun', 'june', 'summer'],
+  mj: ['mayjune', 'may', 'jun', 'june', 'summer'],
+  summer: ['summer', 'june', 'may', 'jun', 'mayjune'],
+
+  oct: ['oct', 'october', 'nov', 'november', 'autumn', 'octnov'],
+  october: ['october', 'oct', 'nov', 'november', 'autumn', 'octnov'],
+  nov: ['nov', 'november', 'oct', 'october', 'autumn', 'octnov'],
+  november: ['november', 'oct', 'october', 'nov', 'autumn', 'octnov'],
+  octnov: ['octnov', 'oct', 'october', 'nov', 'november', 'autumn'],
+  on: ['octnov', 'oct', 'october', 'nov', 'november'],
+  autumn: ['autumn', 'oct', 'october', 'nov', 'november', 'octnov'],
+
+  jan: ['jan', 'january'],
+  january: ['january', 'jan'],
+  feb: ['feb', 'february', 'febmarch'],
+  february: ['february', 'feb', 'febmarch'],
+  mar: ['mar', 'march', 'febmarch'],
+  march: ['march', 'mar', 'febmarch'],
+  fm: ['fm', 'febmarch', 'feb', 'mar', 'march'],
+  febmarch: ['febmarch', 'feb', 'february', 'mar', 'march', 'fm'],
+  winter: ['winter'],
 
   // Variants
   r: ['r', 'regional', 'reg'],
@@ -357,10 +412,13 @@ export const RAW_ATOMIC_SYNONYMS = {
   alta: ['alta', 'alt', 'regional'],
   higher: ['higher', '1h', '2h', '1hr', '2hr'],
   foundation: ['foundation', '1f', '2f', '1fr', '2fr'],
-  modular: ['modular', 'mod']
+  modular: ['modular', 'mod'],
+  v1: ['v1', 'variant 1'],
+  v2: ['v2', 'variant 2'],
+  v3: ['v3', 'variant 3']
 };
 
-// Map IGCSE Subject + Spec -> specification code tokens indexed on each IGCSE paper
+// Map Edexcel IGCSE Subject + Spec -> specification code tokens indexed on each Edexcel IGCSE paper
 export const IGCSE_CODE_BY_SUBJECT = {
   'Accounting': ['4ac1', '4ac0', '4wac1'],
   'Arabic': ['4aa1', '4ar0', '4308'],
@@ -418,8 +476,9 @@ export const DOC_TYPE_TOKENS = {
   QP: ['qp', 'question', 'questions', 'paper', 'papers', 'past'],
   MS: ['ms', 'mark', 'scheme', 'schemes', 'markscheme', 'markschemes', 'answer', 'answers'],
   ER: ['er', 'examiner', 'examiners', 'report', 'reports', 'pef'],
+  GT: ['gt', 'threshold', 'thresholds', 'grade', 'boundaries', 'boundary'],
   SOL: ['sol', 'solution', 'solutions', 'solutionbank', 'bank', 'worked', 'answers'],
-  DF: ['df', 'data', 'file', 'files', 'datafile', 'datafiles', 'practical', 'zip'],
+  DF: ['df', 'sf', 'data', 'source', 'file', 'files', 'datafile', 'datafiles', 'practical', 'zip'],
   AUD: ['aud', 'audio', 'listening', 'mp3', 'recording', 'recordings', 'track', 'tracks', 'subtitles', 'captions', 'cc', 'transcript', 'transcripts'],
   SC: ['sc', 'source', 'sources', 'transcript', 'transcripts', 'insert', 'inserts', 'booklet'],
   SAM: ['sam', 'specimen', 'specimens', 'syllabus', 'syllabuses', 'specification', 'specifications', 'sample', 'samples'],
@@ -430,25 +489,28 @@ export const DOC_TYPE_PHRASES = {
   QP: 'question paper past paper',
   MS: 'mark scheme',
   ER: 'examiner report',
+  GT: 'grade thresholds',
   SOL: 'worked solutions solution bank',
-  DF: 'data file data files',
+  DF: 'data file data files source files',
   AUD: 'listening audio',
-  SC: 'source file',
+  SC: 'source file insert',
   SAM: 'specimen paper'
 };
 
 export const SESSION_SYNONYMS_BY_MONTH = {
-  mayJune: ['may', 'jun', 'june', 'summer'],
-  octNov: ['oct', 'october', 'nov', 'november', 'autumn'],
-  janFeb: ['jan', 'january', 'feb', 'february', 'winter']
+  mayJune: ['may', 'jun', 'june', 'summer', 'mayjune'],
+  octNov: ['oct', 'october', 'nov', 'november', 'autumn', 'octnov'],
+  janEdexcel: ['jan', 'january', 'winter'],
+  febMarchCie: ['feb', 'february', 'mar', 'march', 'fm', 'febmarch']
 };
 
 export const GENERIC_QUERY_WORDS = new Set([
-  'qp', 'ms', 'er', 'aud', 'df', 'sc', 'sol', 'sam', 'book', 'books',
+  'qp', 'ms', 'er', 'gt', 'in', 'ci', 'sf', 'tn', 'pm', 'aud', 'df', 'sc', 'sol', 'sam', 'book', 'books',
   'question', 'questions', 'paper', 'papers', 'mark', 'scheme', 'schemes',
-  'examiner', 'examiners', 'report', 'reports', 'file', 'files',
-  'textbook', 'textbooks', 'solutions', 'ial', 'igcse', 'edexcel',
-  'r', 'regional', 'reg', 'alt', 'alta', 'higher', 'foundation'
+  'examiner', 'examiners', 'report', 'reports', 'threshold', 'thresholds', 'insert', 'inserts', 'file', 'files',
+  'textbook', 'textbooks', 'solutions', 'ial', 'igcse', 'edexcel', 'pearson',
+  'cambridge', 'caie', 'cie', 'olevel', 'olevels', 'alevel', 'alevels',
+  'r', 'regional', 'reg', 'alt', 'alta', 'higher', 'foundation', 'core', 'extended', 'variant'
 ]);
 
 export const ITEM_CODE_EQUIV = {
@@ -466,7 +528,7 @@ export const ITEM_CODE_EQUIV = {
   c4: ['6666'], '6666': ['c4'],
   c12: ['wma01'], wma01: ['c12'],
   c34: ['wma02'], wma02: ['c34'],
-  wma11: ['p1'], wma12: ['p2'], wma13: ['p3'], wma14: ['p4'],
+  wma11: ['p1', 'pure1'], wma12: ['p2', 'pure2'], wma13: ['p3', 'pure3'], wma14: ['p4', 'pure4'],
   '6bi01': ['wbi11'], '6bi02': ['wbi12'], '6bi03': ['wbi13'],
   '6bi04': ['wbi14'], '6bi05': ['wbi15'], '6bi06': ['wbi16']
 };

@@ -1,6 +1,8 @@
 // Full SEO Routing, Answer-Engine FAQ & Schema.org JSON-LD generator.
 // Re-exports lightweight routeCore.js so build scripts keep identical imports while the browser lazy-loads JSON-LD.
 import { BOOK_CATALOG_BY_PATH } from './bookCatalog.js';
+import { getBoardForCurriculum, isCambridgeCurriculum } from './data/boards.js';
+import { extractSyllabusCodeFromSubject, resolveCambridgeSyllabus } from './data/cambridgeCatalog.js';
 import {
   SITE_URL,
   IGCSE_SPEC_CODES,
@@ -21,15 +23,17 @@ export * from './lib/routeCore.js';
 
 export function buildRouteFaqEntries({
   currentTab = 'library',
+  activeBoard = 'edexcel',
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
   filterDocType = null,
   meta = null
 } = {}) {
-  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, dfCount, audioCount } = getArchiveCounts(meta);
+  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, dfCount, audioCount, cambridgeUnique } = getArchiveCounts(meta);
   const subjDisplay = formatSubjectName(filterSubject);
   const curr = filterCurriculum || (filterSubject ? inferCurriculumForSubject(filterSubject, 'Edexcel IAL') : '');
+  const isCie = isCambridgeCurriculum(curr) || (!curr && activeBoard === 'cambridge');
   const faqs = [];
 
   if (currentTab === 'about' || currentTab === 'changelog') {
@@ -51,7 +55,7 @@ export function buildRouteFaqEntries({
       }
     } else {
       faqs.push({
-        q: 'How many Edexcel IAL and IGCSE textbooks and Solution Banks are in the archive?',
+        q: 'How many textbooks and Solution Banks are in the archive?',
         a: `The library indexes ${totalBooks} verified resources (${ialBooks} Edexcel IAL student books, lab books, answer PDFs, and Worked Solution Banks plus ${igcseBooks} Edexcel IGCSE 9-1 student books), all viewable in 2-Page book spread mode.`
       });
     }
@@ -60,16 +64,16 @@ export function buildRouteFaqEntries({
 
   if (filterDocType === 'AUD') {
     faqs.push({
-      q: 'Which Edexcel language listening exams include audio and synced transcripts?',
-      a: `All ${audioCount} archived MP3 and ZIP listening tracks across Edexcel IAL French (WFR02, WFR04), German (WGN02, WGN04), and Spanish (WSP02, WSP04), plus Edexcel IGCSE ESL (4ES1), Chinese (4CN1), Swahili (4SW1), French (4FR1), German (4GN1), and Spanish (4SP1) stream directly in-browser above the Question Paper with live closed captions (CC).`
+      q: 'Which language listening exams include audio and synced transcripts?',
+      a: `All ${audioCount} archived MP3 and ZIP listening tracks across international French, German, Spanish, ESL, Chinese, and Swahili exams stream directly in-browser above the Question Paper with live closed captions (CC).`
     });
     return faqs;
   }
 
   if (filterDocType === 'DF') {
     faqs.push({
-      q: 'Which Edexcel practical exams require source data files (.zip)?',
-      a: `The archive hosts ${dfCount} practical examination source data file archives for Edexcel IAL Information Technology Unit 2 (WIT12) and Unit 4 (WIT14), Edexcel IGCSE ICT Paper 2 (4IT1), and Edexcel IGCSE Computer Science Paper 2 (4CP0).`
+      q: 'Which practical exams require source data files (.zip)?',
+      a: `The archive hosts ${dfCount} practical examination source data file archives for Edexcel IAL Information Technology (WIT12, WIT14), Edexcel IGCSE ICT/CS (4IT1, 4CP0), and Cambridge ICT/CS practical components.`
     });
     return faqs;
   }
@@ -78,18 +82,18 @@ export function buildRouteFaqEntries({
     const unitCode = getUnitCodeFromLabel(filterUnit);
     const legacyEq = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject, filterUnit });
     const unitObj = meta?.wizard?.[curr]?.[filterSubject]?.units?.[filterUnit];
-    const docCount = unitObj?.count || 60;
-    const years = unitObj?.years || [2026, 2025];
-    const yrSpan = `${years[years.length - 1] || 2014}-${years[0] || 2026}`;
+    const docCount = unitObj?.count || 40;
+    const years = unitObj?.years || [2025, 2024];
+    const yrSpan = `${years[years.length - 1] || 2018}-${years[0] || 2025}`;
 
     faqs.push({
       q: `How many ${curr} ${subjDisplay} ${filterUnit} past papers and mark schemes are available?`,
-      a: `This archive indexes ${docCount} verified Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for ${curr} ${subjDisplay} ${filterUnit}${unitCode ? ` (${unitCode})` : ''} spanning ${yrSpan}. Click Split View on any sitting to compare the Question Paper and Mark Scheme side by side.`
+      a: `This archive indexes ${docCount} verified Question Papers (QP), Mark Schemes (MS), and ${isCie ? 'Grade Thresholds (GT) / Examiner Reports (ER)' : 'Examiner Reports (ER)'} for ${curr} ${subjDisplay} ${filterUnit}${unitCode ? ` (${unitCode})` : ''} spanning ${yrSpan}. Click Split View on any sitting to compare the Question Paper and Mark Scheme side by side.`
     });
     if (legacyEq) {
       faqs.push({
-        q: `What are the specification and legacy unit codes for ${curr} ${subjDisplay} ${filterUnit}?`,
-        a: `${legacyEq}. Both current and legacy series are indexed so you can practice every compatible past examination question.`
+        q: `What are the specification and equivalent codes for ${curr} ${subjDisplay} ${filterUnit}?`,
+        a: `${legacyEq}. Both current and equivalent/legacy series are indexed so you can practice every compatible past examination paper.`
       });
     }
     return faqs;
@@ -97,8 +101,25 @@ export function buildRouteFaqEntries({
 
   if (filterSubject) {
     const subjWizard = meta?.wizard?.[curr]?.[filterSubject];
-    const docCount = subjWizard?.totalFiles || 150;
+    const docCount = subjWizard?.totalFiles || 100;
     const unitNames = Object.keys(subjWizard?.units || {});
+    if (isCie) {
+      const code = extractSyllabusCodeFromSubject(filterSubject);
+      const entry = code ? resolveCambridgeSyllabus(code) : null;
+      const legacyNote = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject });
+      faqs.push({
+        q: `What papers and variants are included in ${curr} ${subjDisplay}?`,
+        a: `This collection indexes ${docCount} unique Cambridge International Question Papers, Mark Schemes, Inserts, Grade Thresholds, and Examiner Reports across ${unitNames.length || 'all'} papers and timezone variants (v1, v2, v3)${legacyNote ? ` (${legacyNote})` : ''}.`
+      });
+      if (entry?.alt91) {
+        faqs.push({
+          q: `Are Cambridge IGCSE ${entry.code} and ${entry.alt91} (9-1) past papers the same?`,
+          a: `Yes. Cambridge IGCSE ${entry.code} (A*-G) and ${entry.alt91} (9-1) share identical examination papers and mark schemes; only the final grade scale differs, so searching either code returns the full verified archive.`
+        });
+      }
+      return faqs;
+    }
+
     const unitCodes = getUniqueOrderedUnitCodes(unitNames).filter((c) => !LEGACY_IAL_UNIT_CODES.has(c));
     const igcseCode = curr === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
     const legacySpec = SUBJECT_LEGACY_SPEC_CODES[curr]?.[filterSubject] || '';
@@ -110,15 +131,24 @@ export function buildRouteFaqEntries({
     return faqs;
   }
 
+  if (isCie) {
+    faqs.push({
+      q: 'Which Cambridge International qualifications are included on Conceptualist Systems?',
+      a: `Conceptualist Systems indexes ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International AS & A Level (CIE-AL), Cambridge IGCSE (A*-G and 9-1 equivalents), and Cambridge O Level (CIE-OL) past papers, mark schemes, inserts, grade thresholds, and examiner reports with side-by-side Split View.`
+    });
+    return faqs;
+  }
+
   faqs.push({
-    q: 'What is included in the Conceptualist Systems Edexcel archive?',
-    a: `Conceptualist Systems indexes ${uniqueFiles.toLocaleString()} unique Edexcel IAL and IGCSE Question Papers, Mark Schemes, Examiner Reports, ${totalBooks} Textbooks and Solution Banks, ${audioCount} Listening Audio tracks with synced subtitles, and ${dfCount} IT/CS Data Files (${totalFiles.toLocaleString()} total archived files covering 2003-2026).`
+    q: 'What is included in the Conceptualist Systems international exam archive?',
+    a: `Conceptualist Systems indexes ${uniqueFiles.toLocaleString()} unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers, Mark Schemes, Examiner Reports, Grade Thresholds, ${totalBooks} Textbooks and Solution Banks, ${audioCount} Listening Audio tracks with synced subtitles, and ${dfCount} practical Data Files (${totalFiles.toLocaleString()} total archived files).`
   });
   return faqs;
 }
 
 export function buildJsonLd({
   currentTab = 'library',
+  activeBoard = 'edexcel',
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
@@ -128,6 +158,11 @@ export function buildJsonLd({
   meta = null
 }) {
   const { uniqueFiles, totalFiles } = getArchiveCounts(meta);
+  const effBoard = filterCurriculum
+    ? getBoardForCurriculum(filterCurriculum)
+    : (activeBoard || 'edexcel');
+  const isCie = effBoard === 'cambridge';
+
   const breadcrumbs = [
     {
       '@type': 'ListItem',
@@ -146,7 +181,12 @@ export function buildJsonLd({
   } else if (filterDocType === 'AUD' && !filterCurriculum && !filterSubject) {
     breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Listening Audio MP3s', item: `${SITE_URL}/audio` });
   } else if (forceShowTable && !filterCurriculum && !filterSubject && !filterDocType) {
-    breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'All Past Papers', item: `${SITE_URL}/papers` });
+    if (isCie) {
+      breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Cambridge International', item: `${SITE_URL}/cambridge` });
+      breadcrumbs.push({ '@type': 'ListItem', position: 3, name: 'All Cambridge Past Papers', item: `${SITE_URL}/cambridge/papers` });
+    } else {
+      breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'All Past Papers', item: `${SITE_URL}/papers` });
+    }
   } else if (filterDocType === 'Book' && !filterUnit) {
     breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Textbooks & Solutions', item: `${SITE_URL}/textbooks` });
     if (filterCurriculum) {
@@ -168,6 +208,14 @@ export function buildJsonLd({
       }
     }
   } else {
+    if (isCie) {
+      breadcrumbs.push({
+        '@type': 'ListItem',
+        position: breadcrumbs.length + 1,
+        name: 'Cambridge International',
+        item: `${SITE_URL}/cambridge`
+      });
+    }
     if (filterCurriculum) {
       const currSlug = getCurriculumSlug(filterCurriculum);
       breadcrumbs.push({
@@ -178,17 +226,17 @@ export function buildJsonLd({
       });
     }
     if (filterSubject) {
-      const currSlug = getCurriculumSlug(filterCurriculum || 'Edexcel IAL');
+      const currSlug = getCurriculumSlug(filterCurriculum || inferCurriculumForSubject(filterSubject, 'Edexcel IAL'));
       const subjSlug = getSubjectSlug(filterSubject);
       breadcrumbs.push({
         '@type': 'ListItem',
         position: breadcrumbs.length + 1,
-        name: `${filterCurriculum || 'Edexcel IAL'} ${formatSubjectName(filterSubject)}`,
+        name: `${filterCurriculum || inferCurriculumForSubject(filterSubject, 'Edexcel IAL')} ${formatSubjectName(filterSubject)}`,
         item: `${SITE_URL}/${currSlug}/${subjSlug}`
       });
     }
     if (filterSubject && filterUnit) {
-      const currSlug = getCurriculumSlug(filterCurriculum || 'Edexcel IAL');
+      const currSlug = getCurriculumSlug(filterCurriculum || inferCurriculumForSubject(filterSubject, 'Edexcel IAL'));
       const subjSlug = getSubjectSlug(filterSubject);
       const unitSlug = getUnitSlug(filterUnit);
       breadcrumbs.push({
@@ -200,14 +248,24 @@ export function buildJsonLd({
     }
   }
 
+  const aboutOrg = isCie
+    ? {
+        '@type': 'EducationalOrganization',
+        name: 'Cambridge International Education (AS & A Level, IGCSE & O Level)'
+      }
+    : {
+        '@type': 'EducationalOrganization',
+        name: 'Pearson Edexcel International Examinations (IAL & IGCSE)'
+      };
+
   const graph = [
     {
       '@type': 'WebSite',
       '@id': `${SITE_URL}/#website`,
       url: `${SITE_URL}/`,
-      name: 'Conceptualist Systems — Edexcel Past Papers & Textbooks Library',
-      alternateName: ['Conceptualist Systems', 'Conceptualist Edexcel Library'],
-      description: `Independent academic study repository indexing ${uniqueFiles.toLocaleString()}+ unique Edexcel IAL and IGCSE past exam papers, mark schemes, examiner reports, and textbooks (${totalFiles.toLocaleString()} archived files).`,
+      name: 'Conceptualist Systems — International Exam Past Papers & Textbooks Library',
+      alternateName: ['Conceptualist Systems', 'Conceptualist Exam Archive'],
+      description: `Independent international exam study archive indexing ${uniqueFiles.toLocaleString()}+ unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) past papers, mark schemes, examiner reports, grade thresholds, and textbooks (${totalFiles.toLocaleString()} archived files).`,
       potentialAction: {
         '@type': 'SearchAction',
         target: {
@@ -231,16 +289,13 @@ export function buildJsonLd({
       description: seo.description,
       isPartOf: { '@id': `${SITE_URL}/#website` },
       breadcrumb: { '@id': `${seo.canonicalUrl}#breadcrumb` },
-      about: {
-        '@type': 'EducationalOrganization',
-        name: 'Pearson Edexcel International Examinations (IAL & IGCSE)'
-      }
+      about: aboutOrg
     }
   ];
 
-  // Add ItemList of units when on a Subject Past Papers page
+  // Add ItemList of units/papers when on a Subject Past Papers page
   if (!filterDocType && filterSubject && !filterUnit && meta?.wizard) {
-    const curr = filterCurriculum || 'Edexcel IAL';
+    const curr = filterCurriculum || inferCurriculumForSubject(filterSubject, 'Edexcel IAL');
     const currSlug = getCurriculumSlug(curr);
     const subjSlug = getSubjectSlug(filterSubject);
     const unitsObj = meta.wizard[curr]?.[filterSubject]?.units || {};
@@ -248,7 +303,7 @@ export function buildJsonLd({
     if (unitKeys.length > 0) {
       graph.push({
         '@type': 'ItemList',
-        name: `${curr} ${formatSubjectName(filterSubject)} Units & Examination Papers`,
+        name: `${curr} ${formatSubjectName(filterSubject)} ${isCie ? 'Papers & Components' : 'Units & Examination Papers'}`,
         numberOfItems: unitKeys.length,
         itemListElement: unitKeys.map((u, idx) => ({
           '@type': 'ListItem',
@@ -261,7 +316,7 @@ export function buildJsonLd({
   }
 
   // Add rich Book / CreativeWork ItemList on Textbook routes using verified ISBNs & authors from bookCatalog.js
-  if (filterDocType === 'Book' && !filterUnit) {
+  if (filterDocType === 'Book' && !filterUnit && !isCie) {
     const matchingBooks = Object.entries(BOOK_CATALOG_BY_PATH).filter(([bookPath]) => {
       const bookCurr = bookPath.startsWith('IGCSE Books/') ? 'Edexcel IGCSE' : 'Edexcel IAL';
       if (filterCurriculum && bookCurr !== filterCurriculum) return false;
@@ -283,7 +338,7 @@ export function buildJsonLd({
           .filter(Boolean);
         if (parts.length === 0) return null;
         const toEntity = (name) => {
-          const isOrg = /\b(pearson|edexcel|education|press|publishing|limited|ltd|editorial)\b/i.test(name);
+          const isOrg = /\b(pearson|edexcel|cambridge|education|press|publishing|limited|ltd|editorial)\b/i.test(name);
           return { '@type': isOrg ? 'Organization' : 'Person', name };
         };
         return parts.length === 1 ? toEntity(parts[0]) : parts.map(toEntity);
@@ -318,6 +373,7 @@ export function buildJsonLd({
   // Add Answer-Engine FAQPage schema when route has data-derived Q&As
   const faqEntries = buildRouteFaqEntries({
     currentTab,
+    activeBoard: effBoard,
     filterCurriculum,
     filterSubject,
     filterUnit,
@@ -344,4 +400,3 @@ export function buildJsonLd({
     '@graph': graph
   };
 }
-

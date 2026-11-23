@@ -8,6 +8,7 @@ import { getUnifiedSittingTitle } from '../lib/libraryHelpers.js';
  */
 export function useSeoHeadSync({
   currentTab,
+  activeBoard = 'edexcel',
   isNotFound,
   isWizardRouteActive,
   wizardSubject,
@@ -17,6 +18,7 @@ export function useSeoHeadSync({
   effectiveRouteUnit,
   filterUnit,
   filterYear,
+  filterVariant = '',
   filterDocType,
   deferredSearchQuery,
   previewFile,
@@ -33,16 +35,20 @@ export function useSeoHeadSync({
     if (typeof window === 'undefined') return undefined;
 
     const pathSegments = (window.location.pathname || '/').split('/').filter(Boolean);
-    const waitingForUnitHydration = pathSegments.length >= 3 && pathSegments[0] !== 'textbooks' && !filterUnit && !wizardUnit && !meta?.wizard;
+    const isCambridgeUnitPath = pathSegments[0] === 'cambridge' && pathSegments.length >= 4;
+    const isEdexcelUnitPath = pathSegments[0] !== 'cambridge' && pathSegments[0] !== 'textbooks' && pathSegments.length >= 3;
+    const waitingForUnitHydration = (isCambridgeUnitPath || isEdexcelUnitPath) && !filterUnit && !wizardUnit && !meta?.wizard;
     const activeNotFound = currentTab === 'library' && isNotFound;
 
     if (!waitingForUnitHydration && !activeNotFound) {
       const nextUrl = buildRoutePath({
         currentTab,
+        activeBoard,
         filterCurriculum: effectiveRouteCurriculum,
         filterSubject: effectiveRouteSubject,
         filterUnit: effectiveRouteUnit,
         filterYear,
+        filterVariant,
         filterDocType,
         searchQuery: deferredSearchQuery,
         previewFile: previewFile?.isNotFound ? null : previewFile,
@@ -54,16 +60,18 @@ export function useSeoHeadSync({
       const nextHistoryState = (isWizardRouteActive && wizardSubject)
         ? {
             wizardStep: wizardUnit ? 'year' : 'unit',
+            board: activeBoard,
             curriculum: wizardSubject.curriculum,
             subject: wizardSubject.name,
             unit: wizardUnit || null
           }
-        : { wizardStep: isWizardRouteActive ? 'home' : 'table' };
+        : { wizardStep: isWizardRouteActive ? 'home' : 'table', board: activeBoard };
       const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       const prevState = window.history.state;
       const prevWizardStep = prevState?.wizardStep || null;
       const stateChanged =
         prevWizardStep !== nextHistoryState.wizardStep ||
+        (prevState?.board || '') !== (nextHistoryState.board || '') ||
         (prevState?.subject || '') !== (nextHistoryState.subject || '') ||
         (prevState?.curriculum || '') !== (nextHistoryState.curriculum || '') ||
         (prevState?.unit || '') !== (nextHistoryState.unit || '');
@@ -157,6 +165,7 @@ export function useSeoHeadSync({
         }
         const jsonLdObj = buildJsonLd({
           currentTab,
+          activeBoard,
           filterCurriculum: effectiveRouteCurriculum,
           filterSubject: effectiveRouteSubject,
           filterUnit: effectiveRouteUnit,
@@ -174,6 +183,7 @@ export function useSeoHeadSync({
     };
   }, [
     currentTab,
+    activeBoard,
     isNotFound,
     isWizardRouteActive,
     wizardSubject,
@@ -183,6 +193,7 @@ export function useSeoHeadSync({
     effectiveRouteUnit,
     filterUnit,
     filterYear,
+    filterVariant,
     filterDocType,
     deferredSearchQuery,
     previewFile,

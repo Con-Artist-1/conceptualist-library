@@ -1,5 +1,11 @@
 import React from 'react';
 import {
+  getBoardConfig,
+  getCurriculumMeta,
+  isBookCategory,
+  isCambridgeSpec
+} from '../data/boards.js';
+import {
   shouldHandleClientNavigation,
   DOC_TYPE_INFO,
   getScDocumentLabel,
@@ -20,13 +26,23 @@ import { Breadcrumbs } from './Breadcrumbs.jsx';
 const CORE_UNIFIED_BTNS = [
   { key: 'QP', cls: 'qp', desktop: 'Question Paper', mobile: 'QP', desc: 'Open Question Paper' },
   { key: 'MS', cls: 'ms', desktop: 'Mark Scheme', mobile: 'MS', desc: 'Open Mark Scheme' },
-  { key: 'ER', cls: 'er', desktop: 'Examiner Report', mobile: 'ER', desc: 'Open Examiner Report' }
+  { key: 'ER', cls: 'er', desktop: 'Examiner Report', mobile: 'ER', desc: 'Open Examiner Report' },
+  { key: 'GT', cls: 'gt', desktop: 'Thresholds', mobile: 'GT', desc: 'Open Grade Thresholds' }
 ];
 
 const EXTRA_DOC_TYPES = ['AUD', 'SC', 'DF', 'SOL', 'SAM'];
 
-const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSitePaperUrl, onOpenReader }) => {
+const PaperRow = React.memo(({
+  file,
+  viewMode,
+  filterDocType,
+  scopeAllBoards = false,
+  viewsMap,
+  getOnSitePaperUrl,
+  onOpenReader
+}) => {
   const isUnified = Boolean(viewMode === 'unified' && file.isUnifiedSitting);
+  const isCie = file.board === 'cambridge' || isCambridgeSpec(file.spec);
   const activeDoc = isUnified
     ? ((filterDocType && file.docs?.[filterDocType]) || file.primaryFile || file)
     : file;
@@ -37,15 +53,39 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
   const isPdf = activeDoc.ext === 'pdf';
   const siblings = file.siblings || null;
   const docs = file.docs || {};
-  const canSplit = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
+  const canSplitMs = Boolean(docs.QP?.ext === 'pdf' && docs.MS?.ext === 'pdf');
+  const canSplitSc = Boolean(docs.QP?.ext === 'pdf' && docs.SC?.ext === 'pdf');
+  const canSplit = canSplitMs || canSplitSc;
   const defaultViewMode =
     filterDocType === 'AUD' && (docs.AUD || activeDoc.docType === 'AUD')
       ? 'AUD'
+      : filterDocType === 'GT' && (docs.GT || activeDoc.docType === 'GT')
+      ? 'GT'
       : canSplit
       ? 'split'
       : (docs.QP ? 'QP' : (activeDoc.docType || 'QP'));
   const eligibleForViews = isQuestionPaperEligibleForViews(file);
   const paperViews = eligibleForViews ? getPaperTotalViews(file, viewsMap) : 0;
+
+  const currMeta = getCurriculumMeta(file.curriculum);
+  const currBadgeText = scopeAllBoards ? currMeta.crossBoardLabel : currMeta.shortLabel;
+
+  // Format crisp monospace component chip for Cambridge ("0625 / 42") vs Edexcel ("WMA11")
+  let codeChipText = file.unitCode || '';
+  if (isCie && file.unitCode) {
+    const pMatch = String(file.unitCode).match(/^(\d{4})-P(\d)$/i);
+    if (pMatch) {
+      const comp = /^\d$/.test(String(file.variant || '')) ? `${pMatch[2]}${file.variant}` : `P${pMatch[2]}`;
+      codeChipText = `${pMatch[1]} / ${comp}`;
+    }
+  } else if (isCie && file.syllabusCode && !codeChipText) {
+    codeChipText = file.syllabusCode;
+  }
+
+  const isEdexcelRegional = !isCie && Boolean(
+    file.variant === 'R' || file.variant === 'A' || (file.variant && String(file.variant).includes('R'))
+  );
+  const isCieVariant = isCie && /^\d$/.test(String(file.variant || ''));
 
   const bookMeta = file.bookMeta || null;
   const sublineText = bookMeta
@@ -103,17 +143,17 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
         {!isUnified && (
           <div className="details-primary">
             {formatSubjectDisplay(file.subject)}
-            {!(file.category === 'Books' || file.category === 'IAL Books' || file.category === 'IGCSE Books') && shortUnit
+            {!isBookCategory(file.category) && shortUnit
               ? ` — ${shortUnit}`
               : ''}
           </div>
         )}
         <div className="details-secondary">
-          <span className={`curr-mini-badge ${file.curriculum === 'Edexcel IGCSE' ? 'igcse' : 'ial'}`}>
-            {file.curriculum ? file.curriculum.replace('Edexcel ', '') : 'IAL'}
+          <span className={`curr-mini-badge ${currMeta.badgeCls}`}>
+            {currBadgeText}
           </span>
-          {isUnified && file.unitCode && (
-            <span className="unit-code-chip">{file.unitCode}</span>
+          {codeChipText && (isUnified || isCie) && (
+            <span className="unit-code-chip">{codeChipText}</span>
           )}
           {file.session ? (
             <span className="session-pill-tag">{file.session}</span>
@@ -122,9 +162,14 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
           ) : (
             <span>Reference Resource</span>
           )}
-          {Boolean(file.variant === 'R' || file.variant === 'A' || (file.variant && file.variant.includes('R'))) && (
+          {isEdexcelRegional && (
             <span className="curr-mini-badge regional" title="Regional examination series">
               {file.variant === 'A' ? 'Alt A' : 'Regional'}
+            </span>
+          )}
+          {isCieVariant && (
+            <span className="curr-mini-badge cie-variant" title={`Cambridge Timezone Variant ${file.variant}`}>
+              Var {file.variant}
             </span>
           )}
         </div>
@@ -206,8 +251,8 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
                   onOpenReader(file, 'split');
                 }}
                 className="unified-preview-btn split-btn"
-                aria-label={`Split View (Question Paper & Mark Scheme) — ${displayTitle}`}
-                title="Open Question Paper and Mark Scheme side by side in Split View"
+                aria-label={`Split View — ${displayTitle}`}
+                title={canSplitMs ? 'Open Question Paper and Mark Scheme side by side in Split View' : 'Open Question Paper and Insert side by side in Split View'}
               >
                 <span className="btn-desktop-text">Split View</span>
                 <span className="btn-mobile-text" aria-hidden="true">Split</span>
@@ -250,7 +295,7 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
                   <span className="doc-badge default">Doc</span>
                 )}
 
-                {siblings && ['QP', 'MS', 'ER'].map((sibType) => {
+                {siblings && ['QP', 'MS', 'ER', 'GT'].map((sibType) => {
                   if (sibType === file.docType) return null;
                   const sib = siblings[sibType];
                   if (!sib) return null;
@@ -314,6 +359,9 @@ const PaperRow = React.memo(({ file, viewMode, filterDocType, viewsMap, getOnSit
  */
 export function PaperTable({
   isMobile,
+  scopeAllBoards = false,
+  suggestedOtherBoard = null,
+  onSwitchBoardKeepingQuery,
   searchQuery,
   onSetSearchQuery,
   seoMeta,
@@ -336,6 +384,7 @@ export function PaperTable({
   breadcrumbProps
 }) {
   const isSearchActive = Boolean(searchQuery && searchQuery.trim());
+  const suggestedCfg = suggestedOtherBoard ? getBoardConfig(suggestedOtherBoard) : null;
 
   return (
     <>
@@ -427,6 +476,7 @@ export function PaperTable({
                   file={file}
                   viewMode={viewMode}
                   filterDocType={filterDocType}
+                  scopeAllBoards={scopeAllBoards}
                   viewsMap={viewsMap}
                   getOnSitePaperUrl={getOnSitePaperUrl}
                   onOpenReader={onOpenReader}
@@ -482,6 +532,17 @@ export function PaperTable({
             <>
               <h3>No matching documents found</h3>
               <p>Try refining your search terms or resetting an active filter above.</p>
+              {suggestedCfg && onSwitchBoardKeepingQuery && (
+                <div style={{ marginTop: '12px' }}>
+                  <button
+                    type="button"
+                    className="search-button"
+                    onClick={() => onSwitchBoardKeepingQuery(suggestedOtherBoard)}
+                  >
+                    Search &ldquo;{searchQuery.trim()}&rdquo; in {suggestedCfg.label} →
+                  </button>
+                </div>
+              )}
               {searchMeta.didYouMean && (
                 <p className="search-did-you-mean search-did-you-mean-empty">
                   Did you mean{' '}

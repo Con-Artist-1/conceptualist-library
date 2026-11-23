@@ -2,7 +2,7 @@
   "trailingSlash": false,
   "functions": {
     "api/*.js": {
-      "includeFiles": "public/index.json"
+      "includeFiles": "public/allowlist.json"
     }
   },
   "rewrites": [],
@@ -26,6 +26,15 @@
       ]
     },
     {
+      "source": "/cambridge/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/textbooks/(.*)",
       "headers": [
         {
@@ -35,7 +44,7 @@
       ]
     },
     {
-      "source": "/(ial|igcse|papers|textbooks|data-files|audio|about|changelog)",
+      "source": "/(ial|igcse|cambridge|papers|textbooks|data-files|audio|about|changelog)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -120,7 +129,7 @@
       ]
     },
     {
-      "source": "/(index\\.json|audio-subtitles\\.json)",
+      "source": "/(index(?:-[a-z-]+)?\\.json|audio-subtitles\\.json)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -162,12 +171,162 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-ntCNnIAb18i6cV58/fzVRYbfP4r3Y+/82VoqFCXgBe4=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-EGxBR9sUsXi5gzRLLlNltvMXfiJXLXpT3CyzOYc+bDo=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     }
   ],
   "redirects": [
+    {
+      "source": "/caie",
+      "destination": "/cambridge",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0417",
+      "destination": "/cambridge/igcse/ict-0417",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0478",
+      "destination": "/cambridge/igcse/computer-science-0478",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0500",
+      "destination": "/cambridge/igcse/first-language-english-0500",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0580",
+      "destination": "/cambridge/igcse/mathematics-0580",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0610",
+      "destination": "/cambridge/igcse/biology-0610",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0620",
+      "destination": "/cambridge/igcse/chemistry-0620",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0625",
+      "destination": "/cambridge/igcse/physics-0625",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0970",
+      "destination": "/cambridge/igcse/biology-0610",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0971",
+      "destination": "/cambridge/igcse/chemistry-0620",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0972",
+      "destination": "/cambridge/igcse/physics-0625",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0980",
+      "destination": "/cambridge/igcse/mathematics-0580",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0983",
+      "destination": "/cambridge/igcse/ict-0417",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0984",
+      "destination": "/cambridge/igcse/computer-science-0478",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/0990",
+      "destination": "/cambridge/igcse/first-language-english-0500",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/1123",
+      "destination": "/cambridge/o-level/english-language-1123",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/2058",
+      "destination": "/cambridge/o-level/islamiyat-2058",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/2059",
+      "destination": "/cambridge/o-level/pakistan-studies-2059",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/4024",
+      "destination": "/cambridge/o-level/mathematics-d-4024",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/5054",
+      "destination": "/cambridge/o-level/physics-5054",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/5070",
+      "destination": "/cambridge/o-level/chemistry-5070",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/5090",
+      "destination": "/cambridge/o-level/biology-5090",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9608",
+      "destination": "/cambridge/a-level/computer-science-9618",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9618",
+      "destination": "/cambridge/a-level/computer-science-9618",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9700",
+      "destination": "/cambridge/a-level/biology-9700",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9701",
+      "destination": "/cambridge/a-level/chemistry-9701",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9702",
+      "destination": "/cambridge/a-level/physics-9702",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9708",
+      "destination": "/cambridge/a-level/economics-9708",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/9709",
+      "destination": "/cambridge/a-level/mathematics-9709",
+      "permanent": true
+    },
+    {
+      "source": "/cie",
+      "destination": "/cambridge",
+      "permanent": true
+    },
     {
       "source": "/edexcel-ial",
       "destination": "/ial",

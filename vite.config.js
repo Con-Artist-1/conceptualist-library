@@ -198,7 +198,7 @@ async function attachApiAndLibraryMiddlewares(server) {
     fs.createReadStream(shardPath).pipe(res)
   })
 
-  const ALLOWED_LIBRARY_PREFIXES = ['Past Papers/', 'IAL Books/', 'IGCSE Books/']
+  const ALLOWED_LIBRARY_PREFIXES = ['Past Papers/', 'IAL Books/', 'IGCSE Books/', 'Cambridge Books/']
 
   server.middlewares.use('/library-files', (req, res) => {
     const cleanUrl = (req.url || '').split('?')[0]

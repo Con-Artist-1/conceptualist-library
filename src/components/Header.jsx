@@ -1,16 +1,21 @@
 import React from 'react';
+import { BOARD_IDS, getBoardConfig } from '../data/boards.js';
+import { shouldHandleClientNavigation } from '../lib/libraryHelpers.js';
 import { ThemeToggleButton } from './ThemeToggleButton.jsx';
 import { Breadcrumbs } from './Breadcrumbs.jsx';
 
 /**
- * Top institution bar with coverage badge, 3-state theme cycle toggle, About/Library
- * navigation button, and integrated Mobile Header Breadcrumb Strip.
+ * Top institution bar with international board switcher (Edexcel | Cambridge),
+ * coverage badge, 3-state theme cycle toggle, About/Library navigation button,
+ * and integrated Mobile Header Breadcrumb Strip.
  */
 export function Header({
   isMobile,
   showWelcome,
   isNotFound,
   currentTab,
+  activeBoard = 'edexcel',
+  onSwitchBoard,
   navigateToHome,
   activeDateText,
   theme,
@@ -18,23 +23,57 @@ export function Header({
   onToggleNavTab,
   breadcrumbProps
 }) {
+  const boardCfg = getBoardConfig(activeBoard);
+  const homeHref = activeBoard === 'cambridge' ? '/cambridge' : '/';
+  const hideTopRowOnMobile = !showWelcome && !isNotFound && currentTab === 'library';
+
   return (
     <header className="header-top">
-      <div className={`header-top-row ${!showWelcome && !isNotFound && currentTab === 'library' ? 'mobile-hidden' : ''}`}>
-        <a
-          href="/"
-          className="brand-section"
-          onClick={navigateToHome}
-          aria-label="Conceptualist Systems - Library Home"
-        >
-          <div className="brand-logo-text">
-            Conceptualist <span className="brand-logo-accent">Systems</span>
-          </div>
-          <div className="brand-tagline">
-            <span className="title">EDEXCEL LIBRARY</span>
-            <span>Past Exam Papers & Resources</span>
-          </div>
-        </a>
+      <div className={`header-top-row ${hideTopRowOnMobile ? 'mobile-hidden' : ''}`}>
+        <div className="header-left-group">
+          <a
+            href={homeHref}
+            className="brand-section"
+            onClick={navigateToHome}
+            aria-label="Conceptualist Systems - Library Home"
+          >
+            <div className="brand-logo-text">
+              Conceptualist <span className="brand-logo-accent">Systems</span>
+            </div>
+            <div className="brand-tagline">
+              <span className="title">INTERNATIONAL ARCHIVE</span>
+              <span>{boardCfg.label}</span>
+            </div>
+          </a>
+
+          {onSwitchBoard && (
+            <nav
+              className="board-switcher desktop-board-switcher"
+              aria-label="Select examination board"
+            >
+              {BOARD_IDS.map((bId) => {
+                const cfg = getBoardConfig(bId);
+                const isActive = activeBoard === bId;
+                const href = bId === 'cambridge' ? '/cambridge' : '/';
+                return (
+                  <a
+                    key={bId}
+                    href={href}
+                    className={`board-switch-btn ${isActive ? 'active' : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={(e) => {
+                      if (!shouldHandleClientNavigation(e)) return;
+                      e.preventDefault();
+                      onSwitchBoard(bId);
+                    }}
+                  >
+                    {cfg.shortLabel}
+                  </a>
+                );
+              })}
+            </nav>
+          )}
+        </div>
 
         <div className="header-right-group">
           <div className="header-coverage-badge">
@@ -48,10 +87,10 @@ export function Header({
             ariaLabel="Toggle Theme"
           />
           <a
-            href={currentTab !== 'library' ? '/' : '/about'}
+            href={currentTab !== 'library' ? homeHref : '/about'}
             className={`header-nav-btn ${currentTab !== 'library' ? 'active' : ''}`}
             onClick={(e) => {
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+              if (!shouldHandleClientNavigation(e)) return;
               e.preventDefault();
               onToggleNavTab();
             }}
@@ -67,6 +106,33 @@ export function Header({
           </a>
         </div>
       </div>
+
+      {isMobile && onSwitchBoard && !hideTopRowOnMobile && (
+        <nav className="mobile-board-switcher-bar" aria-label="Select examination board">
+          <div className="board-switcher mobile-board-switcher">
+            {BOARD_IDS.map((bId) => {
+              const cfg = getBoardConfig(bId);
+              const isActive = activeBoard === bId;
+              const href = bId === 'cambridge' ? '/cambridge' : '/';
+              return (
+                <a
+                  key={bId}
+                  href={href}
+                  className={`board-switch-btn ${isActive ? 'active' : ''}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={(e) => {
+                    if (!shouldHandleClientNavigation(e)) return;
+                    e.preventDefault();
+                    onSwitchBoard(bId);
+                  }}
+                >
+                  {cfg.label}
+                </a>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
       {isMobile && currentTab === 'library' && !showWelcome && !isNotFound && (
         <div className="mobile-header-breadcrumb">

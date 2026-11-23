@@ -29,15 +29,23 @@ if (!TOKEN) {
   process.exit(1);
 }
 const REPO_ID = 'Diavlon/mcmaster-docs-library';
-const INDEX_FILE = path.join(APP_DIR, 'public', 'index.json');
 
 async function main() {
-  console.log('Uploading updated live_index.json to Hugging Face...');
-  const buf = fs.readFileSync(INDEX_FILE);
-  const oid = crypto.createHash('sha256').update(buf).digest('hex');
-  const size = buf.length;
+  const targets = [
+    { localPath: path.join(APP_DIR, 'public', 'index.json'), remotePath: 'live_index.json' }
+  ];
+  const cieIndexPath = path.join(APP_DIR, 'public', 'index-cambridge.json');
+  if (fs.existsSync(cieIndexPath)) {
+    targets.push({ localPath: cieIndexPath, remotePath: 'live_index_cambridge.json' });
+  }
 
-  console.log(`File size: ${(size / 1024 / 1024).toFixed(2)} MB, SHA256: ${oid}`);
+  const prepared = targets.map((t) => {
+    const buf = fs.readFileSync(t.localPath);
+    const oid = crypto.createHash('sha256').update(buf).digest('hex');
+    const size = buf.length;
+    console.log(`Prepared ${t.remotePath}: ${(size / 1024 / 1024).toFixed(2)} MB, SHA256: ${oid}`);
+    return { ...t, buf, oid, size };
+  });
 
   // 1. Request LFS upload via batch API
   const batchRes = await fetch(`https://huggingface.co/datasets/${REPO_ID}.git/info/lfs/objects/batch`, {
@@ -50,7 +58,7 @@ async function main() {
     body: JSON.stringify({
       operation: 'upload',
       transfers: ['basic'],
-      objects: [{ oid, size }]
+      objects: prepared.map((p) => ({ oid: p.oid, size: p.size }))
     })
   });
 
@@ -58,50 +66,51 @@ async function main() {
     throw new Error(`LFS batch request failed: HTTP ${batchRes.status}`);
   }
   const batchData = await batchRes.json();
-  const obj = batchData.objects?.[0];
-  if (!obj) {
-    throw new Error('LFS batch response missing objects[0].');
-  }
+  const byOid = new Map(prepared.map((p) => [p.oid, p]));
 
-  if (obj.actions && obj.actions.upload) {
-    const uploadUrl = obj.actions.upload.href;
-    const headers = obj.actions.upload.header || {};
-    console.log('Uploading LFS binary to storage endpoint...');
-    const upRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        ...headers
-      },
-      body: buf
-    });
-    if (!upRes.ok) {
-      throw new Error(`Upload to storage failed: HTTP ${upRes.status}`);
+  for (const obj of batchData.objects || []) {
+    const entry = byOid.get(obj.oid);
+    if (!entry) continue;
+    if (obj.actions && obj.actions.upload) {
+      const uploadUrl = obj.actions.upload.href;
+      const headers = obj.actions.upload.header || {};
+      console.log(`Uploading LFS binary for ${entry.remotePath}...`);
+      const upRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...headers
+        },
+        body: entry.buf
+      });
+      if (!upRes.ok) {
+        throw new Error(`Upload to storage failed for ${entry.remotePath}: HTTP ${upRes.status}`);
+      }
+      console.log(`LFS upload succeeded for ${entry.remotePath}.`);
+    } else {
+      console.log(`${entry.remotePath} already present in LFS store.`);
     }
-    console.log('LFS upload succeeded.');
-  } else {
-    console.log('Object already present in LFS store.');
   }
 
-  // 2. Commit pointer to main branch
-  console.log('Committing live_index.json to main branch...');
+  // 2. Commit pointers to main branch
+  console.log(`Committing ${prepared.map((p) => p.remotePath).join(', ')} to main branch...`);
   const commitUrl = `https://huggingface.co/api/datasets/${REPO_ID}/commit/main`;
   const ndjson = [
     JSON.stringify({
       key: 'header',
       value: {
-        summary: 'Update live_index.json with deduplicated library index and compact tree'
+        summary: `Update ${prepared.map((p) => p.remotePath).join(' & ')} with deduplicated multi-board catalog`
       }
     }),
-    JSON.stringify({
+    ...prepared.map((p) => JSON.stringify({
       key: 'lfsFile',
       value: {
-        path: 'live_index.json',
+        path: p.remotePath,
         algo: 'sha256',
-        oid,
-        size
+        oid: p.oid,
+        size: p.size
       }
-    })
+    }))
   ].join('\n') + '\n';
 
   const comRes = await fetch(commitUrl, {
@@ -122,5 +131,4 @@ async function main() {
   console.log(`Commit successful! Commit OID: ${comData.commit?.oid || 'done'}`);
 }
 
-main().catch(e => { console.error('Fatal HF error:', e); process.exit(1); });
-
+main().catch((e) => { console.error('Fatal HF error:', e); process.exit(1); });

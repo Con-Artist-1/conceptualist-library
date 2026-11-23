@@ -1,9 +1,16 @@
-// Pure catalog hydration, sibling grouping, smart search & query engine.
+// Pure multi-board catalog hydration, sibling grouping, smart search & query engine.
 // Runs off the main UI thread inside src/workers/catalog.worker.js (with transparent fallback).
 
 import { extractVariant, getCleanUnitLabel, compareUnitLabels } from '../unitParser.js';
 import { getBookMetadata } from '../bookCatalog.js';
 import { getPaperTotalViews } from './paperKeys.js';
+import {
+  getBoardForSpec,
+  getCurriculumForSpec,
+  isBookCategory,
+  isCambridgeSpec
+} from '../data/boards.js';
+import { extractSyllabusCodeFromSubject } from '../data/cambridgeCatalog.js';
 import {
   buildFileSearchData,
   finalizeUnifiedSearchData,
@@ -12,9 +19,9 @@ import {
   executeSmartSearch
 } from '../searchEngine.js';
 
-const SIBLING_TYPES = new Set(['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM']);
-const DOC_PRIORITY = ['QP', 'MS', 'ER', 'SOL', 'AUD', 'SC', 'DF', 'SAM'];
-const DOC_ORDER = { QP: 1, MS: 2, ER: 3, SC: 4, DF: 5, AUD: 6, SAM: 7, SOL: 8 };
+const SIBLING_TYPES = new Set(['QP', 'MS', 'ER', 'GT', 'SC', 'AUD', 'DF', 'SOL', 'SAM']);
+const DOC_PRIORITY = ['QP', 'MS', 'ER', 'GT', 'SOL', 'AUD', 'SC', 'DF', 'SAM'];
+const DOC_ORDER = { QP: 1, MS: 2, ER: 3, GT: 4, SC: 5, DF: 6, AUD: 7, SAM: 8, SOL: 9 };
 const UNIT_PREFIX_BY_SUBJECT = { French: 'WFR', German: 'WGN', Spanish: 'WSP' };
 const SAMPLE_AUDIO_ID = 'IAL|French|WFR02||June 2021';
 
@@ -47,6 +54,8 @@ function sanitizeLeafDoc(d) {
     unitCode: d.unitCode,
     unitName: d.unitName,
     spec: d.spec,
+    board: d.board,
+    syllabusCode: d.syllabusCode || null,
     category: d.category,
     variant: d.variant,
     cleanUnitLabel: d.cleanUnitLabel,
@@ -74,8 +83,10 @@ export function serializeItemForUi(item) {
   const out = {
     id: item.id,
     isUnifiedSitting: Boolean(item.isUnifiedSitting),
+    board: item.board,
     spec: item.spec,
     curriculum: item.curriculum,
+    syllabusCode: item.syllabusCode || null,
     category: item.category,
     subject: item.subject,
     unitCode: item.unitCode,
@@ -137,10 +148,11 @@ export function hydrateCatalogPayload(json) {
 
     const dotIdx = fileObj.name ? fileObj.name.lastIndexOf('.') : -1;
     fileObj.ext = dotIdx !== -1 ? fileObj.name.slice(dotIdx + 1).toLowerCase() : '';
-    fileObj.curriculum =
-      fileObj.spec === 'IGCSE' || fileObj.category === 'IGCSE Books'
-        ? 'Edexcel IGCSE'
-        : 'Edexcel IAL';
+    fileObj.board = getBoardForSpec(fileObj.spec);
+    fileObj.curriculum = getCurriculumForSpec(fileObj.spec, fileObj.category);
+    if (!fileObj.syllabusCode && isCambridgeSpec(fileObj.spec)) {
+      fileObj.syllabusCode = extractSyllabusCodeFromSubject(fileObj.subject) || null;
+    }
     if (fileObj.variant === undefined) fileObj.variant = extractVariant(fileObj);
     if (fileObj.cleanUnitLabel === undefined) fileObj.cleanUnitLabel = getCleanUnitLabel(fileObj);
 
@@ -149,17 +161,14 @@ export function hydrateCatalogPayload(json) {
       const s = fileObj.session;
       if (s) {
         if (s.includes('Jan')) sessionVal = 1;
+        else if (s.includes('Feb') || s.includes('Mar')) sessionVal = 3;
         else if (s.includes('May') || s.includes('June')) sessionVal = 6;
-        else if (s.includes('Oct') || s.includes('Nov')) sessionVal = 10;
+        else if (s.includes('Oct') || s.includes('Nov')) sessionVal = isCambridgeSpec(fileObj.spec) ? 11 : 10;
       }
       fileObj.sortKey = (fileObj.year || 2000) * 100 + sessionVal;
     }
 
-    if (
-      fileObj.category === 'Books' ||
-      fileObj.category === 'IAL Books' ||
-      fileObj.category === 'IGCSE Books'
-    ) {
+    if (isBookCategory(fileObj.category)) {
       bookCount++;
       const bm = getBookMetadata(fileObj);
       if (bm) fileObj.bookMeta = bm;
@@ -172,6 +181,7 @@ export function hydrateCatalogPayload(json) {
 
   const hasPreDeduped = Boolean(
     json.meta?.isShard ||
+    json.meta?.isPreDeduped ||
     (json.meta?.uniqueFiles &&
       Array.isArray(flatFiles) &&
       flatFiles.length === json.meta.uniqueFiles)
@@ -180,6 +190,8 @@ export function hydrateCatalogPayload(json) {
   const dedupMap = hasPreDeduped ? null : new Map();
   const siblingGroups = new Map();
   const combinedU2U4Zips = [];
+  // Session-wide Cambridge ER & GT files (shared across all papers/variants in that syllabus + session)
+  const cieSessionDocs = new Map();
 
   for (let i = 0; i < flatFiles.length; i++) {
     const f = flatFiles[i];
@@ -194,6 +206,25 @@ export function hydrateCatalogPayload(json) {
       /u2u4/i.test(f.name || '')
     ) {
       combinedU2U4Zips.push(f);
+    }
+
+    if (
+      f.category === 'Past Papers' &&
+      isCambridgeSpec(f.spec) &&
+      !f.unitCode &&
+      f.syllabusCode &&
+      f.session &&
+      (f.docType === 'ER' || f.docType === 'GT')
+    ) {
+      const sessKey = `${f.spec}|${f.syllabusCode}|${f.session}`;
+      let sBag = cieSessionDocs.get(sessKey);
+      if (!sBag) {
+        sBag = {};
+        cieSessionDocs.set(sessKey, sBag);
+      }
+      if (preferSiblingCandidate(sBag[f.docType], f)) {
+        sBag[f.docType] = f;
+      }
     }
 
     if (dedupMap) {
@@ -237,6 +268,18 @@ export function hydrateCatalogPayload(json) {
     });
   }
 
+  // Attach Cambridge session-wide ER & GT onto every matching syllabus+session sibling group
+  if (cieSessionDocs.size > 0) {
+    for (const grp of siblingGroups.values()) {
+      const refDoc = grp.QP || grp.MS || grp.SC || grp.AUD || grp.DF;
+      if (!refDoc || !isCambridgeSpec(refDoc.spec) || !refDoc.syllabusCode || !refDoc.session) continue;
+      const sBag = cieSessionDocs.get(`${refDoc.spec}|${refDoc.syllabusCode}|${refDoc.session}`);
+      if (!sBag) continue;
+      if (sBag.ER && !grp.ER) grp.ER = sBag.ER;
+      if (sBag.GT && !grp.GT) grp.GT = sBag.GT;
+    }
+  }
+
   for (let i = 0; i < flatFiles.length; i++) {
     const f = flatFiles[i];
     if (f.category === 'Past Papers' && f.unitCode && f.session) {
@@ -278,8 +321,10 @@ export function hydrateCatalogPayload(json) {
       group = {
         id: sittingKey,
         isUnifiedSitting: true,
+        board: f.board,
         spec: f.spec,
         curriculum: f.curriculum,
+        syllabusCode: f.syllabusCode || null,
         category: f.category,
         subject: f.subject,
         unitCode: f.unitCode,
@@ -325,6 +370,17 @@ export function hydrateCatalogPayload(json) {
         if (!group.docs.AUD_ZIP) group.docs.AUD_ZIP = z;
       }
     });
+  }
+
+  // Pass 2: Attach Cambridge session-wide ER & GT to every matching paper sitting (without polluting paper highSet search ranking)
+  if (cieSessionDocs.size > 0) {
+    for (const group of sittingMap.values()) {
+      if (!isCambridgeSpec(group.spec) || !group.syllabusCode || !group.session) continue;
+      const sBag = cieSessionDocs.get(`${group.spec}|${group.syllabusCode}|${group.session}`);
+      if (!sBag) continue;
+      if (sBag.ER && !group.docs.ER) group.docs.ER = sBag.ER;
+      if (sBag.GT && !group.docs.GT) group.docs.GT = sBag.GT;
+    }
   }
 
   const lookupById = new Map();
@@ -394,15 +450,64 @@ export function hydrateCatalogPayload(json) {
   };
 }
 
+export function mergeHydratedStates(statesList) {
+  const valid = (statesList || []).filter(Boolean);
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return valid[0];
+
+  const flatFiles = [];
+  const dedupedFiles = [];
+  const unifiedFiles = [];
+  const vocabSet = new Set();
+  const lookupById = new Map();
+  const lookupByPath = new Map();
+  let sampleAudio = null;
+  let bookCount = 0;
+  let audioCount = 0;
+
+  for (let i = 0; i < valid.length; i++) {
+    const st = valid[i];
+    for (let j = 0; j < st.flatFiles.length; j++) flatFiles.push(st.flatFiles[j]);
+    for (let j = 0; j < st.dedupedFiles.length; j++) dedupedFiles.push(st.dedupedFiles[j]);
+    for (let j = 0; j < st.unifiedFiles.length; j++) unifiedFiles.push(st.unifiedFiles[j]);
+    for (let j = 0; j < st.catalogVocab.length; j++) vocabSet.add(st.catalogVocab[j]);
+    for (const [k, v] of st.lookupById.entries()) if (!lookupById.has(k)) lookupById.set(k, v);
+    for (const [k, v] of st.lookupByPath.entries()) if (!lookupByPath.has(k)) lookupByPath.set(k, v);
+    if (!sampleAudio && st.sampleAudio) sampleAudio = st.sampleAudio;
+    bookCount += st.counts?.bookCount || 0;
+    audioCount += st.counts?.audioCount || 0;
+  }
+
+  return {
+    flatFiles,
+    dedupedFiles,
+    unifiedFiles,
+    catalogVocab: Array.from(vocabSet),
+    lookupById,
+    lookupByPath,
+    sampleAudio,
+    meta: valid[0].meta || {},
+    counts: {
+      flatCount: flatFiles.length,
+      dedupedCount: dedupedFiles.length,
+      unifiedCount: unifiedFiles.length,
+      bookCount,
+      audioCount
+    }
+  };
+}
+
 export function queryCatalogState(state, params) {
   const {
     selectedPath = '',
     viewMode = 'unified',
+    filterBoard = '',
     filterCurriculum = '',
     filterSubject = '',
     filterUnit = '',
     filterYear = '',
     filterSession = '',
+    filterVariant = '',
     filterDocType = null,
     searchQuery = '',
     sortBy = 'newest',
@@ -433,21 +538,24 @@ export function queryCatalogState(state, params) {
     : null;
 
   const hasFolder = Boolean(folderPrefix);
+  const hasBoard = Boolean(filterBoard && filterBoard !== 'all');
   const hasCurriculum = Boolean(filterCurriculum);
   const hasSubject = Boolean(filterSubject);
   const hasUnit = Boolean(filterUnit);
   const hasYear = Boolean(filterYear);
   const hasSession = Boolean(filterSession);
+  const hasVariant = Boolean(filterVariant);
   const hasDocType = Boolean(filterDocType);
 
   let files;
-  if (!hasFolder && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasDocType) {
+  if (!hasFolder && !hasBoard && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasVariant && !hasDocType) {
     files = sourceFiles;
   } else {
     const filtered = [];
     const len = sourceFiles.length;
     const lowerSession = hasSession ? filterSession.toLowerCase() : '';
     const strYear = hasYear ? String(filterYear) : '';
+    const strVariant = hasVariant ? String(filterVariant) : '';
 
     for (let i = 0; i < len; i++) {
       const f = sourceFiles[i];
@@ -464,27 +572,36 @@ export function queryCatalogState(state, params) {
         }
       }
 
+      if (hasBoard && f.board !== filterBoard) continue;
       if (hasCurriculum && f.curriculum !== filterCurriculum) continue;
       if (hasSubject && f.subject !== filterSubject) continue;
       if (hasUnit && f.cleanUnitLabel !== filterUnit) continue;
       if (hasYear && String(f.year) !== strYear) continue;
       if (hasSession && !String(f.session || '').toLowerCase().startsWith(lowerSession)) continue;
+      if (hasVariant && String(f.variant || '') !== strVariant) continue;
 
       if (hasDocType) {
         if (filterDocType === 'Book') {
-          if (f.category !== 'Books' && f.category !== 'IAL Books' && f.category !== 'IGCSE Books') continue;
+          if (!isBookCategory(f.category)) continue;
         } else if (filterDocType === 'Extra') {
           if (useUnified) {
             const hasExtra = Boolean(
-              f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL ||
-              f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL'
+              f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL || f.docs?.GT ||
+              f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL' || f.docType === 'GT'
             );
             if (!hasExtra) continue;
-          } else if (f.docType !== 'DF' && f.docType !== 'AUD' && f.docType !== 'SC' && f.docType !== 'SAM' && f.docType !== 'SOL') {
+          } else if (
+            f.docType !== 'DF' && f.docType !== 'AUD' && f.docType !== 'SC' &&
+            f.docType !== 'SAM' && f.docType !== 'SOL' && f.docType !== 'GT'
+          ) {
             continue;
           }
         } else if (useUnified) {
-          if (!f.docs?.[filterDocType] && f.docType !== filterDocType) continue;
+          if (filterDocType === 'GT' && !hasUnit) {
+            if (f.docType !== 'GT') continue;
+          } else if (!f.docs?.[filterDocType] && f.docType !== filterDocType) {
+            continue;
+          }
         } else if (f.docType !== filterDocType) {
           continue;
         }
@@ -495,7 +612,8 @@ export function queryCatalogState(state, params) {
     files = filtered;
   }
 
-  const parsedSearch = parseSearchQuery(searchQuery, state.catalogVocab);
+  const effectiveBoard = hasBoard ? filterBoard : '';
+  const parsedSearch = parseSearchQuery(searchQuery, state.catalogVocab, { activeBoard: effectiveBoard });
   const searchExec = parsedSearch.hasQuery
     ? executeSmartSearch(files, parsedSearch, { isUnified: useUnified })
     : {

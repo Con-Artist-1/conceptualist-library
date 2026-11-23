@@ -8,23 +8,24 @@ import {
   IAL_SUBJECTS_DEFAULT,
   IGCSE_SUBJECTS_DEFAULT
 } from './routeCore.js';
+import { isCambridgeCurriculum } from '../data/boards.js';
 import { compareUnitLabels } from './unitSort.js';
 import {
   SUBJECTS_WITH_BOOKS,
-  IAL_AUDIO_SUBJECTS,
-  IGCSE_AUDIO_SUBJECTS,
+  hasAudioForCourse,
   hasDataFilesForCourse,
   formatSubjectDisplay
 } from './libraryHelpers.js';
 
 /**
  * Computes hydrated ArchiveContextStrip metadata and lateral internal navigation links
- * for the active curriculum, subject, unit, or resource hub view.
+ * for the active curriculum, subject, unit, or resource hub view across Edexcel and Cambridge.
  */
 export function buildArchiveContextInfo({
   currentTab,
   isNotFound,
   showWelcome,
+  activeBoard = 'edexcel',
   filterCurriculum,
   filterSubject,
   filterUnit,
@@ -46,6 +47,7 @@ export function buildArchiveContextInfo({
   } = actions;
 
   const effCurr = filterCurriculum || inferCurriculumForSubject(filterSubject, '');
+  const isCie = isCambridgeCurriculum(effCurr) || (!effCurr && activeBoard === 'cambridge');
   const legacyInfo = getLegacyEquivalentsForState({
     filterCurriculum: effCurr,
     filterSubject,
@@ -67,7 +69,7 @@ export function buildArchiveContextInfo({
     if (filterUnit) {
       pushLink({
         href: `/${currSlug}/${subjSlug}`,
-        label: `All ${subjDisplay} Units & Papers`,
+        label: `All ${subjDisplay} ${isCie ? 'Papers' : 'Units & Papers'}`,
         onClick: () => { setIsNotFound(false); setFilterUnit(''); setForceShowTable(true); }
       });
     }
@@ -108,14 +110,10 @@ export function buildArchiveContextInfo({
         }
       });
     }
-    if (
-      filterDocType !== 'AUD' &&
-      ((effCurr === 'Edexcel IAL' && IAL_AUDIO_SUBJECTS.has(filterSubject)) ||
-        (effCurr === 'Edexcel IGCSE' && IGCSE_AUDIO_SUBJECTS.has(filterSubject)))
-    ) {
+    if (filterDocType !== 'AUD' && hasAudioForCourse(effCurr, filterSubject)) {
       pushLink({
         href: '/audio',
-        label: `${effCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} Listening Audio (MP3)`,
+        label: 'Listening Audio (MP3)',
         onClick: () => {
           clearFilters({ pushUrl: false });
           setFilterDocType('AUD');
@@ -224,24 +222,29 @@ export function buildArchiveContextInfo({
       });
     }
   } else if (filterCurriculum) {
-    pushLink({
-      href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
-      label: `${filterCurriculum} Textbooks`,
-      onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
-    });
-    pushLink({
-      href: '/data-files',
-      label: 'IT & CS Data Files',
-      onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
-    });
-    pushLink({
-      href: '/audio',
-      label: 'Listening Audio Archive',
-      onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
-    });
-    const subjPool = filterCurriculum === 'Edexcel IGCSE'
-      ? (meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT)
-      : (meta?.ialSubjects || IAL_SUBJECTS_DEFAULT);
+    if (!isCie) {
+      pushLink({
+        href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
+        label: `${filterCurriculum} Textbooks`,
+        onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/data-files',
+        label: 'IT & CS Data Files',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
+      });
+      pushLink({
+        href: '/audio',
+        label: 'Listening Audio Archive',
+        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
+      });
+    }
+    const subjPool =
+      filterCurriculum === 'Edexcel IGCSE' ? (meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT)
+      : filterCurriculum === 'Edexcel IAL' ? (meta?.ialSubjects || IAL_SUBJECTS_DEFAULT)
+      : filterCurriculum === 'Cambridge AS & A Level' ? (meta?.cieAlSubjects || [])
+      : filterCurriculum === 'Cambridge O Level' ? (meta?.cieOlSubjects || [])
+      : (meta?.cieIgcseSubjects || []);
     for (const sName of subjPool) {
       pushLink({
         href: `/${currSlug}/${getSubjectSlug(sName)}`,
@@ -258,13 +261,15 @@ export function buildArchiveContextInfo({
     }
   }
 
-  let note = 'Every sitting pairs Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for instant on-site Split View inspection.';
+  let note = isCie
+    ? 'Every Cambridge sitting pairs Question Papers (QP), Mark Schemes (MS), Inserts (IN), Grade Thresholds (GT), and Examiner Reports (ER) for instant Split View.'
+    : 'Every sitting pairs Question Papers (QP), Mark Schemes (MS), and Examiner Reports (ER) for instant on-site Split View inspection.';
   if (filterDocType === 'Book') {
-    note = `Archived Edexcel student books${filterCurriculum === 'Edexcel IAL' || filterSubject === 'Math' ? ' and worked Solution Banks' : ''} with range-streamed WebPDF viewing.`;
+    note = `Archived student textbooks${filterCurriculum === 'Edexcel IAL' || filterSubject === 'Math' ? ' and worked Solution Banks' : ''} with range-streamed WebPDF viewing.`;
   } else if (filterDocType === 'DF') {
     note = 'Practical examination source archives (.zip) for IT and Computer Science coding, spreadsheet, database, and web tasks.';
   } else if (filterDocType === 'AUD') {
-    note = 'Edexcel IAL & IGCSE listening examination audio tracks (MP3/ZIP) with synchronized transcripts and in-app playback alongside question papers.';
+    note = 'Listening examination audio tracks (MP3/ZIP) with synchronized transcripts and in-app playback alongside question papers.';
   }
 
   if (!legacyInfo && links.length === 0 && !filterCurriculum && !filterSubject) return null;
@@ -274,12 +279,12 @@ export function buildArchiveContextInfo({
     : filterSubject
       ? `${effCurr} ${subjDisplay} Specification & Resources`
       : filterDocType === 'Book'
-        ? 'Edexcel Student Textbooks & Worked Solution Banks'
+        ? 'Student Textbooks & Worked Solution Banks'
         : filterDocType === 'DF'
           ? 'Practical Examination Source Files (.zip)'
           : filterDocType === 'AUD'
-            ? 'IAL & IGCSE Listening Audio Tracks (.mp3)'
-            : `${filterCurriculum || 'Edexcel Archive'} Resource Guide`;
+            ? 'Listening Audio Tracks (.mp3)'
+            : `${filterCurriculum || (isCie ? 'Cambridge International Archive' : 'Edexcel Archive')} Resource Guide`;
 
   return { heading, legacyInfo, note, links };
 }

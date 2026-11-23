@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import '../styles/modal.css';
 import { setActivePaperTelemetry } from '../telemetry.js';
+import { isBookCategory } from '../data/boards.js';
 import {
   normalizePaperTelemetryMode,
   useIsMobile,
@@ -38,7 +39,9 @@ const PreviewModal = ({
     ...(file?.docs || {})
   }), [file]);
 
-  const canSplit = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
+  const canSplitMs = Boolean(siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf');
+  const canSplitSc = Boolean(siblings.QP?.ext === 'pdf' && siblings.SC?.ext === 'pdf');
+  const canSplit = canSplitMs || canSplitSc;
   const isMobile = useIsMobile();
 
   const audSib = siblings.AUD;
@@ -57,6 +60,8 @@ const PreviewModal = ({
   );
   const [audioDockOpen, setAudioDockOpen] = useState(() => shouldStartAudioDock);
   const [swapSplit, setSwapSplit] = useState(false);
+  const [splitRightDocType, setSplitRightDocType] = useState(() => (canSplitMs ? 'MS' : 'SC'));
+  const effectiveSplitRight = (splitRightDocType === 'SC' && canSplitSc) || !canSplitMs ? 'SC' : 'MS';
 
   // On mobile portrait, default to single QP view for maximum readable document height; on desktop, default to split view
   const [activeView, setActiveView] = useState(() => {
@@ -330,6 +335,7 @@ const PreviewModal = ({
     if (activeView === 'QP' && siblings.QP) return siblings.QP;
     if (activeView === 'MS' && siblings.MS) return siblings.MS;
     if (activeView === 'ER' && siblings.ER) return siblings.ER;
+    if (activeView === 'GT' && siblings.GT) return siblings.GT;
     return siblings[activeView] || file.primaryFile || file;
   }, [activeView, siblings, file]);
 
@@ -337,15 +343,11 @@ const PreviewModal = ({
   const singleExt = (currentDoc.ext || (currentDoc.path ? currentDoc.path.split('.').pop() : 'pdf') || 'pdf').toLowerCase();
   const isSinglePdf = singleExt === 'pdf';
   const isTextbookDoc = Boolean(
-    currentDoc.category === 'Books' ||
-    currentDoc.category === 'IAL Books' ||
-    currentDoc.category === 'IGCSE Books' ||
+    isBookCategory(currentDoc.category) ||
     currentDoc.docType === 'Book' ||
-    file?.category === 'Books' ||
-    file?.category === 'IAL Books' ||
-    file?.category === 'IGCSE Books' ||
+    isBookCategory(file?.category) ||
     file?.docType === 'Book' ||
-    /^(?:IAL|IGCSE)\s+Books\//i.test(currentDoc.path || file?.path || '')
+    /^(?:IAL|IGCSE|Cambridge)\s+Books\//i.test(currentDoc.path || file?.path || '')
   );
   const isSingleAudio = singleExt === 'mp3' || singleExt === 'wav' || singleExt === 'm4a' || singleExt === 'ogg';
   const isSingleAudioZip =
@@ -391,13 +393,15 @@ const PreviewModal = ({
     : `${currentDoc.path} ${currentDoc.size ? `(${formatBytes(currentDoc.size)})` : ''}`;
   const downloadUrl = isSplit ? getDownloadUrl(siblings.QP?.path) : getDownloadUrl(currentDoc.path);
 
+  const [scSplitFullLabel, scSplitShortLabel] = siblings.SC ? getScDocumentLabel(siblings.SC) : ['Insert', 'Insert'];
+
   const renderSplitPdfPane = (docTypeKey) => {
-    const targetSib = docTypeKey === 'QP' ? siblings.QP : siblings.MS;
-    const labelText = docTypeKey === 'QP' ? 'Question Paper' : 'Mark Scheme';
+    const targetSib = docTypeKey === 'QP' ? siblings.QP : (docTypeKey === 'SC' ? siblings.SC : siblings.MS);
+    const labelText = docTypeKey === 'QP' ? 'Question Paper' : (docTypeKey === 'SC' ? scSplitFullLabel : 'Mark Scheme');
     return (
       <Suspense fallback={<PdfPaneSkeleton title={`Loading ${labelText}...`} subtitle="Initializing WebPDF Reader" />}>
         <PdfViewerPane
-          key={docTypeKey}
+          key={`${docTypeKey}-${targetSib?.path || ''}`}
           url={getHfUrl(targetSib.path)}
           title={targetSib.name || labelText}
           docType={docTypeKey}
@@ -444,7 +448,9 @@ const PreviewModal = ({
                   <span className="modal-header-badge curriculum">{file.curriculum}</span>
                 )}
                 {isSplit && (
-                  <span className="modal-header-badge split-indicator">QP + MS</span>
+                  <span className="modal-header-badge split-indicator">
+                    {effectiveSplitRight === 'SC' ? `QP + ${scSplitShortLabel}` : 'QP + MS'}
+                  </span>
                 )}
                 {showViews && <PaperViewsCounter count={viewsCount} variant="modal" />}
                 <button
@@ -490,7 +496,7 @@ const PreviewModal = ({
                   }
                 }}
               >
-                {['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SOL', 'SAM'].map((type) => {
+                {['QP', 'MS', 'ER', 'GT', 'SC', 'AUD', 'DF', 'SOL', 'SAM'].map((type) => {
                   const sib = siblings[type];
                   if (!sib || (type === 'AUD' && canDockAudio)) return null;
                   const isCurrent = !isSplit && (activeView === type || currentDoc.path === sib.path);
@@ -498,6 +504,7 @@ const PreviewModal = ({
                     QP: ['Question Paper', 'QP'],
                     MS: ['Mark Scheme', 'MS'],
                     ER: ['Examiner Report', 'ER'],
+                    GT: ['Thresholds', 'GT'],
                     SC: getScDocumentLabel(sib),
                     AUD: ['Listening Audio', 'Audio'],
                     DF: ['Data / Formulae', 'Data'],
@@ -555,13 +562,30 @@ const PreviewModal = ({
                     </button>
                   )}
 
+                  {isSplit && canSplitMs && canSplitSc && (
+                    <button
+                      type="button"
+                      className={`modal-btn modal-swap-split-btn ${effectiveSplitRight === 'SC' ? 'active' : ''}`}
+                      onClick={() => setSplitRightDocType((prev) => (prev === 'SC' ? 'MS' : 'SC'))}
+                      aria-pressed={effectiveSplitRight === 'SC'}
+                      title={effectiveSplitRight === 'SC' ? 'Switch second split pane to Mark Scheme' : `Switch second split pane to ${scSplitFullLabel}`}
+                    >
+                      <span className="btn-desktop-text">
+                        {effectiveSplitRight === 'SC' ? 'Pane: Insert' : `With ${scSplitShortLabel}`}
+                      </span>
+                      <span className="btn-mobile-text" aria-hidden="true">
+                        {effectiveSplitRight === 'SC' ? 'MS' : scSplitShortLabel}
+                      </span>
+                    </button>
+                  )}
+
                   {isSplit && (
                     <button
                       type="button"
                       className={`modal-btn modal-swap-split-btn ${swapSplit ? 'active' : ''}`}
                       onClick={() => setSwapSplit((prev) => !prev)}
                       aria-pressed={swapSplit}
-                      title={swapSplit ? 'Restore Question Paper left / Mark Scheme right' : 'Swap Question Paper and Mark Scheme pane positions'}
+                      title={swapSplit ? 'Restore Question Paper left' : 'Swap left and right split pane positions'}
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
                         <polyline points="17 1 21 5 17 9" />
@@ -700,7 +724,7 @@ const PreviewModal = ({
           ) : isSplit ? (
             <>
               <div className="modal-split-pane qp-pane">
-                {swapSplit ? renderSplitPdfPane('MS') : renderSplitPdfPane('QP')}
+                {swapSplit ? renderSplitPdfPane(effectiveSplitRight) : renderSplitPdfPane('QP')}
               </div>
 
               {!isMobile && (
@@ -744,7 +768,7 @@ const PreviewModal = ({
               )}
 
               <div className="modal-split-pane ms-pane">
-                {swapSplit ? renderSplitPdfPane('QP') : renderSplitPdfPane('MS')}
+                {swapSplit ? renderSplitPdfPane('QP') : renderSplitPdfPane(effectiveSplitRight)}
               </div>
             </>
           ) : (

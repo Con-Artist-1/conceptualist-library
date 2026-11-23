@@ -1,23 +1,26 @@
-# Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library
+# Conceptualist Systems — International Exam Past Papers & Textbooks Library
 
-> Independent study archive; not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel. Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic study archive indexing 16,051 unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 46 IT & Computer Science practical Data Files (19,912 total archived files covering January 2003 through June 2026).
+> Independent international exam study archive; not affiliated with, endorsed by, or sponsored by Pearson plc / Edexcel or Cambridge University Press & Assessment (CAIE). Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic archive indexing 19,030 unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), Grade Thresholds (GT), Inserts (IN), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 62 practical Data Files (22,891 total archived files).
 
 ## Core Platform Capabilities
-- **Side-by-Side Split View Reader:** Open any paired Question Paper (QP) and Mark Scheme (MS) side by side in the browser with synchronized zoom and draggable split divider.
-- **Resizable Two-Page Book Spread Mode:** Read all 73 Edexcel IAL & IGCSE student textbooks and standalone past papers in a 2-Page side-by-side spread with Pure OLED and Academic Dark reading modes.
-- **In-Browser Worked Solution Bank Reader:** Stream all 14 Edexcel IAL Mathematics Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) chapter-by-chapter directly in the browser without downloading full ZIP archives.
-- **Synced Listening Audio & Subtitles (CC):** Play MP3 and multi-track ZIP listening examinations above the Question Paper with clickable time-synced transcripts across French, German, Spanish, ESL, Chinese, and Swahili.
+- **Board Switcher Architecture:** Isolated switching between Pearson Edexcel International (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) with zero cross-board search collisions.
+- **Side-by-Side Split View Reader:** Open paired Question Papers (QP) alongside Mark Schemes (MS) or Cambridge Inserts (IN), plus one-click Grade Thresholds (GT) and Examiner Reports (ER).
+- **Resizable Two-Page Book Spread Mode:** Read student textbooks and standalone past papers in a 2-Page side-by-side spread with Pure OLED and Academic Dark reading modes.
+- **In-Browser Worked Solution Bank Reader:** Stream all 14 Edexcel IAL Mathematics Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) chapter-by-chapter directly in the browser.
+- **Synced Listening Audio & Subtitles (CC):** Play MP3 and multi-track ZIP listening examinations above the Question Paper with clickable time-synced transcripts.
 
 ## Primary Archive Hubs
 - [Library Homepage](https://www.conceptualist.uk/): Interactive subject, unit, and examination year navigator.
-- [All Past Papers Catalog](https://www.conceptualist.uk/papers): Full searchable catalog of 16,051 unique Edexcel resources.
-- [Edexcel IAL Past Papers](https://www.conceptualist.uk/ial): 19 International A-Level subjects (2003-2026).
+- [All Edexcel Past Papers](https://www.conceptualist.uk/papers): Searchable Pearson Edexcel catalog.
+- [Edexcel IAL Past Papers](https://www.conceptualist.uk/ial): 19 International A-Level subjects.
 - [Edexcel IGCSE Past Papers](https://www.conceptualist.uk/igcse): 43 International GCSE (9-1, Regional R, and Modular 4W*) subjects.
+- [Cambridge International Hub](https://www.conceptualist.uk/cambridge): Cambridge AS & A Level (6), IGCSE (7), and O Level (7) subjects.
+- [Cambridge AS & A Level](https://www.conceptualist.uk/cambridge/a-level): International AS & A Level past papers, mark schemes & grade thresholds.
+- [Cambridge IGCSE](https://www.conceptualist.uk/cambridge/igcse): Cambridge IGCSE (A*-G & 9-1 equivalents) past papers, inserts & grade thresholds.
+- [Cambridge O Level](https://www.conceptualist.uk/cambridge/o-level): Cambridge O Level past papers, mark schemes & grade thresholds.
 - [Textbooks & Worked Solution Banks](https://www.conceptualist.uk/textbooks): 73 student books, answer PDFs, lab books, and IAL Maths Solution Banks.
-- [Edexcel IAL Textbooks & Solution Banks](https://www.conceptualist.uk/textbooks/ial): Student Book 1 & 2 PDFs, answers, and P1-P4/M1-M3/S1-S3/D1/FP1-FP3 Solution Banks.
-- [Edexcel IGCSE (9-1) Textbooks](https://www.conceptualist.uk/textbooks/igcse): Verified student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.
 - [Listening Audio Archive (MP3 & Live CC)](https://www.conceptualist.uk/audio): 272 listening audio tracks and synced transcripts.
-- [IT & Computer Science Practical Data Files](https://www.conceptualist.uk/data-files): 46 practical exam source ZIPs for WIT12, WIT14, 4IT1, and 4CP0.
+- [IT & Computer Science Practical Data Files](https://www.conceptualist.uk/data-files): 62 practical exam source ZIPs.
 
 ## Edexcel International A-Level (IAL) Subjects (19)
 - [Edexcel IAL Accounting](https://www.conceptualist.uk/ial/accounting): 264 unique files across 2 units.
@@ -84,6 +87,32 @@
 - [Edexcel IGCSE Tamil (4TA0)](https://www.conceptualist.uk/igcse/tamil): 24 unique files.
 - [Edexcel IGCSE Turkish (4TU0)](https://www.conceptualist.uk/igcse/turkish): 27 unique files.
 - [Edexcel IGCSE Urdu (4UR0)](https://www.conceptualist.uk/igcse/urdu): 24 unique files.
+
+## Cambridge International AS & A Level Subjects (6)
+- [Cambridge AS & A Level Biology (9700)](https://www.conceptualist.uk/cambridge/a-level/biology-9700): 282 unique files.
+- [Cambridge AS & A Level Chemistry (9701)](https://www.conceptualist.uk/cambridge/a-level/chemistry-9701): 281 unique files.
+- [Cambridge AS & A Level Computer Science (9618)](https://www.conceptualist.uk/cambridge/a-level/computer-science-9618): 140 unique files.
+- [Cambridge AS & A Level Economics (9708)](https://www.conceptualist.uk/cambridge/a-level/economics-9708): 178 unique files.
+- [Cambridge AS & A Level Mathematics (9709)](https://www.conceptualist.uk/cambridge/a-level/mathematics-9709): 263 unique files.
+- [Cambridge AS & A Level Physics (9702)](https://www.conceptualist.uk/cambridge/a-level/physics-9702): 280 unique files.
+
+## Cambridge IGCSE Subjects (7)
+- [Cambridge IGCSE Biology (0610)](https://www.conceptualist.uk/cambridge/igcse/biology-0610): 248 unique files.
+- [Cambridge IGCSE Chemistry (0620)](https://www.conceptualist.uk/cambridge/igcse/chemistry-0620): 242 unique files.
+- [Cambridge IGCSE Computer Science (0478)](https://www.conceptualist.uk/cambridge/igcse/computer-science-0478): 86 unique files.
+- [Cambridge IGCSE First Language English (0500)](https://www.conceptualist.uk/cambridge/igcse/first-language-english-0500): 122 unique files.
+- [Cambridge IGCSE ICT (0417)](https://www.conceptualist.uk/cambridge/igcse/ict-0417): 85 unique files.
+- [Cambridge IGCSE Mathematics (0580)](https://www.conceptualist.uk/cambridge/igcse/mathematics-0580): 157 unique files.
+- [Cambridge IGCSE Physics (0625)](https://www.conceptualist.uk/cambridge/igcse/physics-0625): 248 unique files.
+
+## Cambridge O Level Subjects (7)
+- [Cambridge O Level Biology (5090)](https://www.conceptualist.uk/cambridge/o-level/biology-5090): 75 unique files.
+- [Cambridge O Level Chemistry (5070)](https://www.conceptualist.uk/cambridge/o-level/chemistry-5070): 76 unique files.
+- [Cambridge O Level English Language (1123)](https://www.conceptualist.uk/cambridge/o-level/english-language-1123): 40 unique files.
+- [Cambridge O Level Islamiyat (2058)](https://www.conceptualist.uk/cambridge/o-level/islamiyat-2058): 36 unique files.
+- [Cambridge O Level Mathematics D (4024)](https://www.conceptualist.uk/cambridge/o-level/mathematics-d-4024): 36 unique files.
+- [Cambridge O Level Pakistan Studies (2059)](https://www.conceptualist.uk/cambridge/o-level/pakistan-studies-2059): 28 unique files.
+- [Cambridge O Level Physics (5054)](https://www.conceptualist.uk/cambridge/o-level/physics-5054): 76 unique files.
 
 ## Subject Textbooks & Solution Bank Collections
 - [Edexcel IAL Accounting Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/accounting): 4 books/solution banks.

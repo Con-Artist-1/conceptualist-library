@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { SUBJECTS_WITH_BOOKS_MAP } from '../data/curriculumCatalog.js';
 import {
+  getBoardForSpec,
+  getCurriculumForSpec,
+  isBookCategory,
+  isCambridgeCurriculum,
+  isCambridgeSpec
+} from '../data/boards.js';
+import { extractSyllabusCodeFromSubject, resolveCambridgeSyllabus } from '../data/cambridgeCatalog.js';
+import {
   getPaperViewKey,
   isQuestionPaperEligibleForViews,
   getPaperTotalViews
@@ -19,6 +27,7 @@ export const normalizePaperTelemetryMode = (activeView, canSplit, fallbackDocTyp
   if (rawType === 'QP') return 'qp';
   if (rawType === 'MS') return 'ms';
   if (rawType === 'ER') return 'er';
+  if (rawType === 'GT') return 'gt';
   return 'other';
 };
 
@@ -49,18 +58,35 @@ export const DOC_TYPE_INFO = {
   QP: { label: 'QP', fullLabel: 'Question Paper', cls: 'qp' },
   MS: { label: 'MS', fullLabel: 'Mark Scheme', cls: 'ms' },
   ER: { label: 'ER', fullLabel: 'Examiner Report', cls: 'er' },
+  GT: { label: 'GT', fullLabel: 'Grade Thresholds', cls: 'gt' },
   Book: { label: 'Book', fullLabel: 'Textbook', cls: 'book' },
   SOL: { label: 'Solutions', fullLabel: 'Worked Solutions', cls: 'sol' },
   DF: { label: 'Data', fullLabel: 'Data Files', cls: 'df' },
   AUD: { label: 'Audio', fullLabel: 'Listening Audio', cls: 'aud' },
-  SC: { label: 'Source', fullLabel: 'Source / Transcript', cls: 'sc' },
+  SC: { label: 'Source', fullLabel: 'Source / Insert', cls: 'sc' },
   SAM: { label: 'SAM', fullLabel: 'Specimen / Syllabus', cls: 'sam' }
 };
 
 export const IAL_AUDIO_SUBJECTS = new Set(['French', 'German', 'Spanish']);
 export const IGCSE_AUDIO_SUBJECTS = new Set(['Chinese', 'English as a Second Language', 'French', 'German', 'Spanish', 'Swahili']);
 
+export function hasAudioForCourse(curriculum, subject) {
+  if (!subject) return false;
+  if (isCambridgeCurriculum(curriculum)) {
+    const code = extractSyllabusCodeFromSubject(subject);
+    return Boolean(code && resolveCambridgeSyllabus(code)?.hasAudio);
+  }
+  if (curriculum === 'Edexcel IAL') return IAL_AUDIO_SUBJECTS.has(subject);
+  if (curriculum === 'Edexcel IGCSE') return IGCSE_AUDIO_SUBJECTS.has(subject);
+  return false;
+}
+
 export function hasDataFilesForCourse(curriculum, subject) {
+  if (!subject) return false;
+  if (isCambridgeCurriculum(curriculum)) {
+    const code = extractSyllabusCodeFromSubject(subject);
+    return Boolean(code && resolveCambridgeSyllabus(code)?.hasDataFiles);
+  }
   if (subject === 'Information Technology') return true;
   if (subject === 'Computer Science' && curriculum !== 'Edexcel IAL') return true;
   return false;
@@ -69,6 +95,13 @@ export function hasDataFilesForCourse(curriculum, subject) {
 export function getScDocumentLabel(doc) {
   const name = String(doc?.name || doc?.path || '').toLowerCase();
   const subj = String(doc?.subject || '').toLowerCase();
+  const isCie = doc?.board === 'cambridge' || isCambridgeSpec(doc?.spec);
+  if (isCie) {
+    if (/(?:^|[/_-])in(?:[._-]|$)|insert/i.test(name)) return ['Insert', 'Insert'];
+    if (/(?:^|[/_-])ci(?:[._-]|$)|confidential/i.test(name)) return ['Lab Setup (CI)', 'CI'];
+    if (/(?:^|[/_-])tn(?:[._-]|$)|transcript|tapescript/i.test(name)) return ['Transcript', 'Transcript'];
+    if (/(?:^|[/_-])pm(?:[._-]|$)|pre[-_\s]*release/i.test(name)) return ['Pre-Release', 'Pre-Rel'];
+  }
   if (name.includes('transcript')) return ['Transcript', 'Transcript'];
   if (/scientific[\s_-]*article/.test(name) || subj === 'biology') return ['Scientific Article', 'Article'];
   if (/equations?[\s_-]*list/.test(name)) return ['Equations List', 'Equations'];
@@ -80,7 +113,7 @@ export function getScDocumentLabel(doc) {
 }
 
 export function getDocTypeBadge(docType, category) {
-  if (category === 'Books' || category === 'IAL Books' || category === 'IGCSE Books') {
+  if (isBookCategory(category)) {
     if (docType === 'SOL') return DOC_TYPE_INFO.SOL;
     return DOC_TYPE_INFO.Book;
   }
@@ -134,12 +167,18 @@ function escapeRegExp(str) {
 export function getShortUnitDisplay(file) {
   let u = file.unitName || (file.unitCode ? `Unit ${file.unitCode}` : '');
   if (!u) return '';
+  const isCie = file.board === 'cambridge' || isCambridgeSpec(file.spec);
   if (file.subject) {
     const subj = file.subject === 'Information Technology' ? 'IT' : file.subject;
     const prefixRegex = new RegExp(`^(?:${escapeRegExp(file.subject)}|${escapeRegExp(subj)})\\s+`, 'i');
     u = u.replace(prefixRegex, '');
   }
-  const v = file.variant || '';
+  const v = String(file.variant || '');
+  if (isCie && /^\d$/.test(v)) {
+    const pMatch = String(file.unitCode || '').match(/P(\d)$/i);
+    const compCode = pMatch ? `${pMatch[1]}${v}` : '';
+    return compCode ? `${u} (Var ${v} / ${compCode})` : `${u} (Variant ${v})`;
+  }
   if (v === 'R') {
     if (u.startsWith('Paper ')) u = `${u}R (Regional / R)`;
     else u = `${u} (Regional / R)`;
@@ -177,11 +216,7 @@ export function getShortUnitDisplay(file) {
 
 // Generate clean, unambiguous human-readable title without duplicate subject names
 export function getDisplayTitle(file) {
-  if (
-    file.category === 'Books' ||
-    file.category === 'IAL Books' ||
-    file.category === 'IGCSE Books'
-  ) {
+  if (isBookCategory(file.category)) {
     if (file.bookMeta?.title) return file.bookMeta.title;
     return formatFallbackBookTitle(file.name);
   }
@@ -387,13 +422,17 @@ export function buildPendingPaperPlaceholder(paperParam, viewParam = 'QP') {
     const [spec = 'IAL', subject = '', unitCode = '', variant = '', session = ''] = raw.split('|');
     const yearMatch = session.match(/\b(20\d{2})\b/);
     const year = yearMatch ? Number(yearMatch[1]) : '';
-    const curriculum = spec === 'IGCSE' ? 'Edexcel IGCSE' : 'Edexcel IAL';
+    const curriculum = getCurriculumForSpec(spec);
+    const board = getBoardForSpec(spec);
+    const syllabusCode = isCambridgeSpec(spec) ? (extractSyllabusCodeFromSubject(subject) || null) : null;
     const tempFile = {
       id: raw,
       isUnifiedSitting: true,
       isPendingSkeleton: true,
+      board,
       spec,
       curriculum,
+      syllabusCode,
       category: 'Past Papers',
       subject,
       unitCode,
@@ -401,7 +440,7 @@ export function buildPendingPaperPlaceholder(paperParam, viewParam = 'QP') {
       variant,
       year,
       session,
-      docType: viewParam === 'MS' || viewParam === 'ER' ? viewParam : 'QP',
+      docType: viewParam === 'MS' || viewParam === 'ER' || viewParam === 'GT' ? viewParam : 'QP',
       ext: 'pdf',
       docs: {},
       siblings: {},
@@ -418,7 +457,7 @@ export function buildPendingPaperPlaceholder(paperParam, viewParam = 'QP') {
   const ext = extMatch ? extMatch[1] : '';
   const fileName = raw.split('/').pop() || raw;
   const inferredDocType =
-    viewParam && ['QP', 'MS', 'ER', 'AUD', 'SC', 'DF', 'SOL', 'SAM'].includes(viewParam)
+    viewParam && ['QP', 'MS', 'ER', 'GT', 'AUD', 'SC', 'DF', 'SOL', 'SAM'].includes(viewParam)
       ? viewParam
       : ext === 'mp3' || ext === 'wav' || /audio|recording/i.test(fileName)
       ? 'AUD'
@@ -447,6 +486,8 @@ export function serializePaperForHistory(file, preferredView = 'QP') {
     subject: d.subject || file.subject,
     curriculum: d.curriculum || file.curriculum,
     spec: d.spec || file.spec,
+    board: d.board || file.board,
+    syllabusCode: d.syllabusCode || file.syllabusCode || null,
     unitCode: d.unitCode || file.unitCode,
     unitName: d.unitName || file.unitName,
     cleanUnitLabel: d.cleanUnitLabel || file.cleanUnitLabel,
@@ -462,20 +503,22 @@ export function serializePaperForHistory(file, preferredView = 'QP') {
   }
 
   const docs = {};
-  ['QP', 'MS', 'ER', 'SOL', 'AUD', 'SC', 'DF', 'SAM'].forEach((t) => {
+  ['QP', 'MS', 'ER', 'GT', 'SOL', 'AUD', 'SC', 'DF', 'SAM'].forEach((t) => {
     if (rawDocs[t]) docs[t] = pickDoc(rawDocs[t]);
   });
   if (rawDocs.AUD_ZIP) docs.AUD_ZIP = pickDoc(rawDocs.AUD_ZIP);
   if (rawDocs.AUD_SINGLE) docs.AUD_SINGLE = pickDoc(rawDocs.AUD_SINGLE);
 
-  const primary = docs.QP || docs.MS || docs.ER || pickDoc(file.primaryFile || file);
+  const primary = docs.QP || docs.MS || docs.ER || docs.GT || pickDoc(file.primaryFile || file);
   const docTypes = Object.keys(docs);
 
   return {
     id: getPaperViewKey(file) || file.id || file.path,
     isUnifiedSitting: Boolean(file.isUnifiedSitting || docTypes.length > 1),
+    board: file.board || getBoardForSpec(file.spec),
     spec: file.spec || (file.curriculum === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'),
-    curriculum: file.curriculum || 'Edexcel IAL',
+    curriculum: file.curriculum || getCurriculumForSpec(file.spec, file.category),
+    syllabusCode: file.syllabusCode || null,
     category: file.category || 'Past Papers',
     subject: file.subject || '',
     unitCode: file.unitCode || '',

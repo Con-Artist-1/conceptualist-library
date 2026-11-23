@@ -1,20 +1,33 @@
 import React, { lazy, Suspense, useEffect, useRef } from 'react';
+import { getBoardConfig } from '../data/boards.js';
 
 const FilterDrawer = lazy(() => import('./FilterDrawer.jsx'));
 
-const QUICK_CURRICULUM_PILLS = [
-  { value: '', label: 'All' },
-  { value: 'Edexcel IAL', label: 'IAL' },
-  { value: 'Edexcel IGCSE', label: 'IGCSE' }
-];
+const QUICK_PILLS_BY_BOARD = {
+  edexcel: [
+    { value: '', label: 'All' },
+    { value: 'Edexcel IAL', label: 'IAL' },
+    { value: 'Edexcel IGCSE', label: 'IGCSE' }
+  ],
+  cambridge: [
+    { value: '', label: 'All' },
+    { value: 'Cambridge AS & A Level', label: 'A-Level' },
+    { value: 'Cambridge IGCSE', label: 'IGCSE' },
+    { value: 'Cambridge O Level', label: 'O-Level' }
+  ]
+};
 
 /**
- * Sticky search bar with course-code/fuzzy search input, quick curriculum pills,
- * active filter drawer toggle, and lazy-loaded FilterDrawer.
+ * Sticky search bar with board-aware placeholder, quick curriculum pills,
+ * cross-board smart nudge, active filter drawer toggle, and lazy-loaded FilterDrawer.
  */
 export function SearchBanner({
   searchInputRef,
   isMobile,
+  activeBoard = 'edexcel',
+  scopeAllBoards = false,
+  suggestedOtherBoard = null,
+  onSwitchBoardKeepingQuery,
   searchQuery,
   onSearchChange,
   onSearchFocus,
@@ -29,6 +42,9 @@ export function SearchBanner({
   filterDrawerProps
 }) {
   const filterToggleBtnRef = useRef(null);
+  const boardCfg = getBoardConfig(activeBoard);
+  const quickPills = QUICK_PILLS_BY_BOARD[activeBoard] || QUICK_PILLS_BY_BOARD.edexcel;
+  const suggestedCfg = suggestedOtherBoard ? getBoardConfig(suggestedOtherBoard) : null;
 
   useEffect(() => {
     if (!showFilters) return undefined;
@@ -43,12 +59,16 @@ export function SearchBanner({
     return () => window.removeEventListener('keydown', handleEsc);
   }, [showFilters, onToggleFilters]);
 
+  const placeholderText = scopeAllBoards
+    ? (isMobile ? 'Search Edexcel & Cambridge...' : 'Search across Edexcel & Cambridge (e.g. WMA11, 0625 42, 9709 s24)...')
+    : (isMobile ? boardCfg.searchPlaceholderMobile : boardCfg.searchPlaceholderDesktop);
+
   return (
     <div className="search-banner">
       <div className="search-row">
         <div className="search-input-wrapper">
           <label htmlFor="search-input" className="sr-only">
-            Search repository by course code, subject, unit or year
+            Search repository by course code, syllabus, subject, unit or year
           </label>
           <svg aria-hidden="true" className="search-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
@@ -59,11 +79,11 @@ export function SearchBanner({
             id="search-input"
             type="text"
             className="search-input"
-            placeholder={isMobile ? 'Search unit, code, or year...' : 'Search by course code, subject, unit or year (e.g. WMA11, Biology, 4MA1)...'}
+            placeholder={placeholderText}
             value={searchQuery}
             onFocus={onSearchFocus}
             onChange={(e) => onSearchChange(e.target.value)}
-            aria-label="Search by course code, subject, unit or year"
+            aria-label="Search by course code, syllabus, subject, unit or year"
           />
           {searchQuery ? (
             <button
@@ -84,7 +104,7 @@ export function SearchBanner({
 
         <div className="search-button-group">
           <div className="quick-curriculum-pills" role="group" aria-label="Filter by curriculum">
-            {QUICK_CURRICULUM_PILLS.map((opt) => (
+            {quickPills.map((opt) => (
               <button
                 key={opt.label}
                 type="button"
@@ -127,6 +147,21 @@ export function SearchBanner({
           )}
         </div>
       </div>
+
+      {suggestedCfg && onSwitchBoardKeepingQuery && (
+        <div className="cross-board-nudge" role="status">
+          <span>
+            This looks like a <strong>{suggestedCfg.label}</strong> query — currently searching <strong>{boardCfg.shortLabel}</strong>.
+          </span>
+          <button
+            type="button"
+            className="cross-board-nudge-btn"
+            onClick={() => onSwitchBoardKeepingQuery(suggestedOtherBoard)}
+          >
+            Switch to {suggestedCfg.shortLabel} →
+          </button>
+        </div>
+      )}
 
       {showFilters && (
         <Suspense fallback={null}>

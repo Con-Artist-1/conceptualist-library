@@ -7,11 +7,15 @@ function createWorkerClient() {
   let worker = null;
   let nextReqId = 1;
   const pending = new Map();
-  let fallbackState = null;
+
+  const fallbackBoardStates = new Map();
+  const fallbackFullLoaded = new Set();
+  const fallbackGenAt = new Map();
+  let fallbackShardState = null;
+  let fallbackShardBoard = '';
+  let fallbackMerged = null;
   let fallbackSorted = [];
   let fallbackMeta = { isPartialFallback: false, missingTerms: [], appliedCorrections: [], didYouMean: '' };
-  let fallbackIsFull = false;
-  let fallbackGenAt = '';
   let enginePromise = null;
 
   const getFallbackEngine = () => {
@@ -33,7 +37,6 @@ function createWorkerClient() {
         else entry.reject(new Error(error || 'Catalog worker error'));
       };
       worker.onerror = () => {
-        // Reject pending worker calls and fall back gracefully
         for (const entry of pending.values()) {
           entry.reject(new Error('Catalog worker crashed'));
         }
@@ -86,31 +89,58 @@ function createWorkerClient() {
     });
   };
 
+  const getFallbackStateForBoard = (eng, filterBoard = '') => {
+    if (filterBoard === 'edexcel' || filterBoard === 'cambridge') {
+      const full = fallbackBoardStates.get(filterBoard);
+      if (full) return full;
+      if (fallbackShardState && (!fallbackShardBoard || fallbackShardBoard === filterBoard)) return fallbackShardState;
+      return null;
+    }
+    if (fallbackBoardStates.size === 0) return fallbackShardState;
+    if (fallbackBoardStates.size === 1) return fallbackBoardStates.values().next().value;
+    if (!fallbackMerged) {
+      fallbackMerged = eng.mergeHydratedStates(Array.from(fallbackBoardStates.values()));
+    }
+    return fallbackMerged;
+  };
+
   const runFallback = async (type, payload, signal = null) => {
     const eng = await getFallbackEngine();
+    const bKey = String(payload.board || 'edexcel').toLowerCase();
+
     if (type === 'LOAD_BUFFER') {
       const text = new TextDecoder('utf-8').decode(new Uint8Array(payload.buffer));
       const json = JSON.parse(text);
-      if (!payload.isFull && fallbackIsFull) {
-        return { skipped: true, isFull: true, generatedAt: fallbackGenAt, counts: fallbackState?.counts || null, meta: null };
+      if (!payload.isFull && fallbackFullLoaded.has(bKey)) {
+        return { skipped: true, isFull: true, board: bKey, generatedAt: fallbackGenAt.get(bKey) || '', counts: fallbackBoardStates.get(bKey)?.counts || null, meta: null };
       }
-      fallbackState = eng.hydrateCatalogPayload(json);
+      const hydrated = eng.hydrateCatalogPayload(json);
       if (payload.isFull) {
-        fallbackIsFull = true;
-        fallbackGenAt = json.meta?.generatedAt || '';
+        fallbackBoardStates.set(bKey, hydrated);
+        fallbackFullLoaded.add(bKey);
+        fallbackGenAt.set(bKey, json.meta?.generatedAt || '');
+        fallbackMerged = null;
+      } else {
+        fallbackShardState = hydrated;
+        fallbackShardBoard = bKey;
       }
-      return { skipped: false, isFull: fallbackIsFull, generatedAt: json.meta?.generatedAt || '', counts: fallbackState.counts, meta: json.meta?.isShard ? null : (json.meta || null) };
+      return { skipped: false, isFull: fallbackFullLoaded.has(bKey), board: bKey, generatedAt: json.meta?.generatedAt || '', counts: hydrated.counts, meta: json.meta?.isShard ? null : (json.meta || null) };
     }
     if (type === 'LOAD_SHARD') {
+      if (fallbackFullLoaded.has(bKey)) {
+        return { skipped: true, isFull: true, board: bKey, generatedAt: fallbackGenAt.get(bKey) || '', counts: fallbackBoardStates.get(bKey)?.counts || null, meta: null };
+      }
       const res = await fetch(payload.shardUrl, signal ? { signal } : undefined);
       if (!res.ok) throw new Error(`Shard unavailable (${res.status})`);
       const json = await res.json();
-      if (!fallbackIsFull) {
-        fallbackState = eng.hydrateCatalogPayload(json);
-      }
-      return { skipped: fallbackIsFull, isFull: fallbackIsFull, generatedAt: json.meta?.generatedAt || '', counts: fallbackState?.counts || null, meta: null };
+      fallbackShardState = eng.hydrateCatalogPayload(json);
+      fallbackShardBoard = bKey;
+      return { skipped: false, isFull: false, board: bKey, generatedAt: json.meta?.generatedAt || '', counts: fallbackShardState?.counts || null, meta: null };
     }
     if (type === 'LOAD_FULL_INDEX') {
+      if (!payload.forceReload && fallbackFullLoaded.has(bKey) && (!payload.expectedMeta || fallbackGenAt.get(bKey) === payload.expectedMeta.generatedAt)) {
+        return { skipped: true, isFull: true, board: bKey, generatedAt: fallbackGenAt.get(bKey) || '', counts: fallbackBoardStates.get(bKey)?.counts || null, meta: null };
+      }
       let json = null;
       for (const url of payload.urls || []) {
         if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -125,13 +155,16 @@ function createWorkerClient() {
         }
       }
       if (!json) throw new Error('Failed to fetch catalog index');
-      fallbackState = eng.hydrateCatalogPayload(json);
-      fallbackIsFull = true;
-      fallbackGenAt = json.meta?.generatedAt || '';
-      return { skipped: false, isFull: true, generatedAt: fallbackGenAt, counts: fallbackState.counts, meta: json.meta || null };
+      const hydrated = eng.hydrateCatalogPayload(json);
+      fallbackBoardStates.set(bKey, hydrated);
+      fallbackFullLoaded.add(bKey);
+      fallbackGenAt.set(bKey, json.meta?.generatedAt || '');
+      fallbackMerged = null;
+      return { skipped: false, isFull: true, board: bKey, generatedAt: json.meta?.generatedAt || '', counts: hydrated.counts, meta: json.meta || null };
     }
     if (type === 'QUERY') {
-      const { sortedFiles, meta } = eng.queryCatalogState(fallbackState, payload);
+      const targetState = getFallbackStateForBoard(eng, payload.filterBoard);
+      const { sortedFiles, meta } = eng.queryCatalogState(targetState, payload);
       fallbackSorted = sortedFiles;
       fallbackMeta = meta;
       return {
@@ -139,7 +172,7 @@ function createWorkerClient() {
         totalMatchedCount: sortedFiles.length,
         meta,
         fallbackUnits: payload.needFallbackUnits
-          ? eng.getFallbackUnitsFromState(fallbackState, payload.filterSubject, payload.filterCurriculum)
+          ? eng.getFallbackUnitsFromState(targetState, payload.filterSubject, payload.filterCurriculum)
           : null
       };
     }
@@ -151,10 +184,15 @@ function createWorkerClient() {
       };
     }
     if (type === 'RESOLVE_PAPER') {
-      return eng.resolvePaperFromState(fallbackState, payload.paperParam);
+      for (const st of fallbackBoardStates.values()) {
+        const hit = eng.resolvePaperFromState(st, payload.paperParam);
+        if (hit) return hit;
+      }
+      return fallbackShardState ? eng.resolvePaperFromState(fallbackShardState, payload.paperParam) : null;
     }
     if (type === 'RESOLVE_SAMPLE_AUDIO') {
-      return fallbackState?.sampleAudio ? eng.serializeItemForUi(fallbackState.sampleAudio) : null;
+      const target = fallbackBoardStates.get(payload.board || 'edexcel') || getFallbackStateForBoard(eng, 'all');
+      return target?.sampleAudio ? eng.serializeItemForUi(target.sampleAudio) : null;
     }
     return null;
   };
@@ -174,14 +212,14 @@ function createWorkerClient() {
   };
 
   return {
-    loadBuffer(buffer, { isFull = false, cacheUrl = '' } = {}) {
-      return dispatch('LOAD_BUFFER', { buffer, isFull, cacheUrl }, [buffer]);
+    loadBuffer(buffer, { isFull = false, cacheUrl = '', board = 'edexcel' } = {}) {
+      return dispatch('LOAD_BUFFER', { buffer, isFull, cacheUrl, board }, [buffer]);
     },
-    loadShard({ shardUrl, cacheUrl, expectedMeta, signal = null }) {
-      return dispatch('LOAD_SHARD', { shardUrl, cacheUrl, expectedMeta }, [], signal);
+    loadShard({ shardUrl, cacheUrl, expectedMeta, board = 'edexcel', signal = null }) {
+      return dispatch('LOAD_SHARD', { shardUrl, cacheUrl, expectedMeta, board }, [], signal);
     },
-    loadFullIndex({ urls, cacheUrl, expectedMeta, forceReload = false, signal = null }) {
-      return dispatch('LOAD_FULL_INDEX', { urls, cacheUrl, expectedMeta, forceReload }, [], signal);
+    loadFullIndex({ urls, cacheUrl, expectedMeta, forceReload = false, board = 'edexcel', signal = null }) {
+      return dispatch('LOAD_FULL_INDEX', { urls, cacheUrl, expectedMeta, forceReload, board }, [], signal);
     },
     query(params) {
       return dispatch('QUERY', params);
@@ -192,8 +230,8 @@ function createWorkerClient() {
     resolvePaper(paperParam) {
       return dispatch('RESOLVE_PAPER', { paperParam });
     },
-    resolveSampleAudio() {
-      return dispatch('RESOLVE_SAMPLE_AUDIO', {});
+    resolveSampleAudio(board = 'edexcel') {
+      return dispatch('RESOLVE_SAMPLE_AUDIO', { board });
     }
   };
 }

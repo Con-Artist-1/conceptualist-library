@@ -78,6 +78,15 @@
   --modal-tab-er-active-bg: #583E23;
   --modal-tab-er-active-border: #583E23;
 
+  --modal-tab-gt-bg: var(--badge-gt-bg);
+  --modal-tab-gt-border: var(--badge-gt-border);
+  --modal-tab-gt-text: var(--badge-gt-text);
+  --modal-tab-gt-hover-bg: #D4ECE4;
+  --modal-tab-gt-hover-border: #82BBA9;
+  --modal-tab-gt-hover-text: #0C3A2D;
+  --modal-tab-gt-active-bg: #1B5E4A;
+  --modal-tab-gt-active-border: #144939;
+
   --modal-tab-split-bg: #F6EDEF;
   --modal-tab-split-border: #D9B3BD;
   --modal-tab-split-text: var(--mcmaster-maroon);
@@ -403,6 +412,15 @@
   --modal-tab-er-active-bg: #583E23;
   --modal-tab-er-active-border: #8A6137;
 
+  --modal-tab-gt-bg: #102D26;
+  --modal-tab-gt-border: #205B4B;
+  --modal-tab-gt-text: #6EE7B7;
+  --modal-tab-gt-hover-bg: #153B32;
+  --modal-tab-gt-hover-border: #2D7D67;
+  --modal-tab-gt-hover-text: #A7F3D0;
+  --modal-tab-gt-active-bg: #195E4A;
+  --modal-tab-gt-active-border: #257D63;
+
   --modal-tab-split-bg: #2D151B;
   --modal-tab-split-border: #5A1926;
   --modal-tab-split-text: #FF758F;
@@ -720,6 +738,15 @@
   --modal-tab-er-hover-text: #FFFFFF;
   --modal-tab-er-active-bg: #4D3728;
   --modal-tab-er-active-border: #7C5840;
+
+  --modal-tab-gt-bg: #09221C;
+  --modal-tab-gt-border: #1C5446;
+  --modal-tab-gt-text: #6EE7B7;
+  --modal-tab-gt-hover-bg: #10332A;
+  --modal-tab-gt-hover-border: #287560;
+  --modal-tab-gt-hover-text: #A7F3D0;
+  --modal-tab-gt-active-bg: #165945;
+  --modal-tab-gt-active-border: #247B61;
 
   --modal-tab-split-bg: #260C12;
   --modal-tab-split-border: #5A1622;
@@ -1219,6 +1246,24 @@
 .modal-view-btn.er.active {
   background: var(--modal-tab-er-active-bg);
   border-color: var(--modal-tab-er-active-border);
+  color: #FFFFFF;
+}
+
+.modal-view-btn.gt {
+  background: var(--modal-tab-gt-bg);
+  border-color: var(--modal-tab-gt-border);
+  color: var(--modal-tab-gt-text);
+}
+
+.modal-view-btn.gt:hover {
+  background: var(--modal-tab-gt-hover-bg);
+  border-color: var(--modal-tab-gt-hover-border);
+  color: var(--modal-tab-gt-hover-text);
+}
+
+.modal-view-btn.gt.active {
+  background: var(--modal-tab-gt-active-bg);
+  border-color: var(--modal-tab-gt-active-border);
   color: #FFFFFF;
 }
 

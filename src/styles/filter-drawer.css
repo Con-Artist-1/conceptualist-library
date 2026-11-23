@@ -41,6 +41,10 @@
   flex-wrap: wrap;
 }
 
+.drawer-curriculum-group.drawer-curriculum-always {
+  display: flex;
+}
+
 .filter-row {
   display: flex;
   align-items: center;

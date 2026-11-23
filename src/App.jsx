@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef, lazy, Suspense } from 'react';
 import './index.css';
 import {
+  BOARD_STORAGE_KEY,
+  DEFAULT_BOARD_ID,
+  EDEXCEL_CURRICULUMS,
+  CAMBRIDGE_CURRICULUMS,
+  ALL_CURRICULUMS,
+  getBoardForCurriculum,
+  isBookCategory,
+  isCambridgePath
+} from './data/boards.js';
+import { detectLikelyQueryBoard } from './searchEngine.js';
+import {
   buildRoutePath,
   parseRouteFromLocation,
   getSeoMetadata,
@@ -59,16 +70,20 @@ const SEARCH_DEBOUNCE_MS = 80;
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
-  totalFiles: 19882,
-  uniqueFiles: 16021,
+  totalFiles: 19912,
+  uniqueFiles: 16051,
   totalBooks: 73,
   ialBooks: 60,
   igcseBooks: 13,
+  cambridgeBooks: 0,
   dfCount: 46,
   audioCount: 272,
   subjects: DEFAULT_ALL_SUBJECTS,
   ialSubjects: IAL_SUBJECTS_DEFAULT,
   igcseSubjects: IGCSE_SUBJECTS_DEFAULT,
+  cieAlSubjects: [],
+  cieIgcseSubjects: [],
+  cieOlSubjects: [],
   coverage: 'January 2003 – June 2026',
   subjectCoverage: {}
 };
@@ -97,6 +112,39 @@ function getInitialCachedMeta() {
     // Ignore storage errors
   }
   return null;
+}
+
+function getInitialBoard(initialRoute, initialHistoryState) {
+  if (initialHistoryState?.board === 'cambridge' || initialHistoryState?.board === 'edexcel') {
+    return initialHistoryState.board;
+  }
+  if (initialRoute?.activeBoard === 'cambridge' || initialRoute?.activeBoard === 'edexcel') {
+    return initialRoute.activeBoard;
+  }
+  if (initialRoute?.filterCurriculum) {
+    return getBoardForCurriculum(initialRoute.filterCurriculum);
+  }
+  if (initialRoute?.paperParam) {
+    const p = String(initialRoute.paperParam);
+    if (p.startsWith('CIE-') || isCambridgePath(p)) return 'cambridge';
+  }
+  if (typeof window !== 'undefined' && ((window.location.pathname || '/').replace(/\/+$/, '') || '/') === '/') {
+    try {
+      const saved = localStorage.getItem(BOARD_STORAGE_KEY);
+      if (saved === 'cambridge' || saved === 'edexcel') return saved;
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  return DEFAULT_BOARD_ID;
+}
+
+function persistBoardPreference(boardId) {
+  try {
+    localStorage.setItem(BOARD_STORAGE_KEY, boardId);
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 function SecondaryPageSkeleton({ label }) {
@@ -136,6 +184,9 @@ function App() {
       ? parseRouteFromLocation(window.location.pathname, window.location.search, initialCache?.meta || DEFAULT_META, window.location.hash)
       : {}
   ), [initialCache]);
+
+  const [activeBoard, setActiveBoard] = useState(() => getInitialBoard(initialRoute, initialHistoryState));
+  const [scopeAllBoards, setScopeAllBoards] = useState(false);
 
   const [isNotFound, setIsNotFound] = useState(Boolean(!initialHistoryState && initialRoute.notFound));
   const [wizardSubject, setWizardSubject] = useState(() => (
@@ -187,6 +238,7 @@ function App() {
   const [filterUnit, setFilterUnit] = useState(initialHistoryState ? '' : (initialRoute.filterUnit || ''));
   const [filterYear, setFilterYear] = useState(initialHistoryState ? '' : (initialRoute.filterYear || ''));
   const [filterSession, setFilterSession] = useState('');
+  const [filterVariant, setFilterVariant] = useState(initialHistoryState ? '' : (initialRoute.filterVariant || ''));
   const [sortBy, setSortBy] = useState('newest');
   const [forceShowTable, setForceShowTable] = useState(Boolean(!initialHistoryState && initialRoute.forceShowTable));
   const [showFilters, setShowFilters] = useState(false);
@@ -195,14 +247,17 @@ function App() {
   const modalOpenerRef = useRef(null);
   const isPopStateRef = useRef(false);
   const popStateReqIdRef = useRef(0);
-  const isFullIndexLoadedRef = useRef(false);
+  const loadedBoardsRef = useRef(new Set());
+  const boardGenAtRef = useRef(new Map());
   const isHydratedRef = useRef(false);
   const hydratedShardPathRef = useRef(null);
   const latestLoadedGenAtRef = useRef('');
   const dataMetaRef = useRef(meta);
   dataMetaRef.current = meta;
-  const fullIndexPromiseRef = useRef(null);
-  const ensureFullIndexRef = useRef(null);
+  const activeBoardRef = useRef(activeBoard);
+  activeBoardRef.current = activeBoard;
+  const boardIndexPromisesRef = useRef(new Map());
+  const ensureBoardIndexRef = useRef(null);
   const queryReqIdRef = useRef(0);
   const lastQueryBaseKeyRef = useRef('');
   const lastVisibleCountRef = useRef(PAGE_SIZE);
@@ -255,11 +310,7 @@ function App() {
     if (!fileObj || fileObj.isPendingSkeleton || fileObj.isNotFound) return;
     recordPaperView(fileObj, options);
 
-    const isBook =
-      fileObj.category === 'Books' ||
-      fileObj.category === 'IAL Books' ||
-      fileObj.category === 'IGCSE Books';
-    if (!isBook) {
+    if (!isBookCategory(fileObj.category)) {
       const snapshot = serializePaperForHistory(fileObj, preferredView);
       if (snapshot && snapshot.id) {
         setRecentHistory((prev) => {
@@ -296,7 +347,7 @@ function App() {
     recordPaperInteraction(fileObj, preferredView);
   }, [recordPaperInteraction]);
 
-  // Handle browser Back/Forward & hash deep-link navigation across all routes, wizard steps, and modals
+  // Handle browser Back/Forward & hash deep-link navigation across all boards, routes, wizard steps, and modals
   const lastNavLocRef = useRef('');
   const lastNavAtRef = useRef(0);
 
@@ -315,6 +366,14 @@ function App() {
       const navState = (event && event.state) || window.history.state || null;
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, dataMetaRef.current, window.location.hash);
 
+      const resolvedBoard =
+        navState?.board === 'cambridge' || navState?.board === 'edexcel'
+          ? navState.board
+          : parsed.activeBoard || (parsed.filterCurriculum ? getBoardForCurriculum(parsed.filterCurriculum) : activeBoardRef.current);
+
+      setActiveBoard(resolvedBoard);
+      setScopeAllBoards(false);
+
       if ((navState?.wizardStep === 'unit' || navState?.wizardStep === 'year') && navState.subject && navState.curriculum) {
         setCurrentTab('library');
         setIsNotFound(false);
@@ -323,6 +382,7 @@ function App() {
         setFilterUnit('');
         setFilterYear('');
         setFilterSession('');
+        setFilterVariant('');
         setFilterDocType(null);
         setSearchQuery('');
         setSelectedPath('');
@@ -339,6 +399,7 @@ function App() {
         setFilterUnit(parsed.filterUnit || '');
         setFilterYear(parsed.filterYear || '');
         setFilterSession('');
+        setFilterVariant(parsed.filterVariant || '');
         setFilterDocType(parsed.filterDocType || null);
         setSearchQuery(parsed.searchQuery || '');
         setForceShowTable(Boolean(parsed.forceShowTable));
@@ -355,7 +416,7 @@ function App() {
             if (found) {
               setPreviewFile(found);
               setPendingPaperParam('');
-            } else if (isFullIndexLoadedRef.current) {
+            } else if (loadedBoardsRef.current.has(resolvedBoard)) {
               setPreviewFile({ isNotFound: true, path: parsed.paperParam, name: parsed.paperParam });
               setPendingPaperParam('');
             }
@@ -394,6 +455,7 @@ function App() {
     if (segments.length >= 1) {
       const parsed = parseRouteFromLocation(window.location.pathname, window.location.search, meta, window.location.hash);
       setIsNotFound(Boolean(parsed.notFound));
+      if (parsed.activeBoard) setActiveBoard(parsed.activeBoard);
       if (parsed.filterUnit) {
         setFilterCurriculum(parsed.filterCurriculum);
         setFilterSubject(parsed.filterSubject);
@@ -429,9 +491,16 @@ function App() {
           const isPageReload = isBrowserReloadNavigation() || alreadyOpenInSession;
           recordPaperInteraction(found, previewInitialView || 'QP', { isPageReload });
           setPendingPaperParam('');
-        } else if (isFullIndexLoadedRef.current) {
-          setPreviewFile({ isNotFound: true, path: pendingPaperParam, name: pendingPaperParam });
-          setPendingPaperParam('');
+        } else {
+          const needBoard = (pendingPaperParam.startsWith('CIE-') || isCambridgePath(pendingPaperParam))
+            ? 'cambridge'
+            : activeBoardRef.current;
+          if (loadedBoardsRef.current.has(needBoard)) {
+            setPreviewFile({ isNotFound: true, path: pendingPaperParam, name: pendingPaperParam });
+            setPendingPaperParam('');
+          } else {
+            ensureBoardIndexRef.current?.(needBoard, { showLoader: false });
+          }
         }
       })
       .catch(() => {});
@@ -450,6 +519,7 @@ function App() {
     !filterUnit &&
     !filterYear &&
     !filterSession &&
+    !filterVariant &&
     !searchQuery &&
     !forceShowTable
   );
@@ -459,6 +529,7 @@ function App() {
 
   const seoMeta = useMemo(() => getSeoMetadata({
     currentTab,
+    activeBoard,
     filterCurriculum: effectiveRouteCurriculum,
     filterSubject: effectiveRouteSubject,
     filterUnit: effectiveRouteUnit,
@@ -471,6 +542,7 @@ function App() {
     meta
   }), [
     currentTab,
+    activeBoard,
     effectiveRouteCurriculum,
     effectiveRouteSubject,
     effectiveRouteUnit,
@@ -486,6 +558,7 @@ function App() {
 
   useSeoHeadSync({
     currentTab,
+    activeBoard,
     isNotFound,
     isWizardRouteActive,
     wizardSubject,
@@ -495,6 +568,7 @@ function App() {
     effectiveRouteUnit,
     filterUnit,
     filterYear,
+    filterVariant,
     filterDocType,
     deferredSearchQuery,
     previewFile,
@@ -516,21 +590,24 @@ function App() {
   });
 
   const getOnSitePaperUrl = useCallback((fileObj, preferredView = '') => {
+    const fileBoard = fileObj?.board || (fileObj?.curriculum ? getBoardForCurriculum(fileObj.curriculum) : activeBoard);
     return buildRoutePath({
       currentTab: 'library',
+      activeBoard: fileBoard,
       filterCurriculum: filterCurriculum || fileObj?.curriculum || '',
       filterSubject: filterSubject || fileObj?.subject || '',
       filterUnit: filterUnit || fileObj?.cleanUnitLabel || '',
       filterYear,
+      filterVariant,
       filterDocType,
       searchQuery: deferredSearchQuery,
       previewFile: fileObj,
       previewMode: preferredView,
       forceShowTable
     });
-  }, [filterCurriculum, filterSubject, filterUnit, filterYear, filterDocType, deferredSearchQuery, forceShowTable]);
+  }, [activeBoard, filterCurriculum, filterSubject, filterUnit, filterYear, filterVariant, filterDocType, deferredSearchQuery, forceShowTable]);
 
-  // Multi-stage zero-waterfall catalog hydration via Web Worker
+  // Multi-board zero-waterfall catalog hydration via Web Worker
   useEffect(() => {
     let cancelled = false;
     const abortController = new AbortController();
@@ -538,6 +615,7 @@ function App() {
     const activeRoute = retryCount > 0 && typeof window !== 'undefined'
       ? parseRouteFromLocation(window.location.pathname, window.location.search, dataMetaRef.current, window.location.hash)
       : initialRoute;
+    const bootBoard = getInitialBoard(activeRoute, initialHistoryState);
     const initialShardRoute = getShardPathForRoute(activeRoute);
     const catalogClient = getCatalogClient();
 
@@ -555,119 +633,146 @@ function App() {
     let latestMeta = initialCache?.meta || null;
     let shardFailed = false;
 
-    const candidateIndexUrls = [
-      `/index.json?v=${buildQuery}`,
-      '/index.json',
-      'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index.json'
-    ];
-    const INDEX_CACHE_URL = buildIndexCacheUrl(APP_VERSION, BUILD_TIMESTAMP);
+    const getBoardIndexUrls = (bKey) => (
+      bKey === 'cambridge'
+        ? [
+            `/index-cambridge.json?v=${buildQuery}`,
+            '/index-cambridge.json',
+            'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index_cambridge.json'
+          ]
+        : [
+            `/index.json?v=${buildQuery}`,
+            '/index.json',
+            'https://huggingface.co/datasets/Diavlon/mcmaster-docs-library/resolve/main/live_index.json'
+          ]
+    );
 
-    // Consume any in-flight early fetch kicked off in <head> before JS finished parsing
     const earlyFetch = typeof window !== 'undefined' ? window.__CS_EARLY_FETCH__ : null;
     if (typeof window !== 'undefined' && window.__CS_EARLY_FETCH__) {
       window.__CS_EARLY_FETCH__ = null;
     }
 
-    const markWorkerHydrated = (res, { isFull, shardPath = null }) => {
+    const markWorkerHydrated = (res, { isFull, board = 'edexcel', shardPath = null }) => {
       if (cancelled || !res) return;
-      if (!isFull && isFullIndexLoadedRef.current) return;
+      const bKey = res.board || board || 'edexcel';
+      if (!isFull && loadedBoardsRef.current.has(bKey)) return;
       isHydratedRef.current = true;
       if (res.isFull || isFull) {
-        isFullIndexLoadedRef.current = true;
+        loadedBoardsRef.current.add(bKey);
+        boardGenAtRef.current.set(bKey, res.generatedAt || '');
         latestLoadedGenAtRef.current = res.generatedAt || latestLoadedGenAtRef.current;
-        hydratedShardPathRef.current = null;
+        if (hydratedShardPathRef.current && shardPath === null) {
+          hydratedShardPathRef.current = null;
+        }
       } else if (shardPath) {
         hydratedShardPathRef.current = shardPath;
       }
-      if (res.meta) {
-        setMeta((prev) => (res.meta?.wizard ? res.meta : prev));
+      if (res.meta && res.meta.wizard) {
+        setMeta(res.meta);
       }
       if (res.counts) {
-        setCatalogTotalCount(res.counts.unifiedCount || res.counts.flatCount || 0);
+        setCatalogTotalCount((prev) => Math.max(prev, res.counts.unifiedCount || res.counts.flatCount || 0));
       }
       setLoading(false);
       setLoadError(null);
       setCatalogRevision((rev) => rev + 1);
     };
 
-    const loadFullIndex = async (freshMeta = latestMeta, { showLoader = false, forceReload = false } = {}) => {
+    const loadSingleBoardIndex = async (boardKey, freshMeta = latestMeta, { showLoader = false, forceReload = false } = {}) => {
       if (cancelled) return;
+      const bKey = boardKey === 'cambridge' ? 'cambridge' : 'edexcel';
       if (
         !forceReload &&
-        isFullIndexLoadedRef.current &&
-        (!freshMeta || latestLoadedGenAtRef.current === freshMeta.generatedAt)
+        loadedBoardsRef.current.has(bKey) &&
+        (!freshMeta || boardGenAtRef.current.get(bKey) === freshMeta.generatedAt)
       ) {
         return;
       }
-      if (fullIndexPromiseRef.current) return fullIndexPromiseRef.current;
+      if (boardIndexPromisesRef.current.has(bKey)) {
+        return boardIndexPromisesRef.current.get(bKey);
+      }
 
+      const cacheUrl = buildIndexCacheUrl(APP_VERSION, BUILD_TIMESTAMP, bKey);
       const task = (async () => {
-        if (showLoader || !isHydratedRef.current) setFilesLoading(true);
+        if (showLoader || !loadedBoardsRef.current.has(bKey)) setFilesLoading(true);
         setLoadError(null);
 
         try {
-          if (!forceReload && earlyFetch?.fullBufferPromise) {
+          if (!forceReload && earlyFetch?.fullBufferPromise && (earlyFetch.board || 'edexcel') === bKey) {
             const p = earlyFetch.fullBufferPromise;
             earlyFetch.fullBufferPromise = null;
             const buf = await p;
             if (buf && buf.byteLength > 0 && !cancelled) {
-              const res = await catalogClient.loadBuffer(buf, { isFull: true, cacheUrl: INDEX_CACHE_URL });
-              markWorkerHydrated(res, { isFull: true });
+              const res = await catalogClient.loadBuffer(buf, { isFull: true, cacheUrl, board: bKey });
+              markWorkerHydrated(res, { isFull: true, board: bKey });
               return;
             }
           }
 
           const res = await catalogClient.loadFullIndex({
-            urls: candidateIndexUrls,
-            cacheUrl: INDEX_CACHE_URL,
+            urls: getBoardIndexUrls(bKey),
+            cacheUrl,
             expectedMeta: freshMeta,
             forceReload,
+            board: bKey,
             signal: abortController.signal
           });
-          markWorkerHydrated(res, { isFull: true });
+          markWorkerHydrated(res, { isFull: true, board: bKey });
         } catch (err) {
           if (!cancelled && err?.name !== 'AbortError') {
-            console.error('Failed to load index from all candidate sources:', err);
+            console.error(`Failed to load ${bKey} index from all candidate sources:`, err);
             setLoading(false);
             setFilesLoading(false);
             setLoadError(err?.message || 'Connection delayed');
           }
         } finally {
-          fullIndexPromiseRef.current = null;
+          boardIndexPromisesRef.current.delete(bKey);
         }
       })();
 
-      fullIndexPromiseRef.current = task;
+      boardIndexPromisesRef.current.set(bKey, task);
       return task;
     };
 
-    ensureFullIndexRef.current = (opts) => loadFullIndex(latestMeta, opts);
+    const ensureBoardIndex = (target, opts = {}) => {
+      if (target === 'all') {
+        return Promise.all([
+          loadSingleBoardIndex('edexcel', latestMeta, opts),
+          loadSingleBoardIndex('cambridge', latestMeta, opts)
+        ]);
+      }
+      return loadSingleBoardIndex(target || activeBoardRef.current, latestMeta, opts);
+    };
+
+    ensureBoardIndexRef.current = ensureBoardIndex;
 
     const hydrateInitialShard = async () => {
       if (!initialShardRoute) return;
+      const cacheUrl = buildIndexCacheUrl(APP_VERSION, BUILD_TIMESTAMP, bootBoard);
       try {
         if (earlyFetch?.shardBufferPromise && earlyFetch.shardPath === initialShardRoute) {
           const p = earlyFetch.shardBufferPromise;
           earlyFetch.shardBufferPromise = null;
           const buf = await p;
-          if (buf && buf.byteLength > 0 && !cancelled && !isFullIndexLoadedRef.current) {
-            const res = await catalogClient.loadBuffer(buf, { isFull: false });
-            markWorkerHydrated(res, { isFull: false, shardPath: initialShardRoute });
+          if (buf && buf.byteLength > 0 && !cancelled && !loadedBoardsRef.current.has(bootBoard)) {
+            const res = await catalogClient.loadBuffer(buf, { isFull: false, board: bootBoard });
+            markWorkerHydrated(res, { isFull: false, board: bootBoard, shardPath: initialShardRoute });
             return;
           }
         }
 
         const res = await catalogClient.loadShard({
           shardUrl: `${initialShardRoute}?v=${buildQuery}`,
-          cacheUrl: INDEX_CACHE_URL,
+          cacheUrl,
           expectedMeta: latestMeta,
+          board: bootBoard,
           signal: abortController.signal
         });
-        markWorkerHydrated(res, { isFull: Boolean(res?.isFull), shardPath: initialShardRoute });
+        markWorkerHydrated(res, { isFull: Boolean(res?.isFull), board: bootBoard, shardPath: initialShardRoute });
       } catch (err) {
         if (cancelled || err?.name === 'AbortError') return;
         shardFailed = true;
-        void loadFullIndex(latestMeta);
+        void loadSingleBoardIndex(bootBoard, latestMeta);
       }
     };
 
@@ -679,7 +784,7 @@ function App() {
       activeRoute.filterSubject ||
       activeRoute.filterUnit ||
       activeRoute.filterYear ||
-      activeRoute.filterSession ||
+      activeRoute.filterVariant ||
       activeRoute.searchQuery ||
       activeRoute.forceShowTable ||
       activeRoute.paperParam
@@ -688,10 +793,9 @@ function App() {
     if (initialShardRoute) {
       void hydrateInitialShard();
     } else if (initialDemand && !activeRoute.notFound && activeRoute.currentTab === 'library') {
-      void loadFullIndex(latestMeta, { showLoader: true });
+      void loadSingleBoardIndex(bootBoard, latestMeta, { showLoader: true });
     }
 
-    // Validate against /meta.json in parallel (reusing <head> early fetch promise when present)
     const metaPromise = earlyFetch?.metaPromise
       ? earlyFetch.metaPromise.then((json) => json || resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { signal: abortController.signal }, 25000).then((r) => r.json()))
       : resilientFetch([`/meta.json?v=${buildQuery}`, '/meta.json'], { signal: abortController.signal }, 25000).then((r) => r.json());
@@ -712,42 +816,50 @@ function App() {
         } catch {
           // Ignore quota errors
         }
-        const staleFullCache = isFullIndexLoadedRef.current && latestLoadedGenAtRef.current !== (json?.meta?.generatedAt || '');
+        const staleFullCache = loadedBoardsRef.current.has(bootBoard) && boardGenAtRef.current.get(bootBoard) !== (json?.meta?.generatedAt || '');
         if ((!initialShardRoute || shardFailed || staleFullCache) && (initialDemand || staleFullCache)) {
-          if (staleFullCache) isFullIndexLoadedRef.current = false;
-          void loadFullIndex(json?.meta || null, { forceReload: staleFullCache });
+          if (staleFullCache) loadedBoardsRef.current.delete(bootBoard);
+          void loadSingleBoardIndex(bootBoard, json?.meta || null, { forceReload: staleFullCache });
         }
       })
       .catch((err) => {
         if (cancelled || err?.name === 'AbortError') return;
         console.warn('Meta fetch error, proceeding to cached or remote full index:', err);
         if (initialShardRoute && shardFailed) {
-          void loadFullIndex(null);
+          void loadSingleBoardIndex(bootBoard, null);
         }
       });
+
+    const promisesMap = boardIndexPromisesRef.current;
 
     return () => {
       cancelled = true;
       abortController.abort();
-      fullIndexPromiseRef.current = null;
+      promisesMap.clear();
     };
-  }, [initialCache, initialRoute, retryCount]);
+  }, [initialCache, initialHistoryState, initialRoute, retryCount]);
 
   // Reset pagination when filters/search change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, filterSession, deferredSearchQuery, sortBy, viewMode]);
+  }, [activeBoard, scopeAllBoards, selectedPath, filterCurriculum, filterDocType, filterSubject, filterUnit, filterYear, filterSession, filterVariant, deferredSearchQuery, sortBy, viewMode]);
 
   const handleSubjectSelect = useCallback((subject, curriculum = '') => {
     setCurrentTab('library');
     setIsNotFound(false);
     setWizardSubject(null);
     setWizardUnit(null);
-    if (curriculum) setFilterCurriculum(curriculum);
+    if (curriculum) {
+      setFilterCurriculum(curriculum);
+      const b = getBoardForCurriculum(curriculum);
+      setActiveBoard(b);
+      persistBoardPreference(b);
+    }
     setFilterSubject(subject);
     setFilterUnit('');
     setFilterYear('');
     setFilterSession('');
+    setFilterVariant('');
     setSearchQuery('');
     setForceShowTable(true);
     setSelectedPath('');
@@ -758,18 +870,27 @@ function App() {
     setIsNotFound(false);
     setWizardSubject(null);
     setWizardUnit(null);
-    if (curriculum) setFilterCurriculum(curriculum);
+    if (curriculum) {
+      setFilterCurriculum(curriculum);
+      const b = getBoardForCurriculum(curriculum);
+      setActiveBoard(b);
+      persistBoardPreference(b);
+    }
     if (subject) setFilterSubject(subject);
     setFilterUnit(unit || '');
     setFilterYear(year ? String(year) : '');
     setFilterSession('');
+    setFilterVariant('');
     setSearchQuery('');
     setForceShowTable(true);
     setSelectedPath('');
   }, []);
 
-  const clearFilters = useCallback(({ pushUrl = true } = {}) => {
+  const clearFilters = useCallback(({ pushUrl = true, targetBoard = null } = {}) => {
+    const nextBoard = targetBoard || activeBoardRef.current || DEFAULT_BOARD_ID;
+    const homeUrl = nextBoard === 'cambridge' ? '/cambridge' : '/';
     setIsNotFound(false);
+    setScopeAllBoards(false);
     setWizardSubject(null);
     setWizardUnit(null);
     setFilterCurriculum('');
@@ -778,23 +899,81 @@ function App() {
     setFilterUnit('');
     setFilterYear('');
     setFilterSession('');
+    setFilterVariant('');
     setSearchQuery('');
     setSortBy('newest');
     setForceShowTable(false);
     setSelectedPath('');
-    if (pushUrl && typeof window !== 'undefined' && (window.location.pathname !== '/' || window.location.search !== '' || window.location.hash !== '')) {
-      window.history.pushState({ wizardStep: 'home' }, '', '/');
+    if (pushUrl && typeof window !== 'undefined' && (window.location.pathname !== homeUrl || window.location.search !== '' || window.location.hash !== '')) {
+      window.history.pushState({ wizardStep: 'home', board: nextBoard }, '', homeUrl);
     }
   }, []);
+
+  const handleSwitchBoard = useCallback((nextBoard, { keepQuery = false } = {}) => {
+    if (nextBoard !== 'edexcel' && nextBoard !== 'cambridge') return;
+    stopAllSiteAudio();
+    persistBoardPreference(nextBoard);
+    setActiveBoard(nextBoard);
+    setScopeAllBoards(false);
+    setCurrentTab('library');
+    setIsNotFound(false);
+    setWizardSubject(null);
+    setWizardUnit(null);
+    setPreviewFile(null);
+    setPendingPaperParam('');
+    setFilterCurriculum('');
+    setFilterDocType(null);
+    setFilterSubject('');
+    setFilterUnit('');
+    setFilterYear('');
+    setFilterSession('');
+    setFilterVariant('');
+    setSelectedPath('');
+    if (keepQuery) {
+      setForceShowTable(true);
+      ensureBoardIndexRef.current?.(nextBoard, { showLoader: true });
+    } else {
+      setSearchQuery('');
+      setForceShowTable(false);
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, []);
+
+  const handleSwitchBoardKeepingQuery = useCallback((targetBoard) => {
+    handleSwitchBoard(targetBoard, { keepQuery: true });
+  }, [handleSwitchBoard]);
+
+  const handleSelectBoardScope = useCallback((scopeVal) => {
+    setIsNotFound(false);
+    if (scopeVal === 'all') {
+      setScopeAllBoards(true);
+      setFilterCurriculum('');
+      setFilterSubject('');
+      setFilterUnit('');
+      setFilterVariant('');
+      setForceShowTable(true);
+      ensureBoardIndexRef.current?.('all', { showLoader: true });
+    } else if (scopeVal === 'edexcel' || scopeVal === 'cambridge') {
+      setScopeAllBoards(false);
+      if (scopeVal !== activeBoardRef.current) {
+        handleSwitchBoard(scopeVal, { keepQuery: Boolean(searchQuery.trim()) });
+      }
+    }
+  }, [handleSwitchBoard, searchQuery]);
 
   const navigateToHome = useCallback((e) => {
     if (e) {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
       if (e.preventDefault) e.preventDefault();
     }
+    const homeBoard = activeBoardRef.current || DEFAULT_BOARD_ID;
+    const homeUrl = homeBoard === 'cambridge' ? '/cambridge' : '/';
     stopAllSiteAudio();
     setCurrentTab('library');
     setIsNotFound(false);
+    setScopeAllBoards(false);
     setWizardSubject(null);
     setWizardUnit(null);
     setPreviewFile(null);
@@ -810,13 +989,14 @@ function App() {
     setFilterUnit('');
     setFilterYear('');
     setFilterSession('');
+    setFilterVariant('');
     setSearchQuery('');
     setSortBy('newest');
     setForceShowTable(false);
     setSelectedPath('');
     if (typeof window !== 'undefined') {
-      if (window.location.pathname !== '/' || window.location.search !== '' || window.location.hash !== '') {
-        window.history.pushState({ wizardStep: 'home' }, '', '/');
+      if (window.location.pathname !== homeUrl || window.location.search !== '' || window.location.hash !== '') {
+        window.history.pushState({ wizardStep: 'home', board: homeBoard }, '', homeUrl);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -826,6 +1006,7 @@ function App() {
     setCurrentTab('library');
     clearFilters({ pushUrl: false });
     setForceShowTable(true);
+    ensureBoardIndexRef.current?.(activeBoardRef.current, { showLoader: true });
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
   }, [clearFilters]);
 
@@ -845,23 +1026,32 @@ function App() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
   }, [clearFilters]);
 
+  const handleBrowseThresholds = useCallback(() => {
+    setCurrentTab('library');
+    clearFilters({ pushUrl: false });
+    setFilterDocType('GT');
+    setForceShowTable(true);
+    ensureBoardIndexRef.current?.('cambridge', { showLoader: true });
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [clearFilters]);
+
   const handleTrySampleAudio = useCallback(() => {
     const SAMPLE_AUDIO_ID = 'IAL|French|WFR02||June 2021';
     preloadReaderChunksOnce();
     void getCatalogClient()
-      .resolveSampleAudio()
+      .resolveSampleAudio('edexcel')
       .then((sample) => {
         if (sample) {
           openOnSiteReader(sample, 'AUD');
           return;
         }
-        ensureFullIndexRef.current?.({ showLoader: false });
+        ensureBoardIndexRef.current?.('edexcel', { showLoader: false });
         setPreviewInitialView('AUD');
         setPendingPaperParam(SAMPLE_AUDIO_ID);
         setPreviewFile(buildPendingPaperPlaceholder(SAMPLE_AUDIO_ID, 'AUD'));
       })
       .catch(() => {
-        ensureFullIndexRef.current?.({ showLoader: false });
+        ensureBoardIndexRef.current?.('edexcel', { showLoader: false });
         setPreviewInitialView('AUD');
         setPendingPaperParam(SAMPLE_AUDIO_ID);
         setPreviewFile(buildPendingPaperPlaceholder(SAMPLE_AUDIO_ID, 'AUD'));
@@ -881,48 +1071,75 @@ function App() {
     filterUnit ||
     filterYear ||
     filterSession ||
+    filterVariant ||
     searchQuery ||
     forceShowTable
   );
   const isRoot = selectedPath === '';
   const showWelcome = isRoot && !hasActiveFilters;
 
+  const effectiveQueryBoard = scopeAllBoards ? 'all' : activeBoard;
+
+  // Cross-board smart nudge when a query clearly matches the other board (e.g. "0625 42" in Edexcel or "WMA11" in Cambridge)
+  const suggestedOtherBoard = useMemo(() => {
+    if (scopeAllBoards || !searchQuery || !searchQuery.trim()) return null;
+    const likely = detectLikelyQueryBoard(searchQuery);
+    return likely && likely !== activeBoard ? likely : null;
+  }, [searchQuery, activeBoard, scopeAllBoards]);
+
   const availableSubjectsForFilter = useMemo(() => {
-    if (filterCurriculum === 'Edexcel IAL') return meta?.ialSubjects || meta?.subjects || [];
-    if (filterCurriculum === 'Edexcel IGCSE') return meta?.igcseSubjects || meta?.subjects || [];
-    return meta?.subjects || [];
-  }, [filterCurriculum, meta]);
+    if (filterCurriculum === 'Edexcel IAL') return meta?.ialSubjects || IAL_SUBJECTS_DEFAULT;
+    if (filterCurriculum === 'Edexcel IGCSE') return meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT;
+    if (filterCurriculum === 'Cambridge AS & A Level') return meta?.cieAlSubjects || [];
+    if (filterCurriculum === 'Cambridge IGCSE') return meta?.cieIgcseSubjects || [];
+    if (filterCurriculum === 'Cambridge O Level') return meta?.cieOlSubjects || [];
+    if (scopeAllBoards) return meta?.subjects || [];
+    if (activeBoard === 'cambridge') {
+      return Array.from(new Set([
+        ...(meta?.cieAlSubjects || []),
+        ...(meta?.cieIgcseSubjects || []),
+        ...(meta?.cieOlSubjects || [])
+      ])).sort();
+    }
+    return Array.from(new Set([
+      ...(meta?.ialSubjects || IAL_SUBJECTS_DEFAULT),
+      ...(meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT)
+    ])).sort();
+  }, [filterCurriculum, activeBoard, scopeAllBoards, meta]);
+
+  const activeCurriculumsForMeta = useMemo(() => {
+    if (filterCurriculum) return [filterCurriculum];
+    if (scopeAllBoards) return ALL_CURRICULUMS;
+    return activeBoard === 'cambridge' ? CAMBRIDGE_CURRICULUMS : EDEXCEL_CURRICULUMS;
+  }, [filterCurriculum, scopeAllBoards, activeBoard]);
 
   const hasWizardUnits = useMemo(() => {
     if (!filterSubject || !meta?.wizard) return false;
-    const currs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
-    return currs.some((c) => {
+    return activeCurriculumsForMeta.some((c) => {
       const unitsObj = meta.wizard[c]?.[filterSubject]?.units;
       return Boolean(unitsObj && Object.keys(unitsObj).length > 0);
     });
-  }, [filterSubject, filterCurriculum, meta]);
+  }, [filterSubject, activeCurriculumsForMeta, meta]);
 
   const availableUnitsForFilter = useMemo(() => {
     if (!filterSubject) return [];
     const wizard = meta?.wizard;
     if (wizard) {
       const set = new Set();
-      const currs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
-      currs.forEach((c) => {
+      activeCurriculumsForMeta.forEach((c) => {
         const unitsObj = wizard[c]?.[filterSubject]?.units;
         if (unitsObj) Object.keys(unitsObj).forEach((u) => set.add(u));
       });
       if (set.size > 0) return Array.from(set).sort((a, b) => compareUnitLabels(a, b, filterSubject));
     }
     return queryResult.fallbackUnits || [];
-  }, [filterSubject, filterCurriculum, meta, queryResult.fallbackUnits]);
+  }, [filterSubject, activeCurriculumsForMeta, meta, queryResult.fallbackUnits]);
 
   const availableYearsForFilter = useMemo(() => {
     const wizard = meta?.wizard;
     if (filterSubject && wizard) {
       const set = new Set();
-      const currs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
-      currs.forEach((c) => {
+      activeCurriculumsForMeta.forEach((c) => {
         const subjEntry = wizard[c]?.[filterSubject];
         if (subjEntry) {
           const yrs = filterUnit && subjEntry.units?.[filterUnit]
@@ -936,7 +1153,7 @@ function App() {
     const years = [];
     for (let y = 2026; y >= 2003; y--) years.push(y);
     return years;
-  }, [filterSubject, filterCurriculum, filterUnit, meta]);
+  }, [filterSubject, activeCurriculumsForMeta, filterUnit, meta]);
 
   // Execute off-thread filtering, smart fuzzy search, sorting, and pagination slicing inside the Web Worker
   const popularViewsDep = sortBy === 'popular' ? viewsMap : null;
@@ -952,6 +1169,7 @@ function App() {
     const reqId = ++queryReqIdRef.current;
     const baseKey = JSON.stringify([
       catalogRevision,
+      effectiveQueryBoard,
       selectedPath,
       viewMode,
       filterCurriculum,
@@ -959,6 +1177,7 @@ function App() {
       filterUnit,
       filterYear,
       filterSession,
+      filterVariant,
       filterDocType,
       deferredSearchQuery,
       sortBy,
@@ -975,11 +1194,13 @@ function App() {
       : catalogClient.query({
           selectedPath,
           viewMode,
+          filterBoard: effectiveQueryBoard,
           filterCurriculum,
           filterSubject,
           filterUnit,
           filterYear,
           filterSession,
+          filterVariant,
           filterDocType,
           searchQuery: deferredSearchQuery,
           sortBy,
@@ -1008,6 +1229,7 @@ function App() {
     return undefined;
   }, [
     catalogRevision,
+    effectiveQueryBoard,
     showWelcome,
     currentTab,
     isNotFound,
@@ -1018,6 +1240,7 @@ function App() {
     filterUnit,
     filterYear,
     filterSession,
+    filterVariant,
     filterDocType,
     deferredSearchQuery,
     sortBy,
@@ -1043,31 +1266,43 @@ function App() {
     const activeSubj = filterSubject || (showWelcome ? wizardSubject?.name : '');
     const activeCurr = filterCurriculum || (showWelcome ? wizardSubject?.curriculum : '');
     if (activeSubj) {
-      const cov = activeCurr === 'Edexcel IGCSE'
-        ? meta?.igcseSubjectCoverage?.[activeSubj]
-        : (activeCurr === 'Edexcel IAL'
-            ? meta?.ialSubjectCoverage?.[activeSubj]
-            : meta?.subjectCoverage?.[activeSubj]);
+      const cov =
+        activeCurr === 'Edexcel IGCSE' ? meta?.igcseSubjectCoverage?.[activeSubj]
+        : activeCurr === 'Edexcel IAL' ? meta?.ialSubjectCoverage?.[activeSubj]
+        : activeCurr === 'Cambridge AS & A Level' ? meta?.cieAlSubjectCoverage?.[activeSubj]
+        : activeCurr === 'Cambridge IGCSE' ? meta?.cieIgcseSubjectCoverage?.[activeSubj]
+        : activeCurr === 'Cambridge O Level' ? meta?.cieOlSubjectCoverage?.[activeSubj]
+        : meta?.subjectCoverage?.[activeSubj];
       if (cov) return `${formatSubjectDisplay(activeSubj)}: ${cov}`;
     }
-    return meta?.coverage || 'January 2003 – June 2026';
-  }, [filterSubject, filterCurriculum, showWelcome, wizardSubject, meta]);
+    if (activeBoard === 'cambridge') {
+      return meta?.boards?.cambridge?.coverage || 'Cambridge International (CAIE)';
+    }
+    return meta?.boards?.edexcel?.coverage || meta?.coverage || 'January 2003 – June 2026';
+  }, [activeBoard, filterSubject, filterCurriculum, showWelcome, wizardSubject, meta]);
 
   const activeDrawerFilterCount = useMemo(() => {
     let count = 0;
+    if (scopeAllBoards) count += 1;
     if (filterDocType) count += 1;
     if (filterSubject) count += 1;
     if (filterUnit) count += 1;
     if (filterYear) count += 1;
     if (filterSession) count += 1;
+    if (filterVariant) count += 1;
     if (sortBy !== 'newest') count += 1;
     if (viewMode !== 'unified') count += 1;
     return count;
-  }, [filterDocType, filterSubject, filterUnit, filterYear, filterSession, sortBy, viewMode]);
+  }, [scopeAllBoards, filterDocType, filterSubject, filterUnit, filterYear, filterSession, filterVariant, sortBy, viewMode]);
 
-  // Upgrade from a route shard to the full catalog index whenever global search, deep links, or cross-route navigation requires it
+  // Upgrade from a route shard or hydrate the active board's full index on demand
   useEffect(() => {
-    if (isFullIndexLoadedRef.current) return undefined;
+    const requiredTarget = scopeAllBoards ? 'all' : activeBoard;
+    const isTargetLoaded = requiredTarget === 'all'
+      ? (loadedBoardsRef.current.has('edexcel') && loadedBoardsRef.current.has('cambridge'))
+      : loadedBoardsRef.current.has(requiredTarget);
+    if (isTargetLoaded) return undefined;
+
     const activeShard = getShardPathForRoute({
       currentTab,
       filterCurriculum,
@@ -1084,20 +1319,23 @@ function App() {
       Boolean(pendingPaperParam) ||
       Boolean(deferredSearchQuery && deferredSearchQuery.trim()) ||
       Boolean(selectedPath) ||
+      scopeAllBoards ||
       switchedOutOfShard ||
       (!showWelcome && !activeShard);
     if (needsFullNow) {
-      ensureFullIndexRef.current?.({ showLoader: switchedOutOfShard && !showWelcome });
+      ensureBoardIndexRef.current?.(requiredTarget, { showLoader: !showWelcome });
       return undefined;
     }
     if (showWelcome) {
       const idleTimer = setTimeout(() => {
-        ensureFullIndexRef.current?.({ showLoader: false });
-      }, 1600);
+        ensureBoardIndexRef.current?.(requiredTarget, { showLoader: false });
+      }, 1400);
       return () => clearTimeout(idleTimer);
     }
     return undefined;
   }, [
+    activeBoard,
+    scopeAllBoards,
     currentTab,
     filterCurriculum,
     filterSubject,
@@ -1125,13 +1363,14 @@ function App() {
     currentTab,
     isNotFound,
     showWelcome,
+    activeBoard,
     filterCurriculum,
     filterSubject,
     filterUnit,
     filterDocType,
     meta,
     actions: archiveContextActions
-  }), [currentTab, isNotFound, showWelcome, filterCurriculum, filterSubject, filterUnit, filterDocType, meta, archiveContextActions]);
+  }), [currentTab, isNotFound, showWelcome, activeBoard, filterCurriculum, filterSubject, filterUnit, filterDocType, meta, archiveContextActions]);
 
   const welcomeDataProp = useMemo(() => ({ meta }), [meta]);
 
@@ -1140,10 +1379,15 @@ function App() {
     if (!currValue) {
       setFilterCurriculum('');
     } else {
+      const b = getBoardForCurriculum(currValue);
+      if (b && !scopeAllBoards) {
+        setActiveBoard(b);
+        persistBoardPreference(b);
+      }
       setFilterCurriculum((prev) => (prev === currValue ? '' : currValue));
       setForceShowTable(true);
     }
-  }, []);
+  }, [scopeAllBoards]);
 
   const handleQuickDocType = useCallback((docTypeValue) => {
     setIsNotFound(false);
@@ -1160,14 +1404,33 @@ function App() {
     setPreviewFile(null);
     setPendingPaperParam('');
     setCurrentTab('library');
+    setScopeAllBoards(false);
+    if (action === 'cambridge') {
+      handleSwitchBoard('cambridge', { keepQuery: false });
+      return;
+    }
+    if (action === 'ial') {
+      persistBoardPreference('edexcel');
+      setActiveBoard('edexcel');
+      clearFilters({ pushUrl: false, targetBoard: 'edexcel' });
+      setFilterCurriculum('Edexcel IAL');
+      setForceShowTable(true);
+      return;
+    }
+    if (action === 'igcse') {
+      persistBoardPreference('edexcel');
+      setActiveBoard('edexcel');
+      clearFilters({ pushUrl: false, targetBoard: 'edexcel' });
+      setFilterCurriculum('Edexcel IGCSE');
+      setForceShowTable(true);
+      return;
+    }
     clearFilters({ pushUrl: false });
-    if (action === 'ial') setFilterCurriculum('Edexcel IAL');
-    else if (action === 'igcse') setFilterCurriculum('Edexcel IGCSE');
-    else if (action === 'textbooks') setFilterDocType('Book');
+    if (action === 'textbooks') setFilterDocType('Book');
     else if (action === 'data-files') setFilterDocType('DF');
     else if (action === 'audio') setFilterDocType('AUD');
     setForceShowTable(true);
-  }, [clearFilters]);
+  }, [clearFilters, handleSwitchBoard]);
 
   const handleOpenTab = useCallback((tab) => {
     stopAllSiteAudio();
@@ -1178,6 +1441,7 @@ function App() {
   }, []);
 
   const breadcrumbProps = useMemo(() => ({
+    activeBoard,
     navigateToHome,
     filterCurriculum,
     onClearCurriculum: () => setFilterCurriculum(''),
@@ -1189,6 +1453,8 @@ function App() {
     onClearYear: () => setFilterYear(''),
     filterSession,
     onClearSession: () => setFilterSession(''),
+    filterVariant,
+    onClearVariant: () => setFilterVariant(''),
     filterDocType,
     onClearDocType: () => setFilterDocType(null),
     breadcrumbParts: selectedPath ? selectedPath.split(/[\\/]/).filter(Boolean) : [],
@@ -1205,12 +1471,14 @@ function App() {
     visibleFilesCount: visibleFiles.length,
     viewMode
   }), [
+    activeBoard,
     navigateToHome,
     filterCurriculum,
     filterSubject,
     filterUnit,
     filterYear,
     filterSession,
+    filterVariant,
     filterDocType,
     selectedPath,
     searchQuery,
@@ -1223,6 +1491,9 @@ function App() {
   ]);
 
   const filterDrawerProps = useMemo(() => ({
+    activeBoard,
+    scopeAllBoards,
+    onSelectBoardScope: handleSelectBoardScope,
     filterCurriculum,
     onSelectCurriculum: handleQuickCurriculum,
     filterDocType,
@@ -1255,6 +1526,12 @@ function App() {
       setFilterSession(val);
       if (val) setForceShowTable(true);
     },
+    filterVariant,
+    onChangeVariant: (val) => {
+      setIsNotFound(false);
+      setFilterVariant((prev) => (prev === val ? '' : val));
+      if (val) setForceShowTable(true);
+    },
     sortBy,
     onChangeSort: (val) => {
       setSortBy(val);
@@ -1267,6 +1544,9 @@ function App() {
     totalMatchedCount,
     onDoneMobile: () => setShowFilters(false)
   }), [
+    activeBoard,
+    scopeAllBoards,
+    handleSelectBoardScope,
     filterCurriculum,
     handleQuickCurriculum,
     filterDocType,
@@ -1278,6 +1558,7 @@ function App() {
     filterYear,
     availableYearsForFilter,
     filterSession,
+    filterVariant,
     sortBy,
     viewMode,
     hasActiveFilters,
@@ -1305,6 +1586,8 @@ function App() {
         showWelcome={showWelcome}
         isNotFound={isNotFound}
         currentTab={currentTab}
+        activeBoard={activeBoard}
+        onSwitchBoard={(bId) => handleSwitchBoard(bId, { keepQuery: false })}
         navigateToHome={navigateToHome}
         activeDateText={activeDateText}
         theme={theme}
@@ -1317,9 +1600,13 @@ function App() {
         <SearchBanner
           searchInputRef={searchInputRef}
           isMobile={isMobile}
+          activeBoard={activeBoard}
+          scopeAllBoards={scopeAllBoards}
+          suggestedOtherBoard={suggestedOtherBoard}
+          onSwitchBoardKeepingQuery={handleSwitchBoardKeepingQuery}
           searchQuery={searchQuery}
           onSearchChange={(val) => { setIsNotFound(false); setSearchQuery(val); }}
-          onSearchFocus={() => ensureFullIndexRef.current?.()}
+          onSearchFocus={() => ensureBoardIndexRef.current?.(scopeAllBoards ? 'all' : activeBoard)}
           onClearSearch={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
           filterCurriculum={filterCurriculum}
           onSelectCurriculum={handleQuickCurriculum}
@@ -1354,6 +1641,7 @@ function App() {
             <Suspense fallback={<SecondaryPageSkeleton label="Loading Library Home" />}>
               <WelcomePage
                 data={welcomeDataProp}
+                activeBoard={activeBoard}
                 recentHistory={recentHistory}
                 selectedSubject={wizardSubject}
                 selectedUnit={wizardUnit}
@@ -1366,6 +1654,8 @@ function App() {
                 onViewAll={handleViewAll}
                 onBrowseTextbooks={handleBrowseTextbooks}
                 onBrowseAudio={handleBrowseAudio}
+                onBrowseThresholds={handleBrowseThresholds}
+                onQuickCurriculum={handleQuickCurriculum}
                 onTrySampleAudio={handleTrySampleAudio}
                 onSelectFinalFilter={handleSelectFinalFilter}
               />
@@ -1374,6 +1664,9 @@ function App() {
             <>
               <PaperTable
                 isMobile={isMobile}
+                scopeAllBoards={scopeAllBoards}
+                suggestedOtherBoard={suggestedOtherBoard}
+                onSwitchBoardKeepingQuery={handleSwitchBoardKeepingQuery}
                 searchQuery={searchQuery}
                 onSetSearchQuery={setSearchQuery}
                 seoMeta={seoMeta}

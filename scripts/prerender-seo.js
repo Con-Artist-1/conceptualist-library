@@ -17,7 +17,18 @@ import {
   buildJsonLd,
   buildRouteFaqEntries
 } from '../src/seoRoutes.js';
-import { compareUnitLabels, isLegacyIalUnitLabel } from '../src/unitParser.js';
+import { compareUnitLabels, isLegacyUnitLabel } from '../src/unitParser.js';
+import {
+  ALL_CURRICULUMS,
+  getBoardForCurriculum,
+  getCurriculumForSpec,
+  isBookCategory,
+  isCambridgeCurriculum
+} from '../src/data/boards.js';
+import {
+  extractSyllabusCodeFromSubject,
+  resolveCambridgeSyllabus
+} from '../src/data/cambridgeCatalog.js';
 import { BOOK_CATALOG_BY_PATH } from '../src/bookCatalog.js';
 import { CHANGELOG_HISTORY } from '../src/data/changelogHistory.js';
 
@@ -32,11 +43,12 @@ const DOC_TYPE_HUMAN = {
   QP: 'Question Paper (QP)',
   MS: 'Mark Scheme (MS)',
   ER: 'Examiner Report (ER)',
+  GT: 'Grade Thresholds (GT)',
   Book: 'Student Textbook PDF',
   SOL: 'Worked Solution Bank',
   AUD: 'Listening Audio (MP3)',
   DF: 'Practical Data Files',
-  SC: 'Source Booklet',
+  SC: 'Source / Insert Booklet',
   SAM: 'Sample Assessment Material'
 };
 
@@ -70,7 +82,7 @@ function unpackIndexFile(rawIndex) {
     for (let j = 0; j < keys.length; j++) {
       obj[keys[j]] = arr[j];
     }
-    obj.curriculum = (obj.spec === 'IGCSE' || obj.category === 'IGCSE Books') ? 'Edexcel IGCSE' : 'Edexcel IAL';
+    obj.curriculum = getCurriculumForSpec(obj.spec, obj.category);
     items[i] = obj;
   }
   return { keys, rawTuples, items };
@@ -89,8 +101,7 @@ function buildIndexLookup(items) {
     if (!byCurrSubj.has(key)) byCurrSubj.set(key, []);
     byCurrSubj.get(key).push(item);
 
-    const isBook = item.category === 'Books' || item.category === 'IAL Books' || item.category === 'IGCSE Books';
-    if (isBook) {
+    if (isBookCategory(item.category)) {
       booksAll.push(item);
       if (!booksByCurrSubj.has(key)) booksByCurrSubj.set(key, []);
       booksByCurrSubj.get(key).push(item);
@@ -102,13 +113,17 @@ function buildIndexLookup(items) {
   return { byCurrSubj, booksByCurrSubj, booksAll, dfAll, audioAll };
 }
 
-function writeDistShards(rawIndex) {
+function writeDistShards(rawIndexes) {
   const shardsDir = path.join(DIST_DIR, 'shards');
   fs.mkdirSync(shardsDir, { recursive: true });
-  const { keys, rawTuples, items } = unpackIndexFile(rawIndex);
+  const validIndexes = (Array.isArray(rawIndexes) ? rawIndexes : [rawIndexes]).filter(Boolean);
+  if (validIndexes.length === 0) return 0;
+
+  const firstIdx = validIndexes[0];
+  const keys = Array.isArray(firstIdx.keys) ? firstIdx.keys : [];
   const shardMeta = {
-    generatedAt: rawIndex.meta?.generatedAt || '',
-    uniqueFiles: rawIndex.meta?.uniqueFiles || items.length,
+    generatedAt: firstIdx.meta?.generatedAt || '',
+    uniqueFiles: firstIdx.meta?.uniqueFiles || 0,
     isShard: true
   };
 
@@ -118,27 +133,31 @@ function writeDistShards(rawIndex) {
     buckets.get(shardName).push(tuple);
   };
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const tuple = rawTuples[i];
-    const curr = inferCurriculumForSubject(item.subject, item.curriculum);
-    const currSlug = getCurriculumSlug(curr);
-    const subjSlug = getSubjectSlug(item.subject);
-    if (currSlug && subjSlug) {
-      pushToBucket(`${currSlug}-${subjSlug}.json`, tuple);
-      if (currSlug === 'ial' && subjSlug === 'mathematics') {
-        const branchShard = getIalMathBranchShardName(`${item.cleanUnitLabel || ''} ${item.unitCode || ''} ${item.name || ''}`);
-        pushToBucket(branchShard, tuple);
+  for (const rawIndex of validIndexes) {
+    const { rawTuples, items } = unpackIndexFile(rawIndex);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const tuple = rawTuples[i];
+      const curr = inferCurriculumForSubject(item.subject, item.curriculum);
+      const currSlug = getCurriculumSlug(curr);
+      const subjSlug = getSubjectSlug(item.subject);
+      if (currSlug && subjSlug) {
+        const flatCurrSlug = currSlug.replace(/\//g, '-');
+        pushToBucket(`${flatCurrSlug}-${subjSlug}.json`, tuple);
+        if (currSlug === 'ial' && subjSlug === 'mathematics') {
+          const branchShard = getIalMathBranchShardName(`${item.cleanUnitLabel || ''} ${item.unitCode || ''} ${item.name || ''}`);
+          pushToBucket(branchShard, tuple);
+        }
       }
-    }
-    if (item.category === 'Books' || item.category === 'IAL Books' || item.category === 'IGCSE Books') {
-      pushToBucket('textbooks.json', tuple);
-    }
-    if (item.docType === 'DF') {
-      pushToBucket('data-files.json', tuple);
-    }
-    if (item.docType === 'AUD') {
-      pushToBucket('audio.json', tuple);
+      if (isBookCategory(item.category)) {
+        pushToBucket('textbooks.json', tuple);
+      }
+      if (item.docType === 'DF') {
+        pushToBucket('data-files.json', tuple);
+      }
+      if (item.docType === 'AUD') {
+        pushToBucket('audio.json', tuple);
+      }
     }
   }
 
@@ -174,6 +193,8 @@ function collectAllRoutes(meta, indexLookup) {
   // Curriculum & subject shorthand aliases supported by seoRoutes.js
   addRedirect('/edexcel-ial', '/ial');
   addRedirect('/edexcel-igcse', '/igcse');
+  addRedirect('/caie', '/cambridge');
+  addRedirect('/cie', '/cambridge');
   addRedirect('/textbooks/edexcel-ial', '/textbooks/ial');
   addRedirect('/textbooks/edexcel-igcse', '/textbooks/igcse');
   const subjectAliasPairs = [
@@ -245,7 +266,49 @@ function collectAllRoutes(meta, indexLookup) {
     priority: '0.95',
     changefreq: 'weekly',
     includeInSitemap: true,
-    state: { currentTab: 'library', filterCurriculum: 'Edexcel IGCSE' }
+    state: { currentTab: 'library', activeBoard: 'edexcel', filterCurriculum: 'Edexcel IGCSE' }
+  });
+
+  // Cambridge International Top-Level Routes
+  const hasCieFiles = (meta?.boards?.cambridge?.uniqueFiles || 0) > 0;
+  addRoute({
+    path: '/cambridge',
+    priority: '0.95',
+    changefreq: 'weekly',
+    includeInSitemap: true,
+    state: { currentTab: 'library', activeBoard: 'cambridge' }
+  });
+
+  addRoute({
+    path: '/cambridge/papers',
+    priority: '0.90',
+    changefreq: 'weekly',
+    includeInSitemap: hasCieFiles,
+    state: { currentTab: 'library', activeBoard: 'cambridge', forceShowTable: true }
+  });
+
+  addRoute({
+    path: '/cambridge/a-level',
+    priority: '0.92',
+    changefreq: 'weekly',
+    includeInSitemap: (meta?.cieAlSubjects?.length || 0) > 0,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterCurriculum: 'Cambridge AS & A Level' }
+  });
+
+  addRoute({
+    path: '/cambridge/igcse',
+    priority: '0.92',
+    changefreq: 'weekly',
+    includeInSitemap: (meta?.cieIgcseSubjects?.length || 0) > 0,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterCurriculum: 'Cambridge IGCSE' }
+  });
+
+  addRoute({
+    path: '/cambridge/o-level',
+    priority: '0.92',
+    changefreq: 'weekly',
+    includeInSitemap: (meta?.cieOlSubjects?.length || 0) > 0,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterCurriculum: 'Cambridge O Level' }
   });
 
   addRoute({
@@ -327,10 +390,11 @@ function collectAllRoutes(meta, indexLookup) {
     }
   }
 
-  // 3. All Curriculum -> Subject -> Unit Routes from meta.wizard
-  const curriculums = ['Edexcel IAL', 'Edexcel IGCSE'];
-  for (const curr of curriculums) {
+  // 3. All Curriculum -> Subject -> Unit Routes from meta.wizard across Edexcel & Cambridge
+  for (const curr of ALL_CURRICULUMS) {
     const currSlug = getCurriculumSlug(curr);
+    const boardId = getBoardForCurriculum(curr);
+    const isCie = isCambridgeCurriculum(curr);
     const subjectsMap = meta?.wizard?.[curr] || {};
     const subjectNames = Object.keys(subjectsMap).sort();
 
@@ -345,10 +409,25 @@ function collectAllRoutes(meta, indexLookup) {
         includeInSitemap: true,
         state: {
           currentTab: 'library',
+          activeBoard: boardId,
           filterCurriculum: curr,
           filterSubject: subj
         }
       });
+
+      if (isCie) {
+        const sylCode = extractSyllabusCodeFromSubject(subj);
+        if (sylCode) {
+          addRedirect(`/cambridge/${sylCode}`, subjPath);
+          const entry = resolveCambridgeSyllabus(sylCode);
+          if (entry?.alt91) addRedirect(`/cambridge/${entry.alt91}`, subjPath);
+          if (Array.isArray(entry?.legacyCodes)) {
+            for (const lc of entry.legacyCodes) {
+              addRedirect(`/cambridge/${lc}`, subjPath);
+            }
+          }
+        }
+      }
 
       const unitsMap = subjectsMap[subj]?.units || {};
       const unitNames = Object.keys(unitsMap).sort((a, b) => compareUnitLabels(a, b, subj));
@@ -356,7 +435,7 @@ function collectAllRoutes(meta, indexLookup) {
       for (const unitLabel of unitNames) {
         const unitSlug = getUnitSlug(unitLabel);
         const unitPath = `/${currSlug}/${subjSlug}/${unitSlug}`;
-        const isLegacy = isLegacyIalUnitLabel(unitLabel);
+        const isLegacy = isLegacyUnitLabel(unitLabel);
 
         addRoute({
           path: unitPath,
@@ -365,31 +444,32 @@ function collectAllRoutes(meta, indexLookup) {
           includeInSitemap: true,
           state: {
             currentTab: 'library',
+            activeBoard: boardId,
             filterCurriculum: curr,
             filterSubject: subj,
             filterUnit: unitLabel
           }
         });
 
-        // Map direct unit-code & shorthand alias paths (e.g., /ial/mathematics/wma11, /ial/mathematics/p1, /ial/physics/u1) to permanent 308 redirects
-        const unitCode = getUnitCodeFromLabel(unitLabel);
-        if (unitCode) {
-          const codeSlug = unitCode.toLowerCase();
-          addRedirect(`/${currSlug}/${subjSlug}/${codeSlug}`, unitPath);
-          if (isLegacy) {
-            // Preserve old /unit-wph01..06, /unit-wbi01..06, /unit-wch01..07, /unit-wbs01..04, /unit-wec01..04, /unit-6eca1..3 URLs
-            addRedirect(`/${currSlug}/${subjSlug}/unit-${codeSlug}`, unitPath);
+        if (!isCie) {
+          const unitCode = getUnitCodeFromLabel(unitLabel);
+          if (unitCode) {
+            const codeSlug = unitCode.toLowerCase();
+            addRedirect(`/${currSlug}/${subjSlug}/${codeSlug}`, unitPath);
+            if (isLegacy) {
+              addRedirect(`/${currSlug}/${subjSlug}/unit-${codeSlug}`, unitPath);
+            }
           }
-        }
-        const parenMatch = unitLabel.match(/\(([A-Z0-9]{2,6})\)/i);
-        if (parenMatch) {
-          addRedirect(`/${currSlug}/${subjSlug}/${parenMatch[1].toLowerCase()}`, unitPath);
-        }
-        if (!isLegacy) {
-          const unitNumMatch = unitLabel.match(/\bUnit\s+([1-6])\b/i);
-          if (unitNumMatch) {
-            addRedirect(`/${currSlug}/${subjSlug}/u${unitNumMatch[1]}`, unitPath);
-            addRedirect(`/${currSlug}/${subjSlug}/unit-${unitNumMatch[1]}`, unitPath);
+          const parenMatch = unitLabel.match(/\(([A-Z0-9]{2,6})\)/i);
+          if (parenMatch) {
+            addRedirect(`/${currSlug}/${subjSlug}/${parenMatch[1].toLowerCase()}`, unitPath);
+          }
+          if (!isLegacy) {
+            const unitNumMatch = unitLabel.match(/\bUnit\s+([1-6])\b/i);
+            if (unitNumMatch) {
+              addRedirect(`/${currSlug}/${subjSlug}/u${unitNumMatch[1]}`, unitPath);
+              addRedirect(`/${currSlug}/${subjSlug}/unit-${unitNumMatch[1]}`, unitPath);
+            }
           }
         }
       }
@@ -445,14 +525,15 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
 
   if (currentTab === 'about') {
     itemEntries.push(
-      '<li><strong>Archive Scope:</strong> Independent Edexcel IAL (19 subjects) and IGCSE (43 subjects) digital repository covering January 2003 through June 2026.</li>',
-      '<li><strong>In-Browser Study Tools:</strong> Side-by-side Question Paper and Mark Scheme Split View, Resizable Two-Page Book Spread reader, chapter-by-chapter ZIP Worked Solution Bank viewer, and Listening Audio player with synced closed captions (CC).</li>',
+      '<li><strong>Archive Scope:</strong> Independent international exam repository covering Pearson Edexcel (IAL &amp; IGCSE) and Cambridge International (AS &amp; A Level, IGCSE &amp; O Level).</li>',
+      '<li><strong>In-Browser Study Tools:</strong> Side-by-side Question Paper and Mark Scheme Split View, QP + Insert reading, Grade Thresholds (GT), Resizable Two-Page Book Spread reader, chapter-by-chapter ZIP Worked Solution Bank viewer, and Listening Audio player with synced closed captions (CC).</li>',
       '<li><strong>Core Team:</strong> Nafiz.R (Founder &amp; Lead Architect), Nazmul.K (Co-Founder &amp; Systems Lead), Jemison Flaren (Systems Architect), Gemin Arghen (Infrastructure Engineer), Claudis Oppen (Research &amp; Intelligence Lead), Gemin Faure Hidrojen (Intern, Optimizer).</li>',
-      '<li><strong>Educational Notice:</strong> Independent student study archive; not affiliated with or endorsed by Pearson plc or Edexcel.</li>'
+      '<li><strong>Educational Notice:</strong> Independent student study archive; not affiliated with or endorsed by Pearson plc/Edexcel or Cambridge University Press &amp; Assessment (CAIE).</li>'
     );
     links.push(
       '<li><a href="/ial">Edexcel International A-Level (IAL) Past Papers</a></li>',
       '<li><a href="/igcse">Edexcel International GCSE (IGCSE) Past Papers</a></li>',
+      '<li><a href="/cambridge">Cambridge International (AS &amp; A Level, IGCSE &amp; O Level) Past Papers</a></li>',
       '<li><a href="/textbooks">Edexcel IAL &amp; IGCSE Textbooks &amp; Solution Banks</a></li>',
       '<li><a href="/audio">Listening Audio Archive with Synced Subtitles</a></li>',
       '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>'
@@ -566,7 +647,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     const subjItems = indexLookup?.byCurrSubj?.get(`${filterCurriculum}::${filterSubject}`) || [];
     const unitItems = subjItems.filter(it => it.cleanUnitLabel === filterUnit);
     for (const grp of groupSittingsForHtml(unitItems, 90)) {
-      const dtLabels = ['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SAM', 'SOL']
+      const dtLabels = ['QP', 'MS', 'ER', 'GT', 'SC', 'AUD', 'DF', 'SAM', 'SOL']
         .filter(t => grp.docTypes.has(t))
         .map(t => DOC_TYPE_HUMAN[t] || t);
       const variantTxt = grp.variant ? ` (${grp.variant})` : '';
@@ -607,7 +688,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     }
     const subjItems = indexLookup?.byCurrSubj?.get(`${filterCurriculum}::${filterSubject}`) || [];
     for (const grp of groupSittingsForHtml(subjItems, 45)) {
-      const dtLabels = ['QP', 'MS', 'ER', 'SC', 'AUD', 'DF', 'SAM', 'SOL']
+      const dtLabels = ['QP', 'MS', 'ER', 'GT', 'SC', 'AUD', 'DF', 'SAM', 'SOL']
         .filter(t => grp.docTypes.has(t))
         .map(t => DOC_TYPE_HUMAN[t] || t);
       itemEntries.push(
@@ -633,23 +714,43 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       }
     }
   } else if (currentTab === 'library') {
-    links.push(
-      '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
-      '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
-    );
-    for (const curr of ['Edexcel IAL', 'Edexcel IGCSE']) {
-      const currSlug = getCurriculumSlug(curr);
-      const subjectsObj = meta?.wizard?.[curr] || {};
-      for (const s of Object.keys(subjectsObj).sort()) {
-        const subjSlug = getSubjectSlug(s);
-        links.push(
-          `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
-        );
-        const uKeys = Object.keys(subjectsObj[s]?.units || {});
-        if (uKeys.length === 1) {
+    const isCieHome = route.state.activeBoard === 'cambridge';
+    if (isCieHome) {
+      links.push(
+        '<li><a href="/cambridge/a-level">Cambridge International AS &amp; A Level Past Papers</a></li>',
+        '<li><a href="/cambridge/igcse">Cambridge IGCSE Past Papers (A*-G &amp; 9-1)</a></li>',
+        '<li><a href="/cambridge/o-level">Cambridge O Level Past Papers</a></li>'
+      );
+      for (const curr of ['Cambridge AS & A Level', 'Cambridge IGCSE', 'Cambridge O Level']) {
+        const currSlug = getCurriculumSlug(curr);
+        const subjectsObj = meta?.wizard?.[curr] || {};
+        for (const s of Object.keys(subjectsObj).sort()) {
+          const subjSlug = getSubjectSlug(s);
           links.push(
-            `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0])}">${escapeHtml(`${curr} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
+            `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
           );
+        }
+      }
+    } else {
+      links.push(
+        '<li><a href="/cambridge">Cambridge International (CAIE) Past Papers Archive</a></li>',
+        '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
+        '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
+      );
+      for (const curr of ['Edexcel IAL', 'Edexcel IGCSE']) {
+        const currSlug = getCurriculumSlug(curr);
+        const subjectsObj = meta?.wizard?.[curr] || {};
+        for (const s of Object.keys(subjectsObj).sort()) {
+          const subjSlug = getSubjectSlug(s);
+          links.push(
+            `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
+          );
+          const uKeys = Object.keys(subjectsObj[s]?.units || {});
+          if (uKeys.length === 1) {
+            links.push(
+              `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0])}">${escapeHtml(`${curr} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
+            );
+          }
         }
       }
     }
@@ -676,9 +777,13 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       ${faqHtml}
       <nav aria-label="Archive Navigation">
         <p>
-          <a href="/papers">All Past Papers</a> |
-          <a href="/ial">Edexcel IAL Past Papers</a> |
-          <a href="/igcse">Edexcel IGCSE Past Papers</a> |
+          <a href="/papers">Edexcel Past Papers</a> |
+          <a href="/ial">Edexcel IAL</a> |
+          <a href="/igcse">Edexcel IGCSE</a> |
+          <a href="/cambridge">Cambridge International</a> |
+          <a href="/cambridge/a-level">Cambridge A-Level</a> |
+          <a href="/cambridge/igcse">Cambridge IGCSE</a> |
+          <a href="/cambridge/o-level">Cambridge O Level</a> |
           <a href="/textbooks">Textbooks &amp; Solution Banks</a> |
           <a href="/data-files">IT &amp; CS Data Files</a> |
           <a href="/audio">Listening Audio MP3s</a> |
@@ -715,6 +820,9 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
   const staticBody = buildStaticSemanticBody(route, seo, meta, indexLookup);
   const bootShell = buildInstantBootShell(seo);
   const routeShard = getShardPathForRoute(route.state);
+  const routeBoard = route.state.filterCurriculum
+    ? getBoardForCurriculum(route.state.filterCurriculum)
+    : (route.state.activeBoard || 'edexcel');
   const routeNeedsFull = Boolean(
     !routeShard &&
     route.state.currentTab === 'library' &&
@@ -727,6 +835,7 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
   // Inject route-specific parallel early-fetch targets into <head> script
   html = html.replace(/__CS_ROUTE_SHARD__/g, routeShard || '');
   html = html.replace(/__CS_ROUTE_NEEDS_FULL__/g, routeNeedsFull ? '1' : '0');
+  html = html.replace(/__CS_ROUTE_BOARD__/g, routeBoard || 'edexcel');
 
   // Replace <title>
   html = setOrInsertTag(
@@ -811,35 +920,41 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
 }
 
 function generateLlmsTxt(meta, indexLookup) {
-  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16021;
-  const totalFiles = meta?.totalFiles || 19882;
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16051;
+  const totalFiles = meta?.totalFiles || 19912;
   const booksCount = indexLookup?.booksAll?.length || Object.keys(BOOK_CATALOG_BY_PATH).length || 73;
   const audioCount = indexLookup?.audioAll?.length || 272;
   const dfCount = indexLookup?.dfAll?.length || 46;
   const ialSubjects = Object.keys(meta?.wizard?.['Edexcel IAL'] || {}).sort();
   const igcseSubjects = Object.keys(meta?.wizard?.['Edexcel IGCSE'] || {}).sort();
+  const cieAlSubjects = Object.keys(meta?.wizard?.['Cambridge AS & A Level'] || {}).sort();
+  const cieIgcseSubjects = Object.keys(meta?.wizard?.['Cambridge IGCSE'] || {}).sort();
+  const cieOlSubjects = Object.keys(meta?.wizard?.['Cambridge O Level'] || {}).sort();
 
   const lines = [
-    '# Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library',
+    '# Conceptualist Systems — International Exam Past Papers & Textbooks Library',
     '',
-    `> Independent study archive; not affiliated with, endorsed by, or sponsored by Pearson plc or Edexcel. Conceptualist Systems (${SITE_URL}) is a free, zero-ad academic study archive indexing ${uniqueFiles.toLocaleString()} unique Pearson Edexcel International A-Level (IAL) and International GCSE (IGCSE 9-1 & Modular) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), ${booksCount} Student Textbooks & Worked Solution Banks, ${audioCount} Listening Audio tracks with synced closed captions (CC), and ${dfCount} IT & Computer Science practical Data Files (${totalFiles.toLocaleString()} total archived files covering January 2003 through June 2026).`,
+    `> Independent international exam study archive; not affiliated with, endorsed by, or sponsored by Pearson plc / Edexcel or Cambridge University Press & Assessment (CAIE). Conceptualist Systems (${SITE_URL}) is a free, zero-ad academic archive indexing ${uniqueFiles.toLocaleString()} unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), Grade Thresholds (GT), Inserts (IN), ${booksCount} Student Textbooks & Worked Solution Banks, ${audioCount} Listening Audio tracks with synced closed captions (CC), and ${dfCount} practical Data Files (${totalFiles.toLocaleString()} total archived files).`,
     '',
     '## Core Platform Capabilities',
-    '- **Side-by-Side Split View Reader:** Open any paired Question Paper (QP) and Mark Scheme (MS) side by side in the browser with synchronized zoom and draggable split divider.',
-    '- **Resizable Two-Page Book Spread Mode:** Read all 73 Edexcel IAL & IGCSE student textbooks and standalone past papers in a 2-Page side-by-side spread with Pure OLED and Academic Dark reading modes.',
-    '- **In-Browser Worked Solution Bank Reader:** Stream all 14 Edexcel IAL Mathematics Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) chapter-by-chapter directly in the browser without downloading full ZIP archives.',
-    '- **Synced Listening Audio & Subtitles (CC):** Play MP3 and multi-track ZIP listening examinations above the Question Paper with clickable time-synced transcripts across French, German, Spanish, ESL, Chinese, and Swahili.',
+    '- **Board Switcher Architecture:** Isolated switching between Pearson Edexcel International (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) with zero cross-board search collisions.',
+    '- **Side-by-Side Split View Reader:** Open paired Question Papers (QP) alongside Mark Schemes (MS) or Cambridge Inserts (IN), plus one-click Grade Thresholds (GT) and Examiner Reports (ER).',
+    '- **Resizable Two-Page Book Spread Mode:** Read student textbooks and standalone past papers in a 2-Page side-by-side spread with Pure OLED and Academic Dark reading modes.',
+    '- **In-Browser Worked Solution Bank Reader:** Stream all 14 Edexcel IAL Mathematics Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) chapter-by-chapter directly in the browser.',
+    '- **Synced Listening Audio & Subtitles (CC):** Play MP3 and multi-track ZIP listening examinations above the Question Paper with clickable time-synced transcripts.',
     '',
     '## Primary Archive Hubs',
     `- [Library Homepage](${SITE_URL}/): Interactive subject, unit, and examination year navigator.`,
-    `- [All Past Papers Catalog](${SITE_URL}/papers): Full searchable catalog of ${uniqueFiles.toLocaleString()} unique Edexcel resources.`,
-    `- [Edexcel IAL Past Papers](${SITE_URL}/ial): ${ialSubjects.length} International A-Level subjects (2003-2026).`,
+    `- [All Edexcel Past Papers](${SITE_URL}/papers): Searchable Pearson Edexcel catalog.`,
+    `- [Edexcel IAL Past Papers](${SITE_URL}/ial): ${ialSubjects.length} International A-Level subjects.`,
     `- [Edexcel IGCSE Past Papers](${SITE_URL}/igcse): ${igcseSubjects.length} International GCSE (9-1, Regional R, and Modular 4W*) subjects.`,
+    `- [Cambridge International Hub](${SITE_URL}/cambridge): Cambridge AS & A Level (${cieAlSubjects.length}), IGCSE (${cieIgcseSubjects.length}), and O Level (${cieOlSubjects.length}) subjects.`,
+    `- [Cambridge AS & A Level](${SITE_URL}/cambridge/a-level): International AS & A Level past papers, mark schemes & grade thresholds.`,
+    `- [Cambridge IGCSE](${SITE_URL}/cambridge/igcse): Cambridge IGCSE (A*-G & 9-1 equivalents) past papers, inserts & grade thresholds.`,
+    `- [Cambridge O Level](${SITE_URL}/cambridge/o-level): Cambridge O Level past papers, mark schemes & grade thresholds.`,
     `- [Textbooks & Worked Solution Banks](${SITE_URL}/textbooks): ${booksCount} student books, answer PDFs, lab books, and IAL Maths Solution Banks.`,
-    `- [Edexcel IAL Textbooks & Solution Banks](${SITE_URL}/textbooks/ial): Student Book 1 & 2 PDFs, answers, and P1-P4/M1-M3/S1-S3/D1/FP1-FP3 Solution Banks.`,
-    `- [Edexcel IGCSE (9-1) Textbooks](${SITE_URL}/textbooks/igcse): Verified student books across Mathematics A, Further Pure Maths, Sciences, Business, Commerce, Accounting, Economics, and ICT.`,
     `- [Listening Audio Archive (MP3 & Live CC)](${SITE_URL}/audio): ${audioCount} listening audio tracks and synced transcripts.`,
-    `- [IT & Computer Science Practical Data Files](${SITE_URL}/data-files): ${dfCount} practical exam source ZIPs for WIT12, WIT14, 4IT1, and 4CP0.`,
+    `- [IT & Computer Science Practical Data Files](${SITE_URL}/data-files): ${dfCount} practical exam source ZIPs.`,
     '',
     `## Edexcel International A-Level (IAL) Subjects (${ialSubjects.length})`,
     ...ialSubjects.map((s) => {
@@ -854,7 +969,35 @@ function generateLlmsTxt(meta, indexLookup) {
       const code = IGCSE_SPEC_CODES[s] ? ` (${IGCSE_SPEC_CODES[s]})` : '';
       return `- [Edexcel IGCSE ${formatSubjectName(s)}${code}](${SITE_URL}/igcse/${getSubjectSlug(s)}): ${sObj.totalFiles || 0} unique files.`;
     }),
-    '',
+    ''
+  ];
+
+  if (cieAlSubjects.length > 0) {
+    lines.push(`## Cambridge International AS & A Level Subjects (${cieAlSubjects.length})`);
+    for (const s of cieAlSubjects) {
+      const sObj = meta?.wizard?.['Cambridge AS & A Level']?.[s] || {};
+      lines.push(`- [Cambridge AS & A Level ${s}](${SITE_URL}/cambridge/a-level/${getSubjectSlug(s)}): ${sObj.totalFiles || 0} unique files.`);
+    }
+    lines.push('');
+  }
+  if (cieIgcseSubjects.length > 0) {
+    lines.push(`## Cambridge IGCSE Subjects (${cieIgcseSubjects.length})`);
+    for (const s of cieIgcseSubjects) {
+      const sObj = meta?.wizard?.['Cambridge IGCSE']?.[s] || {};
+      lines.push(`- [Cambridge IGCSE ${s}](${SITE_URL}/cambridge/igcse/${getSubjectSlug(s)}): ${sObj.totalFiles || 0} unique files.`);
+    }
+    lines.push('');
+  }
+  if (cieOlSubjects.length > 0) {
+    lines.push(`## Cambridge O Level Subjects (${cieOlSubjects.length})`);
+    for (const s of cieOlSubjects) {
+      const sObj = meta?.wizard?.['Cambridge O Level']?.[s] || {};
+      lines.push(`- [Cambridge O Level ${s}](${SITE_URL}/cambridge/o-level/${getSubjectSlug(s)}): ${sObj.totalFiles || 0} unique files.`);
+    }
+    lines.push('');
+  }
+
+  lines.push(
     '## Subject Textbooks & Solution Bank Collections',
     ...[...(indexLookup?.booksByCurrSubj?.keys() || [])].sort().map((key) => {
       const [curr, subj] = key.split('::');
@@ -862,7 +1005,7 @@ function generateLlmsTxt(meta, indexLookup) {
       return `- [${curr} ${formatSubjectName(subj)} Textbooks & Solutions](${SITE_URL}/textbooks/${getCurriculumSlug(curr)}/${getSubjectSlug(subj)}): ${list.length} books/solution banks.`;
     }),
     ''
-  ];
+  );
 
   return lines.join('\n');
 }
@@ -937,11 +1080,16 @@ function run() {
   const meta = rawMeta.meta || rawMeta;
 
   const indexPath = path.join(PUBLIC_DIR, 'index.json');
-  const rawIndex = fs.existsSync(indexPath)
+  const cieIndexPath = path.join(PUBLIC_DIR, 'index-cambridge.json');
+  const rawEdexcelIndex = fs.existsSync(indexPath)
     ? JSON.parse(fs.readFileSync(indexPath, 'utf8'))
     : null;
-  const unpacked = unpackIndexFile(rawIndex);
-  const indexLookup = buildIndexLookup(unpacked.items);
+  const rawCieIndex = fs.existsSync(cieIndexPath)
+    ? JSON.parse(fs.readFileSync(cieIndexPath, 'utf8'))
+    : null;
+  const unpackedEdexcel = unpackIndexFile(rawEdexcelIndex);
+  const unpackedCie = unpackIndexFile(rawCieIndex);
+  const indexLookup = buildIndexLookup([...unpackedEdexcel.items, ...unpackedCie.items]);
 
   const { routes, aliasRedirects } = collectAllRoutes(meta, indexLookup);
   const lastmodDate = new Date().toISOString().split('T')[0];
@@ -983,8 +1131,9 @@ function run() {
       fs.copyFileSync(path.join(PUBLIC_DIR, 'robots.txt'), path.join(DIST_DIR, 'robots.txt'));
     }
 
-    if (rawIndex) {
-      const shardCount = writeDistShards(rawIndex);
+    const rawIndexesForShards = [rawEdexcelIndex, rawCieIndex].filter(Boolean);
+    if (rawIndexesForShards.length > 0) {
+      const shardCount = writeDistShards(rawIndexesForShards);
       console.log(`✅ Generated ${shardCount} fast route JSON shards in dist/shards/.`);
     }
 

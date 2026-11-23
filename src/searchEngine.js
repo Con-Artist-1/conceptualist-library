@@ -1,4 +1,5 @@
-// High-precision, sub-millisecond fuzzy search & ranking engine for Conceptualist Systems
+// High-precision, sub-millisecond multi-board fuzzy search & ranking engine for Conceptualist Systems.
+// Strictly isolates Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE, O Level).
 
 import {
   STATIC_SEARCH_VOCAB,
@@ -14,6 +15,12 @@ import {
   GENERIC_QUERY_WORDS,
   ITEM_CODE_EQUIV
 } from './data/searchDictionaries.js';
+import { isBookCategory, isCambridgeSpec } from './data/boards.js';
+import {
+  CAMBRIDGE_ALL_CODES,
+  extractSyllabusCodeFromSubject,
+  getCambridgeSubjectAliases
+} from './data/cambridgeCatalog.js';
 
 const _dlPrevPrev = new Int32Array(64);
 const _dlPrev = new Int32Array(64);
@@ -31,6 +38,11 @@ const COMPILED_SYNONYMS = Object.fromEntries(
   ])
 );
 
+const MONTH_NAME_SET = new Set([
+  'jan', 'january', 'feb', 'february', 'mar', 'march', 'may', 'jun', 'june', 'summer',
+  'oct', 'october', 'nov', 'november', 'autumn', 'winter', 'mayjune', 'octnov', 'febmarch', 'fm', 'mj', 'on'
+]);
+
 function tokenizeRaw(str) {
   if (!str) return [];
   return String(str)
@@ -39,10 +51,11 @@ function tokenizeRaw(str) {
     .match(/[a-z0-9]+/g) || [];
 }
 
-function expandBaseCodeAliases(codeLower, targetSet) {
+function expandBaseCodeAliases(codeLower, targetSet, isCambridge = false) {
   if (!codeLower) return;
   targetSet.add(codeLower);
-  // Variant strips: m1a -> m1, m1r -> m1, p1r -> p1, fp2a -> fp2, wma11r -> wma11
+  if (isCambridge) return;
+  // Edexcel variant strips: m1a -> m1, m1r -> m1, p1r -> p1, fp2a -> fp2, wma11r -> wma11
   const strippedVar = codeLower.replace(/(?:r|a)$/, '');
   if (strippedVar && strippedVar !== codeLower && /\d$/.test(strippedVar)) {
     targetSet.add(strippedVar);
@@ -51,14 +64,12 @@ function expandBaseCodeAliases(codeLower, targetSet) {
   if (equiv) {
     for (let i = 0; i < equiv.length; i++) targetSet.add(equiv[i]);
   }
-  // Paper1 / Paper2 concatenated filenames
   const paperMatch = codeLower.match(/^paper([1-4][a-z]?)$/);
   if (paperMatch) {
     targetSet.add('paper');
     targetSet.add(`p${paperMatch[1]}`);
     targetSet.add(`p${paperMatch[1].replace(/[ar]$/, '')}`);
   }
-  // Tiered IGCSE paper codes like 1h, 2hr, 1f, 2fr
   const tierMatch = codeLower.match(/^([1-4])([hf])(r)?$/);
   if (tierMatch) {
     targetSet.add(`p${tierMatch[1]}`);
@@ -73,14 +84,58 @@ function expandBaseCodeAliases(codeLower, targetSet) {
 }
 
 /**
+ * Detect whether a user query unambiguously targets another exam board
+ * so the UI can offer a 1-click "Switch Board" nudge instead of 0-result confusion.
+ */
+export function detectLikelyQueryBoard(rawQuery = '') {
+  const q = String(rawQuery || '').toLowerCase().trim();
+  if (!q) return null;
+
+  // Explicit board keywords
+  if (/\b(?:cambridge|caie|cie|o[-_\s]?levels?)\b/.test(q)) return 'cambridge';
+  if (/\b(?:edexcel|pearson|ial|solomon)\b/.test(q)) return 'edexcel';
+
+  // Explicit Edexcel course codes (W-codes, 4-char IGCSE 4*, 6-char GCE)
+  if (/\b(?:w[a-z]{2}\d{2}|4w?[a-z]{2}\d|4wm[12][hf]|yla[12]|6(?:bi|ch|ph)\d{2})\b/.test(q)) {
+    return 'edexcel';
+  }
+
+  // Explicit Cambridge cover-code or session-letter syntax (e.g. "0625/42", "9709 s24", "0580 fm25")
+  const fourDigitMatches = q.match(/\b\d{4}\b/g) || [];
+  for (const code of fourDigitMatches) {
+    if (CAMBRIDGE_ALL_CODES.has(code)) {
+      // Guard ambiguous year-like code "2010": only treat as Cambridge if paired with another CIE signal or not alone as a year
+      if (code === '2010') {
+        if (/\b(?:[msw]\d{2}|qp|ms|er|gt|in|lit|literature|11|12|13|21|22|23)\b/.test(q)) {
+          return 'cambridge';
+        }
+        continue;
+      }
+      return 'cambridge';
+    }
+  }
+  if (/\b(?:[msw](?:0[2-9]|[12]\d)|fm\d{2}|mj\d{2}|on\d{2})\b/.test(q)) {
+    return 'cambridge';
+  }
+  return null;
+}
+
+/**
  * Attach structured search tokens and phrase indexes once per file object.
  */
 export function buildFileSearchData(fileObj) {
   if (!fileObj) return null;
 
+  const isCie = fileObj.board === 'cambridge' || isCambridgeSpec(fileObj.spec);
   const highSet = new Set();
   const metaSet = new Set();
   const tokenSet = new Set();
+
+  const addTok = (val, destSet) => {
+    if (!val) return;
+    destSet.add(val);
+    tokenSet.add(val);
+  };
 
   const addTokensTo = (str, destSet, alsoExpandCodes = false) => {
     const toks = tokenizeRaw(str);
@@ -89,132 +144,205 @@ export function buildFileSearchData(fileObj) {
       destSet.add(t);
       tokenSet.add(t);
       if (alsoExpandCodes && t.length <= 7 && /\d/.test(t)) {
-        expandBaseCodeAliases(t, destSet);
-        expandBaseCodeAliases(t, tokenSet);
+        expandBaseCodeAliases(t, destSet, isCie);
+        expandBaseCodeAliases(t, tokenSet, isCie);
       }
     }
   };
 
   // High-priority fields: unit label, unit name, unit code, subject, aliases
-  addTokensTo(fileObj.cleanUnitLabel, highSet, true);
-  addTokensTo(fileObj.unitName, highSet, true);
-  addTokensTo(fileObj.unitCode, highSet, true);
+  addTokensTo(fileObj.cleanUnitLabel, highSet, !isCie);
+  addTokensTo(fileObj.unitName, highSet, !isCie);
+  addTokensTo(fileObj.unitCode, highSet, !isCie);
   addTokensTo(fileObj.subject, highSet, false);
 
   const subj = fileObj.subject || '';
-  if (subj === 'Math') {
-    highSet.add('mathematics');
-    highSet.add('maths');
-    tokenSet.add('mathematics');
-    tokenSet.add('maths');
-  } else if (subj === 'Information Technology') {
-    highSet.add('it');
-    highSet.add('ict');
-    tokenSet.add('it');
-    tokenSet.add('ict');
-  } else if (subj === 'Computer Science') {
-    highSet.add('cs');
-    highSet.add('compsci');
-    tokenSet.add('cs');
-    tokenSet.add('compsci');
-  } else if (subj === 'Further Pure Mathematics') {
-    highSet.add('fmath');
-    tokenSet.add('fmath');
+  const subjLower = subj.toLowerCase();
+  if (subj === 'Math' || subjLower.startsWith('mathematics')) {
+    addTok('math', highSet);
+    addTok('mathematics', highSet);
+    addTok('maths', highSet);
+  } else if (subjLower.startsWith('information technology') || subjLower.startsWith('ict')) {
+    addTok('it', highSet);
+    addTok('ict', highSet);
+  } else if (subjLower.startsWith('computer science')) {
+    addTok('cs', highSet);
+    addTok('compsci', highSet);
+  } else if (subjLower.startsWith('further pure mathematics') || subjLower.startsWith('further mathematics')) {
+    addTok('fmath', highSet);
+  } else if (subjLower.startsWith('english as a second language')) {
+    addTok('esl', highSet);
+  } else if (subjLower.startsWith('first language english')) {
+    addTok('fle', highSet);
   }
 
-  // Index IGCSE syllabus codes on IGCSE papers/textbooks so searching "4ma1" or "4ph1" works
-  if (fileObj.spec === 'IGCSE' || fileObj.curriculum === 'Edexcel IGCSE') {
-    const igCodes = IGCSE_CODE_BY_SUBJECT[subj];
-    if (igCodes) {
-      igCodes.forEach((c) => {
-        highSet.add(c);
-        tokenSet.add(c);
-      });
+  // Board-specific syllabus codes & paper/unit indexing
+  const unitLabelStr = `${fileObj.cleanUnitLabel || ''} ${fileObj.unitName || ''}`.toLowerCase();
+
+  if (isCie) {
+    addTok('cambridge', metaSet);
+    addTok('caie', metaSet);
+    addTok('cie', metaSet);
+    if (fileObj.spec === 'CIE-AL') {
+      addTok('alevel', metaSet);
+      addTok('alevels', metaSet);
+      addTok('cie-al', metaSet);
+    } else if (fileObj.spec === 'CIE-OL') {
+      addTok('olevel', metaSet);
+      addTok('olevels', metaSet);
+      addTok('cie-ol', metaSet);
+    } else {
+      addTok('igcse', metaSet);
+      addTok('cie-igcse', metaSet);
+    }
+
+    const sylCode = fileObj.syllabusCode || extractSyllabusCodeFromSubject(subj);
+    if (sylCode) {
+      const aliases = getCambridgeSubjectAliases(sylCode);
+      for (let i = 0; i < aliases.length; i++) {
+        addTok(aliases[i], highSet);
+      }
+    }
+
+    // Index Cambridge paper number (p1..p7) and exact component code (e.g. 42, 12, 33) + variant (v1..v6)
+    const ucPaperMatch = String(fileObj.unitCode || '').match(/P(\d)$/i) || unitLabelStr.match(/\bpaper\s*([1-7])\b/);
+    const paperDigit = ucPaperMatch ? ucPaperMatch[1] : '';
+    const vDigit = /^\d$/.test(String(fileObj.variant || '')) ? String(fileObj.variant) : '';
+    if (paperDigit) {
+      addTok(`p${paperDigit}`, highSet);
+      if (sylCode) addTok(`${sylCode}p${paperDigit}`, highSet);
+      if (vDigit) {
+        addTok(`${paperDigit}${vDigit}`, highSet);
+        addTok(`p${paperDigit}${vDigit}`, highSet);
+        addTok(`v${vDigit}`, metaSet);
+      }
+    }
+    // Also index legacy pre-renumbering component digits from raw filename (e.g. 9709_s19_qp_62 -> 62, p6)
+    const rawCompMatch = String(fileObj.name || '').match(/_(?:qp|ms|in|ci|sf|tn|pm)_(\d{1,2})\./i);
+    if (rawCompMatch) {
+      const rc = rawCompMatch[1];
+      addTok(rc, highSet);
+      if (rc.length === 2 && !rc.startsWith('0')) {
+        addTok(`p${rc[0]}`, highSet);
+        addTok(`v${rc[1]}`, metaSet);
+      } else if (rc.length === 1) {
+        addTok(`p${rc}`, highSet);
+      }
+    }
+
+    // Cambridge 9709 / 9231 board-neutral Math branch tokens
+    if (sylCode === '9709') {
+      if (unitLabelStr.includes('pure mathematics 1')) { addTok('pure1', highSet); addTok('p1', highSet); }
+      else if (unitLabelStr.includes('pure mathematics 2')) { addTok('pure2', highSet); addTok('p2', highSet); }
+      else if (unitLabelStr.includes('pure mathematics 3')) { addTok('pure3', highSet); addTok('p3', highSet); }
+      else if (unitLabelStr.includes('mechanics 2') || unitLabelStr.includes('old p5')) { addTok('m2', highSet); addTok('p5', highSet); }
+      else if (unitLabelStr.includes('mechanics')) { addTok('m1', highSet); addTok('p4', highSet); }
+      else if (unitLabelStr.includes('statistics 1')) { addTok('s1', highSet); addTok('p5', highSet); }
+      else if (unitLabelStr.includes('statistics 2')) { addTok('s2', highSet); addTok('p6', highSet); }
+    } else if (sylCode === '9231') {
+      if (unitLabelStr.includes('further pure mathematics 1')) { addTok('fp1', highSet); addTok('f1', highSet); }
+      else if (unitLabelStr.includes('further pure mathematics 2')) { addTok('fp2', highSet); addTok('f2', highSet); }
+      else if (unitLabelStr.includes('further mechanics')) { addTok('fm', highSet); }
+      else if (unitLabelStr.includes('further probability')) { addTok('fs', highSet); }
+    }
+
+    // Cambridge paper descriptors (MCQ, ATP, Core, Extended, AS, A2)
+    if (unitLabelStr.includes('multiple choice')) addTok('mcq', highSet);
+    if (unitLabelStr.includes('alternative to practical')) addTok('atp', highSet);
+    if (unitLabelStr.includes('core')) addTok('core', highSet);
+    if (unitLabelStr.includes('extended')) addTok('extended', highSet);
+    if (/\(as\)|\bas\b/.test(unitLabelStr)) addTok('as', metaSet);
+    if (/\(a2\)|\ba2\b/.test(unitLabelStr)) addTok('a2', metaSet);
+
+    // Cambridge SC subtypes (Insert, Confidential Instructions, Transcript, Pre-Release)
+    const rawNameLower = String(fileObj.name || '').toLowerCase();
+    if (/_in(?:_|\.)/.test(rawNameLower)) { addTok('in', highSet); addTok('insert', highSet); }
+    if (/_ci(?:_|\.)/.test(rawNameLower)) { addTok('ci', highSet); addTok('confidential', highSet); }
+    if (/_tn(?:_|\.)/.test(rawNameLower)) { addTok('tn', highSet); addTok('transcript', highSet); addTok('tapescript', highSet); }
+    if (/_pm(?:_|\.)/.test(rawNameLower)) { addTok('pm', highSet); addTok('prerelease', highSet); }
+  } else {
+    // Pearson Edexcel indexing (unchanged precision)
+    addTok('edexcel', metaSet);
+    addTok('pearson', metaSet);
+
+    if (fileObj.spec === 'IGCSE' || fileObj.curriculum === 'Edexcel IGCSE') {
+      const igCodes = IGCSE_CODE_BY_SUBJECT[subj];
+      if (igCodes) {
+        igCodes.forEach((c) => addTok(c, highSet));
+      }
+    }
+
+    const unitNumMatch = unitLabelStr.match(/\bunit\s*([1-6])\b/);
+    if (unitNumMatch) addTok(`u${unitNumMatch[1]}`, highSet);
+    const paperNumMatch = unitLabelStr.match(/\bpaper\s*([1-4]r?)\b/);
+    if (paperNumMatch) addTok(`p${paperNumMatch[1]}`, highSet);
+
+    const v = fileObj.variant || '';
+    const isReg = v === 'R' || v === 'A' || v.includes('R');
+    if (isReg) {
+      ['regional', 'reg', 'r'].forEach((t) => addTok(t, metaSet));
+    }
+    if (v === 'A') {
+      ['alt', 'alta'].forEach((t) => addTok(t, metaSet));
+    }
+    if (v.includes('H')) {
+      addTok('higher', metaSet);
+      if (paperNumMatch) {
+        const pDigit = paperNumMatch[1].replace(/r$/i, '');
+        addTok(`${pDigit}h`, highSet);
+        if (isReg) addTok(`${pDigit}hr`, highSet);
+      }
+    }
+    if (v.includes('F')) {
+      addTok('foundation', metaSet);
+      if (paperNumMatch) {
+        const pDigit = paperNumMatch[1].replace(/r$/i, '');
+        addTok(`${pDigit}f`, highSet);
+        if (isReg) addTok(`${pDigit}fr`, highSet);
+      }
     }
   }
 
-  // Extract normalized unit tag (e.g. "Unit 2" -> "u2", "Paper 1" -> "p1")
-  const unitLabelStr = `${fileObj.cleanUnitLabel || ''} ${fileObj.unitName || ''}`.toLowerCase();
-  const unitNumMatch = unitLabelStr.match(/\bunit\s*([1-6])\b/);
-  if (unitNumMatch) {
-    highSet.add(`u${unitNumMatch[1]}`);
-    tokenSet.add(`u${unitNumMatch[1]}`);
-  }
-  const paperNumMatch = unitLabelStr.match(/\bpaper\s*([1-4]r?)\b/);
-  if (paperNumMatch) {
-    highSet.add(`p${paperNumMatch[1]}`);
-    tokenSet.add(`p${paperNumMatch[1]}`);
-  }
-
-  // Metadata fields: curriculum, category, session + bidirectional seasonal aliases, variant, docType
+  // Metadata fields: curriculum, spec, category, year
   addTokensTo(fileObj.curriculum, metaSet, false);
   addTokensTo(fileObj.spec, metaSet, false);
   addTokensTo(fileObj.category, metaSet, false);
   if (fileObj.year) {
-    const yr = String(fileObj.year);
-    metaSet.add(yr);
-    tokenSet.add(yr);
+    addTok(String(fileObj.year), metaSet);
   }
 
+  // Board-isolated session token indexing
   const sRaw = `${fileObj.session || ''} ${fileObj.path || ''}`;
   addTokensTo(fileObj.session, metaSet, false);
-  if (/\b(?:may|jun|june)\b|may[-_\s]*june/i.test(sRaw)) {
-    SESSION_SYNONYMS_BY_MONTH.mayJune.forEach((t) => {
-      metaSet.add(t);
-      tokenSet.add(t);
-    });
-  }
-  if (/\b(?:oct|october|nov|november)\b|oct[-_\s]*nov/i.test(sRaw)) {
-    SESSION_SYNONYMS_BY_MONTH.octNov.forEach((t) => {
-      metaSet.add(t);
-      tokenSet.add(t);
-    });
-  }
-  if (/\b(?:jan|january|feb|february)\b|jan[-_\s]*feb/i.test(sRaw)) {
-    SESSION_SYNONYMS_BY_MONTH.janFeb.forEach((t) => {
-      metaSet.add(t);
-      tokenSet.add(t);
-    });
-  }
+  const yyTwo = fileObj.year ? String(fileObj.year).slice(-2) : '';
 
-  const v = fileObj.variant || '';
-  const isReg = v === 'R' || v === 'A' || v.includes('R');
-  if (isReg) {
-    ['regional', 'reg', 'r'].forEach((t) => {
-      metaSet.add(t);
-      tokenSet.add(t);
-    });
-  }
-  if (v === 'A') {
-    ['alt', 'alta'].forEach((t) => {
-      metaSet.add(t);
-      tokenSet.add(t);
-    });
-  }
-  if (v.includes('H')) {
-    metaSet.add('higher');
-    tokenSet.add('higher');
-    if (paperNumMatch) {
-      const pDigit = paperNumMatch[1].replace(/r$/i, '');
-      highSet.add(`${pDigit}h`);
-      tokenSet.add(`${pDigit}h`);
-      if (isReg) {
-        highSet.add(`${pDigit}hr`);
-        tokenSet.add(`${pDigit}hr`);
-      }
+  if (isCie) {
+    if (/feb[-/\s]*mar|march/i.test(fileObj.session || '')) {
+      SESSION_SYNONYMS_BY_MONTH.febMarchCie.forEach((t) => addTok(t, metaSet));
+      if (yyTwo) { addTok(`m${yyTwo}`, metaSet); addTok(`fm${yyTwo}`, metaSet); }
+    } else if (/may|jun/i.test(fileObj.session || '')) {
+      SESSION_SYNONYMS_BY_MONTH.mayJune.forEach((t) => addTok(t, metaSet));
+      addTok('mj', metaSet);
+      if (yyTwo) { addTok(`s${yyTwo}`, metaSet); addTok(`mj${yyTwo}`, metaSet); }
+    } else if (/oct|nov/i.test(fileObj.session || '')) {
+      SESSION_SYNONYMS_BY_MONTH.octNov.forEach((t) => addTok(t, metaSet));
+      addTok('winter', metaSet);
+      addTok('on', metaSet);
+      if (yyTwo) { addTok(`w${yyTwo}`, metaSet); addTok(`on${yyTwo}`, metaSet); }
     }
-  }
-  if (v.includes('F')) {
-    metaSet.add('foundation');
-    tokenSet.add('foundation');
-    if (paperNumMatch) {
-      const pDigit = paperNumMatch[1].replace(/r$/i, '');
-      highSet.add(`${pDigit}f`);
-      tokenSet.add(`${pDigit}f`);
-      if (isReg) {
-        highSet.add(`${pDigit}fr`);
-        tokenSet.add(`${pDigit}fr`);
-      }
+  } else {
+    if (/\b(?:may|jun|june)\b|may[-_\s]*june/i.test(sRaw)) {
+      SESSION_SYNONYMS_BY_MONTH.mayJune.forEach((t) => addTok(t, metaSet));
+    }
+    if (/\b(?:oct|october|nov|november)\b|oct[-_\s]*nov/i.test(sRaw)) {
+      SESSION_SYNONYMS_BY_MONTH.octNov.forEach((t) => addTok(t, metaSet));
+    }
+    if (/\b(?:jan|january)\b|jan[-_\s]*feb/i.test(sRaw)) {
+      SESSION_SYNONYMS_BY_MONTH.janEdexcel.forEach((t) => addTok(t, metaSet));
+    }
+    if (/\b(?:feb|february)\b/i.test(sRaw)) {
+      addTok('feb', metaSet);
+      addTok('february', metaSet);
     }
   }
 
@@ -222,53 +350,50 @@ export function buildFileSearchData(fileObj) {
   const dtToks = DOC_TYPE_TOKENS[dt];
   if (dtToks) {
     dtToks.forEach((t) => {
-      metaSet.add(t);
-      tokenSet.add(t);
+      if (dt === 'GT') addTok(t, highSet);
+      addTok(t, metaSet);
     });
   }
-  if (
-    (fileObj.category === 'Books' || fileObj.category === 'IAL Books' || fileObj.category === 'IGCSE Books') &&
-    dt !== 'SOL'
-  ) {
+  if (isBookCategory(fileObj.category) && dt !== 'SOL') {
     DOC_TYPE_TOKENS.Book.forEach((t) => {
-      highSet.add(t);
-      metaSet.add(t);
-      tokenSet.add(t);
+      addTok(t, highSet);
+      addTok(t, metaSet);
     });
   }
 
-  // Path & Filename tokens (strip browser duplicate-copy suffixes like " (1).pdf" so Book 2 doesn't index token "1")
+  // Path & Filename tokens
   const sanitizedPathForTokens = String(fileObj.path || '').replace(/\s*\(\d+\)(\.[a-z0-9]+)$/i, '$1');
-  addTokensTo(fileObj.name, tokenSet, true);
-  addTokensTo(sanitizedPathForTokens, tokenSet, true);
+  addTokensTo(fileObj.name, tokenSet, !isCie);
+  addTokensTo(sanitizedPathForTokens, tokenSet, !isCie);
 
-  if (subj === 'Math') {
-    const mathPMap = { p1: 'wma11', p2: 'wma12', p3: 'wma13', p4: 'wma14' };
-    Object.entries(mathPMap).forEach(([pKey, wma]) => {
-      if (tokenSet.has(pKey) || tokenSet.has(`${pKey}r`) || tokenSet.has(`${pKey}a`)) {
-        highSet.add(pKey);
-        highSet.add(wma);
-        tokenSet.add(pKey);
-        tokenSet.add(wma);
+  if (!isCie && subj === 'Math') {
+    const mathPMap = { p1: ['wma11', 'pure1'], p2: ['wma12', 'pure2'], p3: ['wma13', 'pure3'], p4: ['wma14', 'pure4'] };
+    Object.entries(mathPMap).forEach(([pKey, [wma, pureKey]]) => {
+      if (tokenSet.has(pKey) || tokenSet.has(`${pKey}r`) || tokenSet.has(`${pKey}a`) || tokenSet.has(wma)) {
+        addTok(pKey, highSet);
+        addTok(wma, highSet);
+        addTok(pureKey, highSet);
       }
     });
     const mathBookCodeMatch = String(fileObj.name || '').match(/\((p[1-4]|m[1-3]|s[1-3]|fp[1-3]|d1|c12|c34)\)/i);
     if (mathBookCodeMatch) {
-      expandBaseCodeAliases(mathBookCodeMatch[1].toLowerCase(), highSet);
-      expandBaseCodeAliases(mathBookCodeMatch[1].toLowerCase(), tokenSet);
+      expandBaseCodeAliases(mathBookCodeMatch[1].toLowerCase(), highSet, false);
+      expandBaseCodeAliases(mathBookCodeMatch[1].toLowerCase(), tokenSet, false);
     }
   }
 
-  if (isReg && fileObj.unitCode) {
-    const ucLower = fileObj.unitCode.toLowerCase().replace(/[ar]$/, '');
-    const regSuffix = v === 'A' ? 'a' : 'r';
-    highSet.add(`${ucLower}${regSuffix}`);
-    tokenSet.add(`${ucLower}${regSuffix}`);
-    const eqs = ITEM_CODE_EQUIV[ucLower];
-    if (eqs) {
-      for (let i = 0; i < eqs.length; i++) {
-        highSet.add(`${eqs[i]}${regSuffix}`);
-        tokenSet.add(`${eqs[i]}${regSuffix}`);
+  if (!isCie) {
+    const v = fileObj.variant || '';
+    const isReg = v === 'R' || v === 'A' || v.includes('R');
+    if (isReg && fileObj.unitCode) {
+      const ucLower = fileObj.unitCode.toLowerCase().replace(/[ar]$/, '');
+      const regSuffix = v === 'A' ? 'a' : 'r';
+      addTok(`${ucLower}${regSuffix}`, highSet);
+      const eqs = ITEM_CODE_EQUIV[ucLower];
+      if (eqs) {
+        for (let i = 0; i < eqs.length; i++) {
+          addTok(`${eqs[i]}${regSuffix}`, highSet);
+        }
       }
     }
   }
@@ -279,12 +404,13 @@ export function buildFileSearchData(fileObj) {
     fileObj.unitCode,
     fileObj.subject,
     subj === 'Math' ? 'mathematics maths' : '',
-    subj === 'Information Technology' ? 'information technology it ict' : '',
-    subj === 'Computer Science' ? 'computer science cs' : ''
+    subjLower.startsWith('information technology') || subjLower.startsWith('ict') ? 'information technology it ict' : '',
+    subjLower.startsWith('computer science') ? 'computer science cs' : ''
   ]
     .filter(Boolean)
     .join(' ');
 
+  const isEdexcelReg = !isCie && (fileObj.variant === 'R' || fileObj.variant === 'A' || String(fileObj.variant || '').includes('R'));
   const allPhraseBase = [
     highPhraseBase,
     fileObj.name,
@@ -293,7 +419,8 @@ export function buildFileSearchData(fileObj) {
     fileObj.category,
     fileObj.session,
     DOC_TYPE_PHRASES[dt] || '',
-    isReg ? 'regional reg r' : ''
+    isEdexcelReg ? 'regional reg r' : '',
+    isCie && fileObj.variant ? `variant ${fileObj.variant}` : ''
   ]
     .filter(Boolean)
     .join(' ');
@@ -365,9 +492,6 @@ export function buildCatalogVocab(flatFiles = []) {
   return Array.from(vocabSet);
 }
 
-/**
- * Fast bounded Damerau-Levenshtein distance using reusable typed arrays.
- */
 function damerauLevenshtein(a, b, maxDist = 2) {
   const lenA = a.length;
   const lenB = b.length;
@@ -440,30 +564,64 @@ function addSynonymsForKey(key, altsMap, baseEditDist, isPrefix) {
 function normalizeQueryString(rawQuery) {
   let q = String(rawQuery || '').toLowerCase().replace(/['’]/g, '');
 
+  // Cambridge full cover codes: "9709/12/M/J/23" -> "9709 12 mayjune 2023", "0625/42/O/N/24", "0580/42/F/M/25"
+  q = q.replace(/\b(\d{4})[/_\s-]+(\d{1,2})[/_\s-]+m[/\s]*j[/_\s-]*(\d{2,4})\b/g, (_, syl, comp, yr) => (
+    `${syl} ${comp} mayjune ${yr.length === 2 ? `20${yr}` : yr}`
+  ));
+  q = q.replace(/\b(\d{4})[/_\s-]+(\d{1,2})[/_\s-]+o[/\s]*n[/_\s-]*(\d{2,4})\b/g, (_, syl, comp, yr) => (
+    `${syl} ${comp} octnov ${yr.length === 2 ? `20${yr}` : yr}`
+  ));
+  q = q.replace(/\b(\d{4})[/_\s-]+(\d{1,2})[/_\s-]+f[/\s]*m[/_\s-]*(\d{2,4})\b/g, (_, syl, comp, yr) => (
+    `${syl} ${comp} febmarch ${yr.length === 2 ? `20${yr}` : yr}`
+  ));
+
+  // Cambridge syllabus/component slash notation: "9709/12" -> "9709 12", "0625/42" -> "0625 42"
+  q = q.replace(/\b(\d{4})[/](\d{1,2})\b/g, '$1 $2');
+
+  // Cambridge native series+year shorthands: "s24" -> "s24 mayjune 2024", "w23" -> "w23 octnov 2023", "m25"/"fm25" -> "m25 febmarch 2025"
+  // Safe for Edexcel M1-M3 and S1-S3 because those have 1 digit while series codes have 2 digits (02..29)
+  q = q.replace(/\b(?:fm|f\/m)[-_]?([012]\d)\b/g, (_, yy) => `m${yy} febmarch 20${yy}`);
+  q = q.replace(/\b(?:mj|m\/j)[-_]?([012]\d)\b/g, (_, yy) => `s${yy} mayjune 20${yy}`);
+  q = q.replace(/\b(?:on|o\/n)[-_]?([012]\d)\b/g, (_, yy) => `w${yy} octnov 20${yy}`);
+  q = q.replace(/\b([msw])(0[2-9]|[12]\d)\b/g, (_, ch, yy) => {
+    const sess = ch === 'm' ? 'febmarch' : ch === 's' ? 'mayjune' : 'octnov';
+    return `${ch}${yy} ${sess} 20${yy}`;
+  });
+
   // Strip Edexcel cover-sheet component numbers ("WMA11/01" -> "wma11", "4MA1/02HR" -> "4ma1 2hr")
   q = q.replace(/\b([a-z]{2,3}\d{2}|6[a-z]{2}\d{2})[/_\s-]+0[1-9]\b/g, '$1');
   q = q.replace(/\b([a-z]{2,3}\d{2}|4[a-z]{1,3}\d|6[a-z]{2}\d{2})[/_\s-]+0?([1-4][hrfa]{1,2})\b/g, '$1 $2');
   q = q.replace(/\b(4[a-z]{1,3}\d)[/_\s-]+0([1-4])\b/g, '$1 p$2');
 
-  // Rejoin accidentally spaced course codes ("wma 11" -> "wma11", "4ma 1" -> "4ma1", "6bi 01" -> "6bi01")
+  // Rejoin accidentally spaced Edexcel course codes ("wma 11" -> "wma11", "4ma 1" -> "4ma1", "6bi 01" -> "6bi01")
   q = q.replace(/\b(w[a-z]{2}|6[a-z]{2})\s+(\d{2}[ar]?)\b/g, '$1$2');
   q = q.replace(/\b(4[a-z]{1,3})\s+(\d[hf]?r?)\b/g, '$1$2');
 
-  // Split joined session+year or code+year ("jan26" -> "jan 26", "wma11jan25" -> "wma11 jan 25")
-  q = q.replace(/([a-z0-9]{2,})(jan(?:uary)?|feb(?:ruary)?|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?|autumn|winter)(\d{2}|\d{4})\b/gi, '$1 $2 $3');
-  q = q.replace(/\b(jan(?:uary)?|feb(?:ruary)?|mar|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?|autumn|winter)[-_\s/]*(\d{2}|\d{4})\b/g, '$1 $2');
+  // Split joined session+year or code+year ("jan26" -> "jan 2026", "wma11jan25" -> "wma11 jan 2025")
+  q = q.replace(/([a-z0-9]{2,})(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?|autumn|winter)(\d{2}|\d{4})\b/gi, (_, pre, mo, yr) => (
+    `${pre} ${mo} ${yr.length === 2 ? `20${yr}` : yr}`
+  ));
+  q = q.replace(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|may|jun(?:e)?|summer|oct(?:ober)?|nov(?:ember)?|autumn|winter|mayjune|octnov|febmarch)[-_\s/]*(\d{2}|\d{4})\b/g, (_, mo, yr) => (
+    `${mo} ${yr.length === 2 && parseInt(yr, 10) >= 3 && parseInt(yr, 10) <= 29 ? `20${yr}` : yr}`
+  ));
 
-  // Normalize common multi-word unit shorthands ("unit 1" -> "u1", "paper 1r" -> "p1r", "mech 1" -> "m1", "pure mathematics 3" -> "wma13")
+  // Normalize board-neutral multi-word unit/paper shorthands
   q = q.replace(/\bunit\s*([1-6])\b/g, 'u$1');
-  q = q.replace(/\bpaper\s*([1-4][ar]?)\b/g, 'p$1');
+  q = q.replace(/\bpaper\s*([1-7][ar]?)\b/g, 'p$1');
+  q = q.replace(/\bvariant\s*([1-6])\b/g, 'v$1');
   q = q.replace(/\bfurther\s+(?:pure(?:\s+math(?:ematics|s)?)?|math(?:ematics|s)?)\s*(?:f?p|u)?([1-3])([ar])?\b/g, (_, d, v) => (v ? `fp${d} ${v}` : `fp${d}`));
-  q = q.replace(/\bpure(?:\s+math(?:ematics|s)?)?\s*(?:p|u)?([1-4])([ar])?\b/g, (_, d, v) => (v ? `wma1${d} ${v}` : `wma1${d}`));
+  // Pure Mathematics 1..4 -> board-neutral pure1..pure4 (matches both Edexcel WMA11-14 and Cambridge 9709 P1-P3!)
+  q = q.replace(/\bpure(?:\s+math(?:ematics|s)?)?\s*(?:p|u)?([1-4])([ar])?\b/g, (_, d, v) => (v ? `pure${d} ${v}` : `pure${d}`));
   q = q.replace(/\b(?:mechanics|mech)\s*(?:m|p|u)?([1-3])([ar])?\b/g, (_, d, v) => (v ? `m${d} ${v}` : `m${d}`));
   q = q.replace(/\b(?:statistics|stats?)\s*(?:s|p|u)?([1-3])([ar])?\b/g, (_, d, v) => (v ? `s${d} ${v}` : `s${d}`));
   q = q.replace(/\bdecision(?:\s+math(?:ematics|s)?)?\s*(?:d|p|u)?1([ar])?\b/g, (_, v) => (v ? `d1 ${v}` : 'd1'));
   q = q.replace(/\bcore\s+(?:math(?:ematics|s)?\s*)?(?:c|p|u)?([1-4]|12|34)([ar])?\b/g, (_, d, v) => (v ? `c${d} ${v}` : `c${d}`));
+  q = q.replace(/\bfeb(?:ruary)?[-_\s/]+mar(?:ch)?\b/g, 'febmarch');
   q = q.replace(/\bmay[-_\s/]+june?\b/g, 'mayjune');
-  q = q.replace(/\boct[-_\s/]+nov(?:ember)?\b/g, 'octnov');
+  q = q.replace(/\boct(?:ober)?[-_\s/]+nov(?:ember)?\b/g, 'octnov');
+  q = q.replace(/\bo[-_\s]+levels?\b/g, 'olevel');
+  q = q.replace(/\ba[-_\s]+levels?\b/g, 'alevel');
+  q = q.replace(/\bgrade\s+thresholds?\b/g, 'gt');
 
   return q.trim();
 }
@@ -483,7 +641,7 @@ function getVocabSet(catalogVocab) {
  * Parse a user search query into structured positive groups, exact phrases,
  * negative `-exclusions`, typo corrections, and a "Did you mean" candidate.
  */
-export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
+export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB, { activeBoard = '' } = {}) {
   const trimmed = String(rawQuery || '').trim();
   if (!trimmed) {
     return { hasQuery: false, groups: [], exclusions: [], corrections: [], didYouMean: '' };
@@ -508,6 +666,14 @@ export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
   const normalized = normalizeQueryString(remaining).replace(/[,/;•—–_()-]+/g, ' ').trim();
   const rawTokens = normalized ? normalized.split(/\s+/).filter(Boolean) : [];
 
+  // Detect Cambridge query context so 2-digit component codes (12, 22, 33, 42) never expand into 2012/2022!
+  const hasCambridgeSyllabusTok = rawTokens.some((t) => /^\d{4}$/.test(t) && CAMBRIDGE_ALL_CODES.has(t));
+  const hasCambridgeWord = rawTokens.some((t) => t === 'cambridge' || t === 'caie' || t === 'cie' || t === 'olevel' || t === 'febmarch');
+  const isCambridgeContext = activeBoard === 'cambridge' || hasCambridgeSyllabusTok || hasCambridgeWord;
+
+  // Count non-syllabus year tokens so "2010 s23 qp 12" recognizes 2023 as year and 2010 as O-Level Literature syllabus
+  const otherYearCount = rawTokens.filter((t) => /^(?:199\d|20[0-3]\d)$/.test(t) && !CAMBRIDGE_ALL_CODES.has(t)).length;
+
   const groups = [];
   const corrections = [];
 
@@ -527,11 +693,13 @@ export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
   for (let i = 0; i < rawTokens.length; i++) {
     let tok = rawTokens[i];
     const rawOriginal = tok;
+    const prevTok = i > 0 ? rawTokens[i - 1] : '';
 
-    // Expand 2-digit years ("26" -> "2026", "04" -> "2004")
+    // Expand standalone 2-digit years ("26" -> "2026") ONLY when NOT a Cambridge component code (e.g. "0625 22", "9709 12")
     if (/^\d{2}$/.test(tok)) {
       const yrNum = parseInt(tok, 10);
-      if (yrNum >= 3 && yrNum <= 29) {
+      const precededByMonth = MONTH_NAME_SET.has(prevTok);
+      if (yrNum >= 3 && yrNum <= 29 && (!isCambridgeContext || precededByMonth)) {
         tok = String(2000 + yrNum);
       }
     }
@@ -542,11 +710,15 @@ export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
 
     const isNumeric = /^\d+$/.test(tok);
     const hasDigit = /\d/.test(tok);
-    const isKnownWordOrCode = Boolean(COMPILED_SYNONYMS[tok] || STATIC_SEARCH_VOCAB_SET.has(tok) || vocabSet.has(tok));
+    const isKnownWordOrCode = Boolean(
+      COMPILED_SYNONYMS[tok] ||
+      STATIC_SEARCH_VOCAB_SET.has(tok) ||
+      vocabSet.has(tok) ||
+      CAMBRIDGE_ALL_CODES.has(tok)
+    );
     let bestCorrection = null;
 
     if (!isNumeric && tok.length === 3 && !isKnownWordOrCode) {
-      // Short 3-char academic/session typo tolerance (e.g. "boi" -> "bio", "jna" -> "jan")
       SHORT_VOCAB_3CHAR.forEach((word) => {
         if (word === tok) return;
         const dist = damerauLevenshtein(tok, word, 1);
@@ -572,12 +744,9 @@ export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
           addSynonymsForKey(word, altsMap, 0, true);
           prefixMatches++;
         } else if (!isKnownWordOrCode && Math.abs(word.length - tok.length) <= maxEdits) {
-          // Preserve exact digits inside paper/unit codes so "4ph1" never mutates to "4ch1" or "wph11" to "wph12"
           if (hasDigit) {
             if (!/\d/.test(word) || word.replace(/\D/g, '') !== tokDigits) continue;
           }
-          // For 1-edit word typos allow mistyped/dropped first char ("hysics", "conomics");
-          // for 2-edit typos require anchored prefix or swap for high precision.
           const firstAnchored =
             word[0] === tok[0] ||
             (word[0] === tok[1] && word[1] === tok[0]) ||
@@ -609,18 +778,16 @@ export function parseSearchQuery(rawQuery, catalogVocab = STATIC_SEARCH_VOCAB) {
       corrections.push({ from: rawOriginal, to: bestCorrection.word, dist: bestCorrection.dist });
     }
 
-    const isYear = /^\d{4}$/.test(tok);
-    const isCode = /\d/.test(tok) && !isYear;
+    const isCieSyllabus = /^\d{4}$/.test(tok) && CAMBRIDGE_ALL_CODES.has(tok) && !(tok === '2010' && !isCambridgeContext && otherYearCount === 0);
+    const isYear = !isCieSyllabus && /^(?:199\d|20[0-3]\d)$/.test(tok);
+    const isCode = isCieSyllabus || (/\d/.test(tok) && !isYear);
     const isGeneric = GENERIC_QUERY_WORDS.has(tok);
     const isSession = Boolean(
-      SESSION_SYNONYMS_BY_MONTH.mayJune.includes(tok) ||
-      SESSION_SYNONYMS_BY_MONTH.octNov.includes(tok) ||
-      SESSION_SYNONYMS_BY_MONTH.janFeb.includes(tok) ||
-      tok === 'mayjune' ||
-      tok === 'octnov'
+      MONTH_NAME_SET.has(tok) ||
+      /^[msw](?:0[2-9]|[12]\d)$/.test(tok)
     );
     const isSubjectOrTopic = !isYear && !isGeneric && !isSession && (
-      Boolean(COMPILED_SYNONYMS[tok] || IGCSE_SUBJECT_BY_CODE[tok]) ||
+      Boolean(COMPILED_SYNONYMS[tok] || IGCSE_SUBJECT_BY_CODE[tok] || isCieSyllabus) ||
       tok.length >= 3
     );
 
@@ -660,7 +827,6 @@ function phraseContainsWithoutFurtherPrefix(haystack, phraseVal) {
   }
   let idx = haystack.indexOf(needle);
   while (idx !== -1) {
-    // Reject "... further pure mathematics 1 ..." when searching strictly for "pure mathematics 1" (P1/WMA11)
     const before = haystack.slice(Math.max(0, idx - 8), idx);
     if (!before.endsWith(' further')) return true;
     idx = haystack.indexOf(needle, idx + 1);
@@ -679,7 +845,7 @@ function itemMatchesAlt(searchData, alt, allowPrefix = false) {
   if (searchData.highSet.has(val)) return 'high_exact';
   if (searchData.metaSet.has(val)) return 'meta_exact';
   if (searchData.tokenSet.has(val)) return 'body_exact';
-  if (allowPrefix && val.length >= 3 && searchData.wordStr.includes(` ${val}`)) {
+  if (allowPrefix && val.length >= 3 && !/^\d+$/.test(val) && searchData.wordStr.includes(` ${val}`)) {
     return 'word_prefix';
   }
   return null;
@@ -701,7 +867,6 @@ function scoreGroupMatch(item, searchData, group) {
     else if (hitTier === 'body_exact') s = 8;
     else if (hitTier === 'word_prefix') s = 6;
 
-    // Exact field boosts (including canonical unitCode equivalences like WMA13 <-> P3, WME01 <-> M1)
     if (alt.type === 'tok') {
       const uc = item.unitCode ? item.unitCode.toLowerCase() : '';
       const ucBase = uc.replace(/[ar]$/, '');
@@ -712,6 +877,7 @@ function scoreGroupMatch(item, searchData, group) {
         (ITEM_CODE_EQUIV[ucBase] && ITEM_CODE_EQUIV[ucBase].includes(alt.val))
       );
       if (isExactUnitCode) s += 16;
+      if (item.syllabusCode && item.syllabusCode === alt.val) s += 14;
       if (item.subject && item.subject.toLowerCase() === alt.val) s += 10;
       if (item.year && String(item.year) === alt.val) s += 8;
       const isPrimaryOrEquiv =
@@ -770,16 +936,15 @@ export function executeSmartSearch(files, parsedQuery, { isUnified = true } = {}
   const FURTHER_QUERY_KEYS = new Set([
     'further', 'fmath', 'furthermath', 'furthermaths',
     'fp1', 'fp2', 'fp3', 'f1', 'f2', 'f3',
-    'wfm01', 'wfm02', 'wfm03', '4pm1', '4pm0'
+    'wfm01', 'wfm02', 'wfm03', '4pm1', '4pm0', '9231'
   ]);
-  const hasPureQueryToken = groups.some((g) => g.primary === 'pure' || /^wma1[1-4]$/.test(g.primary));
+  const hasPureQueryToken = groups.some((g) => g.primary === 'pure' || /^pure[1-4]$/.test(g.primary) || /^wma1[1-4]$/.test(g.primary));
   const hasFurtherQueryToken = groups.some((g) => FURTHER_QUERY_KEYS.has(g.primary));
   const strictMatched = [];
   const strictRelevance = new WeakMap();
   const groupHitCounts = new Array(groups.length).fill(0);
   let strictTypoUsed = false;
 
-  // Candidate partial fallback buckets
   const partialCandidates = [];
 
   for (let k = 0; k < files.length; k++) {
@@ -832,7 +997,6 @@ export function executeSmartSearch(files, parsedQuery, { isUnified = true } = {}
     };
   }
 
-  // Strict AND had 0 hits: compute relaxed partial matches prioritizing specific anchors
   const hasSpecificGroups = groups.some((g) => g.isSpecific);
   const missingTerms = [];
   for (let i = 0; i < groups.length; i++) {
@@ -855,7 +1019,6 @@ export function executeSmartSearch(files, parsedQuery, { isUnified = true } = {}
     partialMatched.push(cand.item);
   }
 
-  // If minMatched >= 2 was still too strict on 3+ word queries, relax to any multi-specific anchor
   if (partialMatched.length === 0 && partialCandidates.length > 0) {
     for (let p = 0; p < partialCandidates.length; p++) {
       const cand = partialCandidates[p];

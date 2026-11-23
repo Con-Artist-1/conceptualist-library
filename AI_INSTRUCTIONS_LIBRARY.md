@@ -6,19 +6,23 @@ Welcome! If you are an AI assistant tasked with working on the curated document 
 
 ## 1. Directory Structure
 
-The library is an independent study archive indexing **100% Pearson Edexcel** exam resources containing **19,912 archived files** (**16,051 deduplicated unique documents**) across **19 IAL subjects** and **43 IGCSE subjects** covering **January 2003 – June 2026**.
+The library is an independent **strictly international exam-board** study archive indexing **Pearson Edexcel International** and **Cambridge International (CAIE)** resources containing **22,891 archived files** (**19,030 deduplicated unique documents**) across **82 international subjects**: **19 Edexcel IAL**, **43 Edexcel IGCSE** (`19,912` files / `16,051` unique, Jan 2003 – Jun 2026), **6 Cambridge AS & A Level**, **7 Cambridge IGCSE**, and **7 Cambridge O Level** (`2,979` files / `2,979` unique, Feb/March 2024 – May/June 2026). UK domestic boards (OCR, UK AQA, UK Edexcel GCE/GCSE, WJEC/Eduqas) are strictly excluded.
 
 **Main Root Folders:**
 1. **`Past Papers\IAL`**: Contains Edexcel International A-Level (IAL) and legacy GCE Maths papers across 19 subjects (strictly excludes UK GCE non-Math specs and pre-launch years).
 2. **`Past Papers\IGCSE`**: Contains Edexcel International GCSE (9–1) Modular (`4W*`), Linear (`4*`), and Legacy (`4*0` / 4-digit) papers across 43 subjects (including `Sciences (Double Award)` `B`/`C`/`P` papers and merged `Bangla`/`Bengali`).
-3. **`IAL Books`**: Contains Edexcel IAL student textbooks, lab books, and solution banks sorted by subject.
-4. **`IGCSE Books`**: Contains Edexcel IGCSE (9–1) student textbooks sorted by subject.
+3. **`Past Papers\Cambridge`**: Contains strictly international Cambridge Assessment International Education (CAIE) papers isolated under `A-Level\`, `IGCSE\`, and `O-Level\` (`<Subject (4-digit Code)>\<Year>\<Feb-March|May-June|Oct-Nov>\<canonicalFilename>`), unifying 9–1 equivalents (`09xx`/`71xx`) onto canonical A\*–G syllabuses and archiving `qp`, `ms`, `gt`, `er`, `in`, `ci`, `sf`, and `tn` files.
+4. **`IAL Books`**: Contains Edexcel IAL student textbooks, lab books, and solution banks sorted by subject.
+5. **`IGCSE Books`**: Contains Edexcel IGCSE (9–1) student textbooks sorted by subject.
+6. **`Cambridge Books`**: Reserved root directory for Cambridge International textbooks (`A-Level`, `IGCSE`, `O-Level`), already allowlisted in `generate-index.js`, `sync-hf.js`, and `vite.config.js`.
 
 **Typical Hierarchy:**
 - `Past Papers \ IAL \ <Subject> \ <Unit or Year> \ <Session> \ <File.pdf>`
 - `Past Papers \ IGCSE \ <Subject> \ <Year> \ <Session> \ <File.pdf>`
+- `Past Papers \ Cambridge \ <A-Level|IGCSE|O-Level> \ <Subject (Code)> \ <Year> \ <Feb-March|May-June|Oct-Nov> \ <Code_SeriesYY_Type[_Comp].pdf>`
 - `IAL Books \ <Subject> \ <Book.pdf>`
 - `IGCSE Books \ <Subject> \ <Book.pdf>`
+- `Cambridge Books \ <A-Level|IGCSE|O-Level> \ <Subject (Code)> \ <Book.pdf>`
 
 ---
 
@@ -148,20 +152,20 @@ Core Conceptualist Systems contributors listed on `/about`:
 
 ## 8. Rules for Modifying this Library & App
 
-1. **Do not break folder structures.** Stick to `Past Papers\IAL`, `Past Papers\IGCSE`, `IAL Books`, and `IGCSE Books`.
-2. **Independent Archive & Non-Affiliation Copy.** NEVER claim the site, papers, or books are "Official Pearson" or "Official Edexcel" in UI headings, badges, SEO titles/descriptions, JSON-LD, or docs. Keep the **Not affiliated with Pearson or Edexcel** disclaimer intact on Home, Footer, and `/about`.
-3. **Clean file names & Large-PDF `/ObjStm` prep.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing. All 19,476 `.pdf` files in the archive are verified valid PDFs (`%PDF-` header + `%%EOF` trailer + zero trailing HTML), and large `>= 5 MB` PDFs are linearized with `qpdf --linearize --object-streams=generate` before `generate-index.js`, `sync-hf.js`, and `upload-live-index-hf.js`.
+1. **Do not break folder structures.** Stick to `Past Papers\IAL`, `Past Papers\IGCSE`, `Past Papers\Cambridge\{A-Level,IGCSE,O-Level}`, `IAL Books`, `IGCSE Books`, and `Cambridge Books`.
+2. **Independent Archive & Non-Affiliation Copy.** NEVER claim the site, papers, or books are "Official Pearson", "Official Edexcel", or "Official Cambridge" in UI headings, badges, SEO titles/descriptions, JSON-LD, or docs. Keep the **Not affiliated with Pearson plc, Edexcel, or Cambridge University Press & Assessment** disclaimer intact on Home, Footer, and `/about`.
+3. **Clean file names & Large-PDF `/ObjStm` prep.** Strip junk suffixes (`_1700000000.pdf`, aggregator prefixes) before indexing. All `.pdf` files in the archive are verified valid PDFs (`%PDF-` header + `%%EOF` trailer + zero trailing HTML), and large `>= 5 MB` PDFs are linearized with `qpdf --linearize --object-streams=generate` before `generate-index.js`, `sync-hf.js`, and `upload-live-index-hf.js`.
 4. **Strict script hygiene.** Keep no scripts at repo root and strictly retain only the 9 core scripts in `search-app/scripts/` (`build.js`, `deploy-vercel.js`, `generate-index.js`, `index-audio-subtitles.js`, `prerender-seo.js`, `push-github.js`, `sync-hf.js`, `sync-sources.js`, `upload-live-index-hf.js`). Store temporary/verification scripts outside the repo (AppData scratch folder).
 5. **Use Forward Slashes (`/`) in JSON.** Windows backslashes break static builds and Hugging Face URL resolution.
 6. **Node Invocations:** Invoke Node scripts on Windows via Antigravity IDE's Electron runtime, piping `cmd /c "... 2>&1" | Write-Output` from PowerShell so GUI-subsystem stdout/stderr is captured cleanly:
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
-7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors with `"no-undef": "error"` in `.oxlintrc.json`) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, `/papers` Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v7.3.3` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
+7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors with `"no-undef": "error"` in `.oxlintrc.json`) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, Board Switcher (`/`, `/cambridge`) Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.0.0` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
    - **Deploy & IndexNow:** Always run `scripts/deploy-vercel.js`, wait for `=== Production Deployment READY! ===` + `[IndexNow] Submitted ... canonical URLs`, and verify live deployment on `https://www.conceptualist.uk`.
 
-Enjoy working with this independent 19,912-file (16,051-unique-record) Edexcel study archive!
+Enjoy working with this independent 22,891-file (19,030-unique-record) international Edexcel & Cambridge study archive!

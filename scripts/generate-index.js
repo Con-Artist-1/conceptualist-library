@@ -12,17 +12,31 @@ import {
   compareUnitLabels
 } from '../src/unitParser.js';
 import { getBookMetadata } from '../src/bookCatalog.js';
+import {
+  ALL_CURRICULUMS,
+  getBoardForSpec,
+  getCurriculumForSpec,
+  isBookCategory,
+  isCambridgePath,
+  isCambridgeSpec
+} from '../src/data/boards.js';
+import { detectCambridgeSpec } from '../src/parsers/cambridgeParser.js';
+import { extractSyllabusCodeFromSubject } from '../src/data/cambridgeCatalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const TARGET_DIR = path.resolve(__dirname, '..', '..'); // 'e:\The Library'
 const EXCLUDE_DIRS = ['search-app', 'node_modules', '.git', '.scripts', 'ScriptFiles', '.vercel', 'dist'];
-const ALLOWED_ROOT_DIRS = ['Past Papers', 'IAL Books', 'IGCSE Books'];
+const ALLOWED_ROOT_DIRS = ['Past Papers', 'IAL Books', 'IGCSE Books', 'Cambridge Books'];
 
 const CATEGORY_PAST_PAPERS = 'Past Papers';
 const CATEGORY_BOOKS = 'IAL Books';
 const CATEGORY_IGCSE = 'IGCSE Books';
+const CATEGORY_CIE_BOOKS = 'Cambridge Books';
+const CATEGORY_CIE_AL_BOOKS = 'Cambridge AL Books';
+const CATEGORY_CIE_IGCSE_BOOKS = 'Cambridge IGCSE Books';
+const CATEGORY_CIE_OL_BOOKS = 'Cambridge OL Books';
 
 function isIgnoredArtifactFile(fileName) {
   // Exclude known third-party aggregator watermark misfiles (e.g. an IGCSE 4bs1 download inside IAL English Language)
@@ -30,6 +44,7 @@ function isIgnoredArtifactFile(fileName) {
 }
 
 function extractSpec(pathStr) {
+  if (isCambridgePath(pathStr)) return detectCambridgeSpec(pathStr);
   if (pathStr.includes('IGCSE')) return 'IGCSE';
   if (pathStr.includes('IAL')) return 'IAL';
   return 'IAL';
@@ -39,6 +54,18 @@ function extractCategory(pathStr) {
   if (pathStr.startsWith('Past Papers')) return CATEGORY_PAST_PAPERS;
   if (pathStr.startsWith('IGCSE Books')) return CATEGORY_IGCSE;
   if (pathStr.startsWith('IAL Books') || pathStr.startsWith('Books')) return CATEGORY_BOOKS;
+  if (pathStr.startsWith('Cambridge Books')) {
+    if (/^Cambridge Books\/(?:A-Level|AS[-_\s]*A[-_\s]*Level|CIE-AL)\//i.test(pathStr)) {
+      return CATEGORY_CIE_AL_BOOKS;
+    }
+    if (/^Cambridge Books\/(?:O-Level|O[-_\s]*Level|CIE-OL)\//i.test(pathStr)) {
+      return CATEGORY_CIE_OL_BOOKS;
+    }
+    if (/^Cambridge Books\/(?:IGCSE|CIE-IGCSE)\//i.test(pathStr)) {
+      return CATEGORY_CIE_IGCSE_BOOKS;
+    }
+    return CATEGORY_CIE_BOOKS;
+  }
   return 'Other';
 }
 
@@ -48,7 +75,7 @@ function buildTree(dirPath, rootPath) {
     name,
     path: path.relative(rootPath, dirPath).replace(/\\/g, '/'),
     type: 'directory',
-    children: [],
+    children: []
   };
 
   try {
@@ -74,12 +101,15 @@ function buildTree(dirPath, rootPath) {
         const relPath = relativePath;
         const category = extractCategory(relPath);
         const spec = extractSpec(relPath);
-        const subject = detectSubject(relPath);
-        const sessionDate = extractSessionDate(relPath);
-        const { unitCode, unitName } = category === CATEGORY_PAST_PAPERS
+        const subject = detectSubject(relPath, spec);
+        const sessionDate = extractSessionDate(relPath, spec);
+        const unitInfo = category === CATEGORY_PAST_PAPERS
           ? extractUnitInfo(relPath, subject, spec)
-          : { unitCode: null, unitName: null };
-        const bookMeta = (category === CATEGORY_BOOKS || category === CATEGORY_IGCSE)
+          : { unitCode: null, unitName: null, syllabusCode: isCambridgeSpec(spec) ? extractSyllabusCodeFromSubject(subject) : null };
+        const { unitCode, unitName } = unitInfo;
+        const syllabusCode = unitInfo.syllabusCode || (isCambridgeSpec(spec) ? extractSyllabusCodeFromSubject(subject) : null);
+
+        const bookMeta = isBookCategory(category)
           ? getBookMetadata(relPath)
           : null;
         const ext = path.extname(item.name);
@@ -89,19 +119,20 @@ function buildTree(dirPath, rootPath) {
           ? 'Specimen'
           : null;
 
-        const computedYear = bookMeta?.year || (sessionDate ? sessionDate.year : extractYear(relPath));
+        const computedYear = bookMeta?.year || (sessionDate ? sessionDate.year : extractYear(relPath, spec));
         node.children.push({
           name: displayFileName,
           path: relPath,
           size: fs.statSync(fullPath).size,
           subject,
-          docType: detectDocType(item.name, relPath),
+          docType: detectDocType(item.name, relPath, spec),
           year: computedYear,
           session: sessionDate ? sessionDate.label : fallbackSession,
           sortKey: sessionDate ? sessionDate.sortKey : (computedYear ? computedYear * 100 : 200000),
           unitCode,
           unitName,
           spec,
+          syllabusCode: syllabusCode || null,
           category
         });
       }
@@ -130,12 +161,21 @@ function extractFlatFiles(treeNode, filesList = []) {
   return filesList;
 }
 
+function computeCoverageString(filesSubset, fallback = 'January 2003 – June 2026') {
+  const dates = filesSubset
+    .map((f) => extractSessionDate(f.path, f.spec))
+    .filter(Boolean)
+    .sort((a, b) => a.sortKey - b.sortKey);
+  if (dates.length === 0) return fallback;
+  return `${dates[0].label} – ${dates[dates.length - 1].label}`;
+}
+
 function computeCoverageMap(filesSubset, subjectList) {
   const cov = {};
   for (const subj of subjectList) {
-    const subjFiles = filesSubset.filter(f => f.subject === subj);
+    const subjFiles = filesSubset.filter((f) => f.subject === subj);
     const subjDates = subjFiles
-      .map(f => extractSessionDate(f.path))
+      .map((f) => extractSessionDate(f.path, f.spec))
       .filter(Boolean)
       .sort((a, b) => a.sortKey - b.sortKey);
 
@@ -179,7 +219,7 @@ function deduplicateFiles(filesList) {
   }
 
   return Array.from(map.values()).map(({ canonical, variant, allPaths }) => {
-    const alts = allPaths.filter(p => p !== canonical.path);
+    const alts = allPaths.filter((p) => p !== canonical.path);
     return {
       ...canonical,
       variant,
@@ -189,16 +229,18 @@ function deduplicateFiles(filesList) {
   });
 }
 
-// Precompute instant 0ms Wizard metadata (Subject -> Units -> Years & Counts)
+// Precompute instant 0ms Wizard metadata across all 5 international curriculums (Subject -> Units -> Years & Counts)
 function buildWizardMeta(dedupedList) {
-  const wizard = {
-    'Edexcel IAL': {},
-    'Edexcel IGCSE': {}
-  };
+  const wizard = {};
+  for (const curr of ALL_CURRICULUMS) {
+    wizard[curr] = {};
+  }
+
   for (const f of dedupedList) {
-    const curr = f.spec === 'IGCSE' ? 'Edexcel IGCSE' : 'Edexcel IAL';
+    const curr = getCurriculumForSpec(f.spec, f.category);
     const subj = f.subject;
     if (!subj) continue;
+    if (!wizard[curr]) wizard[curr] = {};
     if (!wizard[curr][subj]) {
       wizard[curr][subj] = { totalFiles: 0, units: {}, allYears: new Set() };
     }
@@ -230,61 +272,106 @@ function buildWizardMeta(dedupedList) {
   return wizard;
 }
 
-console.log('Generating index for', TARGET_DIR);
+const KEYS = [
+  'name', 'path', 'size', 'subject', 'docType', 'year', 'session', 'sortKey',
+  'unitCode', 'unitName', 'spec', 'category', 'variant', 'cleanUnitLabel', 'altPaths', 'syllabusCode'
+];
+
+function serializeTuples(list) {
+  return list.map((f) => [
+    f.name,
+    f.path,
+    f.size,
+    f.subject,
+    f.docType,
+    f.year,
+    f.session,
+    f.sortKey,
+    f.unitCode,
+    f.unitName,
+    f.spec,
+    f.category,
+    f.variant,
+    f.cleanUnitLabel,
+    f.altPaths,
+    f.syllabusCode || null
+  ]);
+}
+
+function buildCompactAllowlist(dedupedList, generatedAt) {
+  const validPaperKeys = new Set();
+  const validAudioPaths = new Set();
+  const validAudioSittings = new Set();
+
+  for (const f of dedupedList) {
+    if (f.path) validPaperKeys.add(f.path);
+    if (f.spec && f.subject && f.session) {
+      const sittingKey = `${f.spec}|${f.subject}|${f.unitCode || ''}|${f.variant || ''}|${f.session}`;
+      validPaperKeys.add(sittingKey);
+      if (f.docType === 'AUD') validAudioSittings.add(sittingKey);
+    }
+    if (f.docType === 'AUD') {
+      if (f.path) validAudioPaths.add(f.path);
+      if (Array.isArray(f.altPaths)) {
+        for (const ap of f.altPaths) {
+          if (typeof ap === 'string' && ap) validAudioPaths.add(ap);
+        }
+      }
+    }
+  }
+
+  return {
+    generatedAt,
+    paperKeys: Array.from(validPaperKeys),
+    audioPaths: Array.from(validAudioPaths),
+    audioSittings: Array.from(validAudioSittings)
+  };
+}
+
+console.log('Generating multi-board index for', TARGET_DIR);
 const tree = buildTree(TARGET_DIR, TARGET_DIR);
 tree.name = 'The Library';
 
 const flatFiles = extractFlatFiles(tree);
 const dedupedFiles = deduplicateFiles(flatFiles);
 
-const allSubjects = [...new Set(dedupedFiles.map(f => f.subject).filter(Boolean))].sort();
-const ialSubjects = [...new Set(dedupedFiles.filter(f => f.spec === 'IAL').map(f => f.subject).filter(Boolean))].sort();
-const igcseSubjects = [...new Set(dedupedFiles.filter(f => f.spec === 'IGCSE').map(f => f.subject).filter(Boolean))].sort();
+// Partition by board & Cambridge level
+const edexcelFlat = flatFiles.filter((f) => getBoardForSpec(f.spec) === 'edexcel');
+const cambridgeFlat = flatFiles.filter((f) => getBoardForSpec(f.spec) === 'cambridge');
+
+const edexcelDeduped = dedupedFiles.filter((f) => getBoardForSpec(f.spec) === 'edexcel');
+const cambridgeDeduped = dedupedFiles.filter((f) => getBoardForSpec(f.spec) === 'cambridge');
+const cieAlDeduped = cambridgeDeduped.filter((f) => f.spec === 'CIE-AL');
+const cieIgcseDeduped = cambridgeDeduped.filter((f) => f.spec === 'CIE-IGCSE');
+const cieOlDeduped = cambridgeDeduped.filter((f) => f.spec === 'CIE-OL');
+
+const uniqueSorted = (arr) => [...new Set(arr.filter(Boolean))].sort();
+
+const allSubjects = uniqueSorted(dedupedFiles.map((f) => f.subject));
+const ialSubjects = uniqueSorted(edexcelDeduped.filter((f) => f.spec === 'IAL').map((f) => f.subject));
+const igcseSubjects = uniqueSorted(edexcelDeduped.filter((f) => f.spec === 'IGCSE').map((f) => f.subject));
+const cieAlSubjects = uniqueSorted(cieAlDeduped.map((f) => f.subject));
+const cieIgcseSubjects = uniqueSorted(cieIgcseDeduped.map((f) => f.subject));
+const cieOlSubjects = uniqueSorted(cieOlDeduped.map((f) => f.subject));
 
 const subjectCoverage = computeCoverageMap(dedupedFiles, allSubjects);
-const ialSubjectCoverage = computeCoverageMap(dedupedFiles.filter(f => f.spec === 'IAL'), ialSubjects);
-const igcseSubjectCoverage = computeCoverageMap(dedupedFiles.filter(f => f.spec === 'IGCSE'), igcseSubjects);
+const ialSubjectCoverage = computeCoverageMap(edexcelDeduped.filter((f) => f.spec === 'IAL'), ialSubjects);
+const igcseSubjectCoverage = computeCoverageMap(edexcelDeduped.filter((f) => f.spec === 'IGCSE'), igcseSubjects);
+const cieAlSubjectCoverage = computeCoverageMap(cieAlDeduped, cieAlSubjects);
+const cieIgcseSubjectCoverage = computeCoverageMap(cieIgcseDeduped, cieIgcseSubjects);
+const cieOlSubjectCoverage = computeCoverageMap(cieOlDeduped, cieOlSubjects);
 
 const wizardMeta = buildWizardMeta(dedupedFiles);
+const generatedAt = new Date().toISOString();
 
-const dates = flatFiles
-  .map(f => extractSessionDate(f.path))
-  .filter(Boolean)
-  .sort((a, b) => a.sortKey - b.sortKey);
+const coverageRangeStr = computeCoverageString(flatFiles, 'January 2003 – June 2026');
+const edexcelCoverageStr = computeCoverageString(edexcelFlat, 'January 2003 – June 2026');
+const cambridgeCoverageStr = computeCoverageString(cambridgeFlat, 'May/June 2018 – Oct/Nov 2025');
 
-const minDate = dates[0];
-const maxDate = dates[dates.length - 1];
-
-const coverageRangeStr = minDate && maxDate
-  ? `${minDate.label} – ${maxDate.label}`
-  : 'January 2003 – June 2026';
-
-const keys = [
-  'name', 'path', 'size', 'subject', 'docType', 'year', 'session', 'sortKey',
-  'unitCode', 'unitName', 'spec', 'category', 'variant', 'cleanUnitLabel', 'altPaths'
-];
-const files = dedupedFiles.map(f => [
-  f.name,
-  f.path,
-  f.size,
-  f.subject,
-  f.docType,
-  f.year,
-  f.session,
-  f.sortKey,
-  f.unitCode,
-  f.unitName,
-  f.spec,
-  f.category,
-  f.variant,
-  f.cleanUnitLabel,
-  f.altPaths
-]);
-
-const isBookCategory = (cat) => cat === CATEGORY_BOOKS || cat === CATEGORY_IGCSE || cat === 'Books';
 const totalBooks = dedupedFiles.filter((f) => isBookCategory(f.category)).length;
-const ialBooks = dedupedFiles.filter((f) => f.category === CATEGORY_BOOKS).length;
-const igcseBooks = dedupedFiles.filter((f) => f.category === CATEGORY_IGCSE).length;
+const ialBooks = edexcelDeduped.filter((f) => f.category === CATEGORY_BOOKS).length;
+const igcseBooks = edexcelDeduped.filter((f) => f.category === CATEGORY_IGCSE).length;
+const cambridgeBooks = cambridgeDeduped.filter((f) => isBookCategory(f.category)).length;
 const dfCount = dedupedFiles.filter((f) => f.docType === 'DF').length;
 const audioCount = dedupedFiles.filter((f) => f.docType === 'AUD').length;
 
@@ -294,38 +381,116 @@ const metaInfo = {
   totalBooks,
   ialBooks,
   igcseBooks,
+  cambridgeBooks,
   dfCount,
   audioCount,
   subjects: allSubjects,
   ialSubjects,
   igcseSubjects,
+  cieAlSubjects,
+  cieIgcseSubjects,
+  cieOlSubjects,
   coverage: coverageRangeStr,
   subjectCoverage,
   ialSubjectCoverage,
   igcseSubjectCoverage,
+  cieAlSubjectCoverage,
+  cieIgcseSubjectCoverage,
+  cieOlSubjectCoverage,
+  boards: {
+    edexcel: {
+      totalFiles: edexcelFlat.length,
+      uniqueFiles: edexcelDeduped.length,
+      totalBooks: ialBooks + igcseBooks,
+      ialBooks,
+      igcseBooks,
+      dfCount: edexcelDeduped.filter((f) => f.docType === 'DF').length,
+      audioCount: edexcelDeduped.filter((f) => f.docType === 'AUD').length,
+      subjectCount: new Set([...ialSubjects, ...igcseSubjects]).size,
+      ialSubjectCount: ialSubjects.length,
+      igcseSubjectCount: igcseSubjects.length,
+      coverage: edexcelCoverageStr
+    },
+    cambridge: {
+      totalFiles: cambridgeFlat.length,
+      uniqueFiles: cambridgeDeduped.length,
+      totalBooks: cambridgeBooks,
+      dfCount: cambridgeDeduped.filter((f) => f.docType === 'DF').length,
+      audioCount: cambridgeDeduped.filter((f) => f.docType === 'AUD').length,
+      subjectCount: cieAlSubjects.length + cieIgcseSubjects.length + cieOlSubjects.length,
+      alSubjectCount: cieAlSubjects.length,
+      igcseSubjectCount: cieIgcseSubjects.length,
+      olSubjectCount: cieOlSubjects.length,
+      alFiles: cieAlDeduped.length,
+      igcseFiles: cieIgcseDeduped.length,
+      olFiles: cieOlDeduped.length,
+      coverage: cambridgeCoverageStr
+    }
+  },
   wizard: wizardMeta,
-  generatedAt: new Date().toISOString()
+  generatedAt
 };
 
-const output = {
-  keys,
-  files,
-  meta: metaInfo
+const edexcelOutput = {
+  keys: KEYS,
+  files: serializeTuples(edexcelDeduped),
+  meta: {
+    ...metaInfo,
+    board: 'edexcel',
+    partitionUniqueFiles: edexcelDeduped.length,
+    isPreDeduped: true
+  }
 };
 
-const metaOutput = {
-  meta: metaInfo
+const cambridgeOutput = {
+  keys: KEYS,
+  files: serializeTuples(cambridgeDeduped),
+  meta: {
+    ...metaInfo,
+    board: 'cambridge',
+    partitionUniqueFiles: cambridgeDeduped.length,
+    isPreDeduped: true
+  }
+};
+
+const cieAlOutput = {
+  keys: KEYS,
+  files: serializeTuples(cieAlDeduped),
+  meta: { generatedAt, board: 'cambridge', spec: 'CIE-AL', partitionUniqueFiles: cieAlDeduped.length, isPreDeduped: true }
+};
+
+const cieIgcseOutput = {
+  keys: KEYS,
+  files: serializeTuples(cieIgcseDeduped),
+  meta: { generatedAt, board: 'cambridge', spec: 'CIE-IGCSE', partitionUniqueFiles: cieIgcseDeduped.length, isPreDeduped: true }
+};
+
+const cieOlOutput = {
+  keys: KEYS,
+  files: serializeTuples(cieOlDeduped),
+  meta: { generatedAt, board: 'cambridge', spec: 'CIE-OL', partitionUniqueFiles: cieOlDeduped.length, isPreDeduped: true }
 };
 
 const publicDir = path.resolve(__dirname, '..', 'public');
-const outputPath = path.join(publicDir, 'index.json');
-fs.writeFileSync(outputPath, JSON.stringify(output));
+const edexcelJsonStr = JSON.stringify(edexcelOutput);
+const cambridgeJsonStr = JSON.stringify(cambridgeOutput);
 
-const metaPath = path.join(publicDir, 'meta.json');
-fs.writeFileSync(metaPath, JSON.stringify(metaOutput));
+// Preserve public/index.json (Edexcel) for 100% backwards compatibility alongside explicit partitioned files
+fs.writeFileSync(path.join(publicDir, 'index.json'), edexcelJsonStr);
+fs.writeFileSync(path.join(publicDir, 'index-edexcel.json'), edexcelJsonStr);
+fs.writeFileSync(path.join(publicDir, 'index-cambridge.json'), cambridgeJsonStr);
+fs.writeFileSync(path.join(publicDir, 'index-cie-al.json'), JSON.stringify(cieAlOutput));
+fs.writeFileSync(path.join(publicDir, 'index-cie-igcse.json'), JSON.stringify(cieIgcseOutput));
+fs.writeFileSync(path.join(publicDir, 'index-cie-ol.json'), JSON.stringify(cieOlOutput));
+fs.writeFileSync(path.join(publicDir, 'meta.json'), JSON.stringify({ meta: metaInfo }));
 
-const rootLiveIndexPath = path.join(TARGET_DIR, 'live_index.json');
-fs.writeFileSync(rootLiveIndexPath, JSON.stringify(output));
+// Compact multi-board allowlist for Vercel serverless API cold starts
+const allowlistObj = buildCompactAllowlist(dedupedFiles, generatedAt);
+fs.writeFileSync(path.join(publicDir, 'allowlist.json'), JSON.stringify(allowlistObj));
+
+// Root live indexes synced to Hugging Face
+fs.writeFileSync(path.join(TARGET_DIR, 'live_index.json'), edexcelJsonStr);
+fs.writeFileSync(path.join(TARGET_DIR, 'live_index_cambridge.json'), cambridgeJsonStr);
 
 // Incrementally maintain audio subtitles coverage (sharded public/subtitles/manifest.json + legacy fallback)
 const subtitlesManifestPath = path.join(publicDir, 'subtitles', 'manifest.json');
@@ -344,7 +509,7 @@ try {
     }
   }
 
-  let subDb = { version: '1.0', generatedAt: new Date().toISOString(), tracks: {} };
+  let subDb = { version: '1.0', generatedAt, tracks: {} };
   if (fs.existsSync(subtitlesPath)) {
     const existing = JSON.parse(fs.readFileSync(subtitlesPath, 'utf-8'));
     if (existing && typeof existing.tracks === 'object') {
@@ -364,7 +529,7 @@ try {
     }
   }
   if ((!fs.existsSync(subtitlesPath) && Object.keys(manifestKeys).length === 0) || mergedCount > 0) {
-    subDb.generatedAt = new Date().toISOString();
+    subDb.generatedAt = generatedAt;
     fs.writeFileSync(subtitlesPath, JSON.stringify(subDb));
   }
   const tracksMap = subDb.tracks || {};
@@ -388,5 +553,8 @@ try {
   console.warn('Warning: could not sync audio subtitles metadata:', err.message);
 }
 
-console.log(`Index generated successfully at ${outputPath}`);
-console.log(`Indexed ${flatFiles.length} total files (${dedupedFiles.length} unique records; ${ialSubjects.length} IAL subjects, ${igcseSubjects.length} IGCSE subjects).`);
+console.log(`Indexes generated successfully in ${publicDir}`);
+console.log(
+  `Edexcel: ${edexcelFlat.length} files (${edexcelDeduped.length} unique; ${ialSubjects.length} IAL, ${igcseSubjects.length} IGCSE) | ` +
+  `Cambridge: ${cambridgeFlat.length} files (${cambridgeDeduped.length} unique; ${cieAlSubjects.length} AL, ${cieIgcseSubjects.length} IGCSE, ${cieOlSubjects.length} OL)`
+);

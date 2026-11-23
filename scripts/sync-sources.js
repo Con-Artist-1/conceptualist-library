@@ -1,14 +1,15 @@
 /**
  * Unified Multi-Source Past Paper Sync Utility for Conceptualist Systems Library
  *
- * Crawls Edexcel IAL & IGCSE paper sources, enforces strict IAL vs UK GCE filtering,
- * deduplicates against public/index.json & incremental .data/library_sha_cache.json,
+ * Crawls Edexcel International (IAL & IGCSE) and Cambridge International (CIE-AL, CIE-IGCSE, CIE-OL)
+ * paper sources, enforces strict international-only filtering (zero UK domestic GCE/GCSE leakage),
+ * deduplicates against public/index.json / public/index-cambridge.json & .data/library_sha_cache.json,
  * downloads missing files cleanly (with Google Drive bypass + curl.exe large-file streaming),
  * packs >= 5 MB PDFs lacking /ObjStm via qpdf (when installed), and runs generate-index.js.
  *
  * Usage:
- *   sync-sources.js [--apply] [--sources=bsr,dp,igexams,ssc,pmt,pl,elevare] [--since=2025]
- *                   [--qpdf=<path-to-qpdf.exe>] [--skip-pack] [--skip-index] [--limit=N]
+ *   sync-sources.js [--board=edexcel|cambridge] [--apply] [--sources=...] [--syllabuses=0625,9709,...]
+ *                   [--since=2025] [--qpdf=<path-to-qpdf.exe>] [--skip-pack] [--skip-index] [--limit=N]
  */
 import fs from 'fs';
 import path from 'path';
@@ -22,6 +23,14 @@ import {
   extractUnitInfo,
   extractVariant
 } from '../src/unitParser.js';
+import {
+  parseCambridgePath,
+  detectCambridgeDocType
+} from '../src/parsers/cambridgeParser.js';
+import {
+  resolveCambridgeSyllabus,
+  formatCambridgeSubjectName
+} from '../src/data/cambridgeCatalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +40,7 @@ const PAST_PAPERS = path.join(LIBRARY_ROOT, 'Past Papers');
 const DATA_DIR = path.join(APP_DIR, '.data');
 const SHA_CACHE_PATH = path.join(DATA_DIR, 'library_sha_cache.json');
 const INDEX_PATH = path.join(APP_DIR, 'public', 'index.json');
+const CAMBRIDGE_INDEX_PATH = path.join(APP_DIR, 'public', 'index-cambridge.json');
 
 function loadEnv() {
   const envPath = path.join(APP_DIR, '.env');
@@ -64,9 +74,11 @@ const IAL_LAUNCH_YEAR = {
 
 function parseArgs(argv) {
   const opts = {
+    board: 'edexcel',
     apply: false,
     verbose: false,
-    sources: ['bsr', 'dp', 'igexams', 'ssc', 'pmt', 'pl', 'elevare'],
+    sources: null,
+    syllabuses: null,
     sinceYear: 0,
     qpdfPath: '',
     skipPack: false,
@@ -79,10 +91,25 @@ function parseArgs(argv) {
     else if (arg === '--verbose') opts.verbose = true;
     else if (arg === '--skip-pack') opts.skipPack = true;
     else if (arg === '--skip-index') opts.skipIndex = true;
+    else if (arg.startsWith('--board=')) opts.board = arg.slice(8).trim().toLowerCase() || 'edexcel';
     else if (arg.startsWith('--sources=')) opts.sources = arg.slice(10).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    else if (arg.startsWith('--syllabuses=')) {
+      const codes = arg.slice(13).split(',').map(s => s.trim()).filter(Boolean);
+      const resolved = new Set();
+      for (const c of codes) {
+        const entry = resolveCambridgeSyllabus(c);
+        resolved.add(entry ? entry.code : c);
+      }
+      if (resolved.size) opts.syllabuses = resolved;
+    }
     else if (arg.startsWith('--since=')) opts.sinceYear = Number(arg.slice(8)) || 0;
     else if (arg.startsWith('--qpdf=')) opts.qpdfPath = arg.slice(7);
     else if (arg.startsWith('--limit=')) opts.limit = Number(arg.slice(8)) || Infinity;
+  }
+  if (!opts.sources) {
+    opts.sources = opts.board === 'cambridge'
+      ? ['beh', 'elevare', 'bsr', 'papa']
+      : ['bsr', 'dp', 'igexams', 'ssc', 'pmt', 'pl', 'elevare'];
   }
   return opts;
 }
@@ -386,7 +413,10 @@ async function crawlDriveTree(roots, sinceYear) {
         if (ent.isFolder) {
           const folderYr = Number(ent.name.match(/\b(20\d{2})\b/)?.[1] || 0);
           if (sinceYear && folderYr && folderYr < sinceYear) continue;
-          if (/textbook|solution[-_\s]*bank|grade[-_\s]*(?:bound|thresh|charact)|syllabus|spec(?:ification)?\b/i.test(ent.name)) continue;
+          const skipRe = node.allowGt
+            ? /textbook|solution[-_\s]*bank|syllabus|spec(?:ification|imen)?\b/i
+            : /textbook|solution[-_\s]*bank|grade[-_\s]*(?:bound|thresh|charact)|syllabus|spec(?:ification)?\b/i;
+          if (skipRe.test(ent.name)) continue;
           if (node.spec === 'IAL' && /\b200\d\b|old\s*spec\s*\(6|gce\s*2008/i.test(ent.name)) continue;
           if (node.depth < 4) {
             queue.push({
@@ -935,6 +965,509 @@ function planItems(rawItems, state, sinceYear) {
   return planned;
 }
 
+// ─── Cambridge International (CAIE) Multi-Source Crawlers & Planner ──────────
+
+const CIE_LEVEL_FOLDER = {
+  'CIE-AL': 'A-Level',
+  'CIE-IGCSE': 'IGCSE',
+  'CIE-OL': 'O-Level'
+};
+
+const CIE_SERIES_FOLDER = {
+  m: 'Feb-March',
+  s: 'May-June',
+  w: 'Oct-Nov'
+};
+
+const PAPA_CAMBRIDGE_SLUGS = {
+  '9709': 'as-and-a-level-mathematics-9709',
+  '9702': 'as-and-a-level-physics-9702',
+  '9701': 'as-and-a-level-chemistry-9701',
+  '9700': 'as-and-a-level-biology-9700',
+  '9618': 'as-and-a-level-computer-science-for-first-examination-in-2021-9618',
+  '9708': 'as-and-a-level-economics-9708',
+  '0625': 'igcse-physics-0625',
+  '0620': 'igcse-chemistry-0620',
+  '0610': 'igcse-biology-0610',
+  '0580': 'igcse-mathematics-0580',
+  '0500': 'igcse-english-first-language-0500',
+  '0510': 'igcse-english-as-a-second-language-speaking-endorsement-0510',
+  '0478': 'igcse-computer-science-0478',
+  '0417': 'igcse-information-and-communication-technology-0417',
+  '4024': 'o-level-mathematics-d-4024',
+  '5054': 'o-level-physics-5054',
+  '5070': 'o-level-chemistry-5070',
+  '5090': 'o-level-biology-5090',
+  '1123': 'o-level-english-language-1123',
+  '2058': 'o-level-islamiyat-2058',
+  '2059': 'o-level-pakistan-studies-2059',
+  '7094': 'o-level-bangladesh-studies-7094',
+  '2210': 'o-level-computer-science-2210',
+  '2281': 'o-level-economics-2281',
+  '7707': 'o-level-accounting-7707'
+};
+
+function extractResolvedCambridgeCodes(text = '') {
+  const found = [];
+  const seen = new Set();
+  for (const m of String(text || '').matchAll(/\b(\d{4})\b/g)) {
+    const entry = resolveCambridgeSyllabus(m[1]);
+    if (entry && !seen.has(entry.code)) {
+      seen.add(entry.code);
+      found.push(entry);
+    }
+  }
+  return found;
+}
+
+function matchesSyllabusFilter(textOrCode, syllabusFilter) {
+  if (!syllabusFilter || syllabusFilter.size === 0) return true;
+  const direct = resolveCambridgeSyllabus(String(textOrCode || '').trim());
+  if (direct && syllabusFilter.has(direct.code)) return true;
+  const found = extractResolvedCambridgeCodes(textOrCode);
+  return found.some(e => syllabusFilter.has(e.code));
+}
+
+function buildCambridgeDedupState() {
+  const exactKeys = new Set();
+  const usedPaths = new Set();
+  if (!fs.existsSync(CAMBRIDGE_INDEX_PATH)) return { exactKeys, usedPaths };
+  const idx = JSON.parse(fs.readFileSync(CAMBRIDGE_INDEX_PATH, 'utf8'));
+  const keys = idx.keys || [];
+  const rows = (idx.files || []).map(r => Object.fromEntries(keys.map((k, i) => [k, r[i]])));
+  for (const f of rows) {
+    if (f.path) usedPaths.add(f.path.replace(/\\/g, '/').toLowerCase());
+    if (f.category !== 'Past Papers') continue;
+    const parsed = parseCambridgePath(f.path || '', f.name || '');
+    const sylCode = parsed.syllabusCode || f.syllabusCode || '';
+    const yr = parsed.year || f.year || '';
+    const ser = parsed.seriesChar || '';
+    const dt = (f.docType || detectCambridgeDocType(f.name || '', f.path || '') || '').toUpperCase();
+    const rawDoc = parsed.rawDocCode || dt.toLowerCase();
+    const comp = parsed.componentCode || '';
+    if (sylCode && yr && ser && dt) {
+      exactKeys.add(`${f.spec}|${sylCode}|${yr}-${ser}|${dt}|${rawDoc}|${comp}`);
+    }
+  }
+  return { exactKeys, usedPaths };
+}
+
+async function crawlBehCambridge(sinceYear, syllabusFilter) {
+  console.log('[BEH-CIE] Scanning BestExamHelp Cambridge A-Level, IGCSE & O-Level indexes...');
+  const base = 'https://bestexamhelp.com/exam';
+  const levels = [
+    { spec: 'CIE-AL', slug: 'cambridge-international-a-level' },
+    { spec: 'CIE-IGCSE', slug: 'cambridge-igcse' },
+    { spec: 'CIE-OL', slug: 'cambridge-o-level' }
+  ];
+
+  const subjects = new Map();
+  let errors = 0;
+  for (const lvl of levels) {
+    try {
+      const html = await fetch(`${base}/${lvl.slug}/index.php`, {
+        headers: { 'User-Agent': UA },
+        signal: AbortSignal.timeout(25000)
+      }).then(r => (r.ok ? r.text() : ''));
+      for (const m of html.matchAll(/href=["']([^"'/?#]*-(\d{4}))\/(?:index\.php)?["']/gi)) {
+        const subSlug = m[1];
+        const rawCode = m[2];
+        const entry = resolveCambridgeSyllabus(rawCode);
+        if (!entry) continue;
+        if (syllabusFilter && syllabusFilter.size && !syllabusFilter.has(entry.code)) continue;
+        const key = `${lvl.slug}/${subSlug}`;
+        if (!subjects.has(key)) {
+          subjects.set(key, { spec: entry.spec, levelSlug: lvl.slug, subSlug, code: entry.code, title: `${entry.name} (${entry.code})` });
+        }
+      }
+    } catch { errors++; }
+  }
+
+  // Ensure canonical BEH slugs like physics-0625 are checked if index formatting omits them
+  const fallbackSlugs = [
+    { spec: 'CIE-IGCSE', levelSlug: 'cambridge-igcse', subSlug: 'physics-0625', code: '0625' }
+  ];
+  for (const fb of fallbackSlugs) {
+    if (syllabusFilter && syllabusFilter.size && !syllabusFilter.has(fb.code)) continue;
+    const key = `${fb.levelSlug}/${fb.subSlug}`;
+    if (!subjects.has(key)) {
+      const entry = resolveCambridgeSyllabus(fb.code);
+      if (entry) subjects.set(key, { ...fb, title: `${entry.name} (${entry.code})` });
+    }
+  }
+
+  const sessionPages = [];
+  const subjList = [...subjects.values()];
+  for (let i = 0; i < subjList.length; i += 6) {
+    await Promise.all(subjList.slice(i, i + 6).map(async (sub) => {
+      try {
+        const url = `${base}/${sub.levelSlug}/${sub.subSlug}/index.php`;
+        const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) });
+        if (!res.ok) return;
+        const html = await res.text();
+        const seenSess = new Set();
+        for (const m of html.matchAll(/href=["']((20\d{2})\/(march|summer|winter)\.php)["']/gi)) {
+          const yr = Number(m[2]);
+          if (sinceYear && yr < sinceYear) continue;
+          const rel = m[1];
+          if (seenSess.has(rel)) continue;
+          seenSess.add(rel);
+          sessionPages.push({
+            ...sub,
+            year: yr,
+            sessionUrl: `${base}/${sub.levelSlug}/${sub.subSlug}/${rel}`,
+            yearBaseUrl: `${base}/${sub.levelSlug}/${sub.subSlug}/${yr}`
+          });
+        }
+      } catch { errors++; }
+    }));
+  }
+
+  const out = [];
+  for (let i = 0; i < sessionPages.length; i += 8) {
+    await Promise.all(sessionPages.slice(i, i + 8).map(async (sp) => {
+      try {
+        const res = await fetch(sp.sessionUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) });
+        if (!res.ok) return;
+        const html = await res.text();
+        const seenFiles = new Set();
+        // Wrapper pages like 0625-s24-qp-42.php -> direct 0625_s24_qp_42.pdf
+        for (const m of html.matchAll(/href=["'](\d{4})-(m|s|w)(\d{2})-([a-z]{2,4})(?:-(\d{1,2}))?\.php["']/gi)) {
+          const pdfName = `${m[1]}_${m[2].toLowerCase()}${m[3]}_${m[4].toLowerCase()}${m[5] ? `_${m[5]}` : ''}.pdf`;
+          if (seenFiles.has(pdfName)) continue;
+          seenFiles.add(pdfName);
+          out.push({
+            source: 'BEH-CIE',
+            spec: sp.spec,
+            title: sp.title,
+            folderPath: `${sp.year}`,
+            name: pdfName,
+            url: `${sp.yearBaseUrl}/${pdfName}`,
+            fallbackUrl: `https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/${pdfName}`
+          });
+        }
+        // Direct PDF / ZIP / MP3 links if present on the session page
+        for (const m of html.matchAll(/href=["']([^"']+\.(?:pdf|zip|mp3))["']/gi)) {
+          const fileUrl = normalizeHttpUrl(m[1], sp.sessionUrl);
+          if (!fileUrl) continue;
+          const fileName = decodeURIComponent(fileUrl.split('?')[0].split('/').pop() || '');
+          if (!fileName || seenFiles.has(fileName.toLowerCase())) continue;
+          seenFiles.add(fileName.toLowerCase());
+          out.push({
+            source: 'BEH-CIE',
+            spec: sp.spec,
+            title: sp.title,
+            folderPath: `${sp.year}`,
+            name: fileName,
+            url: fileUrl
+          });
+        }
+      } catch { errors++; }
+    }));
+  }
+
+  console.log(`[BEH-CIE] Collected ${out.length} files across ${subjList.length} subjects (${sessionPages.length} sessions${errors ? `, ${errors} errors` : ''}).`);
+  return out;
+}
+
+async function crawlElevareCambridge(sinceYear, syllabusFilter) {
+  console.log('[Elevare-CIE] Fetching Cambridge Drive roots & curated catalogs...');
+  const baseUrl = 'https://elevareisonline.com/';
+  let pastPapersUrl = `${baseUrl}past-papers.js`;
+  let workspaceUrl = `${baseUrl}papers-workspace.js`;
+  try {
+    const html = await fetch(`${baseUrl}papers`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => r.text());
+    const ppMatch = html.match(/src=["']([^"']*past-papers\.js[^"']*)["']/i);
+    if (ppMatch) pastPapersUrl = normalizeHttpUrl(ppMatch[1], `${baseUrl}papers`) || pastPapersUrl;
+    const wsMatch = html.match(/src=["']([^"']*papers-workspace\.js[^"']*)["']/i);
+    if (wsMatch) workspaceUrl = normalizeHttpUrl(wsMatch[1], `${baseUrl}papers`) || workspaceUrl;
+  } catch { /* fallback defaults */ }
+
+  const driveRoots = [];
+  try {
+    const ppCode = await fetch(pastPapersUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => r.text());
+    const ppObj = extractAssignedObjectLiteral(ppCode, 'var s=');
+    const cambridge = ppObj?.Cambridge || {};
+    for (const [lvlKey, spec] of [['IAL', 'CIE-AL'], ['IGCSE', 'CIE-IGCSE']]) {
+      for (const [title, driveUrl] of Object.entries(cambridge[lvlKey] || {})) {
+        if (typeof driveUrl !== 'string' || !driveUrl.includes('drive.google.com')) continue;
+        if (!matchesSyllabusFilter(title, syllabusFilter)) continue;
+        driveRoots.push({ source: 'Elevare-CIE', spec, title, driveUrl, allowGt: true });
+      }
+    }
+  } catch (err) {
+    console.warn('[Elevare-CIE] past-papers.js parse skipped:', err?.message || err);
+  }
+
+  console.log(`[Elevare-CIE] Found ${driveRoots.length} matching Cambridge Drive roots; crawling folders...`);
+  const driveFiles = await crawlDriveTree(driveRoots, sinceYear);
+  const seenDriveIds = new Set(driveFiles.map(f => f.id).filter(Boolean));
+
+  const catalogTargets = [
+    { spec: 'CIE-AL', file: 'cambridge_ial.js', marker: 'window.CAMBRIDGE_IAL_PAPERS=' },
+    { spec: 'CIE-IGCSE', file: 'cambridge_igcse.js', marker: 'window.CAMBRIDGE_IGCSE_PAPERS=' }
+  ];
+  try {
+    const wsCode = await fetch(workspaceUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => r.text());
+    const catMatch = wsCode.match(/Cambridge\s*:\s*\{([^}]+)\}/);
+    if (catMatch) {
+      const ialF = catMatch[1].match(/IAL\s*:\s*["']([^"']+)["']/)?.[1];
+      const igF = catMatch[1].match(/IGCSE\s*:\s*["']([^"']+)["']/)?.[1];
+      if (ialF) catalogTargets[0].file = ialF;
+      if (igF) catalogTargets[1].file = igF;
+    }
+  } catch { /* fallback defaults */ }
+
+  const curatedExtras = [];
+  for (const target of catalogTargets) {
+    try {
+      const code = await fetch(`${baseUrl}${target.file}`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(45000) }).then(r => r.text());
+      const catalog = extractAssignedObjectLiteral(code, target.marker);
+      if (!catalog) continue;
+      for (const subjEntry of Object.values(catalog)) {
+        const title = subjEntry?.subject || '';
+        if (!matchesSyllabusFilter(title, syllabusFilter)) continue;
+        const resolvedList = extractResolvedCambridgeCodes(title);
+        const primarySyl = resolvedList[0];
+        if (!primarySyl) continue;
+        for (const sess of (subjEntry?.sessions || [])) {
+          const yr = Number(sess?.year || 0);
+          if (!yr || (sinceYear && yr < sinceYear)) continue;
+          const seasonRaw = `${sess?.season || ''} ${sess?.session_title || ''}`.toLowerCase();
+          if (/specimen|sample/i.test(seasonRaw)) continue;
+          let ser = '';
+          if (/feb|mar/.test(seasonRaw)) ser = 'm';
+          else if (/may|jun|summer/.test(seasonRaw)) ser = 's';
+          else if (/oct|nov|winter/.test(seasonRaw)) ser = 'w';
+          if (!ser) continue;
+          const yy = String(yr).slice(-2);
+
+          for (const p of (sess?.papers || [])) {
+            const pLabel = String(p?.paper || '').trim();
+            if (/syllabus|spec(?:ification|imen)?/i.test(pLabel)) continue;
+            const compMatch = pLabel.match(/\b(?:Paper|Component)\s*(\d{1,2})\b/i);
+            const comp = compMatch ? compMatch[1] : '';
+            const emit = (id, docCode, ext = 'pdf') => {
+              if (!id || seenDriveIds.has(id)) return;
+              seenDriveIds.add(id);
+              const suffix = (docCode === 'er' || docCode === 'gt') ? '' : (comp ? `_${comp}` : '');
+              if (docCode !== 'er' && docCode !== 'gt' && !suffix) return;
+              const fileName = `${primarySyl.code}_${ser}${yy}_${docCode}${suffix}.${ext}`;
+              curatedExtras.push({
+                source: 'Elevare-CIE',
+                spec: primarySyl.spec,
+                title,
+                folderPath: `${yr}/${CIE_SERIES_FOLDER[ser]}`,
+                id,
+                name: fileName,
+                url: `https://drive.google.com/uc?export=download&id=${id}`
+              });
+            };
+            if (/grade\s*thresh/i.test(pLabel)) {
+              emit(p?.qp || p?.ms || p?.gt, 'gt');
+              continue;
+            }
+            emit(p?.qp, 'qp');
+            emit(p?.ms, 'ms');
+            emit(p?.er, 'er');
+            if (p?.gt) emit(p.gt, 'gt');
+            if (p?.in) emit(p.in, 'in');
+            if (p?.zip) emit(p.zip, 'sf', 'zip');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[Elevare-CIE] ${target.file} parse skipped:`, err?.message || err);
+    }
+  }
+
+  console.log(`[Elevare-CIE] Collected ${driveFiles.length} Drive files + ${curatedExtras.length} curated-only files.`);
+  return [...driveFiles, ...curatedExtras];
+}
+
+async function crawlBsrCambridge(sinceYear, syllabusFilter) {
+  console.log('[BSR-CIE] Fetching https://britishstudentroom.com/cambridge/ ...');
+  const html = await fetch('https://britishstudentroom.com/cambridge/', {
+    headers: { 'User-Agent': UA },
+    signal: AbortSignal.timeout(30000)
+  }).then(r => r.text());
+  const roots = [];
+  for (const m of html.matchAll(/<div class="subject-card"([^>]*)>/gi)) {
+    const attrs = m[1];
+    const level = attrs.match(/data-level="([^"]*)"/)?.[1] || '';
+    if (level !== 'IAL' && level !== 'IGCSE') continue; // Strictly skip UK GCSE
+    const title = decodeHtml(attrs.match(/data-title="([^"]*)"/)?.[1] || '');
+    const codeAttr = attrs.match(/data-code="([^"]*)"/)?.[1] || '';
+    const resolvedList = extractResolvedCambridgeCodes(`${title} ${codeAttr}`);
+    if (!resolvedList.length) continue;
+    if (syllabusFilter && syllabusFilter.size && !resolvedList.some(e => syllabusFilter.has(e.code))) continue;
+    const slice = html.slice(m.index, m.index + 1400);
+    const driveUrl = slice.match(/openAuthModal\('([^']+)'\)/)?.[1] || '';
+    if (driveUrl) {
+      roots.push({
+        source: 'BSR-CIE',
+        spec: level === 'IAL' ? 'CIE-AL' : 'CIE-IGCSE',
+        title,
+        driveUrl,
+        allowGt: true
+      });
+    }
+  }
+  console.log(`[BSR-CIE] Found ${roots.length} matching Cambridge Drive roots; crawling folders...`);
+  return crawlDriveTree(roots, sinceYear);
+}
+
+async function crawlPapaCambridge(sinceYear, syllabusFilter) {
+  const targetCodes = syllabusFilter && syllabusFilter.size
+    ? [...syllabusFilter].filter(c => PAPA_CAMBRIDGE_SLUGS[c])
+    : Object.keys(PAPA_CAMBRIDGE_SLUGS);
+  if (!targetCodes.length) return [];
+
+  const minYr = Math.max(sinceYear || 2022, 2018);
+  const maxYr = new Date().getFullYear();
+  const seriesSlugs = ['feb-march', 'may-june', 'oct-nov'];
+  const jobs = [];
+  for (const code of targetCodes) {
+    const entry = resolveCambridgeSyllabus(code);
+    if (!entry) continue;
+    const slug = PAPA_CAMBRIDGE_SLUGS[code];
+    for (let yr = minYr; yr <= maxYr; yr++) {
+      for (const sSlug of seriesSlugs) {
+        // Cambridge O-Level has no Feb/March session
+        if (entry.spec === 'CIE-OL' && sSlug === 'feb-march') continue;
+        jobs.push({
+          code: entry.code,
+          spec: entry.spec,
+          title: `${entry.name} (${entry.code})`,
+          year: yr,
+          url: `https://pastpapers.papacambridge.com/papers/caie/${slug}-${yr}-${sSlug}`
+        });
+      }
+    }
+  }
+
+  console.log(`[Papa-CIE] Checking ${jobs.length} session pages across ${targetCodes.length} syllabuses...`);
+  const out = [];
+  const seen = new Set();
+  for (let i = 0; i < jobs.length; i += 6) {
+    await Promise.all(jobs.slice(i, i + 6).map(async (job) => {
+      try {
+        const res = await fetch(job.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) });
+        if (!res.ok) return;
+        const html = await res.text();
+        const re = new RegExp(`\\b(${job.code}_[msw]\\d{2}_[a-z]{2,4}(?:_\\d{1,2})?\\.(?:pdf|zip|mp3))\\b`, 'gi');
+        for (const m of html.matchAll(re)) {
+          const fname = m[1].toLowerCase();
+          if (seen.has(fname)) continue;
+          seen.add(fname);
+          out.push({
+            source: 'Papa-CIE',
+            spec: job.spec,
+            title: job.title,
+            folderPath: `${job.year}`,
+            name: fname,
+            url: `https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/${fname}`
+          });
+        }
+      } catch { /* ignore unavailable session */ }
+    }));
+  }
+  console.log(`[Papa-CIE] Collected ${out.length} direct CAIE files.`);
+  return out;
+}
+
+function planCambridgeItems(rawItems, state, sinceYear, syllabusFilter) {
+  const planned = [];
+  const seenByKey = new Map();
+
+  for (const item of rawItems) {
+    const rawName = sanitizeFileName(item.name || '');
+    const extMatch = rawName.match(/\.(pdf|zip|rar|mp3|wav)$/i);
+    if (!extMatch) continue;
+    const ext = extMatch[1].toLowerCase();
+    const folderPath = decodeHtml(item.folderPath || '');
+    const fullPath = folderPath ? `${folderPath}/${rawName}` : rawName;
+
+    // Strictly block non-paper materials, UK domestic GCSE, and other boards
+    if (/syllabus|spec(?:ification|imen)?\b|\bsample\b|revision|\bnotes?\b|toaz\.info|textbook|solution[-_\s]*bank|timetabl|coursework|teacher[-_\s]*guide|(?:^|[^a-z0-9])(?:edexcel|pearson|aqa|ocr|wjec|eduqas)(?:[^a-z0-9]|$)|(?<!i)\bgcse\b/i.test(fullPath)) {
+      continue;
+    }
+
+    const parsed = parseCambridgePath(fullPath, rawName);
+    const sylEntry = parsed.syllabusEntry;
+    if (!sylEntry) continue; // Strictly international CAIE syllabuses in CAMBRIDGE_SYLLABUSES only!
+    if (syllabusFilter && syllabusFilter.size && !syllabusFilter.has(sylEntry.code)) continue;
+
+    // Require canonical series (m/s/w) and valid exam year
+    const ser = parsed.seriesChar;
+    const yr = parsed.year;
+    if (!ser || !CIE_SERIES_FOLDER[ser] || !yr || yr < 2002 || yr > 2027) continue;
+    if (sinceYear && yr < sinceYear) continue;
+
+    const dt = detectCambridgeDocType(rawName, fullPath);
+    if (!dt || dt === 'SAM') continue;
+    const rawDoc = parsed.rawDocCode || dt.toLowerCase();
+    // Skip unparseable non-standard doc types or specimen/syllabus codes
+    if (rawDoc === 'sp' || rawDoc === 'sm' || rawDoc === 'su' || rawDoc === 'sy') continue;
+
+    const comp = parsed.componentCode || '';
+    // Individual paper docs (QP, MS, SC) should carry a component unless transcript/pre-release
+    if ((dt === 'QP' || dt === 'MS') && !comp) continue;
+
+    const spec = sylEntry.spec;
+    const dedupKey = `${spec}|${sylEntry.code}|${yr}-${ser}|${dt}|${rawDoc}|${comp}`;
+    if (state.exactKeys.has(dedupKey)) continue;
+
+    const fallbackList = [];
+    if (item.fallbackUrl && item.fallbackUrl !== item.url) {
+      fallbackList.push({ url: item.fallbackUrl, source: `${item.source}-fallback` });
+    }
+
+    if (seenByKey.has(dedupKey)) {
+      const prev = seenByKey.get(dedupKey);
+      if (prev.url !== item.url && !prev.fallbacks.some(f => f.url === item.url)) {
+        prev.fallbacks.push({ url: item.url, cookie: item.cookie, id: item.id, source: item.source });
+      }
+      for (const fb of fallbackList) {
+        if (prev.url !== fb.url && !prev.fallbacks.some(f => f.url === fb.url)) {
+          prev.fallbacks.push(fb);
+        }
+      }
+      continue;
+    }
+
+    const levelFolder = CIE_LEVEL_FOLDER[spec] || 'IGCSE';
+    const subjFolder = formatCambridgeSubjectName(sylEntry);
+    const sessFolder = CIE_SERIES_FOLDER[ser];
+    const yy = String(yr).slice(-2);
+    // Preserve canonical Cambridge filename (preferring primary syllabus code for 9-1 equivalents, preserving legacy codes)
+    const fileCode = (parsed.rawSyllabusCode && sylEntry.legacyCodes?.includes(parsed.rawSyllabusCode))
+      ? parsed.rawSyllabusCode
+      : sylEntry.code;
+    const finalName = `${fileCode}_${ser}${yy}_${rawDoc}${comp ? `_${comp}` : ''}.${ext}`;
+    const relDest = `Past Papers/Cambridge/${levelFolder}/${subjFolder}/${yr}/${sessFolder}/${finalName}`;
+    if (state.usedPaths.has(relDest.toLowerCase())) continue;
+
+    const entry = {
+      ...item,
+      spec,
+      subj: subjFolder,
+      u: comp ? `${sylEntry.code}-P${parsed.paperNum}` : '',
+      v: parsed.variant || '',
+      yrStr: String(yr),
+      moCode: ser,
+      dt,
+      relDest,
+      absDest: path.join(LIBRARY_ROOT, relDest.replace(/\//g, '\\')),
+      fallbacks: fallbackList
+    };
+    seenByKey.set(dedupKey, entry);
+    state.usedPaths.add(relDest.toLowerCase());
+    planned.push(entry);
+  }
+  return planned;
+}
+
 function validateMagic(buf, ext) {
   if (!buf || buf.length < 512) return 'TOO_SMALL';
   const head = buf.slice(0, 64).toString('latin1');
@@ -1029,22 +1562,34 @@ function packLargePdf(qpdfExe, absPath, tmpPack) {
 
 async function run() {
   const opts = parseArgs(process.argv.slice(2));
-  const crawlers = { bsr: crawlBsr, dp: crawlDynamicPapers, igexams: crawlIgExams, ssc: crawlSsc, pmt: crawlPmt, pl: crawlPaperlords, elevare: crawlElevare };
+  const isCambridge = opts.board === 'cambridge';
+  const crawlers = isCambridge
+    ? {
+        beh: (yr) => crawlBehCambridge(yr, opts.syllabuses),
+        elevare: (yr) => crawlElevareCambridge(yr, opts.syllabuses),
+        bsr: (yr) => crawlBsrCambridge(yr, opts.syllabuses),
+        papa: (yr) => crawlPapaCambridge(yr, opts.syllabuses)
+      }
+    : { bsr: crawlBsr, dp: crawlDynamicPapers, igexams: crawlIgExams, ssc: crawlSsc, pmt: crawlPmt, pl: crawlPaperlords, elevare: crawlElevare };
+
   const raw = [];
   for (const s of opts.sources) {
-    if (!crawlers[s]) { console.warn(`Unknown source ignored: ${s}`); continue; }
+    if (!crawlers[s]) { console.warn(`Unknown source ignored for board=${opts.board}: ${s}`); continue; }
     raw.push(...(await crawlers[s](opts.sinceYear)));
   }
 
-  const state = buildLibraryDedupState();
-  const planned = planItems(raw, state, opts.sinceYear).slice(0, opts.limit);
+  const state = isCambridge ? buildCambridgeDedupState() : buildLibraryDedupState();
+  const planned = (isCambridge
+    ? planCambridgeItems(raw, state, opts.sinceYear, opts.syllabuses)
+    : planItems(raw, state, opts.sinceYear)
+  ).slice(0, opts.limit);
   const bySubj = {};
   for (const p of planned) {
     const k = `${p.source} | ${p.spec} | ${p.subj}`;
     bySubj[k] = (bySubj[k] || 0) + 1;
   }
 
-  console.log(`\n=== SYNC PLAN (${planned.length} new candidates across ${opts.sources.join(',')}) ===`);
+  console.log(`\n=== SYNC PLAN [${opts.board.toUpperCase()}] (${planned.length} new candidates across ${opts.sources.join(',')}) ===`);
   for (const [k, v] of Object.entries(bySubj).sort()) console.log(`  ${k}: ${v}`);
   if (opts.verbose && planned.length) {
     const cap = Math.min(planned.length, 300);
@@ -1112,7 +1657,14 @@ async function run() {
           lastReason = 'FETCH_TIMEOUT';
         }
       }
-      if (!done) retryCurl.push({ item, lastReason });
+      if (!done) {
+        if (lastReason === 'HTTP_404') {
+          failed++;
+          failReasons[lastReason] = (failReasons[lastReason] || 0) + 1;
+        } else {
+          retryCurl.push({ item, lastReason });
+        }
+      }
     }
   }));
 

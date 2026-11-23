@@ -2,26 +2,49 @@ import React from 'react';
 import '../styles/filter-drawer.css';
 import { formatSubjectDisplay } from '../lib/libraryHelpers.js';
 
-const CURRICULUM_PILLS = [
-  { value: '', label: 'All' },
-  { value: 'Edexcel IAL', label: 'Edexcel IAL' },
-  { value: 'Edexcel IGCSE', label: 'Edexcel IGCSE' }
+const BOARD_PILLS = [
+  { value: 'edexcel', label: 'Edexcel' },
+  { value: 'cambridge', label: 'Cambridge' },
+  { value: 'all', label: 'All Boards' }
 ];
 
-const DOC_TYPE_PILLS = [
-  { value: null, label: 'All Types' },
-  { value: 'QP', label: 'Question Papers' },
-  { value: 'MS', label: 'Mark Schemes' },
-  { value: 'ER', label: 'Examiner Reports' },
-  { value: 'Book', label: 'Textbooks' },
-  { value: 'Extra', label: 'Audio / Data / SAMs' }
+const CURRICULUM_PILLS_BY_SCOPE = {
+  edexcel: [
+    { value: '', label: 'All' },
+    { value: 'Edexcel IAL', label: 'Edexcel IAL' },
+    { value: 'Edexcel IGCSE', label: 'Edexcel IGCSE' }
+  ],
+  cambridge: [
+    { value: '', label: 'All' },
+    { value: 'Cambridge AS & A Level', label: 'AS & A Level' },
+    { value: 'Cambridge IGCSE', label: 'IGCSE' },
+    { value: 'Cambridge O Level', label: 'O Level' }
+  ],
+  all: [
+    { value: '', label: 'All' },
+    { value: 'Edexcel IAL', label: 'Edexcel IAL' },
+    { value: 'Edexcel IGCSE', label: 'Edexcel IGCSE' },
+    { value: 'Cambridge AS & A Level', label: 'CAIE A-Level' },
+    { value: 'Cambridge IGCSE', label: 'CAIE IGCSE' },
+    { value: 'Cambridge O Level', label: 'CAIE O Level' }
+  ]
+};
+
+const VARIANT_PILLS = [
+  { value: '', label: 'All' },
+  { value: '1', label: 'v1' },
+  { value: '2', label: 'v2' },
+  { value: '3', label: 'v3' }
 ];
 
 /**
- * Lazy-loaded collapsible filter drawer with curriculum, document type, subject,
- * unit, year, session, sort, and Unified/Individual view mode controls.
+ * Lazy-loaded collapsible filter drawer with board scope, curriculum, document type,
+ * subject, unit/paper, year, session, Cambridge variant, sort, and Unified/Individual view mode controls.
  */
 export default function FilterDrawer({
+  activeBoard = 'edexcel',
+  scopeAllBoards = false,
+  onSelectBoardScope,
   filterCurriculum,
   onSelectCurriculum,
   filterDocType,
@@ -37,6 +60,8 @@ export default function FilterDrawer({
   onChangeYear,
   filterSession,
   onChangeSession,
+  filterVariant = '',
+  onChangeVariant,
   sortBy,
   onChangeSort,
   viewMode,
@@ -46,13 +71,63 @@ export default function FilterDrawer({
   totalMatchedCount,
   onDoneMobile
 }) {
+  const boardScope = scopeAllBoards ? 'all' : activeBoard;
+  const isCieMode = boardScope === 'cambridge' || boardScope === 'all';
+  const curriculumPills = CURRICULUM_PILLS_BY_SCOPE[boardScope] || CURRICULUM_PILLS_BY_SCOPE.edexcel;
+
+  const docTypePills = isCieMode
+    ? [
+        { value: null, label: 'All Types' },
+        { value: 'QP', label: 'Question Papers' },
+        { value: 'MS', label: 'Mark Schemes' },
+        { value: 'GT', label: 'Thresholds (GT)' },
+        { value: 'ER', label: 'Examiner Reports' },
+        { value: 'SC', label: 'Inserts / CI' },
+        ...(boardScope === 'all' ? [{ value: 'Book', label: 'Textbooks' }] : []),
+        { value: 'Extra', label: 'Audio / Data / SAMs' }
+      ]
+    : [
+        { value: null, label: 'All Types' },
+        { value: 'QP', label: 'Question Papers' },
+        { value: 'MS', label: 'Mark Schemes' },
+        { value: 'ER', label: 'Examiner Reports' },
+        { value: 'Book', label: 'Textbooks' },
+        { value: 'Extra', label: 'Audio / Data / SAMs' }
+      ];
+
+  const sessionOptions =
+    boardScope === 'cambridge'
+      ? ['Feb/March', 'May/June', 'Oct/Nov']
+      : boardScope === 'all'
+        ? ['January', 'Feb/March', 'June', 'May/June', 'October', 'Oct/Nov']
+        : ['January', 'June', 'October'];
+
   return (
     <div id="catalog-filter-drawer" className="filter-controls-container">
       <div className="filter-row">
-        <div className="drawer-curriculum-group">
-          <span className="filter-group-label">Curriculum:</span>
+        {onSelectBoardScope && (
+          <>
+            <span className="filter-group-label">Board:</span>
+            <div className="filter-pills" role="group" aria-label="Filter by examination board">
+              {BOARD_PILLS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={boardScope === opt.value}
+                  className={`filter-btn ${boardScope === opt.value ? 'active' : ''}`}
+                  onClick={() => onSelectBoardScope(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className={boardScope === 'all' ? 'drawer-curriculum-group drawer-curriculum-always' : 'drawer-curriculum-group'}>
+          <span className="filter-group-label">{boardScope === 'cambridge' ? 'Level:' : 'Curriculum:'}</span>
           <div className="filter-pills" role="group" aria-label="Filter by curriculum">
-            {CURRICULUM_PILLS.map((opt) => (
+            {curriculumPills.map((opt) => (
               <button
                 key={opt.label}
                 type="button"
@@ -68,7 +143,7 @@ export default function FilterDrawer({
 
         <span className="filter-group-label">Type:</span>
         <div className="filter-pills" role="group" aria-label="Filter by document type">
-          {DOC_TYPE_PILLS.map((opt) => (
+          {docTypePills.map((opt) => (
             <button
               key={opt.label}
               type="button"
@@ -99,7 +174,9 @@ export default function FilterDrawer({
 
         {availableUnits.length > 0 && (
           <>
-            <label htmlFor="unit-select" className="filter-group-label">Unit:</label>
+            <label htmlFor="unit-select" className="filter-group-label">
+              {boardScope === 'cambridge' ? 'Paper:' : 'Unit:'}
+            </label>
             <select
               id="unit-select"
               aria-label="Filter documents by unit or paper"
@@ -107,7 +184,7 @@ export default function FilterDrawer({
               value={filterUnit}
               onChange={(e) => onChangeUnit(e.target.value)}
             >
-              <option value="">All Units &amp; Papers</option>
+              <option value="">{boardScope === 'cambridge' ? 'All Papers' : 'All Units & Papers'}</option>
               {availableUnits.map((u) => (
                 <option key={u} value={u}>{u}</option>
               ))}
@@ -140,10 +217,29 @@ export default function FilterDrawer({
               onChange={(e) => onChangeSession(e.target.value)}
             >
               <option value="">All Sessions</option>
-              <option value="January">January</option>
-              <option value="June">June</option>
-              <option value="October">October</option>
+              {sessionOptions.map((sess) => (
+                <option key={sess} value={sess}>{sess}</option>
+              ))}
             </select>
+          </>
+        )}
+
+        {isCieMode && filterDocType !== 'Book' && onChangeVariant && (
+          <>
+            <span className="filter-group-label">Variant:</span>
+            <div className="filter-pills" role="group" aria-label="Filter Cambridge timezone variant">
+              {VARIANT_PILLS.map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  aria-pressed={filterVariant === opt.value}
+                  className={`filter-btn ${filterVariant === opt.value ? 'active' : ''}`}
+                  onClick={() => onChangeVariant(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </>
         )}
 

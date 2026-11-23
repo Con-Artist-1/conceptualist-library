@@ -4,6 +4,7 @@ import { shouldHandleClientNavigation } from '../lib/libraryHelpers.js';
 const NOT_FOUND_ROUTES = [
   { href: '/ial', label: 'Edexcel IAL', action: 'ial' },
   { href: '/igcse', label: 'Edexcel IGCSE', action: 'igcse' },
+  { href: '/cambridge', label: 'Cambridge International', action: 'cambridge' },
   { href: '/textbooks', label: 'Textbooks', action: 'textbooks' },
   { href: '/data-files', label: 'Data Files', action: 'data-files' },
   { href: '/audio', label: 'Audio Archive', action: 'audio' }
