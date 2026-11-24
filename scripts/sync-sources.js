@@ -9,7 +9,10 @@
  *
  * Usage:
  *   sync-sources.js [--board=edexcel|cambridge] [--apply] [--sources=...] [--syllabuses=0625,9709,...]
- *                   [--since=2025] [--qpdf=<path-to-qpdf.exe>] [--skip-pack] [--skip-index] [--limit=N]
+ *                   [--since=2025] [--dump-json=<file>] [--from-json=<file>] [--qpdf=<path-to-qpdf.exe>]
+ *                   [--skip-pack] [--skip-index] [--limit=N]
+ *   Edexcel sources:   bsr, dp, igexams, ssc, pmt, pl, elevare, beh, almr
+ *   Cambridge sources: beh, elevare, bsr, pmt, almr, cie, papa
  */
 import fs from 'fs';
 import path from 'path';

@@ -1,14 +1,17 @@
 // Incremental offline pre-indexer for sharded audio subtitles (public/subtitles/*.json + manifest.json).
-// Scans public/index.json for all AUD resources (MP3/WAV/M4A/OGG and single/nested ZIP archives),
-// skips tracks already present in public/subtitles/ by SHA-256 hash, and transcribes ONLY newly added
-// tracks using local Whisper (CPU AVX2 + single Vulkan GPU worker) with Silero VAD, English exam rubric
-// probes (opening + post-reading-pause), and verbatim PDF.js forced alignment on IAL recordings.
+// Scans public/index.json (and/or public/index-cambridge.json via --board=edexcel|cambridge|all) for AUD
+// resources (MP3/WAV/M4A/OGG and single/nested ZIP archives), skips tracks already present in public/subtitles/
+// by SHA-256 hash, and transcribes ONLY newly added tracks using local Whisper (CPU AVX2 + single Vulkan GPU
+// worker) with Silero VAD, English exam rubric probes (opening + post-reading-pause), and verbatim PDF.js
+// forced alignment on Transcript PDFs.
 //
 // Usage:
-//   node scripts/index-audio-subtitles.js              # Incremental: index only newly added tracks
-//   node scripts/index-audio-subtitles.js --dry-run    # Preview pending new tracks without transcribing
-//   node scripts/index-audio-subtitles.js --cpu-only   # Use CPU worker only (skip Vulkan GPU)
-//   node scripts/index-audio-subtitles.js --force      # Re-index all tracks from scratch
+//   node scripts/index-audio-subtitles.js                          # Incremental Edexcel AUD pre-index (default)
+//   node scripts/index-audio-subtitles.js --board=cambridge        # Incremental Cambridge AUD pre-index
+//   node scripts/index-audio-subtitles.js --board=all --dry-run    # Preview pending tracks across both boards
+//   node scripts/index-audio-subtitles.js --syllabuses=0510,0520   # Filter Cambridge AUD by 4-digit code(s)
+//   node scripts/index-audio-subtitles.js --cpu-only               # Use CPU worker only (skip Vulkan GPU)
+//   node scripts/index-audio-subtitles.js --force                  # Re-index selected tracks from scratch
 
 import fs from 'fs';
 import path from 'path';
@@ -39,6 +42,12 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const CPU_ONLY = args.includes('--cpu-only');
 const FORCE = args.includes('--force');
+const boardArg = args.find((a) => a.startsWith('--board='));
+const TARGET_BOARD = boardArg ? boardArg.split('=')[1].toLowerCase() : 'edexcel';
+const sylArg = args.find((a) => a.startsWith('--syllabuses=') || a.startsWith('--syllabus='));
+const SYLLABUS_FILTER = sylArg
+  ? new Set(sylArg.slice(sylArg.indexOf('=') + 1).split(',').map((s) => s.trim()).filter(Boolean))
+  : null;
 const gpuDevArg = args.find((a) => a.startsWith('--gpu-dev='));
 const GPU_DEV = gpuDevArg ? gpuDevArg.split('=')[1] : '0';
 const threadsArg = args.find((a) => a.startsWith('--threads='));
@@ -52,6 +61,27 @@ const LANG_CODE = {
   Chinese: 'zh',
   Swahili: 'sw'
 };
+
+function inferCliLangCode(subject = '') {
+  if (LANG_CODE[subject]) return LANG_CODE[subject];
+  const s = String(subject || '').toLowerCase();
+  if (s.includes('french')) return 'fr';
+  if (s.includes('german')) return 'de';
+  if (s.includes('spanish')) return 'es';
+  if (s.includes('chinese') || s.includes('mandarin')) return 'zh';
+  if (s.includes('arabic')) return 'ar';
+  if (s.includes('urdu')) return 'ur';
+  if (s.includes('malay')) return 'ms';
+  if (s.includes('tamil')) return 'ta';
+  if (s.includes('sinhala')) return 'si';
+  if (s.includes('bengali') || s.includes('bangla')) return 'bn';
+  if (s.includes('hindi')) return 'hi';
+  if (s.includes('gujarati')) return 'gu';
+  if (s.includes('turkish')) return 'tr';
+  if (s.includes('greek')) return 'el';
+  if (s.includes('swahili')) return 'sw';
+  return 'en';
+}
 
 const PREFIX_MAP = { French: 'WFR', German: 'WGN', Spanish: 'WSP' };
 
@@ -879,8 +909,8 @@ async function transcribeTrack(job, workerConfig) {
     return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
   }
 
-  const lang = LANG_CODE[job.subject] || 'en';
-  const isIgcse = job.spec === 'IGCSE';
+  const lang = inferCliLangCode(job.subject);
+  const isIgcse = job.spec === 'IGCSE' || job.spec === 'CIE-IGCSE' || job.spec === 'CIE-OL';
   const useVad = isIgcse;
   const maxContext = lang === 'zh' || lang === 'sw' ? '0' : '64';
   const { audioPath, isTemp } = materializeAudioFile(job);
@@ -1132,12 +1162,25 @@ async function main() {
     }
   }
 
-  // 2. Scan public/index.json for all AUD resources and compute SHA-256 track IDs + candidate keys
-  const idx = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-  const files = idx.files.map((r) => Object.fromEntries(idx.keys.map((k, i) => [k, r[i]])));
+  // 2. Scan selected board index(es) for AUD resources and compute SHA-256 track IDs + candidate keys
+  const indexPathsToScan = [];
+  if (TARGET_BOARD === 'edexcel' || TARGET_BOARD === 'all') indexPathsToScan.push(indexPath);
+  if (TARGET_BOARD === 'cambridge' || TARGET_BOARD === 'all') {
+    const cieIdxPath = path.join(PUBLIC_DIR, 'index-cambridge.json');
+    if (fs.existsSync(cieIdxPath)) indexPathsToScan.push(cieIdxPath);
+  }
+  const files = [];
+  for (const ip of indexPathsToScan) {
+    const idx = JSON.parse(fs.readFileSync(ip, 'utf8'));
+    for (const r of idx.files || []) {
+      const obj = Object.fromEntries(idx.keys.map((k, i) => [k, r[i]]));
+      if (SYLLABUS_FILTER && obj.syllabusCode && !SYLLABUS_FILTER.has(String(obj.syllabusCode))) continue;
+      files.push(obj);
+    }
+  }
   const targetAuds = files.filter((f) => f.docType === 'AUD');
   const pdfPool = files.filter(
-    (f) => f.path.toLowerCase().endsWith('.pdf') && (f.docType === 'SC' || f.docType === 'MS' || /_QP_2|transcript/i.test(f.name))
+    (f) => f.path.toLowerCase().endsWith('.pdf') && (f.docType === 'SC' || f.docType === 'MS' || /_QP_2|_tn_|transcript/i.test(f.name))
   );
 
   const uniqueTracks = new Map();
@@ -1263,7 +1306,7 @@ async function main() {
       )
       .sort((a, b) => {
         const score = (x) =>
-          /transcript/i.test(x.name) && x.docType === 'SC' ? 30 : /_QP_2/i.test(x.name) ? 20 : x.docType === 'MS' ? 10 : 0;
+          (/transcript|_tn_/i.test(x.name) && x.docType === 'SC') ? 30 : /_QP_2/i.test(x.name) ? 20 : x.docType === 'MS' ? 10 : 0;
         return score(b) - score(a);
       });
     job.candidatePdfs = matchingPdfs.map((p) => ({ docType: p.docType, path: p.path, name: p.name }));

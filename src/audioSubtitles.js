@@ -482,12 +482,22 @@ async function getWhisperTranscriber(onStatus) {
 
 function inferWhisperLanguage(subject) {
   const s = String(subject || '').toLowerCase();
-  if (s.includes('chinese')) return 'chinese';
+  if (s.includes('chinese') || s.includes('mandarin')) return 'chinese';
+  if (s.includes('arabic')) return 'arabic';
+  if (s.includes('urdu')) return 'urdu';
+  if (s.includes('malay')) return 'malay';
+  if (s.includes('tamil')) return 'tamil';
+  if (s.includes('sinhala')) return 'sinhala';
+  if (s.includes('bengali') || s.includes('bangla')) return 'bengali';
+  if (s.includes('hindi')) return 'hindi';
+  if (s.includes('gujarati')) return 'gujarati';
+  if (s.includes('turkish')) return 'turkish';
+  if (s.includes('greek')) return 'greek';
   if (s.includes('swahili')) return 'swahili';
   if (s.includes('german')) return 'german';
   if (s.includes('spanish')) return 'spanish';
-  if (s.includes('english') || s.includes('esl')) return 'english';
-  return 'french';
+  if (s.includes('french')) return 'french';
+  return 'english';
 }
 
 export async function generateLiveWhisperSubtitles({

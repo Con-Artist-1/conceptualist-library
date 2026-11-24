@@ -1,6 +1,6 @@
 # Conceptualist Systems — Multi-Board Architecture & Exam Board Deep-Dive
 
-**Status:** Implemented in `v8.0.0` (Phases 1–5 Complete — Live Multi-Board Engine + 2,979 Pilot Cambridge Papers across 20 Subjects)  
+**Status:** Implemented & Fully Rolled Out in `v8.1.0` (`78,739` Archived Files / `74,877` Unique Records across `62` Edexcel Subjects + All `107/107` International Cambridge Syllabuses `2002–2026`)  
 **Target Scope:** Strictly **International Exam Boards Only** (excluding UK domestic GCSE / GCE A-Level boards such as OCR, UK AQA, UK Edexcel GCE, and WJEC/Eduqas). Adding **Cambridge International (CAIE — International AS & A Level, IGCSE, O Level)** alongside **Pearson Edexcel International (IAL & IGCSE)** via an isolated, extensible **Board Switcher + Pluggable Adapter** architecture—designed so future international boards (**OxfordAQA** International A-Level/GCSE, **IB Diploma**, **AP**) can be added cleanly without modifying core UI layouts, breaking search precision, or disrupting existing Edexcel routes and data.
 
 ---

@@ -105,7 +105,7 @@ async function ensureRepoExists(repoFullName) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: repoName,
-        description: 'Conceptualist Systems — Pearson Edexcel IAL & IGCSE Past Papers & Textbooks Library (conceptualist.uk)',
+        description: 'Conceptualist Systems — International Edexcel & Cambridge Past Papers & Textbooks Library (conceptualist.uk)',
         homepage: 'https://www.conceptualist.uk',
         private: false,
         auto_init: true

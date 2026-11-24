@@ -366,7 +366,7 @@ const generatedAt = new Date().toISOString();
 
 const coverageRangeStr = computeCoverageString(flatFiles, 'January 2003 – June 2026');
 const edexcelCoverageStr = computeCoverageString(edexcelFlat, 'January 2003 – June 2026');
-const cambridgeCoverageStr = computeCoverageString(cambridgeFlat, 'May/June 2018 – Oct/Nov 2025');
+const cambridgeCoverageStr = computeCoverageString(cambridgeFlat, 'Oct/Nov 2002 – May/June 2026');
 
 const totalBooks = dedupedFiles.filter((f) => isBookCategory(f.category)).length;
 const ialBooks = edexcelDeduped.filter((f) => f.category === CATEGORY_BOOKS).length;
