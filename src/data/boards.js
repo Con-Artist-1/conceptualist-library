@@ -21,7 +21,7 @@ export const BOARD_REGISTRY = {
         crossBoardLabel: 'EDX IAL',
         badgeCls: 'ial',
         routeSlug: 'ial',
-        indexFile: 'index-edexcel.json'
+        indexFile: 'index.json'
       },
       {
         id: 'Edexcel IGCSE',
@@ -31,7 +31,7 @@ export const BOARD_REGISTRY = {
         crossBoardLabel: 'EDX IGCSE',
         badgeCls: 'igcse',
         routeSlug: 'igcse',
-        indexFile: 'index-edexcel.json'
+        indexFile: 'index.json'
       }
     ],
     sessions: ['January', 'June', 'October'],
@@ -55,7 +55,7 @@ export const BOARD_REGISTRY = {
         crossBoardLabel: 'CAIE AL',
         badgeCls: 'cie-al',
         routeSlug: 'cambridge/a-level',
-        indexFile: 'index-cie-al.json'
+        indexFile: 'index-cambridge.json'
       },
       {
         id: 'Cambridge IGCSE',
@@ -65,7 +65,7 @@ export const BOARD_REGISTRY = {
         crossBoardLabel: 'CAIE IGCSE',
         badgeCls: 'cie-igcse',
         routeSlug: 'cambridge/igcse',
-        indexFile: 'index-cie-igcse.json'
+        indexFile: 'index-cambridge.json'
       },
       {
         id: 'Cambridge O Level',
@@ -75,7 +75,7 @@ export const BOARD_REGISTRY = {
         crossBoardLabel: 'CAIE OL',
         badgeCls: 'cie-ol',
         routeSlug: 'cambridge/o-level',
-        indexFile: 'index-cie-ol.json'
+        indexFile: 'index-cambridge.json'
       }
     ],
     sessions: ['Feb/March', 'May/June', 'Oct/Nov'],
@@ -188,18 +188,9 @@ export function getCurriculumMeta(curriculum) {
     crossBoardLabel: 'EDX IAL',
     badgeCls: 'ial',
     routeSlug: 'ial',
-    indexFile: 'index-edexcel.json',
+    indexFile: 'index.json',
     boardId: 'edexcel'
   };
-}
-
-export function getIndexFileForBoardOrCurriculum(boardId = 'edexcel', curriculum = '') {
-  if (curriculum) {
-    const meta = getCurriculumMeta(curriculum);
-    return meta.indexFile;
-  }
-  if (boardId === 'cambridge') return 'index-cambridge.json';
-  return 'index-edexcel.json';
 }
 
 export function isCambridgePath(pathStr = '') {

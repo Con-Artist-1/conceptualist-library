@@ -79,7 +79,7 @@ export function buildRouteFaqEntries({
   }
 
   if (filterSubject && filterUnit) {
-    const unitCode = getUnitCodeFromLabel(filterUnit);
+    const unitCode = getUnitCodeFromLabel(filterUnit, { isCambridge: isCie });
     const legacyEq = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject, filterUnit });
     const unitObj = meta?.wizard?.[curr]?.[filterSubject]?.units?.[filterUnit];
     const docCount = unitObj?.count || 40;
@@ -238,7 +238,7 @@ export function buildJsonLd({
     if (filterSubject && filterUnit) {
       const currSlug = getCurriculumSlug(filterCurriculum || inferCurriculumForSubject(filterSubject, 'Edexcel IAL'));
       const subjSlug = getSubjectSlug(filterSubject);
-      const unitSlug = getUnitSlug(filterUnit);
+      const unitSlug = getUnitSlug(filterUnit, { isCambridge: isCie });
       breadcrumbs.push({
         '@type': 'ListItem',
         position: breadcrumbs.length + 1,
@@ -309,7 +309,7 @@ export function buildJsonLd({
           '@type': 'ListItem',
           position: idx + 1,
           name: `${curr} ${formatSubjectName(filterSubject)} — ${u}`,
-          url: `${SITE_URL}/${currSlug}/${subjSlug}/${getUnitSlug(u)}`
+          url: `${SITE_URL}/${currSlug}/${subjSlug}/${getUnitSlug(u, { isCambridge: isCie })}`
         }))
       });
     }

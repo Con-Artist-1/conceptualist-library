@@ -1,7 +1,8 @@
 // Pure multi-board catalog hydration, sibling grouping, smart search & query engine.
 // Runs off the main UI thread inside src/workers/catalog.worker.js (with transparent fallback).
 
-import { extractVariant, getCleanUnitLabel, compareUnitLabels } from '../unitParser.js';
+import { compareUnitLabels } from './unitSort.js';
+import { decodeCatalogFiles } from './indexSerializer.js';
 import { getBookMetadata } from '../bookCatalog.js';
 import { getPaperTotalViews } from './paperKeys.js';
 import {
@@ -115,25 +116,42 @@ export function serializeItemForUi(item) {
   return out;
 }
 
-export function hydrateCatalogPayload(json) {
-  let rawList = [];
-  if (json.files && json.keys) {
-    const keys = json.keys;
-    const kLen = keys.length;
-    rawList = new Array(json.files.length);
-    for (let i = 0; i < json.files.length; i++) {
-      const arr = json.files[i];
-      const fileObj = {};
-      for (let j = 0; j < kLen; j++) {
-        fileObj[keys[j]] = arr[j];
-      }
-      rawList[i] = fileObj;
-    }
-  } else {
-    rawList = json.flatFiles || [];
+export function ensureItemSearchData(item) {
+  if (!item) return null;
+  if (item._search) return item._search;
+  if (item.isUnifiedSitting && Array.isArray(item._searchSources)) {
+    const sources = item._searchSources;
+    finalizeUnifiedSearchData(item, sources);
+    item._searchSources = null;
+    return item._search;
   }
+  item._search = buildFileSearchData(item);
+  return item._search;
+}
+
+function ensureCatalogVocab(state) {
+  if (!state) return undefined;
+  if (!state.catalogVocab) {
+    state.catalogVocab = buildCatalogVocab(state.flatFiles);
+  }
+  return state.catalogVocab;
+}
+
+function pushMapList(mapObj, key, item) {
+  if (!key) return;
+  let arr = mapObj.get(key);
+  if (!arr) {
+    arr = [];
+    mapObj.set(key, arr);
+  }
+  arr.push(item);
+}
+
+export function hydrateCatalogPayload(json) {
+  const rawList = decodeCatalogFiles(json);
 
   const flatFiles = new Array(rawList.length);
+  const bySyllabusFlat = new Map();
   let bookCount = 0;
   let audioCount = 0;
 
@@ -141,9 +159,6 @@ export function hydrateCatalogPayload(json) {
     const fileObj = rawList[i];
     if (fileObj.name && fileObj.name.includes('_17')) {
       fileObj.name = fileObj.name.replace(/_\d{10,14}/g, '');
-    }
-    if (fileObj.path && fileObj.path.includes('_17')) {
-      fileObj.path = fileObj.path.replace(/_\d{10,14}/g, '');
     }
 
     const dotIdx = fileObj.name ? fileObj.name.lastIndexOf('.') : -1;
@@ -153,8 +168,8 @@ export function hydrateCatalogPayload(json) {
     if (!fileObj.syllabusCode && isCambridgeSpec(fileObj.spec)) {
       fileObj.syllabusCode = extractSyllabusCodeFromSubject(fileObj.subject) || null;
     }
-    if (fileObj.variant === undefined) fileObj.variant = extractVariant(fileObj);
-    if (fileObj.cleanUnitLabel === undefined) fileObj.cleanUnitLabel = getCleanUnitLabel(fileObj);
+    if (fileObj.variant === undefined || fileObj.variant === null) fileObj.variant = '';
+    if (fileObj.cleanUnitLabel === undefined) fileObj.cleanUnitLabel = fileObj.unitName || null;
 
     if (!fileObj.sortKey) {
       let sessionVal = 0;
@@ -175,7 +190,9 @@ export function hydrateCatalogPayload(json) {
     }
     if (fileObj.docType === 'AUD') audioCount++;
 
-    fileObj._search = buildFileSearchData(fileObj);
+    if (fileObj.syllabusCode) {
+      pushMapList(bySyllabusFlat, fileObj.syllabusCode, fileObj);
+    }
     flatFiles[i] = fileObj;
   }
 
@@ -392,6 +409,7 @@ export function hydrateCatalogPayload(json) {
 
   const lookupById = new Map();
   const lookupByPath = new Map();
+  const bySyllabusUnified = new Map();
   let sampleAudio = null;
   let fallbackAudioWithQp = null;
   let fallbackAudioAny = null;
@@ -415,13 +433,15 @@ export function hydrateCatalogPayload(json) {
       item.size = item.totalSize;
       item.docType = primary.docType;
       item.siblings = primary.siblings;
-      const searchSources = item.docs.AUD && !item._childFiles.includes(item.docs.AUD)
+      item._searchSources = item.docs.AUD && !item._childFiles.includes(item.docs.AUD)
         ? [...item._childFiles, item.docs.AUD]
         : item._childFiles;
-      finalizeUnifiedSearchData(item, searchSources);
       delete item._childFiles;
     }
 
+    if (item.syllabusCode) {
+      pushMapList(bySyllabusUnified, item.syllabusCode, item);
+    }
     if (item.id && !lookupById.has(item.id)) lookupById.set(item.id, item);
     if (item.path && !lookupByPath.has(item.path)) lookupByPath.set(item.path, item);
 
@@ -439,13 +459,13 @@ export function hydrateCatalogPayload(json) {
     if (f.path && !lookupByPath.has(f.path)) lookupByPath.set(f.path, f);
   }
 
-  const catalogVocab = buildCatalogVocab(flatFiles);
-
   return {
     flatFiles,
     dedupedFiles,
     unifiedFiles,
-    catalogVocab,
+    bySyllabusUnified,
+    bySyllabusFlat,
+    catalogVocab: null,
     lookupById,
     lookupByPath,
     sampleAudio: sampleAudio || fallbackAudioWithQp || fallbackAudioAny || null,
@@ -468,7 +488,8 @@ export function mergeHydratedStates(statesList) {
   const flatFiles = [];
   const dedupedFiles = [];
   const unifiedFiles = [];
-  const vocabSet = new Set();
+  const bySyllabusUnified = new Map();
+  const bySyllabusFlat = new Map();
   const lookupById = new Map();
   const lookupByPath = new Map();
   let sampleAudio = null;
@@ -480,7 +501,18 @@ export function mergeHydratedStates(statesList) {
     for (let j = 0; j < st.flatFiles.length; j++) flatFiles.push(st.flatFiles[j]);
     for (let j = 0; j < st.dedupedFiles.length; j++) dedupedFiles.push(st.dedupedFiles[j]);
     for (let j = 0; j < st.unifiedFiles.length; j++) unifiedFiles.push(st.unifiedFiles[j]);
-    for (let j = 0; j < st.catalogVocab.length; j++) vocabSet.add(st.catalogVocab[j]);
+    if (st.bySyllabusUnified) {
+      for (const [code, list] of st.bySyllabusUnified.entries()) {
+        const existing = bySyllabusUnified.get(code);
+        bySyllabusUnified.set(code, existing ? existing.concat(list) : list.slice());
+      }
+    }
+    if (st.bySyllabusFlat) {
+      for (const [code, list] of st.bySyllabusFlat.entries()) {
+        const existing = bySyllabusFlat.get(code);
+        bySyllabusFlat.set(code, existing ? existing.concat(list) : list.slice());
+      }
+    }
     for (const [k, v] of st.lookupById.entries()) if (!lookupById.has(k)) lookupById.set(k, v);
     for (const [k, v] of st.lookupByPath.entries()) if (!lookupByPath.has(k)) lookupByPath.set(k, v);
     if (!sampleAudio && st.sampleAudio) sampleAudio = st.sampleAudio;
@@ -492,7 +524,9 @@ export function mergeHydratedStates(statesList) {
     flatFiles,
     dedupedFiles,
     unifiedFiles,
-    catalogVocab: Array.from(vocabSet),
+    bySyllabusUnified,
+    bySyllabusFlat,
+    catalogVocab: null,
     lookupById,
     lookupByPath,
     sampleAudio,
@@ -558,7 +592,10 @@ export function queryCatalogState(state, params) {
   const hasDocType = Boolean(filterDocType);
 
   const effectiveBoard = hasBoard ? filterBoard : '';
-  const parsedSearch = parseSearchQuery(searchQuery, state.catalogVocab, { activeBoard: effectiveBoard });
+  const hasRawSearch = Boolean(searchQuery && String(searchQuery).trim());
+  const parsedSearch = hasRawSearch
+    ? parseSearchQuery(searchQuery, () => ensureCatalogVocab(state), { activeBoard: effectiveBoard })
+    : { hasQuery: false, groups: [], exclusions: [], corrections: [], didYouMean: '' };
   const queryRequestsSessionDoc = Boolean(
     parsedSearch.hasQuery &&
     Array.isArray(parsedSearch.groups) &&
@@ -572,18 +609,30 @@ export function queryCatalogState(state, params) {
   );
   const hideAttachedSessionDocs = Boolean(useUnified && !hasDocType && !queryRequestsSessionDoc);
 
-  let files;
-  if (!hasFolder && !hasBoard && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasVariant && !hasDocType && !hideAttachedSessionDocs) {
-    files = sourceFiles;
-  } else {
+  // Fast O(1) syllabus bucket pre-filter when query specifies an unambiguous Cambridge 4-digit code
+  let syllabusBucket = null;
+  if (parsedSearch.hasQuery && !hasFolder && !hasSubject && !hasUnit) {
+    const cieGroup = parsedSearch.groups.find((g) => g.isCieSyllabus && g.resolvedCieCode);
+    if (cieGroup && (!hasBoard || filterBoard === 'cambridge')) {
+      const sylMap = useUnified ? state.bySyllabusUnified : state.bySyllabusFlat;
+      if (sylMap) {
+        syllabusBucket = sylMap.get(cieGroup.resolvedCieCode) || sylMap.get(cieGroup.primary) || null;
+      }
+    }
+  }
+
+  const applyAttributeFilters = (inputList) => {
+    if (!hasFolder && !hasBoard && !hasCurriculum && !hasSubject && !hasUnit && !hasYear && !hasSession && !hasVariant && !hasDocType && !hideAttachedSessionDocs) {
+      return inputList;
+    }
     const filtered = [];
-    const len = sourceFiles.length;
+    const len = inputList.length;
     const lowerSession = hasSession ? filterSession.toLowerCase() : '';
     const strYear = hasYear ? String(filterYear) : '';
     const strVariant = hasVariant ? String(filterVariant) : '';
 
     for (let i = 0; i < len; i++) {
-      const f = sourceFiles[i];
+      const f = inputList[i];
       if (hideAttachedSessionDocs && f.isAttachedSessionDoc) continue;
 
       if (hasFolder) {
@@ -612,13 +661,13 @@ export function queryCatalogState(state, params) {
         } else if (filterDocType === 'Extra') {
           if (useUnified) {
             const hasExtra = Boolean(
-              f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL || f.docs?.GT ||
-              f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL' || f.docType === 'GT'
+              f.docs?.DF || f.docs?.AUD || f.docs?.SC || f.docs?.SAM || f.docs?.SOL ||
+              f.docType === 'DF' || f.docType === 'AUD' || f.docType === 'SC' || f.docType === 'SAM' || f.docType === 'SOL'
             );
             if (!hasExtra) continue;
           } else if (
             f.docType !== 'DF' && f.docType !== 'AUD' && f.docType !== 'SC' &&
-            f.docType !== 'SAM' && f.docType !== 'SOL' && f.docType !== 'GT'
+            f.docType !== 'SAM' && f.docType !== 'SOL'
           ) {
             continue;
           }
@@ -635,19 +684,39 @@ export function queryCatalogState(state, params) {
 
       filtered.push(f);
     }
-    files = filtered;
-  }
+    return filtered;
+  };
 
-  const searchExec = parsedSearch.hasQuery
-    ? executeSmartSearch(files, parsedSearch, { isUnified: useUnified })
-    : {
-        files,
-        relevanceMap: null,
-        isPartialFallback: false,
-        missingTerms: [],
-        appliedCorrections: [],
-        didYouMean: ''
-      };
+  let searchExec;
+  if (parsedSearch.hasQuery) {
+    if (syllabusBucket && syllabusBucket.length > 0) {
+      const fastPool = applyAttributeFilters(syllabusBucket);
+      const fastRes = executeSmartSearch(fastPool, parsedSearch, {
+        isUnified: useUnified,
+        ensureSearchData: ensureItemSearchData
+      });
+      if (!fastRes.isPartialFallback && fastRes.files.length > 0) {
+        searchExec = fastRes;
+      }
+    }
+    if (!searchExec) {
+      const fullPool = applyAttributeFilters(sourceFiles);
+      searchExec = executeSmartSearch(fullPool, parsedSearch, {
+        isUnified: useUnified,
+        ensureSearchData: ensureItemSearchData
+      });
+    }
+  } else {
+    const files = applyAttributeFilters(sourceFiles);
+    searchExec = {
+      files,
+      relevanceMap: null,
+      isPartialFallback: false,
+      missingTerms: [],
+      appliedCorrections: [],
+      didYouMean: ''
+    };
+  }
 
   const matchedFiles = searchExec.files;
   const relevanceMap = searchExec.relevanceMap;

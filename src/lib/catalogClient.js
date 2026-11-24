@@ -91,17 +91,23 @@ function createWorkerClient() {
 
   const getFallbackStateForBoard = (eng, filterBoard = '') => {
     if (filterBoard === 'edexcel' || filterBoard === 'cambridge') {
+      if (fallbackMerged) fallbackMerged = null;
       const full = fallbackBoardStates.get(filterBoard);
       if (full) return full;
-      if (fallbackShardState && (!fallbackShardBoard || fallbackShardBoard === filterBoard)) return fallbackShardState;
+      if (fallbackShardState && (!fallbackShardBoard || fallbackShardBoard === 'all' || fallbackShardBoard === filterBoard)) return fallbackShardState;
       return null;
     }
     if (fallbackBoardStates.size === 0) return fallbackShardState;
-    if (fallbackBoardStates.size === 1) return fallbackBoardStates.values().next().value;
-    if (!fallbackMerged) {
-      fallbackMerged = eng.mergeHydratedStates(Array.from(fallbackBoardStates.values()));
+    if (fallbackBoardStates.size === 1 && (!fallbackShardState || fallbackShardBoard !== 'all')) {
+      return fallbackBoardStates.values().next().value;
     }
-    return fallbackMerged;
+    if (fallbackBoardStates.size >= 2) {
+      if (!fallbackMerged) {
+        fallbackMerged = eng.mergeHydratedStates(Array.from(fallbackBoardStates.values()));
+      }
+      return fallbackMerged;
+    }
+    return fallbackShardState || fallbackBoardStates.values().next().value;
   };
 
   const runFallback = async (type, payload, signal = null) => {
@@ -109,6 +115,9 @@ function createWorkerClient() {
     const bKey = String(payload.board || 'edexcel').toLowerCase();
 
     if (type === 'LOAD_BUFFER') {
+      if (!payload.buffer || payload.buffer.byteLength === 0) {
+        throw new Error('Transferred buffer detached before fallback decode');
+      }
       const text = new TextDecoder('utf-8').decode(new Uint8Array(payload.buffer));
       const json = JSON.parse(text);
       if (!payload.isFull && fallbackFullLoaded.has(bKey)) {

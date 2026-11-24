@@ -38,6 +38,8 @@ export function buildArchiveContextInfo({
   const {
     clearFilters,
     setIsNotFound,
+    setActiveBoard,
+    setScopeAllBoards,
     setFilterCurriculum,
     setFilterSubject,
     setFilterUnit,
@@ -105,6 +107,7 @@ export function buildArchiveContextInfo({
         label: 'IT & CS Data Files (.zip)',
         onClick: () => {
           clearFilters({ pushUrl: false });
+          setScopeAllBoards?.(true);
           setFilterDocType('DF');
           setForceShowTable(true);
         }
@@ -116,6 +119,7 @@ export function buildArchiveContextInfo({
         label: 'Listening Audio (MP3)',
         onClick: () => {
           clearFilters({ pushUrl: false });
+          setScopeAllBoards?.(true);
           setFilterDocType('AUD');
           setForceShowTable(true);
         }
@@ -130,7 +134,7 @@ export function buildArchiveContextInfo({
       ).slice().sort((a, b) => compareUnitLabels(a, b, filterSubject));
       for (const uLabel of unitList) {
         if (uLabel === filterUnit) continue;
-        const uSlug = getUnitSlug(uLabel);
+        const uSlug = getUnitSlug(uLabel, { isCambridge: isCie });
         if (!uSlug) continue;
         pushLink({
           href: `/${currSlug}/${subjSlug}/${uSlug}`,
@@ -182,39 +186,50 @@ export function buildArchiveContextInfo({
       }
     }
   } else if (filterDocType === 'DF') {
-    pushLink({
-      href: '/ial/information-technology',
-      label: 'IAL Information Technology',
-      onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IAL'); setFilterSubject('Information Technology'); setForceShowTable(true); }
-    });
-    pushLink({
-      href: '/igcse/computer-science',
-      label: 'IGCSE Computer Science',
-      onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Computer Science'); setForceShowTable(true); }
-    });
-    pushLink({
-      href: '/igcse/information-technology',
-      label: 'IGCSE Information Technology',
-      onClick: () => { clearFilters({ pushUrl: false }); setFilterCurriculum('Edexcel IGCSE'); setFilterSubject('Information Technology'); setForceShowTable(true); }
-    });
+    const dfHubs = [
+      { href: '/ial/information-technology', label: 'IAL Information Technology', board: 'edexcel', curr: 'Edexcel IAL', subj: 'Information Technology' },
+      { href: '/igcse/computer-science', label: 'IGCSE Computer Science', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'Computer Science' },
+      { href: '/igcse/information-technology', label: 'IGCSE Information Technology', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'Information Technology' },
+      { href: '/cambridge/igcse/ict-0417', label: 'Cambridge IGCSE ICT (0417)', board: 'cambridge', curr: 'Cambridge IGCSE', subj: 'ICT (0417)' },
+      { href: '/cambridge/a-level/information-technology-9626', label: 'Cambridge A-Level IT (9626)', board: 'cambridge', curr: 'Cambridge AS & A Level', subj: 'Information Technology (9626)' },
+      { href: '/cambridge/a-level/computer-science-9618', label: 'Cambridge A-Level CS (9618)', board: 'cambridge', curr: 'Cambridge AS & A Level', subj: 'Computer Science (9618)' }
+    ];
+    for (const hub of dfHubs) {
+      pushLink({
+        href: hub.href,
+        label: hub.label,
+        onClick: () => {
+          clearFilters({ pushUrl: false, targetBoard: hub.board });
+          setActiveBoard?.(hub.board);
+          setFilterCurriculum(hub.curr);
+          setFilterSubject(hub.subj);
+          setForceShowTable(true);
+        }
+      });
+    }
   } else if (filterDocType === 'AUD') {
     const audioHubs = [
-      { href: '/ial/french', label: 'IAL French Papers', curr: 'Edexcel IAL', subj: 'French' },
-      { href: '/ial/german', label: 'IAL German Papers', curr: 'Edexcel IAL', subj: 'German' },
-      { href: '/ial/spanish', label: 'IAL Spanish Papers', curr: 'Edexcel IAL', subj: 'Spanish' },
-      { href: '/igcse/english-as-a-second-language', label: 'IGCSE ESL Papers', curr: 'Edexcel IGCSE', subj: 'English as a Second Language' },
-      { href: '/igcse/french', label: 'IGCSE French Papers', curr: 'Edexcel IGCSE', subj: 'French' },
-      { href: '/igcse/german', label: 'IGCSE German Papers', curr: 'Edexcel IGCSE', subj: 'German' },
-      { href: '/igcse/spanish', label: 'IGCSE Spanish Papers', curr: 'Edexcel IGCSE', subj: 'Spanish' },
-      { href: '/igcse/chinese', label: 'IGCSE Chinese Papers', curr: 'Edexcel IGCSE', subj: 'Chinese' },
-      { href: '/igcse/swahili', label: 'IGCSE Swahili Papers', curr: 'Edexcel IGCSE', subj: 'Swahili' }
+      { href: '/ial/french', label: 'IAL French Papers', board: 'edexcel', curr: 'Edexcel IAL', subj: 'French' },
+      { href: '/ial/german', label: 'IAL German Papers', board: 'edexcel', curr: 'Edexcel IAL', subj: 'German' },
+      { href: '/ial/spanish', label: 'IAL Spanish Papers', board: 'edexcel', curr: 'Edexcel IAL', subj: 'Spanish' },
+      { href: '/igcse/english-as-a-second-language', label: 'Edexcel IGCSE ESL', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'English as a Second Language' },
+      { href: '/igcse/french', label: 'Edexcel IGCSE French', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'French' },
+      { href: '/igcse/german', label: 'Edexcel IGCSE German', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'German' },
+      { href: '/igcse/spanish', label: 'Edexcel IGCSE Spanish', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'Spanish' },
+      { href: '/igcse/chinese', label: 'Edexcel IGCSE Chinese', board: 'edexcel', curr: 'Edexcel IGCSE', subj: 'Chinese' },
+      { href: '/cambridge/igcse/english-as-a-second-language-0510', label: 'Cambridge IGCSE ESL (0510)', board: 'cambridge', curr: 'Cambridge IGCSE', subj: 'English as a Second Language (0510)' },
+      { href: '/cambridge/igcse/french-0520', label: 'Cambridge IGCSE French (0520)', board: 'cambridge', curr: 'Cambridge IGCSE', subj: 'French (0520)' },
+      { href: '/cambridge/igcse/german-0525', label: 'Cambridge IGCSE German (0525)', board: 'cambridge', curr: 'Cambridge IGCSE', subj: 'German (0525)' },
+      { href: '/cambridge/igcse/spanish-0530', label: 'Cambridge IGCSE Spanish (0530)', board: 'cambridge', curr: 'Cambridge IGCSE', subj: 'Spanish (0530)' },
+      { href: '/cambridge/igcse/mandarin-chinese-0547', label: 'Cambridge Mandarin (0547)', board: 'cambridge', curr: 'Cambridge IGCSE', subj: 'Mandarin Chinese (0547)' }
     ];
     for (const hub of audioHubs) {
       pushLink({
         href: hub.href,
         label: hub.label,
         onClick: () => {
-          clearFilters({ pushUrl: false });
+          clearFilters({ pushUrl: false, targetBoard: hub.board });
+          setActiveBoard?.(hub.board);
           setFilterCurriculum(hub.curr);
           setFilterSubject(hub.subj);
           setForceShowTable(true);
@@ -228,17 +243,17 @@ export function buildArchiveContextInfo({
         label: `${filterCurriculum} Textbooks`,
         onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
       });
-      pushLink({
-        href: '/data-files',
-        label: 'IT & CS Data Files',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('DF'); setForceShowTable(true); }
-      });
-      pushLink({
-        href: '/audio',
-        label: 'Listening Audio Archive',
-        onClick: () => { clearFilters({ pushUrl: false }); setFilterDocType('AUD'); setForceShowTable(true); }
-      });
     }
+    pushLink({
+      href: '/data-files',
+      label: 'IT & CS Data Files',
+      onClick: () => { clearFilters({ pushUrl: false }); setScopeAllBoards?.(true); setFilterDocType('DF'); setForceShowTable(true); }
+    });
+    pushLink({
+      href: '/audio',
+      label: 'Listening Audio Archive',
+      onClick: () => { clearFilters({ pushUrl: false }); setScopeAllBoards?.(true); setFilterDocType('AUD'); setForceShowTable(true); }
+    });
     const subjPool =
       filterCurriculum === 'Edexcel IGCSE' ? (meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT)
       : filterCurriculum === 'Edexcel IAL' ? (meta?.ialSubjects || IAL_SUBJECTS_DEFAULT)

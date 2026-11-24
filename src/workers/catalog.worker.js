@@ -36,17 +36,23 @@ const activeAbortControllers = new Map();
 
 function getStateForBoard(filterBoard = '') {
   if (filterBoard === 'edexcel' || filterBoard === 'cambridge') {
+    if (mergedCache) mergedCache = null;
     const full = boardStates.get(filterBoard);
     if (full) return full;
-    if (shardState && (!shardBoard || shardBoard === filterBoard)) return shardState;
+    if (shardState && (!shardBoard || shardBoard === 'all' || shardBoard === filterBoard)) return shardState;
     return null;
   }
   if (boardStates.size === 0) return shardState;
-  if (boardStates.size === 1) return boardStates.values().next().value;
-  if (!mergedCache) {
-    mergedCache = mergeHydratedStates(Array.from(boardStates.values()));
+  if (boardStates.size === 1 && (!shardState || shardBoard !== 'all')) {
+    return boardStates.values().next().value;
   }
-  return mergedCache;
+  if (boardStates.size >= 2) {
+    if (!mergedCache) {
+      mergedCache = mergeHydratedStates(Array.from(boardStates.values()));
+    }
+    return mergedCache;
+  }
+  return shardState || boardStates.values().next().value;
 }
 
 function applyJson(json, { isFull, board = 'edexcel' }) {
@@ -125,12 +131,15 @@ self.onmessage = async (event) => {
     }
 
     if (type === 'LOAD_SHARD') {
-      const { shardUrl, cacheUrl, expectedMeta, board = 'edexcel' } = payload;
+      const { shardUrl, board = 'edexcel' } = payload;
       const bKey = String(board || 'edexcel').toLowerCase();
       const controller = new AbortController();
       activeAbortControllers.set(id, controller);
       try {
-        if (boardFullLoaded.has(bKey)) {
+        const isAlreadyCovered = bKey === 'all'
+          ? (boardFullLoaded.has('edexcel') && boardFullLoaded.has('cambridge'))
+          : boardFullLoaded.has(bKey);
+        if (isAlreadyCovered) {
           self.postMessage({
             id,
             ok: true,
@@ -145,17 +154,9 @@ self.onmessage = async (event) => {
           });
           return;
         }
-        // Check Cache API for valid full board index first
-        if (cacheUrl) {
-          const cached = await readCachedIndex(cacheUrl);
-          if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-          if (isCacheFresh(cached, expectedMeta, bKey)) {
-            const result = applyJson(cached, { isFull: true, board: bKey });
-            self.postMessage({ id, ok: true, result: { ...result, fromFullCache: true } });
-            return;
-          }
-        }
 
+        // Always hydrate the lightweight route shard immediately (< 25 ms) so UI paints without
+        // waiting on full-index Cache API reads; App.jsx upgrades full index asynchronously in background.
         const res = await fetch(shardUrl, { signal: controller.signal });
         const ct = res.headers.get('content-type') || '';
         if (!res.ok || !ct.includes('application/json')) {
@@ -165,7 +166,8 @@ self.onmessage = async (event) => {
         if (!Array.isArray(shardJson?.files)) {
           throw new Error('Malformed shard payload');
         }
-        const result = applyJson(shardJson, { isFull: false, board: bKey });
+        const shardEffectiveBoard = shardJson.meta?.board || bKey;
+        const result = applyJson(shardJson, { isFull: false, board: shardEffectiveBoard });
         self.postMessage({ id, ok: true, result });
         return;
       } finally {

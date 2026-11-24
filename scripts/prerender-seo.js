@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import {
   SITE_URL,
@@ -31,6 +32,7 @@ import {
 } from '../src/data/cambridgeCatalog.js';
 import { BOOK_CATALOG_BY_PATH } from '../src/bookCatalog.js';
 import { CHANGELOG_HISTORY } from '../src/data/changelogHistory.js';
+import { decodeCatalogFiles, encodeCompactCatalog } from '../src/lib/indexSerializer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,22 +72,12 @@ function escapeXml(str) {
 }
 
 function unpackIndexFile(rawIndex) {
-  if (!rawIndex || !Array.isArray(rawIndex.files)) {
-    return { keys: [], rawTuples: [], items: [] };
+  if (!rawIndex) return { items: [] };
+  const decoded = decodeCatalogFiles(rawIndex);
+  for (let i = 0; i < decoded.length; i++) {
+    decoded[i].curriculum = getCurriculumForSpec(decoded[i].spec, decoded[i].category);
   }
-  const keys = Array.isArray(rawIndex.keys) ? rawIndex.keys : [];
-  const rawTuples = rawIndex.files;
-  const items = new Array(rawTuples.length);
-  for (let i = 0; i < rawTuples.length; i++) {
-    const arr = rawTuples[i];
-    const obj = {};
-    for (let j = 0; j < keys.length; j++) {
-      obj[keys[j]] = arr[j];
-    }
-    obj.curriculum = getCurriculumForSpec(obj.spec, obj.category);
-    items[i] = obj;
-  }
-  return { keys, rawTuples, items };
+  return { items: decoded };
 }
 
 function buildIndexLookup(items) {
@@ -120,50 +112,62 @@ function writeDistShards(rawIndexes) {
   if (validIndexes.length === 0) return 0;
 
   const firstIdx = validIndexes[0];
-  const keys = Array.isArray(firstIdx.keys) ? firstIdx.keys : [];
-  const shardMeta = {
+  const baseShardMeta = {
     generatedAt: firstIdx.meta?.generatedAt || '',
     uniqueFiles: firstIdx.meta?.uniqueFiles || 0,
-    isShard: true
+    isShard: true,
+    isPreDeduped: true
   };
 
   const buckets = new Map();
-  const pushToBucket = (shardName, tuple) => {
-    if (!buckets.has(shardName)) buckets.set(shardName, []);
-    buckets.get(shardName).push(tuple);
+  const pushToBucket = (shardName, item) => {
+    let arr = buckets.get(shardName);
+    if (!arr) {
+      arr = [];
+      buckets.set(shardName, arr);
+    }
+    arr.push(item);
   };
 
   for (const rawIndex of validIndexes) {
-    const { rawTuples, items } = unpackIndexFile(rawIndex);
+    const { items } = unpackIndexFile(rawIndex);
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const tuple = rawTuples[i];
       const curr = inferCurriculumForSubject(item.subject, item.curriculum);
       const currSlug = getCurriculumSlug(curr);
       const subjSlug = getSubjectSlug(item.subject);
       if (currSlug && subjSlug) {
         const flatCurrSlug = currSlug.replace(/\//g, '-');
-        pushToBucket(`${flatCurrSlug}-${subjSlug}.json`, tuple);
+        pushToBucket(`${flatCurrSlug}-${subjSlug}.json`, item);
         if (currSlug === 'ial' && subjSlug === 'mathematics') {
           const branchShard = getIalMathBranchShardName(`${item.cleanUnitLabel || ''} ${item.unitCode || ''} ${item.name || ''}`);
-          pushToBucket(branchShard, tuple);
+          pushToBucket(branchShard, item);
         }
       }
       if (isBookCategory(item.category)) {
-        pushToBucket('textbooks.json', tuple);
+        pushToBucket('textbooks.json', item);
       }
       if (item.docType === 'DF') {
-        pushToBucket('data-files.json', tuple);
+        pushToBucket('data-files.json', item);
       }
       if (item.docType === 'AUD') {
-        pushToBucket('audio.json', tuple);
+        pushToBucket('audio.json', item);
       }
     }
   }
 
-  for (const [shardName, tuples] of buckets.entries()) {
-    const payload = JSON.stringify({ keys, meta: shardMeta, files: tuples });
-    fs.writeFileSync(path.join(shardsDir, shardName), payload, 'utf8');
+  for (const [shardName, itemsList] of buckets.entries()) {
+    const shardBoard = (shardName === 'audio.json' || shardName === 'data-files.json')
+      ? 'all'
+      : shardName.startsWith('cambridge-')
+        ? 'cambridge'
+        : 'edexcel';
+    const compactPayload = encodeCompactCatalog(itemsList, {
+      ...baseShardMeta,
+      board: shardBoard,
+      partitionUniqueFiles: itemsList.length
+    });
+    fs.writeFileSync(path.join(shardsDir, shardName), JSON.stringify(compactPayload), 'utf8');
   }
   return buckets.size;
 }
@@ -195,6 +199,11 @@ function collectAllRoutes(meta, indexLookup) {
   addRedirect('/edexcel-igcse', '/igcse');
   addRedirect('/caie', '/cambridge');
   addRedirect('/cie', '/cambridge');
+  addRedirect('/cambridge/al', '/cambridge/a-level');
+  addRedirect('/cambridge/as-a-level', '/cambridge/a-level');
+  addRedirect('/cambridge/ol', '/cambridge/o-level');
+  addRedirect('/textbooks/cambridge', '/textbooks');
+  addRedirect('/textbooks/cambridge/:path*', '/textbooks');
   addRedirect('/textbooks/edexcel-ial', '/textbooks/ial');
   addRedirect('/textbooks/edexcel-igcse', '/textbooks/igcse');
   const subjectAliasPairs = [
@@ -230,7 +239,10 @@ function collectAllRoutes(meta, indexLookup) {
     ['/ial/chemistry/practical-chemistry-i-wch13', '/ial/chemistry/unit-3-practical-chemistry-i-wch13'],
     ['/ial/chemistry/practical-chemistry-ii-wch16', '/ial/chemistry/unit-6-practical-chemistry-ii-wch16'],
     ['/ial/english-literature/unit-wet12', '/ial/english-literature/english-literature-unit-2-wet02'],
-    ['/ial/english-literature/wet12', '/ial/english-literature/english-literature-unit-2-wet02']
+    ['/ial/english-literature/wet12', '/ial/english-literature/english-literature-unit-2-wet02'],
+    ['/cambridge/a-level/mathematics-9709/pure-mathematics-1-p1-wma11', '/cambridge/a-level/mathematics-9709/pure-mathematics-1-p1'],
+    ['/cambridge/a-level/mathematics-9709/pure-mathematics-2-p2-wma12', '/cambridge/a-level/mathematics-9709/pure-mathematics-2-p2'],
+    ['/cambridge/a-level/mathematics-9709/pure-mathematics-3-p3-wma13', '/cambridge/a-level/mathematics-9709/pure-mathematics-3-p3']
   ];
   for (const [src, dst] of legacyUnitRedirects) {
     addRedirect(src, dst);
@@ -419,6 +431,10 @@ function collectAllRoutes(meta, indexLookup) {
         const sylCode = extractSyllabusCodeFromSubject(subj);
         if (sylCode) {
           addRedirect(`/cambridge/${sylCode}`, subjPath);
+          const codelessSlug = subjSlug.replace(/-\d{4}$/, '');
+          if (codelessSlug && codelessSlug !== subjSlug) {
+            addRedirect(`/${currSlug}/${codelessSlug}`, subjPath);
+          }
           const entry = resolveCambridgeSyllabus(sylCode);
           if (entry?.alt91) addRedirect(`/cambridge/${entry.alt91}`, subjPath);
           if (Array.isArray(entry?.legacyCodes)) {
@@ -433,7 +449,7 @@ function collectAllRoutes(meta, indexLookup) {
       const unitNames = Object.keys(unitsMap).sort((a, b) => compareUnitLabels(a, b, subj));
 
       for (const unitLabel of unitNames) {
-        const unitSlug = getUnitSlug(unitLabel);
+        const unitSlug = getUnitSlug(unitLabel, { isCambridge: isCie });
         const unitPath = `/${currSlug}/${subjSlug}/${unitSlug}`;
         const isLegacy = isLegacyUnitLabel(unitLabel);
 
@@ -505,17 +521,21 @@ function groupSittingsForHtml(items, limit = 80) {
 
 function buildStaticSemanticBody(route, seo, meta, indexLookup) {
   const {
+    activeBoard = 'edexcel',
     filterCurriculum = '',
     filterSubject = '',
     filterUnit = '',
     filterDocType = null,
+    forceShowTable = false,
     currentTab = 'library'
   } = route.state;
+  const isCieRoute = isCambridgeCurriculum(filterCurriculum) || (!filterCurriculum && activeBoard === 'cambridge');
   const links = [];
   const itemEntries = [];
   const legacyNote = getLegacyEquivalentsForState({ filterCurriculum, filterSubject, filterUnit });
   const faqEntries = buildRouteFaqEntries({
     currentTab,
+    activeBoard,
     filterCurriculum,
     filterSubject,
     filterUnit,
@@ -612,6 +632,9 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       '<li><a href="/igcse/information-technology/paper-2-p2">Edexcel IGCSE ICT Paper 2 (4IT1/02) Practical Papers</a></li>',
       '<li><a href="/igcse/computer-science">Edexcel IGCSE Computer Science (4CP0) Past Papers</a></li>',
       '<li><a href="/igcse/computer-science/paper-2-p2">Edexcel IGCSE Computer Science Paper 2 (4CP0/02) Practical Papers</a></li>',
+      '<li><a href="/cambridge/igcse/ict-0417">Cambridge IGCSE ICT (0417) Past Papers &amp; Source Files</a></li>',
+      '<li><a href="/cambridge/a-level/information-technology-9626">Cambridge AS &amp; A Level IT (9626) Past Papers &amp; Data Files</a></li>',
+      '<li><a href="/cambridge/a-level/computer-science-9618">Cambridge AS &amp; A Level Computer Science (9618) Past Papers</a></li>',
       '<li><a href="/textbooks/ial/information-technology">Edexcel IAL Information Technology Student Books 1 &amp; 2</a></li>',
       '<li><a href="/textbooks/igcse/information-technology">Edexcel IGCSE ICT Student Textbook</a></li>'
     );
@@ -639,7 +662,12 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       '<li><a href="/igcse/french">Edexcel IGCSE French (4FR1) Past Papers &amp; Listening Audio</a></li>',
       '<li><a href="/igcse/german">Edexcel IGCSE German (4GN1) Past Papers &amp; Listening Audio</a></li>',
       '<li><a href="/igcse/spanish">Edexcel IGCSE Spanish (4SP1) Past Papers &amp; Listening Audio</a></li>',
-      '<li><a href="/igcse/swahili">Edexcel IGCSE Swahili (4SW1) Past Papers &amp; Listening Audio</a></li>'
+      '<li><a href="/igcse/swahili">Edexcel IGCSE Swahili (4SW1) Past Papers &amp; Listening Audio</a></li>',
+      '<li><a href="/cambridge/igcse/english-as-a-second-language-0510">Cambridge IGCSE English as a Second Language (0510) Listening Audio</a></li>',
+      '<li><a href="/cambridge/igcse/french-0520">Cambridge IGCSE French (0520) Listening Audio</a></li>',
+      '<li><a href="/cambridge/igcse/german-0525">Cambridge IGCSE German (0525) Listening Audio</a></li>',
+      '<li><a href="/cambridge/igcse/spanish-0530">Cambridge IGCSE Spanish (0530) Listening Audio</a></li>',
+      '<li><a href="/cambridge/igcse/mandarin-chinese-0547">Cambridge IGCSE Mandarin Chinese (0547) Listening Audio</a></li>'
     );
   } else if (filterSubject && filterCurriculum && filterUnit) {
     const currSlug = getCurriculumSlug(filterCurriculum);
@@ -669,7 +697,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     for (const sibUnit of siblingUnits) {
       if (sibUnit === filterUnit) continue;
       links.push(
-        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(sibUnit)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${sibUnit} Past Papers`)}</a></li>`
+        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(sibUnit, { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${sibUnit} Past Papers`)}</a></li>`
       );
     }
   } else if (filterSubject && filterCurriculum) {
@@ -678,7 +706,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     const unitsObj = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units || {};
     for (const u of Object.keys(unitsObj).sort((a, b) => compareUnitLabels(a, b, filterSubject))) {
       links.push(
-        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${u} Past Papers & Mark Schemes`)}</a></li>`
+        `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u, { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${u} Past Papers & Mark Schemes`)}</a></li>`
       );
     }
     if (indexLookup?.booksByCurrSubj?.has(`${filterCurriculum}::${filterSubject}`)) {
@@ -697,9 +725,11 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     }
   } else if (filterCurriculum) {
     const currSlug = getCurriculumSlug(filterCurriculum);
-    links.push(
-      `<li><a href="/textbooks/${currSlug}">${escapeHtml(`${filterCurriculum} Textbooks & Worked Solution Banks`)}</a></li>`
-    );
+    if (!isCieRoute) {
+      links.push(
+        `<li><a href="/textbooks/${currSlug}">${escapeHtml(`${filterCurriculum} Textbooks & Worked Solution Banks`)}</a></li>`
+      );
+    }
     const subjectsObj = meta?.wizard?.[filterCurriculum] || {};
     for (const s of Object.keys(subjectsObj).sort()) {
       const subjSlug = getSubjectSlug(s);
@@ -709,7 +739,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       const uKeys = Object.keys(subjectsObj[s]?.units || {});
       if (uKeys.length === 1) {
         links.push(
-          `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0])}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
+          `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0], { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
         );
       }
     }
@@ -763,6 +793,9 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
   return `<main class="seo-prerender-shell" style="max-width:1160px;margin:24px auto;padding:20px 16px;font-family:'Roboto',system-ui,-apple-system,sans-serif;color:var(--text-primary,#1A1D20);background:var(--bg-surface,#FFFFFF);border-top:3px solid var(--mcmaster-maroon,#6F1D2B);box-sizing:border-box;">
       <nav aria-label="Breadcrumb" style="font-size:13px;margin-bottom:12px;">
         <a href="/" style="color:inherit;">Conceptualist Library Home</a>
+        ${isCieRoute && !filterDocType ? ' / <a href="/cambridge" style="color:inherit;">Cambridge International</a>' : ''}
+        ${isCieRoute && forceShowTable && !filterCurriculum && !filterSubject && !filterDocType ? ' / <span>All Cambridge Past Papers</span>' : ''}
+        ${!isCieRoute && forceShowTable && !filterCurriculum && !filterSubject && !filterDocType ? ' / <span>All Past Papers</span>' : ''}
         ${filterDocType === 'Book' ? ' / <a href="/textbooks" style="color:inherit;">Textbooks &amp; Solutions</a>' : ''}
         ${filterDocType === 'DF' ? ' / <span>IT &amp; CS Data Files</span>' : ''}
         ${filterDocType === 'AUD' ? ' / <span>Listening Audio MP3s</span>' : ''}
@@ -858,12 +891,8 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
     `<meta name="robots" content="${escapeHtml(seo.robots || 'index, follow')}" />`
   );
 
-  // Replace meta keywords
-  html = setOrInsertTag(
-    html,
-    /<meta\s+name="keywords"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="keywords" content="${escapeHtml(seo.keywords)}" />`
-  );
+  // Remove obsolete meta keywords tag to keep pre-rendered HTML lean
+  html = html.replace(/\s*<meta\s+name="keywords"\s+content="[^"]*"\s*\/?>/gi, '');
 
   // Replace or inject canonical when indexable or when a thin route provides a consolidating parent canonical
   if (String(seo.robots || '').includes('noindex') && !seo.consolidatingCanonical) {
@@ -902,6 +931,13 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
     /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:description" content="${escapeHtml(seo.description)}" />`
   );
+  if (routeBoard === 'cambridge') {
+    html = setOrInsertTag(
+      html,
+      /<meta\s+property="og:image:alt"\s+content="[^"]*"\s*\/?>/i,
+      '<meta property="og:image:alt" content="Conceptualist Systems — Cambridge International IGCSE, O Level &amp; A-Level Past Papers Reader" />'
+    );
+  }
 
   // Inject JSON-LD before </head> (escape '<' so embedded strings can never terminate the script element)
   const jsonLdScript = `  <script id="seo-json-ld" type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n  </head>`;
@@ -1094,19 +1130,33 @@ function run() {
   const { routes, aliasRedirects } = collectAllRoutes(meta, indexLookup);
   const lastmodDate = new Date().toISOString().split('T')[0];
 
-  // Sync permanent 308 alias redirects into vercel.json and remove catch-all rewrites so invalid subpaths return genuine HTTP 404 (dist/404.html)
-  if (fs.existsSync(VERCEL_CONFIG_PATH)) {
+  // Sync permanent 308 alias redirects, private allowlist function bundle, and inline <script> CSP SHA-256 into vercel.json
+  const syncVercelConfig = (inlineScriptCspHash = '') => {
+    if (!fs.existsSync(VERCEL_CONFIG_PATH)) return;
     try {
       const vercelCfg = JSON.parse(fs.readFileSync(VERCEL_CONFIG_PATH, 'utf8'));
       const sortedRedirects = [...aliasRedirects].sort((a, b) => a.source.localeCompare(b.source));
       vercelCfg.rewrites = [];
       vercelCfg.redirects = sortedRedirects;
+      if (vercelCfg.functions && vercelCfg.functions['api/*.js']) {
+        vercelCfg.functions['api/*.js'].includeFiles = 'api/_allowlist.json';
+      }
+      if (inlineScriptCspHash && Array.isArray(vercelCfg.headers)) {
+        for (const hRule of vercelCfg.headers) {
+          for (const h of hRule.headers || []) {
+            if (h.key === 'Content-Security-Policy' && typeof h.value === 'string') {
+              h.value = h.value.replace(/'sha256-[A-Za-z0-9+/=]+'/g, `'sha256-${inlineScriptCspHash}'`);
+            }
+          }
+        }
+      }
       fs.writeFileSync(VERCEL_CONFIG_PATH, JSON.stringify(vercelCfg, null, 2) + '\n', 'utf8');
-      console.log(`✅ Synced ${sortedRedirects.length} permanent shorthand/unit alias redirects into vercel.json (wildcard Soft-404 rewrites cleared).`);
+      console.log(`✅ Synced ${sortedRedirects.length} permanent redirects${inlineScriptCspHash ? ` + CSP sha256-${inlineScriptCspHash}` : ''} into vercel.json.`);
     } catch (err) {
-      console.warn('⚠️ Could not sync vercel.json redirects:', err.message);
+      console.warn('⚠️ Could not sync vercel.json:', err.message);
     }
-  }
+  };
+  syncVercelConfig();
 
   // 1. Write public/sitemap.xml & public/llms.txt
   const sitemapXml = generateSitemapXml(routes, lastmodDate, meta, indexLookup);
@@ -1123,6 +1173,11 @@ function run() {
   const distIndexPath = path.join(DIST_DIR, 'index.html');
   if (fs.existsSync(distIndexPath)) {
     const templateHtml = fs.readFileSync(distIndexPath, 'utf8');
+    const inlineScriptMatch = templateHtml.match(/<script>([\s\S]*?)<\/script>/i);
+    if (inlineScriptMatch) {
+      const cspSha256 = crypto.createHash('sha256').update(inlineScriptMatch[1], 'utf8').digest('base64');
+      syncVercelConfig(cspSha256);
+    }
 
     // Copy updated sitemap.xml, llms.txt & robots.txt to dist/
     fs.writeFileSync(path.join(DIST_DIR, 'sitemap.xml'), sitemapXml, 'utf8');
@@ -1151,7 +1206,7 @@ function run() {
     let prerenderedCount = 0;
     for (const route of routes) {
       let renderedHtml = injectSeoIntoHtml(templateHtml, route, meta, indexLookup);
-      if (route.path === '/') {
+      if (route.path === '/' || route.path === '/cambridge') {
         if (homePreloadTags) {
           const entryCssRe = /(<link\s+rel="stylesheet"\s+crossorigin\s+href="\/assets\/index-[^"]+\.css"\s*\/?>)/i;
           if (entryCssRe.test(renderedHtml)) {
@@ -1160,6 +1215,8 @@ function run() {
             renderedHtml = renderedHtml.replace(/<\/head>/i, `${homePreloadTags}\n  </head>`);
           }
         }
+      }
+      if (route.path === '/') {
         fs.writeFileSync(distIndexPath, renderedHtml, 'utf8');
         prerenderedCount++;
       } else {

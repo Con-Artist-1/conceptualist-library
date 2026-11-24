@@ -249,8 +249,20 @@ const PreviewModal = ({
   }, [handleCloseModal, headerVisible]);
 
   // Shared split drag handler parameterized for desktop (horizontal) and mobile (vertical)
+  const activeSplitDragCleanupRef = useRef(null);
+
+  useEffect(() => () => {
+    if (activeSplitDragCleanupRef.current) {
+      activeSplitDragCleanupRef.current();
+      activeSplitDragCleanupRef.current = null;
+    }
+  }, []);
+
   const startSplitDrag = useCallback((axis, e) => {
     if (!e.touches && e.cancelable) e.preventDefault();
+    if (activeSplitDragCleanupRef.current) {
+      activeSplitDragCleanupRef.current();
+    }
     setIsDragging(true);
 
     const onMove = (moveEvent) => {
@@ -270,20 +282,28 @@ const PreviewModal = ({
       }
     };
 
-    const onEnd = () => {
-      setIsDragging(false);
-      if (axis === 'x') setDesktopSplitRatio(desktopRatioRef.current);
-      else setMobileSplitRatio(mobileRatioRef.current);
+    const cleanupListeners = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onEnd);
       window.removeEventListener('touchmove', onMove);
       window.removeEventListener('touchend', onEnd);
+      window.removeEventListener('touchcancel', onEnd);
     };
 
+    function onEnd() {
+      cleanupListeners();
+      activeSplitDragCleanupRef.current = null;
+      setIsDragging(false);
+      if (axis === 'x') setDesktopSplitRatio(desktopRatioRef.current);
+      else setMobileSplitRatio(mobileRatioRef.current);
+    }
+
+    activeSplitDragCleanupRef.current = cleanupListeners;
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onEnd);
     window.addEventListener('touchmove', onMove, { passive: false });
     window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
   }, []);
 
   const handleDesktopDragStart = useCallback((e) => startSplitDrag('x', e), [startSplitDrag]);

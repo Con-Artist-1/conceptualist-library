@@ -1,6 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { buildRoutePath } from '../lib/routeCore.js';
-import { getUnifiedSittingTitle } from '../lib/libraryHelpers.js';
+import { isBookCategory } from '../data/boards.js';
+import { getDisplayTitle, getUnifiedSittingTitle } from '../lib/libraryHelpers.js';
+
+function getModalTitleSuffix(file, viewModeStr) {
+  if (isBookCategory(file.category)) {
+    return file.docType === 'SOL' ? 'Worked Solution Bank' : 'Student Textbook PDF';
+  }
+  const vUpper = String(viewModeStr || '').toUpperCase();
+  if (vUpper === 'AUD' || file.docType === 'AUD') return 'Listening Audio & Transcript';
+  if (vUpper === 'GT' || file.docType === 'GT') return 'Grade Thresholds';
+  if (vUpper === 'ER' || file.docType === 'ER') return 'Examiner Report';
+  if (vUpper === 'DF' || file.docType === 'DF') return 'Practical Data Files';
+  return 'Past Paper & Mark Scheme';
+}
 
 /**
  * Synchronizes active route state to browser history URL, <title>, OpenGraph/Twitter meta tags,
@@ -107,13 +120,22 @@ export function useSeoHeadSync({
       }
     }
 
-    const pageTitle = previewFile && !previewFile.isNotFound
-      ? `${getUnifiedSittingTitle(previewFile)} — Past Paper & Mark Scheme | Conceptualist Systems`
+    const modalBaseTitle = previewFile && !previewFile.isNotFound
+      ? (isBookCategory(previewFile.category) || !previewFile.isUnifiedSitting
+          ? getDisplayTitle(previewFile)
+          : getUnifiedSittingTitle(previewFile))
+      : '';
+    const pageTitle = modalBaseTitle
+      ? `${modalBaseTitle} — ${getModalTitleSuffix(previewFile, previewInitialView)} | Conceptualist`
       : seoMeta.title;
     document.title = pageTitle;
 
     const setMetaTag = (selector, attrName, attrVal, contentVal) => {
       let el = document.querySelector(selector);
+      if (!contentVal) {
+        if (el) el.remove();
+        return;
+      }
       if (!el) {
         el = document.createElement('meta');
         el.setAttribute(attrName, attrVal);
@@ -124,7 +146,7 @@ export function useSeoHeadSync({
 
     const robotsVal = seoMeta.robots || 'index, follow';
     setMetaTag('meta[name="description"]', 'name', 'description', seoMeta.description);
-    setMetaTag('meta[name="keywords"]', 'name', 'keywords', seoMeta.keywords);
+    setMetaTag('meta[name="keywords"]', 'name', 'keywords', '');
     setMetaTag('meta[name="robots"]', 'name', 'robots', robotsVal);
     setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
     setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);

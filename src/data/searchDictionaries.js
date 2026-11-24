@@ -16,7 +16,7 @@ export const STATIC_SEARCH_VOCAB = [
   'mechanics', 'mech', 'statistics', 'stat', 'stats', 'decision', 'core', 'extended', 'solomon',
   'unit', 'paper', 'papers', 'regional', 'foundation', 'higher', 'modular', 'variant', 'variants',
   'mcq', 'atp', 'alternative', 'multiple', 'choice', 'theory',
-  'question', 'questions', 'mark', 'scheme', 'schemes', 'markscheme', 'markschemes',
+  'question', 'questions', 'mark', 'scheme', 'schemes', 'markscheme', 'markschemes', 'que', 'rms', 'msc', 'eams',
   'examiner', 'examiners', 'report', 'reports', 'pef',
   'threshold', 'thresholds', 'grade', 'boundaries', 'boundary', 'gt',
   'insert', 'inserts', 'confidential', 'instructions', 'prerelease', 'tapescript',
@@ -38,6 +38,7 @@ export const STATIC_SEARCH_VOCAB = [
   '6ch01', '6ch02', '6ch03', '6ch04', '6ch05', '6ch06',
   '4ma0', '4ph0', '4ch0', '4bi0', '4hb0', '4es0', '4ar0', '4fr0', '4gn0', '4sp0', '4hi0', '4rs0',
   '4308', '4357', '4400', '7042',
+  '6663', '6664', '6665', '6666', '6667', '6668', '6669', '6677', '6678', '6679', '6683', '6684', '6685', '6689', '6691',
   'wma11', 'wma12', 'wma13', 'wma14', 'wma01', 'wma02', 'wfm01', 'wfm02', 'wfm03',
   'wme01', 'wme02', 'wme03', 'wst01', 'wst02', 'wst03', 'wdm11', 'wdm01',
   'wbi11', 'wbi12', 'wbi13', 'wbi14', 'wbi15', 'wbi16',
@@ -61,8 +62,8 @@ export const STATIC_SEARCH_VOCAB = [
 
 export const SHORT_VOCAB_3CHAR = new Set([
   'acc', 'ara', 'atp', 'aud', 'ban', 'bio', 'bus', 'che', 'cie', 'eco', 'eng', 'esl', 'ext', 'feb',
-  'fre', 'geo', 'ger', 'ict', 'jan', 'jun', 'law', 'lit', 'mar', 'may', 'mcq', 'nov',
-  'oct', 'pef', 'phy', 'sam', 'sol', 'spa'
+  'fre', 'geo', 'ger', 'ict', 'jan', 'jun', 'law', 'lit', 'mar', 'may', 'mcq', 'msc', 'nov',
+  'oct', 'pef', 'phy', 'que', 'rms', 'sam', 'sol', 'spa'
 ]);
 
 export const STATIC_SEARCH_VOCAB_SET = new Set(STATIC_SEARCH_VOCAB);
@@ -154,11 +155,15 @@ export const RAW_ATOMIC_SYNONYMS = {
 
   // Document types
   qp: ['qp', 'question paper', 'past paper'],
+  que: ['qp', 'question paper', 'past paper'],
   questionpaper: ['qp', 'question paper', 'past paper'],
   questionpapers: ['qp', 'question paper', 'past paper'],
   pastpaper: ['qp', 'question paper', 'past paper'],
   pastpapers: ['qp', 'question paper', 'past paper'],
   ms: ['ms', 'mark scheme', 'markscheme', 'answers'],
+  rms: ['ms', 'mark scheme', 'markscheme'],
+  msc: ['ms', 'mark scheme', 'markscheme'],
+  eams: ['ms', 'mark scheme', 'markscheme'],
   markscheme: ['ms', 'mark scheme', 'markscheme'],
   markschemes: ['ms', 'mark scheme', 'markscheme'],
   marking: ['ms', 'mark scheme', 'markscheme'],
@@ -293,6 +298,21 @@ export const RAW_ATOMIC_SYNONYMS = {
   c2: ['c2', 'c2a', 'c2r', '6664', 'core mathematics 2', 'core 2'],
   c3: ['c3', 'c3a', 'c3r', '6665', 'core mathematics 3', 'core 3'],
   c4: ['c4', 'c4a', 'c4r', '6666', 'core mathematics 4', 'core 4'],
+  '6663': ['c1', '6663', 'core mathematics 1', 'core 1'],
+  '6664': ['c2', '6664', 'core mathematics 2', 'core 2'],
+  '6665': ['c3', '6665', 'core mathematics 3', 'core 3'],
+  '6666': ['c4', '6666', 'core mathematics 4', 'core 4'],
+  '6667': ['fp1', 'f1', 'wfm01', '6667', 'further pure 1', 'further pure mathematics 1'],
+  '6668': ['fp2', 'f2', 'wfm02', '6668', 'further pure 2', 'further pure mathematics 2'],
+  '6669': ['fp3', 'f3', 'wfm03', '6669', 'further pure 3', 'further pure mathematics 3'],
+  '6677': ['m1', 'wme01', '6677', 'mechanics 1'],
+  '6678': ['m2', 'wme02', '6678', 'mechanics 2'],
+  '6679': ['m3', 'wme03', '6679', 'mechanics 3'],
+  '6683': ['s1', 'wst01', '6683', 'statistics 1'],
+  '6684': ['s2', 'wst02', '6684', 'statistics 2'],
+  '6685': ['s3', 'wst03', '6685', 'statistics 3'],
+  '6691': ['s3', 'wst03', '6691', 'statistics 3'],
+  '6689': ['d1', 'wdm11', 'wdm01', '6689', 'decision 1', 'decision mathematics 1'],
   c12: ['c12', 'c12a', 'c12r', 'wma01', 'core mathematics 12', 'core 12'],
   c34: ['c34', 'c34a', 'c34r', 'wma02', 'core mathematics 34', 'core 34'],
   wma01: ['wma01', 'c12', 'core mathematics 12'],
@@ -400,8 +420,8 @@ export const RAW_ATOMIC_SYNONYMS = {
   february: ['february', 'feb', 'febmarch'],
   mar: ['mar', 'march', 'febmarch'],
   march: ['march', 'mar', 'febmarch'],
-  fm: ['fm', 'febmarch', 'feb', 'mar', 'march'],
-  febmarch: ['febmarch', 'feb', 'february', 'mar', 'march', 'fm'],
+  fm: ['fm', 'febmarch', 'feb', 'mar', 'march', 'further mechanics'],
+  febmarch: ['febmarch', 'feb', 'february', 'mar', 'march'],
   winter: ['winter'],
 
   // Variants
@@ -505,7 +525,7 @@ export const SESSION_SYNONYMS_BY_MONTH = {
 };
 
 export const GENERIC_QUERY_WORDS = new Set([
-  'qp', 'ms', 'er', 'gt', 'in', 'ci', 'sf', 'tn', 'pm', 'aud', 'df', 'sc', 'sol', 'sam', 'book', 'books',
+  'qp', 'que', 'ms', 'rms', 'msc', 'eams', 'er', 'pef', 'gt', 'in', 'ci', 'sf', 'tn', 'pm', 'aud', 'df', 'sc', 'sol', 'sam', 'book', 'books',
   'question', 'questions', 'paper', 'papers', 'mark', 'scheme', 'schemes',
   'examiner', 'examiners', 'report', 'reports', 'threshold', 'thresholds', 'insert', 'inserts', 'file', 'files',
   'textbook', 'textbooks', 'solutions', 'ial', 'igcse', 'edexcel', 'pearson',
@@ -514,14 +534,16 @@ export const GENERIC_QUERY_WORDS = new Set([
 ]);
 
 export const ITEM_CODE_EQUIV = {
-  m1: ['wme01'], m2: ['wme02'], m3: ['wme03'],
-  wme01: ['m1'], wme02: ['m2'], wme03: ['m3'],
-  s1: ['wst01'], s2: ['wst02'], s3: ['wst03'],
-  wst01: ['s1'], wst02: ['s2'], wst03: ['s3'],
-  fp1: ['f1', 'wfm01'], f1: ['fp1', 'wfm01'], wfm01: ['fp1', 'f1'],
-  fp2: ['f2', 'wfm02'], f2: ['fp2', 'wfm02'], wfm02: ['fp2', 'f2'],
-  fp3: ['f3', 'wfm03'], f3: ['fp3', 'wfm03'], wfm03: ['fp3', 'f3'],
-  d1: ['wdm11', 'wdm01'], wdm11: ['d1', 'wdm01'], wdm01: ['d1', 'wdm11'],
+  m1: ['wme01', '6677'], m2: ['wme02', '6678'], m3: ['wme03', '6679'],
+  wme01: ['m1', '6677'], wme02: ['m2', '6678'], wme03: ['m3', '6679'],
+  '6677': ['m1', 'wme01'], '6678': ['m2', 'wme02'], '6679': ['m3', 'wme03'],
+  s1: ['wst01', '6683'], s2: ['wst02', '6684'], s3: ['wst03', '6685', '6691'],
+  wst01: ['s1', '6683'], wst02: ['s2', '6684'], wst03: ['s3', '6685', '6691'],
+  '6683': ['s1', 'wst01'], '6684': ['s2', 'wst02'], '6685': ['s3', 'wst03'], '6691': ['s3', 'wst03'],
+  fp1: ['f1', 'wfm01', '6667'], f1: ['fp1', 'wfm01', '6667'], wfm01: ['fp1', 'f1', '6667'], '6667': ['fp1', 'f1', 'wfm01'],
+  fp2: ['f2', 'wfm02', '6668'], f2: ['fp2', 'wfm02', '6668'], wfm02: ['fp2', 'f2', '6668'], '6668': ['fp2', 'f2', 'wfm02'],
+  fp3: ['f3', 'wfm03', '6669'], f3: ['fp3', 'wfm03', '6669'], wfm03: ['fp3', 'f3', '6669'], '6669': ['fp3', 'f3', 'wfm03'],
+  d1: ['wdm11', 'wdm01', '6689'], wdm11: ['d1', 'wdm01', '6689'], wdm01: ['d1', 'wdm11', '6689'], '6689': ['d1', 'wdm11', 'wdm01'],
   c1: ['6663'], '6663': ['c1'],
   c2: ['6664'], '6664': ['c2'],
   c3: ['6665'], '6665': ['c3'],

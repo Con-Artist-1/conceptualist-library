@@ -264,6 +264,9 @@
   --pdf-badge-er-bg: #583E23;
   --pdf-badge-er-border: #583E23;
   --pdf-badge-er-text: #FFFFFF;
+  --pdf-badge-gt-bg: #1B5E4A;
+  --pdf-badge-gt-border: #144939;
+  --pdf-badge-gt-text: #FFFFFF;
   --pdf-badge-book-bg: var(--mcmaster-maroon);
   --pdf-badge-book-border: var(--mcmaster-maroon);
   --pdf-badge-aud-bg: #1E4E8C;
@@ -597,6 +600,9 @@
   --pdf-badge-er-bg: #2E2008;
   --pdf-badge-er-border: #6E4E10;
   --pdf-badge-er-text: #FFD33D;
+  --pdf-badge-gt-bg: #102D26;
+  --pdf-badge-gt-border: #205B4B;
+  --pdf-badge-gt-text: #6EE7B7;
   --pdf-badge-book-bg: #8C1D2F;
   --pdf-badge-book-border: #A8253B;
   --pdf-badge-aud-bg: #1D3557;
@@ -885,8 +891,8 @@
   --sub-ctrl-bg: #0C0C0C;
   --sub-ctrl-border: #2A2A2A;
   --sub-ctrl-text: #CBD5E1;
-  --sub-ctrl-hover-border: var(--mcmaster-maroon);
-  --sub-ctrl-hover-text: var(--mcmaster-maroon);
+  --sub-ctrl-hover-border: #FF5370;
+  --sub-ctrl-hover-text: #FFFFFF;
   --sub-ctrl-active-bg: #9E263A;
   --sub-ctrl-active-border: #FF5370;
   --sub-card-bg: #0A0A0A;
@@ -924,6 +930,9 @@
   --pdf-badge-er-bg: #2E2008;
   --pdf-badge-er-border: #6E4E10;
   --pdf-badge-er-text: #FFD33D;
+  --pdf-badge-gt-bg: #102D26;
+  --pdf-badge-gt-border: #205B4B;
+  --pdf-badge-gt-text: #6EE7B7;
   --pdf-badge-book-bg: #8C1D2F;
   --pdf-badge-book-border: #A8253B;
   --pdf-badge-aud-bg: #152C47;
@@ -2553,6 +2562,12 @@
   border: 1px solid var(--pdf-badge-er-border);
 }
 
+.pdf-doc-badge.gt {
+  background: var(--pdf-badge-gt-bg);
+  color: var(--pdf-badge-gt-text);
+  border: 1px solid var(--pdf-badge-gt-border);
+}
+
 .pdf-doc-badge.book,
 .pdf-doc-badge.sol {
   background: var(--pdf-badge-book-bg);
@@ -3224,7 +3239,7 @@
   }
 }
 
-@media (min-width: 769px) and (max-width: 1260px) {
+@media (min-width: 769px) and (max-width: 1520px) {
   .modal-view-tabs .modal-btn .btn-desktop-text,
   .modal-view-extras .modal-btn .btn-desktop-text {
     display: none;

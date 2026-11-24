@@ -447,6 +447,58 @@ async function loadZipDirectory(url, knownSize = 0, signal = null) {
   };
 }
 
+function runRefCountedTask(inFlightMap, key, callerSignal, factory) {
+  if (callerSignal?.aborted) {
+    return Promise.reject(new DOMException('Aborted', 'AbortError'));
+  }
+
+  let shared = inFlightMap.get(key);
+  if (!shared) {
+    const ctrl = new AbortController();
+    const entry = { ctrl, refCount: 0, settled: false, promise: null };
+    entry.promise = Promise.resolve()
+      .then(() => factory(ctrl.signal))
+      .finally(() => {
+        entry.settled = true;
+        inFlightMap.delete(key);
+      });
+    inFlightMap.set(key, entry);
+    shared = entry;
+  }
+
+  shared.refCount += 1;
+  if (!callerSignal) return shared.promise;
+
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const onAbort = () => {
+      if (finished) return;
+      finished = true;
+      shared.refCount = Math.max(0, shared.refCount - 1);
+      if (shared.refCount === 0 && !shared.settled) {
+        try { shared.ctrl.abort(); } catch { /* ignore */ }
+        inFlightMap.delete(key);
+      }
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    callerSignal.addEventListener('abort', onAbort, { once: true });
+    shared.promise.then(
+      (val) => {
+        if (finished) return;
+        finished = true;
+        callerSignal.removeEventListener('abort', onAbort);
+        resolve(val);
+      },
+      (err) => {
+        if (finished) return;
+        finished = true;
+        callerSignal.removeEventListener('abort', onAbort);
+        reject(err);
+      }
+    );
+  });
+}
+
 export async function listZipPdfEntries(url, knownSize = 0, { signal } = {}) {
   if (!url) throw new Error('Missing archive URL.');
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -457,21 +509,11 @@ export async function listZipPdfEntries(url, knownSize = 0, { signal } = {}) {
     return cached;
   }
 
-  if (inFlightIndexes.has(url)) {
-    return inFlightIndexes.get(url);
-  }
-
-  const task = loadZipDirectory(url, knownSize, signal)
-    .then((result) => {
-      setLruCache(zipIndexCache, url, result, MAX_CACHED_INDEXES);
-      return result;
-    })
-    .finally(() => {
-      inFlightIndexes.delete(url);
-    });
-
-  inFlightIndexes.set(url, task);
-  return task;
+  return runRefCountedTask(inFlightIndexes, url, signal, async (sharedSignal) => {
+    const result = await loadZipDirectory(url, knownSize, sharedSignal);
+    setLruCache(zipIndexCache, url, result, MAX_CACHED_INDEXES);
+    return result;
+  });
 }
 
 export async function extractZipPdfEntry(url, entry, knownSize = 0, { signal } = {}) {
@@ -493,92 +535,81 @@ export async function extractZipPdfEntry(url, entry, knownSize = 0, { signal } =
     return cached;
   }
 
-  if (inFlightPdfs.has(cacheKey)) {
-    return inFlightPdfs.get(cacheKey);
-  }
+  return runRefCountedTask(inFlightPdfs, cacheKey, signal, async (sharedSignal) => {
+    const indexInfo = await listZipPdfEntries(url, knownSize, { signal: sharedSignal });
+    let sliceBytes = null;
 
-  const task = (async () => {
-    try {
-      const indexInfo = await listZipPdfEntries(url, knownSize, { signal });
-      let sliceBytes = null;
-
-      if (indexInfo.fullBytes) {
+    if (indexInfo.fullBytes) {
+      sliceBytes = indexInfo.fullBytes.subarray(entry.localHeaderOffset);
+    } else {
+      const estimatedEnd = Math.min(
+        indexInfo.totalLength - 1,
+        entry.localHeaderOffset + 30 + (entry.cdNameLen || 256) + LOCAL_EXTRA_BUFFER_BYTES + entry.compressedSize - 1
+      );
+      const firstSlice = await fetchArchiveRange(indexInfo, entry.localHeaderOffset, estimatedEnd, sharedSignal);
+      if (firstSlice.status !== 206 && firstSlice.bytes.byteLength >= indexInfo.totalLength) {
+        indexInfo.fullBytes = firstSlice.bytes;
         sliceBytes = indexInfo.fullBytes.subarray(entry.localHeaderOffset);
       } else {
-        const estimatedEnd = Math.min(
-          indexInfo.totalLength - 1,
-          entry.localHeaderOffset + 30 + (entry.cdNameLen || 256) + LOCAL_EXTRA_BUFFER_BYTES + entry.compressedSize - 1
-        );
-        const firstSlice = await fetchArchiveRange(indexInfo, entry.localHeaderOffset, estimatedEnd, signal);
-        if (firstSlice.status !== 206 && firstSlice.bytes.byteLength >= indexInfo.totalLength) {
-          indexInfo.fullBytes = firstSlice.bytes;
-          sliceBytes = indexInfo.fullBytes.subarray(entry.localHeaderOffset);
-        } else {
-          sliceBytes = firstSlice.bytes;
-        }
+        sliceBytes = firstSlice.bytes;
       }
-
-      if (!sliceBytes || sliceBytes.byteLength < 30) {
-        throw new Error('Failed to read ZIP file entry header.');
-      }
-      const view = new DataView(sliceBytes.buffer, sliceBytes.byteOffset, sliceBytes.byteLength);
-      if (view.getUint32(0, true) !== 0x04034b50) {
-        throw new Error('Corrupt ZIP local header signature.');
-      }
-
-      const localNameLen = view.getUint16(26, true);
-      const localExtraLen = view.getUint16(28, true);
-      const dataStart = 30 + localNameLen + localExtraLen;
-      const dataEnd = dataStart + entry.compressedSize;
-
-      if (dataEnd > sliceBytes.byteLength) {
-        // Rare: local extra field exceeded buffer; fetch missing tail bytes once
-        const missingBegin = entry.localHeaderOffset + sliceBytes.byteLength;
-        const missingEnd = entry.localHeaderOffset + dataEnd - 1;
-        const tailRes = await fetchArchiveRange(indexInfo, missingBegin, missingEnd, signal);
-        const combined = new Uint8Array(sliceBytes.byteLength + tailRes.bytes.byteLength);
-        combined.set(sliceBytes, 0);
-        combined.set(tailRes.bytes, sliceBytes.byteLength);
-        sliceBytes = combined;
-      }
-
-      const compressedSlice = sliceBytes.subarray(dataStart, dataEnd);
-      let pdfBytes;
-      if (entry.compressionMethod === 0) {
-        pdfBytes = new Uint8Array(compressedSlice);
-      } else if (entry.compressionMethod === 8) {
-        pdfBytes = await inflateRawBytes(compressedSlice, entry.uncompressedSize);
-      } else {
-        throw new Error(`Unsupported ZIP compression method (${entry.compressionMethod}).`);
-      }
-
-      const blobUrl =
-        typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
-          ? URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }))
-          : '';
-
-      const result = {
-        bytes: pdfBytes,
-        blobUrl,
-        fileName: entry.fileName
-      };
-
-      setLruCache(zipPdfCache, cacheKey, result, MAX_CACHED_PDFS, (evicted) => {
-        if (evicted?.blobUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-          try {
-            URL.revokeObjectURL(evicted.blobUrl);
-          } catch {
-            // Ignore revoke errors
-          }
-        }
-      });
-
-      return result;
-    } finally {
-      inFlightPdfs.delete(cacheKey);
     }
-  })();
 
-  inFlightPdfs.set(cacheKey, task);
-  return task;
+    if (!sliceBytes || sliceBytes.byteLength < 30) {
+      throw new Error('Failed to read ZIP file entry header.');
+    }
+    const view = new DataView(sliceBytes.buffer, sliceBytes.byteOffset, sliceBytes.byteLength);
+    if (view.getUint32(0, true) !== 0x04034b50) {
+      throw new Error('Corrupt ZIP local header signature.');
+    }
+
+    const localNameLen = view.getUint16(26, true);
+    const localExtraLen = view.getUint16(28, true);
+    const dataStart = 30 + localNameLen + localExtraLen;
+    const dataEnd = dataStart + entry.compressedSize;
+
+    if (dataEnd > sliceBytes.byteLength) {
+      // Rare: local extra field exceeded buffer; fetch missing tail bytes once
+      const missingBegin = entry.localHeaderOffset + sliceBytes.byteLength;
+      const missingEnd = entry.localHeaderOffset + dataEnd - 1;
+      const tailRes = await fetchArchiveRange(indexInfo, missingBegin, missingEnd, sharedSignal);
+      const combined = new Uint8Array(sliceBytes.byteLength + tailRes.bytes.byteLength);
+      combined.set(sliceBytes, 0);
+      combined.set(tailRes.bytes, sliceBytes.byteLength);
+      sliceBytes = combined;
+    }
+
+    const compressedSlice = sliceBytes.subarray(dataStart, dataEnd);
+    let pdfBytes;
+    if (entry.compressionMethod === 0) {
+      pdfBytes = new Uint8Array(compressedSlice);
+    } else if (entry.compressionMethod === 8) {
+      pdfBytes = await inflateRawBytes(compressedSlice, entry.uncompressedSize);
+    } else {
+      throw new Error(`Unsupported ZIP compression method (${entry.compressionMethod}).`);
+    }
+
+    const blobUrl =
+      typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+        ? URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }))
+        : '';
+
+    const result = {
+      bytes: pdfBytes,
+      blobUrl,
+      fileName: entry.fileName
+    };
+
+    setLruCache(zipPdfCache, cacheKey, result, MAX_CACHED_PDFS, (evicted) => {
+      if (evicted?.blobUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        try {
+          URL.revokeObjectURL(evicted.blobUrl);
+        } catch {
+          // Ignore revoke errors
+        }
+      }
+    });
+
+    return result;
+  });
 }

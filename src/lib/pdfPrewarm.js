@@ -150,8 +150,8 @@ export function prewarmPaperOnPointerDown(file, preferredView = '') {
   const siblings = { ...(file.siblings || {}), ...(file.docs || {}) };
   const targets = [];
 
-  if (preferredView === 'split' && siblings.QP?.ext === 'pdf' && siblings.MS?.ext === 'pdf') {
-    targets.push(siblings.QP, siblings.MS);
+  if (preferredView === 'split' && siblings.QP?.ext === 'pdf' && (siblings.MS?.ext === 'pdf' || siblings.SC?.ext === 'pdf')) {
+    targets.push(siblings.QP, siblings.MS?.ext === 'pdf' ? siblings.MS : siblings.SC);
   } else {
     const doc = (preferredView && siblings[preferredView]) || file.primaryFile || file;
     const ext = (doc?.ext || (doc?.path ? doc.path.split('.').pop() : '') || '').toLowerCase();

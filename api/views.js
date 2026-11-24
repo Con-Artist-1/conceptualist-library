@@ -38,7 +38,9 @@ let inflightHydratePromise = globalThis.__csInflightViewsHydrate || null;
 let lastHydratedAt = globalThis.__csLastViewsHydratedAt || 0;
 let lastHydratedSource = globalThis.__csLastViewsHydratedSource || 'server-store';
 const HYDRATION_TTL_MS = 15 * 1000;
+const DEFAULT_PUBLIC_VIEWS_LIMIT = 5000;
 let hasSyncedFallbackToMongo = false;
+let viewsSortIndexInitialized = globalThis.__csViewsSortIndexInitialized || false;
 
 function loadLocalServerStore() {
   if (memoryViewsStore) return memoryViewsStore;
@@ -127,6 +129,15 @@ function recordCooldownTimestamp(ipHash, vidHash, paperKey, now = Date.now()) {
 async function getViewsCollection() {
   const db = await getMongoDatabase();
   const col = db.collection(COLLECTION_NAME);
+
+  if (!viewsSortIndexInitialized) {
+    viewsSortIndexInitialized = true;
+    globalThis.__csViewsSortIndexInitialized = true;
+    void col.createIndex({ views: -1 }, { background: true }).catch(() => {
+      viewsSortIndexInitialized = false;
+      globalThis.__csViewsSortIndexInitialized = false;
+    });
+  }
 
   // Sync any locally buffered server views into MongoDB Atlas once connected
   if (!hasSyncedFallbackToMongo) {
@@ -285,7 +296,9 @@ export default async function handler(req, res) {
           : (urlObj.searchParams.get('q') || urlObj.searchParams.get('search') || '').trim();
     const rawLimit =
       typeof req.query?.limit === 'string' ? req.query.limit : urlObj.searchParams.get('limit');
-    const requestedLimit = rawLimit ? Math.min(25000, Math.max(1, parsePositiveInt(rawLimit))) : 0;
+    const requestedLimit = rawLimit
+      ? Math.min(25000, Math.max(1, parsePositiveInt(rawLimit)))
+      : (searchParam ? 0 : DEFAULT_PUBLIC_VIEWS_LIMIT);
 
     if (paperKeyParam && !isValidPaperKey(paperKeyParam)) {
       res.setHeader('Cache-Control', 'no-store, max-age=0');

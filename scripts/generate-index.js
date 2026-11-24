@@ -22,6 +22,7 @@ import {
 } from '../src/data/boards.js';
 import { detectCambridgeSpec } from '../src/parsers/cambridgeParser.js';
 import { extractSyllabusCodeFromSubject } from '../src/data/cambridgeCatalog.js';
+import { encodeCompactCatalog, encodeCompactAllowlist } from '../src/lib/indexSerializer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,7 +134,9 @@ function buildTree(dirPath, rootPath) {
           unitName,
           spec,
           syllabusCode: syllabusCode || null,
-          category
+          category,
+          _sdLabel: sessionDate ? sessionDate.label : null,
+          _sdSort: sessionDate ? sessionDate.sortKey : 0
         });
       }
     }
@@ -162,30 +165,56 @@ function extractFlatFiles(treeNode, filesList = []) {
 }
 
 function computeCoverageString(filesSubset, fallback = 'January 2003 – June 2026') {
-  const dates = filesSubset
-    .map((f) => extractSessionDate(f.path, f.spec))
-    .filter(Boolean)
-    .sort((a, b) => a.sortKey - b.sortKey);
-  if (dates.length === 0) return fallback;
-  return `${dates[0].label} – ${dates[dates.length - 1].label}`;
+  let minSort = Infinity;
+  let minLabel = null;
+  let maxSort = -Infinity;
+  let maxLabel = null;
+  for (let i = 0; i < filesSubset.length; i++) {
+    const f = filesSubset[i];
+    const lbl = f._sdLabel;
+    if (!lbl) continue;
+    const sk = f._sdSort;
+    if (sk < minSort) {
+      minSort = sk;
+      minLabel = lbl;
+    }
+    if (sk > maxSort) {
+      maxSort = sk;
+      maxLabel = lbl;
+    }
+  }
+  if (!minLabel || !maxLabel) return fallback;
+  return `${minLabel} – ${maxLabel}`;
 }
 
 function computeCoverageMap(filesSubset, subjectList) {
+  const boundsBySubj = new Map();
+  for (let i = 0; i < filesSubset.length; i++) {
+    const f = filesSubset[i];
+    const subj = f.subject;
+    const lbl = f._sdLabel;
+    if (!subj || !lbl) continue;
+    const sk = f._sdSort;
+    let b = boundsBySubj.get(subj);
+    if (!b) {
+      b = { minSort: sk, minLabel: lbl, maxSort: sk, maxLabel: lbl };
+      boundsBySubj.set(subj, b);
+    } else {
+      if (sk < b.minSort) {
+        b.minSort = sk;
+        b.minLabel = lbl;
+      }
+      if (sk > b.maxSort) {
+        b.maxSort = sk;
+        b.maxLabel = lbl;
+      }
+    }
+  }
+
   const cov = {};
   for (const subj of subjectList) {
-    const subjFiles = filesSubset.filter((f) => f.subject === subj);
-    const subjDates = subjFiles
-      .map((f) => extractSessionDate(f.path, f.spec))
-      .filter(Boolean)
-      .sort((a, b) => a.sortKey - b.sortKey);
-
-    if (subjDates.length > 0) {
-      const minD = subjDates[0];
-      const maxD = subjDates[subjDates.length - 1];
-      cov[subj] = `${minD.label} – ${maxD.label}`;
-    } else {
-      cov[subj] = 'Reference Collection';
-    }
+    const b = boundsBySubj.get(subj);
+    cov[subj] = b ? `${b.minLabel} – ${b.maxLabel}` : 'Reference Collection';
   }
   return cov;
 }
@@ -272,61 +301,7 @@ function buildWizardMeta(dedupedList) {
   return wizard;
 }
 
-const KEYS = [
-  'name', 'path', 'size', 'subject', 'docType', 'year', 'session', 'sortKey',
-  'unitCode', 'unitName', 'spec', 'category', 'variant', 'cleanUnitLabel', 'altPaths', 'syllabusCode'
-];
-
-function serializeTuples(list) {
-  return list.map((f) => [
-    f.name,
-    f.path,
-    f.size,
-    f.subject,
-    f.docType,
-    f.year,
-    f.session,
-    f.sortKey,
-    f.unitCode,
-    f.unitName,
-    f.spec,
-    f.category,
-    f.variant,
-    f.cleanUnitLabel,
-    f.altPaths,
-    f.syllabusCode || null
-  ]);
-}
-
-function buildCompactAllowlist(dedupedList, generatedAt) {
-  const validPaperKeys = new Set();
-  const validAudioPaths = new Set();
-  const validAudioSittings = new Set();
-
-  for (const f of dedupedList) {
-    if (f.path) validPaperKeys.add(f.path);
-    if (f.spec && f.subject && f.session) {
-      const sittingKey = `${f.spec}|${f.subject}|${f.unitCode || ''}|${f.variant || ''}|${f.session}`;
-      validPaperKeys.add(sittingKey);
-      if (f.docType === 'AUD') validAudioSittings.add(sittingKey);
-    }
-    if (f.docType === 'AUD') {
-      if (f.path) validAudioPaths.add(f.path);
-      if (Array.isArray(f.altPaths)) {
-        for (const ap of f.altPaths) {
-          if (typeof ap === 'string' && ap) validAudioPaths.add(ap);
-        }
-      }
-    }
-  }
-
-  return {
-    generatedAt,
-    paperKeys: Array.from(validPaperKeys),
-    audioPaths: Array.from(validAudioPaths),
-    audioSittings: Array.from(validAudioSittings)
-  };
-}
+// Compact v2 serialization & allowlist encoding are imported from ../src/lib/indexSerializer.js
 
 console.log('Generating multi-board index for', TARGET_DIR);
 const tree = buildTree(TARGET_DIR, TARGET_DIR);
@@ -431,62 +406,48 @@ const metaInfo = {
   generatedAt
 };
 
-const edexcelOutput = {
-  keys: KEYS,
-  files: serializeTuples(edexcelDeduped),
-  meta: {
-    ...metaInfo,
-    board: 'edexcel',
-    partitionUniqueFiles: edexcelDeduped.length,
-    isPreDeduped: true
-  }
-};
+const edexcelOutput = encodeCompactCatalog(edexcelDeduped, {
+  ...metaInfo,
+  board: 'edexcel',
+  partitionUniqueFiles: edexcelDeduped.length,
+  isPreDeduped: true
+});
 
-const cambridgeOutput = {
-  keys: KEYS,
-  files: serializeTuples(cambridgeDeduped),
-  meta: {
-    ...metaInfo,
-    board: 'cambridge',
-    partitionUniqueFiles: cambridgeDeduped.length,
-    isPreDeduped: true
-  }
-};
-
-const cieAlOutput = {
-  keys: KEYS,
-  files: serializeTuples(cieAlDeduped),
-  meta: { generatedAt, board: 'cambridge', spec: 'CIE-AL', partitionUniqueFiles: cieAlDeduped.length, isPreDeduped: true }
-};
-
-const cieIgcseOutput = {
-  keys: KEYS,
-  files: serializeTuples(cieIgcseDeduped),
-  meta: { generatedAt, board: 'cambridge', spec: 'CIE-IGCSE', partitionUniqueFiles: cieIgcseDeduped.length, isPreDeduped: true }
-};
-
-const cieOlOutput = {
-  keys: KEYS,
-  files: serializeTuples(cieOlDeduped),
-  meta: { generatedAt, board: 'cambridge', spec: 'CIE-OL', partitionUniqueFiles: cieOlDeduped.length, isPreDeduped: true }
-};
+const cambridgeOutput = encodeCompactCatalog(cambridgeDeduped, {
+  ...metaInfo,
+  board: 'cambridge',
+  partitionUniqueFiles: cambridgeDeduped.length,
+  isPreDeduped: true
+});
 
 const publicDir = path.resolve(__dirname, '..', 'public');
+const apiDir = path.resolve(__dirname, '..', 'api');
 const edexcelJsonStr = JSON.stringify(edexcelOutput);
 const cambridgeJsonStr = JSON.stringify(cambridgeOutput);
 
-// Preserve public/index.json (Edexcel) for 100% backwards compatibility alongside explicit partitioned files
+// Write compact v2 multi-board indexes and lightweight metadata
 fs.writeFileSync(path.join(publicDir, 'index.json'), edexcelJsonStr);
-fs.writeFileSync(path.join(publicDir, 'index-edexcel.json'), edexcelJsonStr);
 fs.writeFileSync(path.join(publicDir, 'index-cambridge.json'), cambridgeJsonStr);
-fs.writeFileSync(path.join(publicDir, 'index-cie-al.json'), JSON.stringify(cieAlOutput));
-fs.writeFileSync(path.join(publicDir, 'index-cie-igcse.json'), JSON.stringify(cieIgcseOutput));
-fs.writeFileSync(path.join(publicDir, 'index-cie-ol.json'), JSON.stringify(cieOlOutput));
 fs.writeFileSync(path.join(publicDir, 'meta.json'), JSON.stringify({ meta: metaInfo }));
 
-// Compact multi-board allowlist for Vercel serverless API cold starts
-const allowlistObj = buildCompactAllowlist(dedupedFiles, generatedAt);
-fs.writeFileSync(path.join(publicDir, 'allowlist.json'), JSON.stringify(allowlistObj));
+// Remove deprecated duplicate/public index & allowlist artifacts if present
+const deprecatedPublicFiles = [
+  'index-edexcel.json',
+  'index-cie-al.json',
+  'index-cie-igcse.json',
+  'index-cie-ol.json',
+  'allowlist.json'
+];
+for (const deadFile of deprecatedPublicFiles) {
+  const deadPath = path.join(publicDir, deadFile);
+  if (fs.existsSync(deadPath)) {
+    try { fs.unlinkSync(deadPath); } catch { /* ignore */ }
+  }
+}
+
+// Compact v2 prefix-grouped private allowlist for Vercel serverless API cold starts (not publicly served)
+const allowlistObj = encodeCompactAllowlist(dedupedFiles, generatedAt);
+fs.writeFileSync(path.join(apiDir, '_allowlist.json'), JSON.stringify(allowlistObj));
 
 // Root live indexes synced to Hugging Face
 fs.writeFileSync(path.join(TARGET_DIR, 'live_index.json'), edexcelJsonStr);

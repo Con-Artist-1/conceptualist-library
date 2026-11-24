@@ -5,7 +5,7 @@ const ACTIVITY_THROTTLE_MS = 5000;
 const MODAL_CLOSE_COALESCE_MS = 50;
 const MIN_SITE_FLUSH_MS = 250;
 
-const ALLOWED_MODES = new Set(['split', 'qp', 'ms', 'er', 'other']);
+const ALLOWED_MODES = new Set(['split', 'qp', 'ms', 'er', 'gt', 'other']);
 
 const state = {
   initialized: false,

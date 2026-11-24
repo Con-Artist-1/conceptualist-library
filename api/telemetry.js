@@ -13,7 +13,7 @@ import {
   sendJsonResponse
 } from './_shared.js';
 
-const ALLOWED_MODES = new Set(['split', 'qp', 'ms', 'er', 'other']);
+const ALLOWED_MODES = new Set(['split', 'qp', 'ms', 'er', 'gt', 'other']);
 const ALLOWED_DEVICES = new Set(['desktop', 'mobile']);
 const SESSION_ID_REGEX = /^[A-Za-z0-9_-]{8,64}$/;
 

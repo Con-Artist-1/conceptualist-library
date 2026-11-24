@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.2.0',
+    date: '2026-11-24T22:30:00+06:00',
+    title: 'Compact v2 Catalog Engine, Instant Shard Navigation & Search/SEO Hardening',
+    summary: 'Compacted board indexes and route shards by ~62% via interned v2 tuples, eliminated warm-cache and fast-click shard stalls, accelerated smart search by 30x–150x with O(1) syllabus buckets and lazy search structures, and resolved mobile drawer, reader, API, and Cambridge SEO edge cases.',
+    changes: [
+      'Compact v2 Catalog & Instant Shard Navigation: Replaced repeated string tuples with interned v2 catalog/shard payloads and a private prefix-grouped API allowlist (api/_allowlist.json), cutting catalog/shard payload sizes by ~62%, dropping worker hydration memory by ~65% via lazy _search/vocab construction, and making warm-cache visits and homepage quick-filter clicks render immediately from lightweight route shards.',
+      'Smart Search & Regex Upgrades: Added O(1) Cambridge syllabus bucket pre-filtering and length-bucketed fuzzy vocabulary lookup (sub-millisecond syllabus queries), raw filename/underscore/extension normalization, official Pearson YYYYMMDD exam/results-day parsing, legacy Edexcel 4-digit GCE/IGCSE unit codes (6663–6691, 4400, 4357), YLA1/01–02 Law codes, pre-2020 9709 Paper 5/6 disambiguation, and 9231 FM vs Feb/March separation.',
+      'Reader, Accessibility, API & SEO Polish: Restored the sticky mobile "Done & View Results" drawer button, styled WebPDF Grade Thresholds (.pdf-doc-badge.gt) and Pure OLED subtitle hover contrast, added ref-counted ZIP abort safety, hardened /api/subtitles and /api/views with MongoDB indexes and static-manifest anti-poisoning guards, and cleaned up Cambridge 9709 unit URLs, <65-char SERP titles, and Breadcrumb/FAQ parity.'
+    ]
+  },
+  {
     version: 'v8.1.0',
     date: '2026-11-24T10:30:00+06:00',
     title: 'Full 107-Syllabus Cambridge Archive Expansion & Multi-Source Sync (78,739 Files)',

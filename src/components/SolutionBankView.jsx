@@ -57,8 +57,8 @@ export default function SolutionBankView({
         setSolDirLoading(false);
       })
       .catch((err) => {
-        if (cancelled || err?.name === 'AbortError') return;
-        setSolDirError(err?.message || 'Unable to read Solution Bank chapters');
+        if (cancelled) return;
+        setSolDirError(err?.name === 'AbortError' ? 'Request interrupted — click Retry' : (err?.message || 'Unable to read Solution Bank chapters'));
         setSolDirLoading(false);
       });
 
@@ -105,8 +105,8 @@ export default function SolutionBankView({
         setSolPdfLoading(false);
       })
       .catch((err) => {
-        if (cancelled || err?.name === 'AbortError') return;
-        setSolPdfError(err?.message || 'Unable to unpack selected PDF');
+        if (cancelled) return;
+        setSolPdfError(err?.name === 'AbortError' ? 'Request interrupted — click Retry' : (err?.message || 'Unable to unpack selected PDF'));
         setSolPdfLoading(false);
       });
 

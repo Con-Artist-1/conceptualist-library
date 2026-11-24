@@ -140,7 +140,7 @@
 }
 
 .filter-apply-btn {
-  display: none !important;
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -213,6 +213,7 @@
   }
 
   .filter-apply-btn {
+    display: block;
     position: sticky;
     bottom: 0;
     z-index: 5;

@@ -27,7 +27,7 @@ export const PdfPaneSkeleton = ({ title, subtitle }) => (
       </div>
       <div className="pdf-skeleton-status-pill">
         <span className="pdf-skeleton-spinner" />
-        <span>{title || 'Loading Edexcel Examination PDF...'}</span>
+        <span>{title || 'Loading Examination PDF...'}</span>
         {subtitle && <small style={{ marginLeft: 6, opacity: 0.8 }}>{subtitle}</small>}
       </div>
     </div>

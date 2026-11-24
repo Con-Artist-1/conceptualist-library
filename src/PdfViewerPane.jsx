@@ -602,12 +602,14 @@ export const PdfViewerPane = ({
     };
   }, [url, pdfData, fileSize]);
 
+  const [retrySeq, setRetrySeq] = useState(0);
+
   useEffect(() => {
     const cleanup = loadDocument();
     return () => {
       if (cleanup) cleanup();
     };
-  }, [loadDocument]);
+  }, [loadDocument, retrySeq]);
 
   // Setup IntersectionObserver for smooth progressive page rendering with bounded canvas memory
   useEffect(() => {
@@ -1190,7 +1192,7 @@ export const PdfViewerPane = ({
               <button
                 type="button"
                 className="modal-action-link"
-                onClick={loadDocument}
+                onClick={() => setRetrySeq((n) => n + 1)}
               >
                 Retry
               </button>

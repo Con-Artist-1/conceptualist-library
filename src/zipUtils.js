@@ -43,14 +43,16 @@ export async function inflateRawBytes(compressedBytes, uncompressedSize = 0) {
   const expectedLen = rawExpectedLen > 0 && rawExpectedLen <= MAX_INFLATE_PREALLOC_BYTES ? rawExpectedLen : 0;
   const out = expectedLen > 0 ? new Uint8Array(expectedLen) : null;
   let offset = 0;
+  let outWritten = 0;
   const overflow = [];
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (out && offset + value.byteLength <= out.byteLength) {
-        out.set(value, offset);
+      if (out && overflow.length === 0 && outWritten + value.byteLength <= out.byteLength) {
+        out.set(value, outWritten);
+        outWritten += value.byteLength;
       } else {
         overflow.push(value);
       }
@@ -64,16 +66,15 @@ export async function inflateRawBytes(compressedBytes, uncompressedSize = 0) {
     throw writeError;
   }
 
-  if (out && overflow.length === 0 && offset === out.byteLength) {
+  if (out && overflow.length === 0 && outWritten === out.byteLength) {
     return out;
   }
 
   const exact = new Uint8Array(offset);
   let pos = 0;
-  if (out && offset > 0) {
-    const copied = Math.min(offset, out.byteLength);
-    exact.set(out.subarray(0, copied), 0);
-    pos = copied;
+  if (out && outWritten > 0) {
+    exact.set(out.subarray(0, outWritten), 0);
+    pos = outWritten;
   }
   for (let i = 0; i < overflow.length; i++) {
     const chunk = overflow[i];

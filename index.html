@@ -6,8 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="index, follow" />
-    <meta name="description" content="Study 16,021+ Edexcel IAL &amp; IGCSE past papers, mark schemes, examiner reports &amp; textbooks (2003–2026) in Split View." />
-    <meta name="keywords" content="Conceptualist, Conceptualist Systems, Edexcel, IAL, IGCSE, past papers, mark scheme, question paper, examiner report, A-Level, textbooks, solution bank" />
+    <meta name="description" content="Study 74,877+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
     <title>Edexcel IAL &amp; IGCSE Past Papers &amp; Textbooks | Conceptualist</title>
     <link rel="canonical" href="https://www.conceptualist.uk/" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
@@ -15,7 +14,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Conceptualist Systems" />
     <meta property="og:title" content="Edexcel IAL &amp; IGCSE Past Papers &amp; Textbooks | Conceptualist" />
-    <meta property="og:description" content="Study 16,021+ Edexcel IAL &amp; IGCSE past papers, mark schemes, examiner reports &amp; textbooks (2003–2026) in Split View." />
+    <meta property="og:description" content="Study 74,877+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
     <meta property="og:url" content="https://www.conceptualist.uk/" />
     <meta property="og:image" content="https://www.conceptualist.uk/og-card.png?v=2" />
     <meta property="og:image:type" content="image/png" />
@@ -24,7 +23,7 @@
     <meta property="og:image:alt" content="Conceptualist Systems — Pearson Edexcel IAL &amp; IGCSE Past Papers Split View Reader" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Edexcel IAL &amp; IGCSE Past Papers &amp; Textbooks | Conceptualist" />
-    <meta name="twitter:description" content="Study 16,021+ Edexcel IAL &amp; IGCSE past papers, mark schemes, examiner reports &amp; textbooks (2003–2026) in Split View." />
+    <meta name="twitter:description" content="Study 74,877+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
     <meta name="twitter:image" content="https://www.conceptualist.uk/og-card.png?v=2" />
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
@@ -114,9 +113,18 @@
               .then(function(r) { return r.ok ? r.json() : null; })
               .catch(function() { return null; });
 
-            if (shard || needsFull) {
+            if (shard) {
+              // Always fetch the lightweight route shard (~10-35 KB) immediately even on warm visits
+              // so the table hydrates in <25 ms instead of blocking on full-index Cache API deserialization.
+              ef.shardBufferPromise = fetch(shard + '?v=' + q)
+                .then(function(r) {
+                  var ct = r.headers.get('content-type') || '';
+                  return (r.ok && ct.indexOf('application/json') !== -1) ? r.arrayBuffer() : null;
+                })
+                .catch(function() { return null; });
+            } else if (needsFull) {
               var appVer = bootEl ? (bootEl.getAttribute('data-ver') || '') : '';
-              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v8.0.0';
+              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v8.2.0';
               var cacheKey = 'https://cs-cache.local/index_' + verTag + '_' + q + '_' + board + '.json';
               var indexFile = board === 'cambridge' ? '/index-cambridge.json' : '/index.json';
               var checkCache = (typeof caches !== 'undefined')
@@ -125,24 +133,12 @@
                     .catch(function() { return null; })
                 : Promise.resolve(null);
 
-              if (shard) {
-                ef.shardBufferPromise = checkCache.then(function(hit) {
-                  if (hit) return null;
-                  return fetch(shard + '?v=' + q, { priority: 'low' })
-                    .then(function(r) {
-                      var ct = r.headers.get('content-type') || '';
-                      return (r.ok && ct.indexOf('application/json') !== -1) ? r.arrayBuffer() : null;
-                    })
-                    .catch(function() { return null; });
-                });
-              } else if (needsFull) {
-                ef.fullBufferPromise = checkCache.then(function(hit) {
-                  if (hit) return null;
-                  return fetch(indexFile + '?v=' + q, { priority: 'low' })
-                    .then(function(r) { return r.ok ? r.arrayBuffer() : null; })
-                    .catch(function() { return null; });
-                });
-              }
+              ef.fullBufferPromise = checkCache.then(function(hit) {
+                if (hit) return null;
+                return fetch(indexFile + '?v=' + q, { priority: 'low' })
+                  .then(function(r) { return r.ok ? r.arrayBuffer() : null; })
+                  .catch(function() { return null; });
+              });
             }
             window.__CS_EARLY_FETCH__ = ef;
           }

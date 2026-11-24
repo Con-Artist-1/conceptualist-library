@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { MongoClient } from 'mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,8 +14,8 @@ export const COLLECTION_SUBTITLES = 'audio_subtitles';
 export const COLLECTION_RATE_LIMITS = 'rate_limits';
 
 export const PAPER_KEY_MAX_LEN = 220;
-export const PAPER_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&]+$/;
-export const SUBTITLE_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&#]+$/;
+export const PAPER_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&'%[\]]+$/;
+export const SUBTITLE_KEY_REGEX = /^[A-Za-z0-9|_\-. (),/+&#'%[\]]+$/;
 
 const MONGO_RETRY_BACKOFF_MS = 15 * 1000;
 let cachedMongoClientPromise = globalThis.__csMongoClientPromise || null;
@@ -32,20 +31,80 @@ export function constantTimeEqual(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
+function buildDirSetMap(dirs, groupedFiles) {
+  const map = new Map();
+  if (!Array.isArray(dirs) || !Array.isArray(groupedFiles)) return map;
+  for (let i = 0; i < dirs.length; i++) {
+    const dir = dirs[i];
+    const files = groupedFiles[i];
+    if (typeof dir === 'string' && Array.isArray(files)) {
+      map.set(dir, new Set(files));
+    }
+  }
+  return map;
+}
+
+function hasPathInDirMap(dirMap, fullPath) {
+  if (!dirMap || dirMap.size === 0 || !fullPath) return false;
+  const slash = fullPath.lastIndexOf('/');
+  const dir = slash >= 0 ? fullPath.slice(0, slash) : '';
+  const base = slash >= 0 ? fullPath.slice(slash + 1) : fullPath;
+  const fileSet = dirMap.get(dir);
+  return Boolean(fileSet && fileSet.has(base));
+}
+
 /**
- * Lazy-loads catalog allowlist sets from public/allowlist.json (preferred compact multi-board file)
- * or falls back to public/index.json + public/index-cambridge.json so API endpoints can reject
- * fabricated paperKeys or non-existent audio subtitle keys.
+ * Lazy-loads catalog allowlist sets from api/_allowlist.json (compact v2 prefix-grouped allowlist),
+ * legacy public/allowlist.json, or falls back to public/index.json + public/index-cambridge.json (v1 or v2)
+ * so API endpoints can reject fabricated paperKeys or non-existent audio subtitle keys.
  */
 export function getCatalogAllowlist() {
   if (cachedCatalogAllowlist) return cachedCatalogAllowlist;
   try {
-    const allowlistPath = path.join(PROJECT_ROOT, 'public', 'allowlist.json');
-    if (fs.existsSync(allowlistPath)) {
+    const allowlistCandidates = [
+      path.join(__dirname, '_allowlist.json'),
+      path.join(PROJECT_ROOT, 'public', 'allowlist.json')
+    ];
+    for (const allowlistPath of allowlistCandidates) {
+      if (!fs.existsSync(allowlistPath)) continue;
       const raw = JSON.parse(fs.readFileSync(allowlistPath, 'utf8'));
+      if (raw && raw.v === 2 && Array.isArray(raw.s)) {
+        const str = raw.s;
+        const paperDirMap = buildDirSetMap(
+          (raw.pfDirs || []).map((idx) => str[idx] || ''),
+          raw.pfFiles || []
+        );
+        const audioDirMap = buildDirSetMap(
+          (raw.afDirs || []).map((idx) => str[idx] || ''),
+          raw.afFiles || []
+        );
+        const validPaperSittings = new Set();
+        for (const t of raw.psRows || []) {
+          validPaperSittings.add(`${str[t[0]] || ''}|${str[t[1]] || ''}|${str[t[2]] || ''}|${str[t[3]] || ''}|${str[t[4]] || ''}`);
+        }
+        const validAudioSittings = new Set();
+        for (const t of raw.asRows || []) {
+          validAudioSittings.add(`${str[t[0]] || ''}|${str[t[1]] || ''}|${str[t[2]] || ''}|${str[t[3]] || ''}|${str[t[4]] || ''}`);
+        }
+        cachedCatalogAllowlist = {
+          v: 2,
+          paperDirMap,
+          audioDirMap,
+          validPaperSittings,
+          validAudioSittings,
+          validPaperKeys: null,
+          validAudioPaths: null
+        };
+        globalThis.__csCatalogAllowlist = cachedCatalogAllowlist;
+        return cachedCatalogAllowlist;
+      }
       if (raw && Array.isArray(raw.paperKeys)) {
         cachedCatalogAllowlist = {
+          v: 1,
+          paperDirMap: null,
+          audioDirMap: null,
           validPaperKeys: new Set(raw.paperKeys),
+          validPaperSittings: null,
           validAudioPaths: new Set(Array.isArray(raw.audioPaths) ? raw.audioPaths : []),
           validAudioSittings: new Set(Array.isArray(raw.audioSittings) ? raw.audioSittings : [])
         };
@@ -66,7 +125,41 @@ export function getCatalogAllowlist() {
 
     for (const indexPath of indexCandidates) {
       const raw = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      if (!raw || !Array.isArray(raw.keys) || !Array.isArray(raw.files)) continue;
+      if (!raw || !Array.isArray(raw.files)) continue;
+
+      if (raw.v === 2 && Array.isArray(raw.s)) {
+        const s = raw.s;
+        for (const row of raw.files) {
+          const dir = row[0] >= 0 ? s[row[0]] : '';
+          const base = row[1] || '';
+          const p = dir ? `${dir}/${base}` : base;
+          const subj = row[3] >= 0 ? s[row[3]] : '';
+          const dt = row[4] >= 0 ? s[row[4]] : '';
+          const sess = row[5] >= 0 ? s[row[5]] : '';
+          const unit = row[7] >= 0 ? s[row[7]] : '';
+          const spec = row[9] >= 0 ? s[row[9]] : '';
+          const variant = row[11] >= 0 ? s[row[11]] : '';
+          const alts = row[14];
+
+          if (p) validPaperKeys.add(p);
+          if (spec && subj && sess) {
+            const sittingKey = `${spec}|${subj}|${unit || ''}|${variant || ''}|${sess}`;
+            validPaperKeys.add(sittingKey);
+            if (dt === 'AUD') validAudioSittings.add(sittingKey);
+          }
+          if (dt === 'AUD') {
+            if (p) validAudioPaths.add(p);
+            if (Array.isArray(alts)) {
+              for (const ap of alts) {
+                if (typeof ap === 'string' && ap) validAudioPaths.add(ap);
+              }
+            }
+          }
+        }
+        continue;
+      }
+
+      if (!Array.isArray(raw.keys)) continue;
       const idxPath = raw.keys.indexOf('path');
       const idxSpec = raw.keys.indexOf('spec');
       const idxSubj = raw.keys.indexOf('subject');
@@ -103,7 +196,15 @@ export function getCatalogAllowlist() {
       }
     }
 
-    cachedCatalogAllowlist = { validPaperKeys, validAudioPaths, validAudioSittings };
+    cachedCatalogAllowlist = {
+      v: 1,
+      paperDirMap: null,
+      audioDirMap: null,
+      validPaperKeys,
+      validPaperSittings: null,
+      validAudioPaths,
+      validAudioSittings
+    };
     globalThis.__csCatalogAllowlist = cachedCatalogAllowlist;
     return cachedCatalogAllowlist;
   } catch {
@@ -111,15 +212,44 @@ export function getCatalogAllowlist() {
   }
 }
 
+let cachedStaticSubKeys = globalThis.__csStaticSubAllowKeys || null;
+
+function getStaticSubtitleKeySet() {
+  if (cachedStaticSubKeys) return cachedStaticSubKeys;
+  try {
+    const mp = path.join(PROJECT_ROOT, 'public', 'subtitles', 'manifest.json');
+    if (fs.existsSync(mp)) {
+      const parsed = JSON.parse(fs.readFileSync(mp, 'utf8'));
+      if (parsed && parsed.keys && typeof parsed.keys === 'object') {
+        cachedStaticSubKeys = new Set(Object.keys(parsed.keys));
+        globalThis.__csStaticSubAllowKeys = cachedStaticSubKeys;
+        return cachedStaticSubKeys;
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+  cachedStaticSubKeys = new Set();
+  globalThis.__csStaticSubAllowKeys = cachedStaticSubKeys;
+  return cachedStaticSubKeys;
+}
+
 export function isKnownSubtitleTrackKey(trackKey) {
   const allowlist = getCatalogAllowlist();
   if (!allowlist) return true;
   const key = String(trackKey || '').trim();
-  if (allowlist.validAudioPaths.has(key) || allowlist.validAudioSittings.has(key)) return true;
+  const staticKeys = getStaticSubtitleKeySet();
+  if (staticKeys.has(key)) return true;
+  const checkBase = (candidate) => {
+    if (staticKeys.has(candidate)) return true;
+    if (allowlist.validAudioSittings.has(candidate)) return true;
+    if (allowlist.v === 2) return hasPathInDirMap(allowlist.audioDirMap, candidate);
+    return Boolean(allowlist.validAudioPaths && allowlist.validAudioPaths.has(candidate));
+  };
+  if (checkBase(key)) return true;
   const hashIdx = key.indexOf('#');
   if (hashIdx > 0) {
-    const base = key.slice(0, hashIdx);
-    if (allowlist.validAudioPaths.has(base) || allowlist.validAudioSittings.has(base)) return true;
+    return checkBase(key.slice(0, hashIdx));
   }
   return false;
 }
@@ -127,7 +257,12 @@ export function isKnownSubtitleTrackKey(trackKey) {
 export function isKnownPaperKey(paperKey) {
   const allowlist = getCatalogAllowlist();
   if (!allowlist) return true;
-  return allowlist.validPaperKeys.has(String(paperKey || '').trim());
+  const key = String(paperKey || '').trim();
+  if (allowlist.v === 2) {
+    if (key.includes('|')) return allowlist.validPaperSittings.has(key);
+    return hasPathInDirMap(allowlist.paperDirMap, key);
+  }
+  return Boolean(allowlist.validPaperKeys && allowlist.validPaperKeys.has(key));
 }
 
 export function parsePositiveInt(raw) {
@@ -329,13 +464,16 @@ export async function getMongoDatabase() {
   }
 
   if (!cachedMongoClientPromise) {
-    const client = new MongoClient(uri, {
-      maxPoolSize: 10,
-      minPoolSize: 0,
-      serverSelectionTimeoutMS: 6000,
-      connectTimeoutMS: 6000
-    });
-    cachedMongoClientPromise = client.connect().catch((err) => {
+    cachedMongoClientPromise = (async () => {
+      const { MongoClient } = await import('mongodb');
+      const client = new MongoClient(uri, {
+        maxPoolSize: 10,
+        minPoolSize: 0,
+        serverSelectionTimeoutMS: 6000,
+        connectTimeoutMS: 6000
+      });
+      return client.connect();
+    })().catch((err) => {
       cachedMongoClientPromise = null;
       globalThis.__csMongoClientPromise = null;
       lastMongoFailAt = Date.now();

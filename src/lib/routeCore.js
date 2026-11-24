@@ -85,12 +85,14 @@ export function getSubjectSlug(subject) {
   return slugify(subject);
 }
 
-export function getUnitSlug(unitLabel) {
+export function getUnitSlug(unitLabel, { isCambridge = false } = {}) {
   if (!unitLabel) return '';
   const base = slugify(unitLabel);
-  const mathCode = IAL_MATH_UNIT_CODES[unitLabel];
-  if (mathCode && !base.endsWith(mathCode.toLowerCase())) {
-    return `${base}-${mathCode.toLowerCase()}`;
+  if (!isCambridge) {
+    const mathCode = IAL_MATH_UNIT_CODES[unitLabel];
+    if (mathCode && !base.endsWith(mathCode.toLowerCase())) {
+      return `${base}-${mathCode.toLowerCase()}`;
+    }
   }
   return base;
 }
@@ -101,11 +103,21 @@ export function formatSubjectName(subj) {
   return subj;
 }
 
-export function getUnitCodeFromLabel(unitLabel) {
+const NON_CODE_PARENS = new Set(['AS', 'A2', 'CORE', 'EXTENDED', 'MCQ', 'ATP', 'SL', 'HL']);
+
+export function getUnitCodeFromLabel(unitLabel, { isCambridge = false } = {}) {
   if (!unitLabel) return '';
-  if (IAL_MATH_UNIT_CODES[unitLabel]) return IAL_MATH_UNIT_CODES[unitLabel];
-  const parenMatch = unitLabel.match(/\(([A-Z0-9]{2,6})\)/i);
-  return parenMatch ? parenMatch[1].toUpperCase() : '';
+  if (!isCambridge && IAL_MATH_UNIT_CODES[unitLabel]) return IAL_MATH_UNIT_CODES[unitLabel];
+  for (const m of String(unitLabel).matchAll(/\(([A-Z0-9]{2,6})\)/gi)) {
+    const cand = m[1].toUpperCase();
+    if (NON_CODE_PARENS.has(cand)) continue;
+    if (/\d/.test(cand)) return cand;
+  }
+  if (isCambridge) {
+    const paperPrefix = String(unitLabel).match(/\bPaper\s+([1-7])\b/i);
+    if (paperPrefix) return `P${paperPrefix[1]}`;
+  }
+  return '';
 }
 
 function resolveCambridgeSubjectFromSlug(slug, curriculum, meta) {
@@ -196,21 +208,26 @@ function resolveUnitFromSlug(unitSlug, curriculum, subject, meta) {
   if (!unitSlug || !subject) return '';
   const clean = unitSlug.toLowerCase().trim();
   const curr = curriculum || 'Edexcel IAL';
+  const isCie = isCambridgeCurriculum(curr);
   const unitsObj = meta?.wizard?.[curr]?.[subject]?.units;
   const unitLabels = unitsObj
     ? Object.keys(unitsObj)
-    : isCambridgeCurriculum(curr)
+    : isCie
       ? getDefaultCambridgeUnitLabels(subject)
       : (DEFAULT_UNIT_LABELS[curr]?.[subject] || []);
 
-  // 1. Exact slug match
+  // 1. Exact slug match (also tolerate legacy -wma11/-wma12/-wma13 suffix on Cambridge 9709)
+  const strippedLegacyMathSuffix = isCie ? clean.replace(/-wma1[1-4]$/, '') : clean;
   for (const label of unitLabels) {
-    if (getUnitSlug(label) === clean || slugify(label) === clean) return label;
+    const canonicalSlug = getUnitSlug(label, { isCambridge: isCie });
+    if (canonicalSlug === clean || canonicalSlug === strippedLegacyMathSuffix || slugify(label) === clean) {
+      return label;
+    }
   }
 
   // 2. Match by unit/paper code or shorthand (e.g. "wma11", "p1", "p4", "unit-1", "paper-4")
   for (const label of unitLabels) {
-    const code = getUnitCodeFromLabel(label).toLowerCase();
+    const code = getUnitCodeFromLabel(label, { isCambridge: isCie }).toLowerCase();
     const parenMatch = label.match(/\(([a-z0-9]+)\)/i);
     const parenCode = parenMatch ? parenMatch[1].toLowerCase() : '';
     if (code && (clean === code || clean.endsWith(`-${code}`) || clean.startsWith(`${code}-`))) {
@@ -315,11 +332,13 @@ export function buildRoutePath({
     pathname = '/audio';
   } else if (filterDocType === 'Book' && !filterUnit) {
     if (!filterCurriculum && !filterSubject) {
-      pathname = effBoard === 'cambridge' ? '/textbooks/cambridge' : '/textbooks';
+      pathname = '/textbooks';
     } else {
       const curr = inferCurriculumForSubject(filterSubject, filterCurriculum);
       const currSlug = getCurriculumSlug(curr);
-      if (filterSubject && currSlug) {
+      if (isCambridgeCurriculum(curr)) {
+        pathname = '/textbooks';
+      } else if (filterSubject && currSlug) {
         pathname = `/textbooks/${currSlug}/${getSubjectSlug(filterSubject)}`;
       } else if (currSlug) {
         pathname = `/textbooks/${currSlug}`;
@@ -330,10 +349,11 @@ export function buildRoutePath({
   } else if (filterCurriculum || filterSubject) {
     const curr = inferCurriculumForSubject(filterSubject, filterCurriculum);
     const currSlug = getCurriculumSlug(curr);
+    const isCie = isCambridgeCurriculum(curr);
     if (filterSubject) {
       const subjSlug = getSubjectSlug(filterSubject);
       if (filterUnit) {
-        pathname = `/${currSlug}/${subjSlug}/${getUnitSlug(filterUnit)}`;
+        pathname = `/${currSlug}/${subjSlug}/${getUnitSlug(filterUnit, { isCambridge: isCie })}`;
       } else {
         pathname = `/${currSlug}/${subjSlug}`;
       }
@@ -421,10 +441,13 @@ function cleanUnitForContext(subjDisplay, filterUnit) {
 }
 
 function compactUnitTitleLabel(label) {
-  const m = /^(Unit\s+\d+|Paper\s+\d+):\s+.+?(\s*\([A-Z0-9]+\))?$/i.exec(label);
-  if (m) return `${m[1]}${m[2] || ''}`;
+  const legacyPreMatch = /^Legacy\s+.+?\b(Paper\s+\d+|Unit\s+\d+)\s*\((Pre-\d{4}|Old\s+[A-Z0-9]+)\)$/i.exec(label);
+  if (legacyPreMatch) return `${legacyPreMatch[2]} ${legacyPreMatch[1]}`;
+  const m = /^(?:Legacy\s+)?(Unit\s+\d+|Paper\s+\d+):\s+.+?(\s*\([A-Z0-9]+\))?$/i.exec(label);
+  if (m) return `${label.toLowerCase().startsWith('legacy ') ? 'Legacy ' : ''}${m[1]}${m[2] || ''}`;
   return String(label || '')
-    .replace(/\b(Decision|Pure|Core|Further Pure)\s+Mathematics\b/gi, '$1')
+    .replace(/\bProbability\s*(?:&|and)\s*Statistics\b/gi, 'Prob & Stats')
+    .replace(/\b(Decision|Pure|Core|Further Pure|Further)\s+Mathematics\b/gi, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -518,11 +541,13 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null,
     return result;
   }
   if (cleanPath === '/data-files') {
+    result.scopeAllBoards = true;
     result.filterDocType = 'DF';
     result.forceShowTable = true;
     return result;
   }
   if (cleanPath === '/audio') {
+    result.scopeAllBoards = true;
     result.filterDocType = 'AUD';
     result.forceShowTable = true;
     return result;
@@ -810,16 +835,44 @@ export function getSeoMetadata({
   }
 
   const subjDisplay = formatSubjectName(filterSubject);
+  const cieCodeInSubj = extractSyllabusCodeFromSubject(subjDisplay);
+  const baseSubjNoCode = cieCodeInSubj
+    ? subjDisplay.replace(/\s*\(\d{4}\)\s*$/, '').trim()
+    : subjDisplay;
   const SUBJECT_SHORT_MAP = {
     'Mathematics': 'Maths',
-    'Information Technology': 'IT',
-    'English as a Second Language': 'ESL',
+    'Mathematics (Without Coursework)': 'Maths',
+    'Additional Mathematics': 'Add Maths',
+    'Further Mathematics': 'Further Maths',
     'Further Pure Mathematics': 'Further Pure Maths',
-    'Greek (First Language)': 'Greek (1st Lang)',
+    'International Mathematics': 'Int Maths',
+    'Information Technology': 'IT',
+    'Information and Communication Technology': 'ICT',
+    'Computer Science': 'CS',
+    'English as a Second Language': 'ESL',
+    'English as a Second Language (Speaking Endorsement)': 'ESL',
+    'English as a Second Language (Count-in Speaking)': 'ESL',
+    'First Language English': 'First Lang English',
+    'Literature in English': 'English Lit',
+    'English Literature': 'English Lit',
+    'English Language': 'English Lang',
+    'Co-ordinated Sciences (Double Award)': 'Double Science',
+    'Combined Science': 'Combined Sci',
     'Sciences (Double Award)': 'Double Science',
-    'Sciences (Single Award)': 'Single Science'
+    'Sciences (Single Award)': 'Single Science',
+    'Environmental Management': 'Env Management',
+    'Global Perspectives & Research': 'Global Perspectives',
+    'Global Perspectives': 'Global Persp',
+    'Design and Technology': 'Design & Tech',
+    'Physical Education': 'PE',
+    'Business Studies': 'Business',
+    'Religious Studies': 'RS',
+    'Bangladesh Studies': 'Bangladesh St',
+    'Pakistan Studies': 'Pakistan St',
+    'Greek (First Language)': 'Greek (1st Lang)'
   };
-  const subjShort = SUBJECT_SHORT_MAP[subjDisplay] || subjDisplay;
+  const mappedShortBase = SUBJECT_SHORT_MAP[baseSubjNoCode] || baseSubjNoCode.replace(/\s*\([^)]*\)/g, '').trim();
+  const subjShort = cieCodeInSubj ? `${mappedShortBase} (${cieCodeInSubj})` : mappedShortBase;
   const currShort =
     filterCurriculum === 'Cambridge AS & A Level' ? 'Cambridge A-Level'
     : filterCurriculum === 'Cambridge IGCSE' ? 'Cambridge IGCSE'
@@ -827,6 +880,11 @@ export function getSeoMetadata({
     : filterCurriculum === 'Edexcel IGCSE' ? 'Edexcel IGCSE'
     : filterCurriculum === 'Edexcel IAL' ? 'Edexcel IAL'
     : (isCie ? 'Cambridge' : 'Edexcel');
+  const currTiny =
+    filterCurriculum === 'Cambridge AS & A Level' ? 'CAIE A-Level'
+    : filterCurriculum === 'Cambridge IGCSE' ? 'CAIE IGCSE'
+    : filterCurriculum === 'Cambridge O Level' ? 'CAIE O Level'
+    : currShort;
 
   if (filterDocType === 'Book' && !filterUnit) {
     if (filterSubject) {
@@ -895,7 +953,7 @@ export function getSeoMetadata({
       };
     }
     return {
-      title: 'Edexcel IAL & IGCSE Textbooks & Solution Banks PDF',
+      title: 'Edexcel IAL & IGCSE Textbooks & Solutions | Conceptualist',
       description: fitDescription(`Read ${totalBooks} Edexcel IAL and IGCSE (9-1) student textbooks, answer PDFs, and Maths worked solution banks free online in 2-Page WebPDF reader.`),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
@@ -907,19 +965,23 @@ export function getSeoMetadata({
 
   // Unit / Paper-level SEO metadata
   if (filterSubject && filterUnit) {
-    const unitCode = getUnitCodeFromLabel(filterUnit);
+    const unitCode = getUnitCodeFromLabel(filterUnit, { isCambridge: isCie });
     const cieCode = isCie ? extractSyllabusCodeFromSubject(filterSubject) : '';
     const igcseCode = filterCurriculum === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
     const unitClean = cleanUnitForContext(subjDisplay, filterUnit);
-    const unitWithCode = unitCode && !unitClean.includes(unitCode) ? `${unitClean} (${unitCode})` : unitClean;
+    const unitWithCode = unitCode && !unitClean.includes(unitCode) && !(isCie && /^P\d$/.test(unitCode) && /\bPaper\s+\d\b/i.test(unitClean))
+      ? `${unitClean} (${unitCode})`
+      : unitClean;
     const compactClean = compactUnitTitleLabel(unitClean);
-    const unitShort = unitCode && !compactClean.includes(unitCode)
+    const unitShort = unitCode && !compactClean.includes(unitCode) && !(isCie && /^P\d$/.test(unitCode) && /\bPaper\s+\d\b/i.test(compactClean))
       ? `${compactClean} (${unitCode})`
       : compactClean;
     const parenShortMatch = unitClean.match(/\(([A-Z0-9]{2,4})\)/i);
-    const ultraShortUnit = parenShortMatch && unitCode && parenShortMatch[1].toUpperCase() !== unitCode
-      ? `${parenShortMatch[1].toUpperCase()} (${unitCode})`
-      : (unitCode || unitShort);
+    const parenTok = parenShortMatch ? parenShortMatch[1].toUpperCase() : '';
+    const validParenTok = parenTok && !NON_CODE_PARENS.has(parenTok) ? parenTok : '';
+    const ultraShortUnit = validParenTok && unitCode && validParenTok !== unitCode
+      ? `${validParenTok} (${unitCode})`
+      : (isCie ? compactClean : (unitCode || unitShort));
 
     const unitObj = meta?.wizard?.[filterCurriculum || 'Edexcel IAL']?.[filterSubject]?.units?.[filterUnit];
     const docCount = unitObj?.count || 40;
@@ -945,10 +1007,15 @@ export function getSeoMetadata({
       `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
       `${currShort} ${subjShort} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
       `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
-      `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
+      `${currTiny} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
       `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
-      `${currShort} ${subjShort} ${ultraShortUnit} Past Papers & Mark Schemes`
-    ], 62);
+      cieCode
+        ? `CAIE ${cieCode} ${ultraShortUnit} Past Papers | Conceptualist`
+        : `${currShort} ${subjShort} ${ultraShortUnit} Past Papers`,
+      cieCode
+        ? `CAIE ${cieCode} ${unitCode || ultraShortUnit} Past Papers | Conceptualist`
+        : `${subjShort} ${unitCode || ultraShortUnit} Past Papers`
+    ], 64);
 
     const codeNote = !unitWithCode.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
     const shortCodeNote = !unitShort.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
@@ -1022,13 +1089,15 @@ export function getSeoMetadata({
       `${currShort} ${subjDisplay}${shortCodeStr} Past Papers & MS | Conceptualist`,
       `${currShort} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
       `${currShort} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
-      `${currShort} ${subjDisplay} Past Papers & Mark Schemes | Conceptualist`,
-      `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
+      `${currTiny} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
       `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
-      `${currShort} ${subjDisplay} Past Papers | Conceptualist`,
-      `${currShort} ${subjShort} Past Papers | Conceptualist`,
-      `${currShort} ${subjDisplay} Past Papers & Mark Schemes`
-    ], 62);
+      cieCode
+        ? `CAIE ${subjShort} Past Papers | Conceptualist`
+        : `${currShort} ${subjShort} Past Papers | Conceptualist`,
+      cieCode
+        ? `Cambridge ${cieCode} Past Papers & MS | Conceptualist`
+        : `${currShort} ${subjShort} Past Papers`
+    ], 64);
 
     const resourceTail = isCie
       ? 'past papers, mark schemes, inserts, grade thresholds & examiner reports'
@@ -1120,7 +1189,9 @@ export function getSeoMetadata({
       title: forceShowTable
         ? 'All Cambridge International Past Papers Archive | Conceptualist'
         : 'Cambridge IGCSE, O Level & A-Level Past Papers | Conceptualist',
-      description: fitDescription(`Study ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE, and O Level past papers, mark schemes, inserts & grade thresholds in Split View.`),
+      description: forceShowTable
+        ? fitDescription(`Search and filter all ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE & O Level past papers, mark schemes & grade thresholds (2002–2026).`)
+        : fitDescription(`Study ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE, and O Level past papers, mark schemes, inserts & grade thresholds in Split View.`),
       keywords: 'Cambridge past papers, CAIE past papers, Cambridge IGCSE, Cambridge O Level, Cambridge A Level, 0625, 0580, 9709, 9702, 4024, 5054, grade thresholds',
       canonicalUrl,
       robots,

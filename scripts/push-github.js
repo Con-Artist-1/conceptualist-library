@@ -7,6 +7,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const APP_DIR = path.resolve(__dirname, '..');
 
+function stripSurroundingQuotes(v) {
+  if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) {
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
 function loadEnv() {
   const envPath = path.join(APP_DIR, '.env');
   if (!fs.existsSync(envPath)) return;
@@ -16,7 +23,7 @@ function loadEnv() {
     const eq = trimmed.indexOf('=');
     if (eq > 0) {
       const key = trimmed.slice(0, eq).trim();
-      const val = trimmed.slice(eq + 1).trim();
+      const val = stripSurroundingQuotes(trimmed.slice(eq + 1).trim());
       if (!process.env[key]) process.env[key] = val;
     }
   }
@@ -149,44 +156,68 @@ async function main() {
     }
   }
 
-  // Upload changed blobs
-  const treeEntries = [];
+  // Upload changed blobs with bounded concurrency & retry
+  const treeEntries = new Array(files.length);
   let uploadedCount = 0;
   let unchangedCount = 0;
+  const toUpload = [];
 
-  for (const f of files) {
+  for (let idx = 0; idx < files.length; idx++) {
+    const f = files[idx];
     if (existingShas.get(f.rel) === f.gitSha) {
       unchangedCount++;
-      treeEntries.push({
+      treeEntries[idx] = {
         path: f.rel,
         mode: '100644',
         type: 'blob',
         sha: f.gitSha
-      });
-      continue;
+      };
+    } else {
+      toUpload.push({ idx, f });
     }
-
-    const blobRes = await ghRequest(`/repos/${REPO}/git/blobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: f.buf.toString('base64'),
-        encoding: 'base64'
-      })
-    });
-    if (!blobRes.ok) {
-      throw new Error(`Failed uploading blob ${f.rel} (${blobRes.status}): ${await blobRes.text()}`);
-    }
-    const blobData = await blobRes.json();
-    uploadedCount++;
-    console.log(`  Uploaded: ${f.rel} (${(f.size / 1024).toFixed(1)} KB)`);
-    treeEntries.push({
-      path: f.rel,
-      mode: '100644',
-      type: 'blob',
-      sha: blobData.sha
-    });
   }
+
+  let uploadCursor = 0;
+  const BLOB_CONCURRENCY = 4;
+  await Promise.all(Array.from({ length: Math.min(BLOB_CONCURRENCY, toUpload.length) }, async () => {
+    while (uploadCursor < toUpload.length) {
+      const { idx, f } = toUpload[uploadCursor++];
+      let blobData = null;
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const blobRes = await ghRequest(`/repos/${REPO}/git/blobs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: f.buf.toString('base64'),
+              encoding: 'base64'
+            })
+          });
+          if (blobRes.ok) {
+            blobData = await blobRes.json();
+            lastErr = null;
+            break;
+          }
+          const errText = await blobRes.text();
+          lastErr = new Error(`Failed uploading blob ${f.rel} (${blobRes.status}): ${errText}`);
+          if (blobRes.status < 500 && blobRes.status !== 403 && blobRes.status !== 429) break;
+        } catch (err) {
+          lastErr = err;
+        }
+        if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1500));
+      }
+      if (lastErr || !blobData) throw lastErr || new Error(`Empty blob response for ${f.rel}`);
+      uploadedCount++;
+      console.log(`  Uploaded: ${f.rel} (${(f.size / 1024).toFixed(1)} KB)`);
+      treeEntries[idx] = {
+        path: f.rel,
+        mode: '100644',
+        type: 'blob',
+        sha: blobData.sha
+      };
+    }
+  }));
 
   if (uploadedCount === 0 && parentCommitSha && existingShas.size === files.length) {
     console.log(`\nAll ${files.length} files are already up-to-date on https://github.com/${REPO}!`);
@@ -219,10 +250,11 @@ async function main() {
   }
   const newCommit = await createCommitRes.json();
 
+  const forcePush = process.argv.includes('--force');
   const updateRefRes = await ghRequest(`/repos/${REPO}/git/refs/heads/${branch}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sha: newCommit.sha, force: true })
+    body: JSON.stringify({ sha: newCommit.sha, force: forcePush })
   });
   if (!updateRefRes.ok) {
     throw new Error(`Failed updating branch ref (${updateRefRes.status}): ${await updateRefRes.text()}`);

@@ -514,13 +514,3 @@ export function getBookMetadata(fileOrPath) {
   const normalized = relPath.replace(/\\/g, '/');
   return BOOK_CATALOG_BY_PATH[normalized] || null;
 }
-
-export function formatFallbackBookTitle(rawName = '') {
-  return String(rawName || '')
-    .replace(/\.(pdf|zip|rar|mp3|wav|docx)$/i, '')
-    .replace(/_\d{10,14}/g, '')
-    .replace(/\s*\(\d+\)\s*$/g, '') // Strip duplicate browser download suffixes like "(1)"
-    .replace(/_/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}

@@ -19,6 +19,8 @@ import zlib from 'zlib';
 import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { decodeCatalogFiles } from '../src/lib/indexSerializer.js';
+import { isCambridgeSpec } from '../src/data/boards.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1005,7 +1007,7 @@ async function transcribeTrack(job, workerConfig) {
 }
 
 async function buildCompactSubtitleEntry(job, raw) {
-  const isIgcse = job.spec === 'IGCSE';
+  const isIgcse = job.spec === 'IGCSE' || job.spec === 'CIE-IGCSE' || job.spec === 'CIE-OL';
   const { words: asrWords, segments: whisperSegments } = parseWhisperOjf(
     raw.transcription,
     raw.duration,
@@ -1025,8 +1027,15 @@ async function buildCompactSubtitleEntry(job, raw) {
   let finalSource = 'whisper-ai';
   let usedPdfPath = '';
 
-  if (job.spec === 'IAL' && Array.isArray(job.candidatePdfs) && job.candidatePdfs.length > 0 && raw.duration < 1200) {
+  const canAlignTranscriptPdf =
+    (job.spec === 'IAL' || isCambridgeSpec(job.spec)) &&
+    Array.isArray(job.candidatePdfs) &&
+    job.candidatePdfs.length > 0 &&
+    raw.duration < 2700;
+
+  if (canAlignTranscriptPdf) {
     for (const cand of job.candidatePdfs) {
+      if (isCambridgeSpec(job.spec) && !/_tn_|transcript/i.test(cand.path || '')) continue;
       const pdfDoc = await extractCleanPdfTranscript(cand.path);
       if (!pdfDoc || pdfDoc.sentences.length < 6) continue;
       const targetSentences = job.isTrackedPart ? selectBestPassageForTrackedPart(pdfDoc, foreignAsrWords) : pdfDoc.sentences;
@@ -1172,8 +1181,7 @@ async function main() {
   const files = [];
   for (const ip of indexPathsToScan) {
     const idx = JSON.parse(fs.readFileSync(ip, 'utf8'));
-    for (const r of idx.files || []) {
-      const obj = Object.fromEntries(idx.keys.map((k, i) => [k, r[i]]));
+    for (const obj of decodeCatalogFiles(idx)) {
       if (SYLLABUS_FILTER && obj.syllabusCode && !SYLLABUS_FILTER.has(String(obj.syllabusCode))) continue;
       files.push(obj);
     }

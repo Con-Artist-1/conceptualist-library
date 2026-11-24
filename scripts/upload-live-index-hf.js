@@ -7,6 +7,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const APP_DIR = path.resolve(__dirname, '..');
 
+function stripSurroundingQuotes(v) {
+  if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) {
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
 function loadEnv() {
   const envPath = path.join(APP_DIR, '.env');
   if (!fs.existsSync(envPath)) return;
@@ -16,7 +23,7 @@ function loadEnv() {
     const eq = trimmed.indexOf('=');
     if (eq > 0) {
       const key = trimmed.slice(0, eq).trim();
-      const val = trimmed.slice(eq + 1).trim();
+      const val = stripSurroundingQuotes(trimmed.slice(eq + 1).trim());
       if (!process.env[key]) process.env[key] = val;
     }
   }
@@ -29,6 +36,28 @@ if (!TOKEN) {
   process.exit(1);
 }
 const REPO_ID = 'Diavlon/mcmaster-docs-library';
+
+async function fetchWithRetry(url, options = {}, attempts = 6) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(url, options);
+      if ((res.status === 429 || res.status >= 500) && i < attempts) {
+        const retryAfter = Number(res.headers.get('retry-after') || 0);
+        const waitMs = res.status === 429 ? Math.max(retryAfter * 1000, 15000) : i * 2000;
+        console.log(`  [HF ${res.status}] Retrying in ${Math.round(waitMs / 1000)}s (attempt ${i + 1}/${attempts})...`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (i === attempts) throw err;
+      await new Promise((r) => setTimeout(r, i * 1500));
+    }
+  }
+  throw lastErr;
+}
 
 async function main() {
   const targets = [
@@ -48,7 +77,7 @@ async function main() {
   });
 
   // 1. Request LFS upload via batch API
-  const batchRes = await fetch(`https://huggingface.co/datasets/${REPO_ID}.git/info/lfs/objects/batch`, {
+  const batchRes = await fetchWithRetry(`https://huggingface.co/datasets/${REPO_ID}.git/info/lfs/objects/batch`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,
@@ -58,7 +87,8 @@ async function main() {
     body: JSON.stringify({
       operation: 'upload',
       transfers: ['basic'],
-      objects: prepared.map((p) => ({ oid: p.oid, size: p.size }))
+      objects: prepared.map((p) => ({ oid: p.oid, size: p.size })),
+      hash_algo: 'sha256'
     })
   });
 
@@ -75,7 +105,7 @@ async function main() {
       const uploadUrl = obj.actions.upload.href;
       const headers = obj.actions.upload.header || {};
       console.log(`Uploading LFS binary for ${entry.remotePath}...`);
-      const upRes = await fetch(uploadUrl, {
+      const upRes = await fetchWithRetry(uploadUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/octet-stream',
@@ -85,6 +115,20 @@ async function main() {
       });
       if (!upRes.ok) {
         throw new Error(`Upload to storage failed for ${entry.remotePath}: HTTP ${upRes.status}`);
+      }
+      if (obj.actions.verify) {
+        const verifyRes = await fetchWithRetry(obj.actions.verify.href, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/vnd.git-lfs+json',
+            'Content-Type': 'application/vnd.git-lfs+json',
+            ...(obj.actions.verify.header || {})
+          },
+          body: JSON.stringify({ oid: obj.oid, size: obj.size })
+        });
+        if (!verifyRes.ok) {
+          throw new Error(`LFS verify failed for ${entry.remotePath}: HTTP ${verifyRes.status}`);
+        }
       }
       console.log(`LFS upload succeeded for ${entry.remotePath}.`);
     } else {
@@ -99,7 +143,7 @@ async function main() {
     JSON.stringify({
       key: 'header',
       value: {
-        summary: `Update ${prepared.map((p) => p.remotePath).join(' & ')} with deduplicated multi-board catalog`
+        summary: `Update ${prepared.map((p) => p.remotePath).join(' & ')} with compact v2 multi-board catalog`
       }
     }),
     ...prepared.map((p) => JSON.stringify({
@@ -113,7 +157,7 @@ async function main() {
     }))
   ].join('\n') + '\n';
 
-  const comRes = await fetch(commitUrl, {
+  const comRes = await fetchWithRetry(commitUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${TOKEN}`,

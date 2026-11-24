@@ -34,6 +34,7 @@ import {
   resolveCambridgeSyllabus,
   formatCambridgeSubjectName
 } from '../src/data/cambridgeCatalog.js';
+import { decodeCatalogFiles } from '../src/lib/indexSerializer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -229,8 +230,7 @@ function buildLibraryDedupState() {
 
   if (!fs.existsSync(INDEX_PATH)) return { exactKeys, looseKeys, usedPaths, histVariants };
   const idx = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
-  const keys = idx.keys || [];
-  const rows = (idx.files || []).map(r => Object.fromEntries(keys.map((k, i) => [k, r[i]])));
+  const rows = decodeCatalogFiles(idx);
 
   for (const f of rows) {
     if (f.path) usedPaths.add(f.path.replace(/\\/g, '/').toLowerCase());
@@ -1009,7 +1009,7 @@ async function crawlBehEdexcel(sinceYear) {
     await Promise.all(sessionPages.slice(i, i + 6).map(async (sp) => {
       try {
         const html = await fetch(sp.sessionUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(25000) }).then(r => (r.ok ? r.text() : ''));
-        const monFolder = sp.season === 'summer' ? 'June' : (sp.season === 'winter' ? 'January' : 'January');
+        const monFolder = sp.season === 'summer' ? 'June' : (sp.season === 'winter' ? 'October' : 'January');
         for (const m of html.matchAll(/href=["']([a-z0-9]{4,6})-(m|s|w)(\d{2})-(qp|ms|er)(?:-([a-z0-9]+))?\.php["']/gi)) {
           const pdfName = `${m[1].toLowerCase()}_${m[2].toLowerCase()}${m[3]}_${m[4].toLowerCase()}${m[5] ? `_${m[5].toLowerCase()}` : ''}.pdf`;
           out.push({
@@ -1234,8 +1234,7 @@ function buildCambridgeDedupState() {
   const usedPaths = new Set();
   if (!fs.existsSync(CAMBRIDGE_INDEX_PATH)) return { exactKeys, usedPaths };
   const idx = JSON.parse(fs.readFileSync(CAMBRIDGE_INDEX_PATH, 'utf8'));
-  const keys = idx.keys || [];
-  const rows = (idx.files || []).map(r => Object.fromEntries(keys.map((k, i) => [k, r[i]])));
+  const rows = decodeCatalogFiles(idx);
   for (const f of rows) {
     if (f.path) usedPaths.add(f.path.replace(/\\/g, '/').toLowerCase());
     if (f.category !== 'Past Papers') continue;

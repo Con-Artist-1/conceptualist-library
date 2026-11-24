@@ -163,15 +163,25 @@ function escapeRegExp(str) {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const _subjectPrefixRegexCache = new Map();
+
+function getSubjectPrefixRegex(subject) {
+  let re = _subjectPrefixRegexCache.get(subject);
+  if (!re) {
+    const shortSubj = subject === 'Information Technology' ? 'IT' : subject;
+    re = new RegExp(`^(?:${escapeRegExp(subject)}|${escapeRegExp(shortSubj)})\\s+`, 'i');
+    _subjectPrefixRegexCache.set(subject, re);
+  }
+  return re;
+}
+
 // Strip redundant subject prefix from unitName (e.g. "Accounting Unit 1 (WAC11)" -> "Unit 1 (WAC11)")
 export function getShortUnitDisplay(file) {
   let u = file.unitName || (file.unitCode ? `Unit ${file.unitCode}` : '');
   if (!u) return '';
   const isCie = file.board === 'cambridge' || isCambridgeSpec(file.spec);
   if (file.subject) {
-    const subj = file.subject === 'Information Technology' ? 'IT' : file.subject;
-    const prefixRegex = new RegExp(`^(?:${escapeRegExp(file.subject)}|${escapeRegExp(subj)})\\s+`, 'i');
-    u = u.replace(prefixRegex, '');
+    u = u.replace(getSubjectPrefixRegex(file.subject), '');
   }
   if (isCie) {
     return u;

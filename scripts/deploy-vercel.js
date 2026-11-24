@@ -7,6 +7,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const APP_DIR = path.resolve(__dirname, '..');
 
+function stripSurroundingQuotes(v) {
+  if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) {
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
 function loadEnv() {
   const envPath = path.join(APP_DIR, '.env');
   if (!fs.existsSync(envPath)) return;
@@ -16,7 +23,7 @@ function loadEnv() {
     const eq = trimmed.indexOf('=');
     if (eq > 0) {
       const key = trimmed.slice(0, eq).trim();
-      const val = trimmed.slice(eq + 1).trim();
+      const val = stripSurroundingQuotes(trimmed.slice(eq + 1).trim());
       if (!process.env[key]) process.env[key] = val;
     }
   }
@@ -200,23 +207,40 @@ async function main() {
   const files = collectAppFiles(APP_DIR);
   console.log(`Collected ${files.length} files to upload.`);
 
-  // 1. Upload files to /v2/files
-  for (const f of files) {
-    const res = await fetch(`https://api.vercel.com/v2/files?teamId=${TEAM_ID}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${TOKEN}`,
-        'Content-Type': 'application/octet-stream',
-        'x-vercel-digest': f.sha
-      },
-      body: f.buf
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Failed uploading ${f.rel} (${res.status}): ${err}`);
+  // 1. Upload files to /v2/files with bounded concurrency & retry
+  const UPLOAD_CONCURRENCY = 6;
+  let uploadCursor = 0;
+  await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, async () => {
+    while (uploadCursor < files.length) {
+      const f = files[uploadCursor++];
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await fetch(`https://api.vercel.com/v2/files?teamId=${TEAM_ID}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${TOKEN}`,
+              'Content-Type': 'application/octet-stream',
+              'x-vercel-digest': f.sha
+            },
+            body: f.buf
+          });
+          if (res.ok) {
+            lastErr = null;
+            console.log(`  Uploaded: ${f.rel} (${(f.size / 1024).toFixed(1)} KB)`);
+            break;
+          }
+          const errText = await res.text();
+          lastErr = new Error(`Failed uploading ${f.rel} (${res.status}): ${errText}`);
+          if (res.status < 500 && res.status !== 429) break;
+        } catch (err) {
+          lastErr = err;
+        }
+        if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1500));
+      }
+      if (lastErr) throw lastErr;
     }
-    console.log(`  Uploaded: ${f.rel} (${(f.size / 1024).toFixed(1)} KB)`);
-  }
+  }));
 
   // 2. Create production deployment
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'vercel.json'), 'utf8'));
@@ -256,11 +280,16 @@ async function main() {
   console.log(`\nDeployment created: ${dep.id} -> https://${dep.url}`);
   console.log('Waiting for Vercel production build to complete...');
 
-  for (let i = 0; i < 60; i++) {
+  const MAX_POLLS = 100;
+  for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise(r => setTimeout(r, 3000));
     const checkRes = await fetch(`https://api.vercel.com/v13/deployments/${dep.id}?teamId=${TEAM_ID}`, {
       headers: { 'Authorization': `Bearer ${TOKEN}` }
     });
+    if (!checkRes.ok) {
+      console.warn(`  [${(i + 1) * 3}s] Warning: poll HTTP ${checkRes.status}`);
+      continue;
+    }
     const statusObj = await checkRes.json();
     console.log(`  [${(i + 1) * 3}s] Status: ${statusObj.readyState}`);
     if (statusObj.readyState === 'READY') {
@@ -279,6 +308,7 @@ async function main() {
       throw new Error(`Deployment ended with state: ${statusObj.readyState}`);
     }
   }
+  throw new Error(`Timed out after ${MAX_POLLS * 3}s waiting for Vercel deployment ${dep.id} to reach READY state.`);
 }
 
 main().catch(err => {

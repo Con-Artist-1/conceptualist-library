@@ -778,7 +778,7 @@ const WelcomePage = ({
                     <div className="wizard-button-grid">
                       {units.map((unitName) => {
                         const unitCount = availableUnitsMap[unitName]?.count;
-                        const unitHref = `/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(unitName)}`;
+                        const unitHref = `/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(unitName, { isCambridge: isCambridgeCurriculum(selectedSubject.curriculum) })}`;
                         return (
                           <a
                             key={unitName}
@@ -805,7 +805,7 @@ const WelcomePage = ({
               <h2>Select Examination Year for {selectedUnit}:</h2>
               <div style={{ marginBottom: '20px' }}>
                 <a
-                  href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(selectedUnit)}`}
+                  href={`/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(selectedUnit, { isCambridge: isCambridgeCurriculum(selectedSubject.curriculum) })}`}
                   className="wizard-option-btn primary"
                   onClick={(e) => {
                     if (!shouldHandleClientNavigation(e)) return;

@@ -2,7 +2,7 @@
   "trailingSlash": false,
   "functions": {
     "api/*.js": {
-      "includeFiles": "public/allowlist.json"
+      "includeFiles": "api/_allowlist.json"
     }
   },
   "rewrites": [],
@@ -171,7 +171,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-EGxBR9sUsXi5gzRLLlNltvMXfiJXLXpT3CyzOYc+bDo=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-eb4K/mizn4bvLzOCekBIb/D5EnFD2Qy4V8CGhYNmzSo=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     }
@@ -885,6 +885,571 @@
     {
       "source": "/cambridge/9990",
       "destination": "/cambridge/a-level/psychology-9990",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting",
+      "destination": "/cambridge/a-level/accounting-9706",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic",
+      "destination": "/cambridge/a-level/arabic-9680",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology",
+      "destination": "/cambridge/a-level/biology-9700",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business",
+      "destination": "/cambridge/a-level/business-9609",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry",
+      "destination": "/cambridge/a-level/chemistry-9701",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese",
+      "destination": "/cambridge/a-level/chinese-9715",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science",
+      "destination": "/cambridge/a-level/computer-science-9618",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/design-and-technology",
+      "destination": "/cambridge/a-level/design-and-technology-9705",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics",
+      "destination": "/cambridge/a-level/economics-9708",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-general-paper",
+      "destination": "/cambridge/a-level/english-general-paper-8021",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language",
+      "destination": "/cambridge/a-level/english-language-9093",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/environmental-management",
+      "destination": "/cambridge/a-level/environmental-management-8291",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french",
+      "destination": "/cambridge/a-level/french-9716",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/further-mathematics",
+      "destination": "/cambridge/a-level/further-mathematics-9231",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography",
+      "destination": "/cambridge/a-level/geography-9696",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german",
+      "destination": "/cambridge/a-level/german-9717",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/global-perspectives-and-research",
+      "destination": "/cambridge/a-level/global-perspectives-and-research-9239",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history",
+      "destination": "/cambridge/a-level/history-9489",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology",
+      "destination": "/cambridge/a-level/information-technology-9626",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies",
+      "destination": "/cambridge/a-level/islamic-studies-9488",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law",
+      "destination": "/cambridge/a-level/law-9084",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english",
+      "destination": "/cambridge/a-level/literature-in-english-9695",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science",
+      "destination": "/cambridge/a-level/marine-science-9693",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/mathematics",
+      "destination": "/cambridge/a-level/mathematics-9709",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/mathematics-9709/pure-mathematics-1-p1-wma11",
+      "destination": "/cambridge/a-level/mathematics-9709/pure-mathematics-1-p1",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/mathematics-9709/pure-mathematics-2-p2-wma12",
+      "destination": "/cambridge/a-level/mathematics-9709/pure-mathematics-2-p2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/mathematics-9709/pure-mathematics-3-p3-wma13",
+      "destination": "/cambridge/a-level/mathematics-9709/pure-mathematics-3-p3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/media-studies",
+      "destination": "/cambridge/a-level/media-studies-9607",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics",
+      "destination": "/cambridge/a-level/physics-9702",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology",
+      "destination": "/cambridge/a-level/psychology-9990",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology",
+      "destination": "/cambridge/a-level/sociology-9699",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish",
+      "destination": "/cambridge/a-level/spanish-9719",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/travel-and-tourism",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu",
+      "destination": "/cambridge/a-level/urdu-9686",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/al",
+      "destination": "/cambridge/a-level",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/as-a-level",
+      "destination": "/cambridge/a-level",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/accounting",
+      "destination": "/cambridge/igcse/accounting-0452",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/additional-mathematics",
+      "destination": "/cambridge/igcse/additional-mathematics-0606",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/agriculture",
+      "destination": "/cambridge/igcse/agriculture-0600",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design",
+      "destination": "/cambridge/igcse/art-and-design-0400",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/bangladesh-studies",
+      "destination": "/cambridge/igcse/bangladesh-studies-0449",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology",
+      "destination": "/cambridge/igcse/biology-0610",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/business-studies",
+      "destination": "/cambridge/igcse/business-studies-0450",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry",
+      "destination": "/cambridge/igcse/chemistry-0620",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science",
+      "destination": "/cambridge/igcse/combined-science-0653",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/computer-science",
+      "destination": "/cambridge/igcse/computer-science-0478",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology",
+      "destination": "/cambridge/igcse/design-and-technology-0445",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/drama",
+      "destination": "/cambridge/igcse/drama-0411",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics",
+      "destination": "/cambridge/igcse/economics-0455",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/enterprise",
+      "destination": "/cambridge/igcse/enterprise-0454",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/environmental-management",
+      "destination": "/cambridge/igcse/environmental-management-0680",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-arabic",
+      "destination": "/cambridge/igcse/first-language-arabic-0508",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-chinese",
+      "destination": "/cambridge/igcse/first-language-chinese-0509",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-english",
+      "destination": "/cambridge/igcse/first-language-english-0500",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-french",
+      "destination": "/cambridge/igcse/first-language-french-0501",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-malay",
+      "destination": "/cambridge/igcse/first-language-malay-0696",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-spanish",
+      "destination": "/cambridge/igcse/first-language-spanish-0502",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/food-and-nutrition",
+      "destination": "/cambridge/igcse/food-and-nutrition-0648",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french",
+      "destination": "/cambridge/igcse/french-0520",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography",
+      "destination": "/cambridge/igcse/geography-0460",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german",
+      "destination": "/cambridge/igcse/german-0525",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/global-perspectives",
+      "destination": "/cambridge/igcse/global-perspectives-0457",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/history",
+      "destination": "/cambridge/igcse/history-0470",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict",
+      "destination": "/cambridge/igcse/ict-0417",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics",
+      "destination": "/cambridge/igcse/international-mathematics-0607",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/islamiyat",
+      "destination": "/cambridge/igcse/islamiyat-0493",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english",
+      "destination": "/cambridge/igcse/literature-in-english-0475",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics",
+      "destination": "/cambridge/igcse/mathematics-0580",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/music",
+      "destination": "/cambridge/igcse/music-0410",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/pakistan-studies",
+      "destination": "/cambridge/igcse/pakistan-studies-0448",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physical-education",
+      "destination": "/cambridge/igcse/physical-education-0413",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics",
+      "destination": "/cambridge/igcse/physics-0625",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/religious-studies",
+      "destination": "/cambridge/igcse/religious-studies-0490",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/sociology",
+      "destination": "/cambridge/igcse/sociology-0495",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish",
+      "destination": "/cambridge/igcse/spanish-0530",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/travel-and-tourism",
+      "destination": "/cambridge/igcse/travel-and-tourism-0471",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/accounting",
+      "destination": "/cambridge/o-level/accounting-7707",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/additional-mathematics",
+      "destination": "/cambridge/o-level/additional-mathematics-4037",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/arabic",
+      "destination": "/cambridge/o-level/arabic-3180",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bangladesh-studies",
+      "destination": "/cambridge/o-level/bangladesh-studies-7094",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bengali",
+      "destination": "/cambridge/o-level/bengali-3204",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology",
+      "destination": "/cambridge/o-level/biology-5090",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/business-studies",
+      "destination": "/cambridge/o-level/business-studies-7115",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry",
+      "destination": "/cambridge/o-level/chemistry-5070",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/combined-science",
+      "destination": "/cambridge/o-level/combined-science-5129",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/commerce",
+      "destination": "/cambridge/o-level/commerce-7100",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/computer-science",
+      "destination": "/cambridge/o-level/computer-science-2210",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/economics",
+      "destination": "/cambridge/o-level/economics-2281",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/english-language",
+      "destination": "/cambridge/o-level/english-language-1123",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/environmental-management",
+      "destination": "/cambridge/o-level/environmental-management-5014",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/first-language-urdu",
+      "destination": "/cambridge/o-level/first-language-urdu-3247",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/french",
+      "destination": "/cambridge/o-level/french-3015",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography",
+      "destination": "/cambridge/o-level/geography-2217",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/global-perspectives",
+      "destination": "/cambridge/o-level/global-perspectives-2069",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/history",
+      "destination": "/cambridge/o-level/history-2147",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamic-studies",
+      "destination": "/cambridge/o-level/islamic-studies-2068",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat",
+      "destination": "/cambridge/o-level/islamiyat-2058",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/literature-in-english",
+      "destination": "/cambridge/o-level/literature-in-english-2010",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d",
+      "destination": "/cambridge/o-level/mathematics-d-4024",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/pakistan-studies",
+      "destination": "/cambridge/o-level/pakistan-studies-2059",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics",
+      "destination": "/cambridge/o-level/physics-5054",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/second-language-urdu",
+      "destination": "/cambridge/o-level/second-language-urdu-3248",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sinhala",
+      "destination": "/cambridge/o-level/sinhala-3205",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sociology",
+      "destination": "/cambridge/o-level/sociology-2251",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/statistics",
+      "destination": "/cambridge/o-level/statistics-4040",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/tamil",
+      "destination": "/cambridge/o-level/tamil-3226",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/travel-and-tourism",
+      "destination": "/cambridge/o-level/travel-and-tourism-7096",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/ol",
+      "destination": "/cambridge/o-level",
       "permanent": true
     },
     {
@@ -2950,6 +3515,16 @@
     {
       "source": "/igcse/urdu/p1",
       "destination": "/igcse/urdu/paper-1-p1",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/cambridge",
+      "destination": "/textbooks",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/cambridge/:path*",
+      "destination": "/textbooks",
       "permanent": true
     },
     {

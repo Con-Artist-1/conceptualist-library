@@ -10,7 +10,7 @@ import {
   isBookCategory,
   isCambridgePath
 } from './data/boards.js';
-import { detectLikelyQueryBoard } from './searchEngine.js';
+import { detectLikelyQueryBoard } from './lib/queryBoardDetect.js';
 import {
   buildRoutePath,
   parseRouteFromLocation,
@@ -186,7 +186,7 @@ function App() {
   ), [initialCache]);
 
   const [activeBoard, setActiveBoard] = useState(() => getInitialBoard(initialRoute, initialHistoryState));
-  const [scopeAllBoards, setScopeAllBoards] = useState(false);
+  const [scopeAllBoards, setScopeAllBoards] = useState(() => Boolean(!initialHistoryState && initialRoute.scopeAllBoards));
 
   const [isNotFound, setIsNotFound] = useState(Boolean(!initialHistoryState && initialRoute.notFound));
   const [wizardSubject, setWizardSubject] = useState(() => (
@@ -251,6 +251,8 @@ function App() {
   const boardGenAtRef = useRef(new Map());
   const isHydratedRef = useRef(false);
   const hydratedShardPathRef = useRef(null);
+  const hydratedShardBoardRef = useRef(null);
+  const inFlightShardPathRef = useRef(null);
   const latestLoadedGenAtRef = useRef('');
   const dataMetaRef = useRef(meta);
   dataMetaRef.current = meta;
@@ -372,7 +374,7 @@ function App() {
           : parsed.activeBoard || (parsed.filterCurriculum ? getBoardForCurriculum(parsed.filterCurriculum) : activeBoardRef.current);
 
       setActiveBoard(resolvedBoard);
-      setScopeAllBoards(false);
+      setScopeAllBoards(Boolean(parsed.scopeAllBoards));
 
       if ((navState?.wizardStep === 'unit' || navState?.wizardStep === 'year') && navState.subject && navState.curriculum) {
         setCurrentTab('library');
@@ -655,17 +657,19 @@ function App() {
     const markWorkerHydrated = (res, { isFull, board = 'edexcel', shardPath = null }) => {
       if (cancelled || !res) return;
       const bKey = res.board || board || 'edexcel';
-      if (!isFull && loadedBoardsRef.current.has(bKey)) return;
+      if (!isFull && bKey !== 'all' && loadedBoardsRef.current.has(bKey)) return;
       isHydratedRef.current = true;
       if (res.isFull || isFull) {
         loadedBoardsRef.current.add(bKey);
         boardGenAtRef.current.set(bKey, res.generatedAt || '');
         latestLoadedGenAtRef.current = res.generatedAt || latestLoadedGenAtRef.current;
-        if (hydratedShardPathRef.current && shardPath === null) {
+        if (hydratedShardPathRef.current && shardPath === null && hydratedShardBoardRef.current === bKey) {
           hydratedShardPathRef.current = null;
+          hydratedShardBoardRef.current = null;
         }
       } else if (shardPath) {
         hydratedShardPathRef.current = shardPath;
+        hydratedShardBoardRef.current = bKey;
       }
       if (res.meta && res.meta.wizard) {
         setMeta(res.meta);
@@ -694,18 +698,22 @@ function App() {
 
       const cacheUrl = buildIndexCacheUrl(APP_VERSION, BUILD_TIMESTAMP, bKey);
       const task = (async () => {
-        if (showLoader || !loadedBoardsRef.current.has(bKey)) setFilesLoading(true);
+        if (showLoader && !loadedBoardsRef.current.has(bKey)) setFilesLoading(true);
         setLoadError(null);
 
         try {
           if (!forceReload && earlyFetch?.fullBufferPromise && (earlyFetch.board || 'edexcel') === bKey) {
             const p = earlyFetch.fullBufferPromise;
             earlyFetch.fullBufferPromise = null;
-            const buf = await p;
-            if (buf && buf.byteLength > 0 && !cancelled) {
-              const res = await catalogClient.loadBuffer(buf, { isFull: true, cacheUrl, board: bKey });
-              markWorkerHydrated(res, { isFull: true, board: bKey });
-              return;
+            try {
+              const buf = await p;
+              if (buf && buf.byteLength > 0 && !cancelled) {
+                const res = await catalogClient.loadBuffer(buf, { isFull: true, cacheUrl, board: bKey });
+                markWorkerHydrated(res, { isFull: true, board: bKey });
+                return;
+              }
+            } catch (bufErr) {
+              console.warn(`Early buffer decode failed for ${bKey}, falling back to network/cache fetch:`, bufErr);
             }
           }
 
@@ -746,18 +754,26 @@ function App() {
 
     ensureBoardIndexRef.current = ensureBoardIndex;
 
+    const isCrossBoardShard = (sp) => sp === '/shards/audio.json' || sp === '/shards/data-files.json';
+
     const hydrateInitialShard = async () => {
       if (!initialShardRoute) return;
+      const shardTargetBoard = isCrossBoardShard(initialShardRoute) ? 'all' : bootBoard;
       const cacheUrl = buildIndexCacheUrl(APP_VERSION, BUILD_TIMESTAMP, bootBoard);
+      inFlightShardPathRef.current = initialShardRoute;
       try {
         if (earlyFetch?.shardBufferPromise && earlyFetch.shardPath === initialShardRoute) {
           const p = earlyFetch.shardBufferPromise;
           earlyFetch.shardBufferPromise = null;
-          const buf = await p;
-          if (buf && buf.byteLength > 0 && !cancelled && !loadedBoardsRef.current.has(bootBoard)) {
-            const res = await catalogClient.loadBuffer(buf, { isFull: false, board: bootBoard });
-            markWorkerHydrated(res, { isFull: false, board: bootBoard, shardPath: initialShardRoute });
-            return;
+          try {
+            const buf = await p;
+            if (buf && buf.byteLength > 0 && !cancelled && (shardTargetBoard === 'all' || !loadedBoardsRef.current.has(bootBoard))) {
+              const res = await catalogClient.loadBuffer(buf, { isFull: false, board: shardTargetBoard });
+              markWorkerHydrated(res, { isFull: false, board: res?.board || shardTargetBoard, shardPath: initialShardRoute });
+              return;
+            }
+          } catch (bufErr) {
+            console.warn('Early shard buffer decode failed, falling back to shard fetch:', bufErr);
           }
         }
 
@@ -765,14 +781,18 @@ function App() {
           shardUrl: `${initialShardRoute}?v=${buildQuery}`,
           cacheUrl,
           expectedMeta: latestMeta,
-          board: bootBoard,
+          board: shardTargetBoard,
           signal: abortController.signal
         });
-        markWorkerHydrated(res, { isFull: Boolean(res?.isFull), board: bootBoard, shardPath: initialShardRoute });
+        markWorkerHydrated(res, { isFull: Boolean(res?.isFull), board: res?.board || shardTargetBoard, shardPath: initialShardRoute });
       } catch (err) {
         if (cancelled || err?.name === 'AbortError') return;
         shardFailed = true;
-        void loadSingleBoardIndex(bootBoard, latestMeta);
+        void ensureBoardIndex(shardTargetBoard, { showLoader: true });
+      } finally {
+        if (inFlightShardPathRef.current === initialShardRoute) {
+          inFlightShardPathRef.current = null;
+        }
       }
     };
 
@@ -1012,7 +1032,9 @@ function App() {
 
   const handleBrowseTextbooks = useCallback(() => {
     setCurrentTab('library');
-    clearFilters({ pushUrl: false });
+    persistBoardPreference('edexcel');
+    setActiveBoard('edexcel');
+    clearFilters({ pushUrl: false, targetBoard: 'edexcel' });
     setFilterDocType('Book');
     setForceShowTable(true);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
@@ -1021,6 +1043,7 @@ function App() {
   const handleBrowseAudio = useCallback(() => {
     setCurrentTab('library');
     clearFilters({ pushUrl: false });
+    setScopeAllBoards(true);
     setFilterDocType('AUD');
     setForceShowTable(true);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
@@ -1164,9 +1187,25 @@ function App() {
       setFilesLoading(false);
       return undefined;
     }
+    const currentRouteShard = getShardPathForRoute({
+      currentTab,
+      filterCurriculum,
+      filterSubject,
+      filterUnit,
+      filterDocType,
+      notFound: currentTab === 'library' && isNotFound
+    });
+    const hasMatchingShard = Boolean(
+      currentRouteShard &&
+      hydratedShardPathRef.current === currentRouteShard &&
+      (
+        hydratedShardBoardRef.current === effectiveQueryBoard ||
+        hydratedShardBoardRef.current === 'all'
+      )
+    );
     const isTargetBoardHydrated = effectiveQueryBoard === 'all'
-      ? (loadedBoardsRef.current.has('edexcel') && loadedBoardsRef.current.has('cambridge'))
-      : (loadedBoardsRef.current.has(effectiveQueryBoard) || Boolean(hydratedShardPathRef.current));
+      ? ((loadedBoardsRef.current.has('edexcel') && loadedBoardsRef.current.has('cambridge')) || hasMatchingShard)
+      : (loadedBoardsRef.current.has(effectiveQueryBoard) || hasMatchingShard);
     if (catalogRevision === 0 || !isTargetBoardHydrated) {
       setFilesLoading(true);
       return undefined;
@@ -1306,7 +1345,7 @@ function App() {
     return count;
   }, [scopeAllBoards, filterDocType, filterSubject, filterUnit, filterYear, filterSession, filterVariant, sortBy, viewMode]);
 
-  // Upgrade from a route shard or hydrate the active board's full index on demand
+  // Upgrade from a route shard or hydrate the active board's shard/full index on demand
   useEffect(() => {
     const requiredTarget = scopeAllBoards ? 'all' : activeBoard;
     const isTargetLoaded = requiredTarget === 'all'
@@ -1322,13 +1361,86 @@ function App() {
       filterDocType,
       notFound: currentTab === 'library' && isNotFound
     });
+    const isCrossBoardHubShard = activeShard === '/shards/audio.json' || activeShard === '/shards/data-files.json';
+    const shardBoardTarget = isCrossBoardHubShard ? 'all' : activeBoard;
+    const hasActiveSearch = Boolean(deferredSearchQuery && deferredSearchQuery.trim());
+    const canServeFromShard = Boolean(
+      !showWelcome &&
+      activeShard &&
+      !pendingPaperParam &&
+      !hasActiveSearch &&
+      !selectedPath &&
+      (!scopeAllBoards || isCrossBoardHubShard)
+    );
+
+    if (canServeFromShard) {
+      const shardAlreadyReady =
+        hydratedShardPathRef.current === activeShard &&
+        (hydratedShardBoardRef.current === shardBoardTarget || hydratedShardBoardRef.current === 'all');
+
+      if (!shardAlreadyReady && inFlightShardPathRef.current !== activeShard) {
+        let cancelled = false;
+        inFlightShardPathRef.current = activeShard;
+        const buildQuery = encodeURIComponent(BUILD_TIMESTAMP);
+        void getCatalogClient()
+          .loadShard({
+            shardUrl: `${activeShard}?v=${buildQuery}`,
+            board: shardBoardTarget
+          })
+          .then((res) => {
+            if (cancelled || !res) return;
+            const resolvedShardBoard = res.board || shardBoardTarget;
+            if (!res.isFull) {
+              hydratedShardPathRef.current = activeShard;
+              hydratedShardBoardRef.current = resolvedShardBoard;
+            }
+            if (res.counts) {
+              setCatalogTotalCount((prev) => Math.max(prev, res.counts.unifiedCount || res.counts.flatCount || 0));
+            }
+            setLoading(false);
+            setLoadError(null);
+            setCatalogRevision((rev) => rev + 1);
+          })
+          .catch(() => {
+            if (!cancelled) {
+              ensureBoardIndexRef.current?.(requiredTarget, { showLoader: true });
+            }
+          })
+          .finally(() => {
+            if (inFlightShardPathRef.current === activeShard) {
+              inFlightShardPathRef.current = null;
+            }
+          });
+
+        // Upgrade single-board full index quietly after shard paints (cross-board shards already have 100% of items)
+        const bgTimer = !isCrossBoardHubShard
+          ? setTimeout(() => {
+              ensureBoardIndexRef.current?.(activeBoard, { showLoader: false });
+            }, 1200)
+          : null;
+
+        return () => {
+          cancelled = true;
+          if (bgTimer) clearTimeout(bgTimer);
+        };
+      }
+
+      if (!isCrossBoardHubShard) {
+        const bgTimer = setTimeout(() => {
+          ensureBoardIndexRef.current?.(activeBoard, { showLoader: false });
+        }, 1200);
+        return () => clearTimeout(bgTimer);
+      }
+      return undefined;
+    }
+
     const switchedOutOfShard = Boolean(
       hydratedShardPathRef.current &&
       activeShard !== hydratedShardPathRef.current
     );
     const needsFullNow =
       Boolean(pendingPaperParam) ||
-      Boolean(deferredSearchQuery && deferredSearchQuery.trim()) ||
+      hasActiveSearch ||
       Boolean(selectedPath) ||
       scopeAllBoards ||
       switchedOutOfShard ||
@@ -1362,6 +1474,8 @@ function App() {
   const archiveContextActions = useMemo(() => ({
     clearFilters,
     setIsNotFound,
+    setActiveBoard,
+    setScopeAllBoards,
     setFilterCurriculum,
     setFilterSubject,
     setFilterUnit,
@@ -1436,10 +1550,22 @@ function App() {
       setForceShowTable(true);
       return;
     }
+    if (action === 'textbooks') {
+      persistBoardPreference('edexcel');
+      setActiveBoard('edexcel');
+      clearFilters({ pushUrl: false, targetBoard: 'edexcel' });
+      setFilterDocType('Book');
+      setForceShowTable(true);
+      return;
+    }
     clearFilters({ pushUrl: false });
-    if (action === 'textbooks') setFilterDocType('Book');
-    else if (action === 'data-files') setFilterDocType('DF');
-    else if (action === 'audio') setFilterDocType('AUD');
+    if (action === 'data-files') {
+      setScopeAllBoards(true);
+      setFilterDocType('DF');
+    } else if (action === 'audio') {
+      setScopeAllBoards(true);
+      setFilterDocType('AUD');
+    }
     setForceShowTable(true);
   }, [clearFilters, handleSwitchBoard]);
 

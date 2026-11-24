@@ -26,8 +26,7 @@ export function useViewsState() {
     }
     const req = fetch('/api/views', {
       method: 'GET',
-      headers: { Accept: 'application/json' },
-      cache: 'no-store'
+      headers: { Accept: 'application/json' }
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((payload) => {

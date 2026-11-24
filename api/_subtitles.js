@@ -14,7 +14,41 @@ import {
 
 const LOCAL_STORE_DIR = path.join(PROJECT_ROOT, '.data');
 const LOCAL_SUBTITLES_FILE = path.join(LOCAL_STORE_DIR, 'audio_subtitles.json');
+const STATIC_MANIFEST_FILE = path.join(PROJECT_ROOT, 'public', 'subtitles', 'manifest.json');
 let memorySubtitlesStore = globalThis.__csMemorySubtitlesStore || null;
+let cachedStaticManifestKeys = globalThis.__csStaticSubManifestKeys || null;
+let subtitleAliasIndexInitialized = globalThis.__csSubtitleAliasIndexInitialized || false;
+
+function isPreIndexedStaticSubtitleKey(key) {
+  if (!key) return false;
+  if (!cachedStaticManifestKeys) {
+    try {
+      if (fs.existsSync(STATIC_MANIFEST_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(STATIC_MANIFEST_FILE, 'utf8'));
+        if (parsed && parsed.keys && typeof parsed.keys === 'object') {
+          cachedStaticManifestKeys = new Set(Object.keys(parsed.keys));
+          globalThis.__csStaticSubManifestKeys = cachedStaticManifestKeys;
+        }
+      }
+    } catch {
+      // Ignore manifest read failures
+    }
+    if (!cachedStaticManifestKeys) {
+      cachedStaticManifestKeys = new Set();
+    }
+  }
+  return cachedStaticManifestKeys.has(key);
+}
+
+function ensureSubtitleCollectionIndexes(subCol) {
+  if (!subCol || subtitleAliasIndexInitialized) return;
+  subtitleAliasIndexInitialized = true;
+  globalThis.__csSubtitleAliasIndexInitialized = true;
+  void subCol.createIndex({ aliasKeys: 1 }, { background: true }).catch(() => {
+    subtitleAliasIndexInitialized = false;
+    globalThis.__csSubtitleAliasIndexInitialized = false;
+  });
+}
 
 // Dedicated stricter rate limit for unauthenticated subtitle writes (SEC-02)
 const SUBTITLE_WRITE_WINDOW_MS = 10 * 60 * 1000;
@@ -70,9 +104,11 @@ function stripControlChars(input, replacement = '') {
   return out;
 }
 
-function sanitizeSubtitlePayload(raw) {
+function sanitizeSubtitlePayload(raw, { isAdminOverwrite = false } = {}) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.segments)) return null;
   const cleanSegments = [];
+  let totalChars = 0;
+  let maxEndSec = 0;
   for (const seg of raw.segments.slice(0, 1200)) {
     if (!seg || typeof seg !== 'object') continue;
     const start = Number(seg.start);
@@ -82,20 +118,33 @@ function sanitizeSubtitlePayload(raw) {
       .trim()
       .slice(0, 360);
     if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || !text) continue;
+    const roundedStart = Number(start.toFixed(1));
+    const roundedEnd = Number(end.toFixed(1));
     const item = {
-      start: Number(start.toFixed(1)),
-      end: Number(end.toFixed(1)),
+      start: roundedStart,
+      end: roundedEnd,
       text
     };
     if (seg.passage && typeof seg.passage === 'string') {
       item.passage = stripControlChars(seg.passage, '').replace(/[<>]/g, '').trim().slice(0, 80);
     }
+    totalChars += text.length;
+    if (roundedEnd > maxEndSec) maxEndSec = roundedEnd;
     cleanSegments.push(item);
   }
   if (cleanSegments.length === 0) return null;
+
+  const duration = Number.isFinite(Number(raw.duration)) ? Number(Number(raw.duration).toFixed(1)) : 0;
+  // Block single-segment spam / permanent poisoning from unauthenticated clients
+  if (!isAdminOverwrite) {
+    if (cleanSegments.length < 3 || totalChars < 40 || Math.max(duration, maxEndSec) < 12) {
+      return null;
+    }
+  }
+
   return {
-    duration: Number.isFinite(Number(raw.duration)) ? Number(Number(raw.duration).toFixed(1)) : 0,
-    source: typeof raw.source === 'string' ? raw.source.slice(0, 40) : 'whisper-ai',
+    duration,
+    source: isAdminOverwrite && typeof raw.source === 'string' ? raw.source.slice(0, 40) : 'whisper-ai',
     language: typeof raw.language === 'string' ? raw.language.slice(0, 24) : 'french',
     updatedAt: new Date().toISOString(),
     segments: cleanSegments
@@ -124,6 +173,7 @@ export async function handleGetSubtitles(req, res, urlObj, subtitlesKeyParam) {
   try {
     const db = await getMongoDatabase();
     const subCol = db.collection(COLLECTION_SUBTITLES);
+    ensureSubtitleCollectionIndexes(subCol);
     const docs = await subCol
       .find(
         { $or: [{ _id: { $in: lookupKeys } }, { aliasKeys: { $in: lookupKeys } }] },
@@ -186,17 +236,25 @@ export async function handleSaveSubtitles(req, res, body, clientIp) {
   const headerAdminKey = typeof req.headers['x-admin-key'] === 'string' ? req.headers['x-admin-key'] : '';
   const isAdminOverwrite = Boolean(adminKey && constantTimeEqual(headerAdminKey, adminKey));
 
-  // SEC-02: reject arbitrary unindexed trackKeys and enforce stricter per-IP write throttle
+  // SEC-02: reject arbitrary unindexed trackKeys, protect pre-indexed static tracks, and enforce per-IP write throttle
   if (!isAdminOverwrite) {
     if (!isKnownSubtitleTrackKey(trackKey)) {
       return sendJsonResponse(res, 400, { ok: false, error: 'Unknown archive audio trackKey' });
+    }
+    if (isPreIndexedStaticSubtitleKey(trackKey)) {
+      return sendJsonResponse(res, 200, {
+        ok: true,
+        source: 'static',
+        trackKey,
+        preservedExisting: true
+      });
     }
     if (!checkSlidingRateLimit(subtitleWriteRateMap, clientIp, SUBTITLE_WRITE_WINDOW_MS, MAX_SUBTITLE_WRITES_PER_WINDOW)) {
       return sendJsonResponse(res, 429, { ok: false, error: 'Subtitle write rate limit exceeded' });
     }
   }
 
-  const cleanSubtitle = sanitizeSubtitlePayload(body?.subtitle);
+  const cleanSubtitle = sanitizeSubtitlePayload(body?.subtitle, { isAdminOverwrite });
   if (!cleanSubtitle) {
     return sendJsonResponse(res, 400, { ok: false, error: 'Invalid subtitle segments' });
   }
@@ -204,7 +262,12 @@ export async function handleSaveSubtitles(req, res, body, clientIp) {
   const rawAliasKeys = Array.isArray(body?.aliasKeys)
     ? body.aliasKeys
         .map((k) => String(k || '').trim())
-        .filter((k) => k && k !== trackKey && isValidSubtitleKey(k) && (isAdminOverwrite || isKnownSubtitleTrackKey(k)))
+        .filter((k) => (
+          k &&
+          k !== trackKey &&
+          isValidSubtitleKey(k) &&
+          (isAdminOverwrite || (isKnownSubtitleTrackKey(k) && !isPreIndexedStaticSubtitleKey(k)))
+        ))
         .slice(0, 4)
     : [];
 
@@ -231,6 +294,7 @@ export async function handleSaveSubtitles(req, res, body, clientIp) {
     }
 
     const subCol = db.collection(COLLECTION_SUBTITLES);
+    ensureSubtitleCollectionIndexes(subCol);
     const conflictKeys = [trackKey, ...rawAliasKeys];
     const existingDocs = await subCol
       .find(
