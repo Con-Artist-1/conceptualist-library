@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.1.0',
+    date: '2026-11-24T10:30:00+06:00',
+    title: 'Full 107-Syllabus Cambridge Archive Expansion & Multi-Source Sync (78,739 Files)',
+    summary: 'Expanded Cambridge International (CAIE) from 20 pilot syllabuses to all 107 international syllabuses spanning 2002–2026 (58,795 Cambridge files) and added 32 newly discovered Edexcel International files across 169 total subjects (78,739 archived files / 74,877 unique records).',
+    changes: [
+      'Complete 107-Syllabus Cambridge Archive (2002–2026): Ingested and trailer-verified 55,816 additional Cambridge International past papers, mark schemes, examiner reports, grade thresholds, inserts, confidential instructions, data files, and listening tracks across all 31 AS & A Level, 45 IGCSE, and 31 O Level syllabuses (58,795 Cambridge files / 58,794 unique records).',
+      'Edexcel International Completeness & 100% Audio Subtitles: Added 32 missing Edexcel IAL and IGCSE files across 19,944 Edexcel files (16,083 unique records) and pre-indexed the newly added IGCSE ESL listening track into Tier 1 static shards (368 unique SHA-256 tracks / 995 manifest keys covering 100% of all 273 Edexcel AUD resources).',
+      '176 Instant Route Shards & 780 Sitemap Routes: Pre-rendered 783 canonical HTML pages and generated 176 per-subject JSON shards so every single Edexcel and Cambridge subject page hydrates immediately without waiting for full board indexes.'
+    ]
+  },
+  {
     version: 'v8.0.0',
     date: '2026-11-24T02:00:00+06:00',
     title: 'Multi-Board International Archive & Cambridge International (CAIE) Launch',

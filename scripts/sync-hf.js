@@ -8,6 +8,9 @@ const __dirname = path.dirname(__filename);
 
 const LIBRARY_ROOT = path.resolve(__dirname, '..', '..');
 const APP_DIR = path.resolve(__dirname, '..');
+const DATA_DIR = path.join(APP_DIR, '.data');
+const SHA_CACHE_PATH = path.join(DATA_DIR, 'library_sha_cache.json');
+const HF_STATUS_PATH = path.join(DATA_DIR, 'hf_sync_status.json');
 
 function loadEnv() {
   const envPath = path.join(APP_DIR, '.env');
@@ -125,7 +128,7 @@ async function fetchAllRemoteFiles() {
   return remoteMap;
 }
 
-async function ensureLfsObjectsUploaded(files) {
+async function ensureLfsObjectsUploaded(files, onUploaded) {
   const byOid = new Map();
   for (const f of files) {
     if (!byOid.has(f.oid)) {
@@ -168,10 +171,12 @@ async function ensureLfsObjectsUploaded(files) {
       }
       await new Promise(r => setTimeout(r, attempt * 1500));
     }
+    const presentInChunk = chunk.length - ((data.objects || []).filter(obj => obj.actions && obj.actions.upload).length);
+    alreadyPresentCount += presentInChunk;
+    if (onUploaded && presentInChunk > 0) onUploaded(presentInChunk, 0);
     const toUpload = (data.objects || []).filter(obj => obj.actions && obj.actions.upload);
-    alreadyPresentCount += (chunk.length - toUpload.length);
 
-    const CONCURRENCY = 5;
+    const CONCURRENCY = 10;
     for (let j = 0; j < toUpload.length; j += CONCURRENCY) {
       const sub = toUpload.slice(j, j + CONCURRENCY);
       await Promise.all(sub.map(async (obj) => {
@@ -221,6 +226,7 @@ async function ensureLfsObjectsUploaded(files) {
           }
         }
         uploadedCount++;
+        if (onUploaded) onUploaded(1, fileMeta.size);
       }));
     }
     console.log(`  LFS check [${Math.min(i + BATCH_SIZE, uniqueFiles.length)}/${uniqueFiles.length}]: ${alreadyPresentCount} already on HF, ${uploadedCount} newly uploaded`);
@@ -267,6 +273,15 @@ async function main() {
   const remoteMap = await fetchAllRemoteFiles();
   console.log(`Total remote files on Hugging Face: ${remoteMap.size}\n`);
 
+  // Load local SHA-256 cache from Past Papers to avoid re-reading 45+ GB from disk
+  let shaCacheFiles = {};
+  if (fs.existsSync(SHA_CACHE_PATH)) {
+    try {
+      shaCacheFiles = JSON.parse(fs.readFileSync(SHA_CACHE_PATH, 'utf8')).files || {};
+    } catch { /* ignore cache read error */ }
+  }
+  const pastPapersDir = path.join(LIBRARY_ROOT, 'Past Papers');
+
   // Find all local files that are missing on remote or differ in size
   const missingOrChanged = [];
   const byFolderCounts = {};
@@ -274,8 +289,19 @@ async function main() {
   for (const lf of localFiles) {
     const rf = remoteMap.get(lf.relPath);
     if (!rf || rf.size !== lf.size || !rf.lfsOid) {
-      const buf = fs.readFileSync(lf.fullPath);
-      const oid = crypto.createHash('sha256').update(buf).digest('hex');
+      let oid = '';
+      if (lf.relPath.startsWith('Past Papers/')) {
+        const relFromPP = path.relative(pastPapersDir, lf.fullPath).replace(/\\/g, '/');
+        const st = fs.statSync(lf.fullPath);
+        const cached = shaCacheFiles[relFromPP];
+        if (cached && cached.size === st.size && cached.mtimeMs === st.mtimeMs && cached.sha) {
+          oid = cached.sha;
+        }
+      }
+      if (!oid) {
+        const buf = fs.readFileSync(lf.fullPath);
+        oid = crypto.createHash('sha256').update(buf).digest('hex');
+      }
       missingOrChanged.push({
         ...lf,
         oid
@@ -290,19 +316,64 @@ async function main() {
     console.log(`  - ${folder}: ${count} missing files`);
   }
 
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const startedAtMs = Date.now();
+  let committedFiles = 0;
+  let lfsProcessedInCurrentBatch = 0;
+  let bytesUploaded = 0;
+  let lastStatusWrite = 0;
+
+  const writeHfStatus = (phase, currentBatch, totalChunks) => {
+    const elapsedSec = Math.max(1, (Date.now() - startedAtMs) / 1000);
+    const doneTotal = Math.min(missingOrChanged.length, committedFiles + lfsProcessedInCurrentBatch);
+    const filesPerMin = Number(((doneTotal / elapsedSec) * 60).toFixed(1));
+    const remaining = Math.max(0, missingOrChanged.length - doneTotal);
+    const etaMinutes = filesPerMin > 0 ? Number((remaining / filesPerMin).toFixed(1)) : null;
+    try {
+      fs.writeFileSync(HF_STATUS_PATH, JSON.stringify({
+        phase,
+        startedAt: new Date(startedAtMs).toISOString(),
+        updatedAt: new Date().toISOString(),
+        elapsedSec: Math.round(elapsedSec),
+        totalLocalFiles: localFiles.length,
+        totalMissingInitial: missingOrChanged.length,
+        committedFiles,
+        doneTotal,
+        remaining,
+        percent: missingOrChanged.length > 0 ? Number(((doneTotal / missingOrChanged.length) * 100).toFixed(2)) : 100,
+        currentBatch,
+        totalBatches: totalChunks,
+        mbUploaded: Number((bytesUploaded / (1024 * 1024)).toFixed(2)),
+        filesPerMin,
+        etaMinutes
+      }, null, 2));
+    } catch { /* ignore */ }
+  };
+
   if (missingOrChanged.length === 0) {
+    writeHfStatus('done', 0, 0);
     console.log(`\nAll ${localFiles.length.toLocaleString()} files are already 100% in sync on Hugging Face!`);
     return;
   }
 
-  // Upload & commit in chunks of 400 files so commits stay fast and reliable
-  const COMMIT_CHUNK_SIZE = 400;
+  // Upload & commit in chunks of 1,000 files (~54 commits for 54k files, well under HF's 128 commits/hr limit)
+  const COMMIT_CHUNK_SIZE = 1000;
   const totalChunks = Math.ceil(missingOrChanged.length / COMMIT_CHUNK_SIZE);
+  writeHfStatus('uploading', 1, totalChunks);
 
   for (let c = 0; c < totalChunks; c++) {
     const chunk = missingOrChanged.slice(c * COMMIT_CHUNK_SIZE, (c + 1) * COMMIT_CHUNK_SIZE);
+    lfsProcessedInCurrentBatch = 0;
     console.log(`\n--- Processing Batch ${c + 1}/${totalChunks} (${chunk.length} files) ---`);
-    await ensureLfsObjectsUploaded(chunk);
+    await ensureLfsObjectsUploaded(chunk, (countDelta, bytesDelta) => {
+      lfsProcessedInCurrentBatch += countDelta;
+      bytesUploaded += bytesDelta;
+      const now = Date.now();
+      if (now - lastStatusWrite >= 5000) {
+        lastStatusWrite = now;
+        writeHfStatus('uploading', c + 1, totalChunks);
+      }
+    });
     await sendCommit(
       `Sync missing library files batch ${c + 1}/${totalChunks} (${chunk.length} files)`,
       chunk.map(f => ({
@@ -310,7 +381,12 @@ async function main() {
         value: { path: f.relPath, algo: 'sha256', oid: f.oid, size: f.size }
       }))
     );
+    committedFiles += chunk.length;
+    lfsProcessedInCurrentBatch = 0;
+    writeHfStatus('uploading', c + 1, totalChunks);
   }
+
+  writeHfStatus('done', totalChunks, totalChunks);
 
   console.log('\n=== Full 100% Hugging Face Sync Completed! ===');
 }

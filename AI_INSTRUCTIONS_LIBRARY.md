@@ -6,7 +6,7 @@ Welcome! If you are an AI assistant tasked with working on the curated document 
 
 ## 1. Directory Structure
 
-The library is an independent **strictly international exam-board** study archive indexing **Pearson Edexcel International** and **Cambridge International (CAIE)** resources containing **22,891 archived files** (**19,030 deduplicated unique documents**) across **82 international subjects**: **19 Edexcel IAL**, **43 Edexcel IGCSE** (`19,912` files / `16,051` unique, Jan 2003 – Jun 2026), **6 Cambridge AS & A Level**, **7 Cambridge IGCSE**, and **7 Cambridge O Level** (`2,979` files / `2,979` unique, Feb/March 2024 – May/June 2026). UK domestic boards (OCR, UK AQA, UK Edexcel GCE/GCSE, WJEC/Eduqas) are strictly excluded.
+The library is an independent **strictly international exam-board** study archive indexing **Pearson Edexcel International** and **Cambridge International (CAIE)** resources containing **78,739 archived files** (**74,877 deduplicated unique documents**) across **169 international subjects**: **19 Edexcel IAL**, **43 Edexcel IGCSE** (`19,944` files / `16,083` unique, Jan 2003 – Jun 2026), **31 Cambridge AS & A Level**, **45 Cambridge IGCSE**, and **31 Cambridge O Level** (`58,795` files / `58,794` unique across all 107/107 international syllabuses, 2002 – May/June 2026). UK domestic boards (OCR, UK AQA, UK Edexcel GCE/GCSE, WJEC/Eduqas) are strictly excluded.
 
 **Main Root Folders:**
 1. **`Past Papers\IAL`**: Contains Edexcel International A-Level (IAL) and legacy GCE Maths papers across 19 subjects (strictly excludes UK GCE non-Math specs and pre-launch years).
@@ -41,10 +41,10 @@ The naming conventions depend on the source batch:
 ## 3. Web Application, Route Sharding & Indexing
 
 The front-end application (React 19 + Vite 8 + Vercel Web Analytics & Speed Insights + MongoDB endpoints `/api/views` & `/api/telemetry`) located at `e:\The Library\search-app` uses multi-stage static data loading:
-- `public/meta.json`: High-speed compact metadata & wizard catalog (`~34.6 KB`, `compactTree` removed) for `0ms` initial UI hydration.
-- `dist/shards/*.json`: **69 compact route shards** (including 4 branch-level IAL Mathematics shards: Pure, Mechanics, Statistics, Further/Decision) loaded in parallel with `meta.json` on cold landing pages.
-- `public/index.json`: Tuple-encoded (`keys` + `files`) deduplicated global catalog loaded on demand / background upgrade, with Hugging Face `live_index.json` fallback.
-- `public/subtitles/`: Sharded Tier 1 subtitle index (`manifest.json` with `992` keys + **9 lazy subject shards**: `ial-french.json`, `ial-german.json`, `ial-spanish.json`, `igcse-chinese.json`, `igcse-esl.json`, `igcse-french.json`, `igcse-german.json`, `igcse-spanish.json`, `igcse-swahili.json` totaling **367 unique SHA-256 tracks / 50,363 timed segments** covering **100% of all 272/272 `AUD` resources** across IAL & IGCSE). `generate-index.js` reports combined coverage from `public/subtitles/manifest.json` plus legacy `public/audio-subtitles.json` / `.data/audio_subtitles.json`. Newly added future audio packs fall back cleanly to Tier 2 MongoDB (`audio_subtitles`, 1,200-segment / 320 KB caps) caching and Tier 3 on-demand browser generation (`inferWhisperLanguage`).
+- `public/meta.json`: High-speed compact metadata & wizard catalog (`~110 KB`, `compactTree` removed) for `0ms` initial UI hydration across all 169 subjects.
+- `dist/shards/*.json`: **176 compact route shards** (covering all 62 Edexcel subjects, 107 Cambridge subjects, 4 branch-level IAL Mathematics shards, textbooks, data-files, and audio) loaded in parallel with `meta.json` on cold landing pages.
+- `public/index.json` (`index-edexcel.json`) & `public/index-cambridge.json`: Tuple-encoded (`keys` + `files`) deduplicated board-partitioned catalogs loaded on demand / background upgrade, with Hugging Face `live_index.json` & `live_index_cambridge.json` fallbacks.
+- `public/subtitles/`: Sharded Tier 1 subtitle index (`manifest.json` with `995` keys + **9 lazy subject shards**: `ial-french.json`, `ial-german.json`, `ial-spanish.json`, `igcse-chinese.json`, `igcse-esl.json`, `igcse-french.json`, `igcse-german.json`, `igcse-spanish.json`, `igcse-swahili.json` totaling **368 unique SHA-256 tracks** covering **100% of all 273/273 Edexcel `AUD` resources** across IAL & IGCSE). `generate-index.js` reports combined coverage from `public/subtitles/manifest.json` plus legacy `public/audio-subtitles.json` / `.data/audio_subtitles.json`. Newly added or Cambridge audio packs fall back cleanly to Tier 2 MongoDB (`audio_subtitles`, 1,200-segment / 320 KB caps) caching and Tier 3 on-demand browser generation (`inferWhisperLanguage`).
 
 **Core Production Scripts (`search-app/scripts/`):**
 The scripts directory contains strictly **9 essential utilities**. Keep all temporary/verification scripts outside the repo (e.g. in AppData scratch directories).
@@ -57,7 +57,7 @@ The scripts directory contains strictly **9 essential utilities**. Keep all temp
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output
    ```
-3. **SEO Sitemap, `/llms.txt`, Route Shards & Static HTML Pre-rendering (`296` indexable sitemap URLs with per-route `<lastmod>` dates excluding `< 3`-file thin `noindex` routes, `69` shards, `299` canonical HTML routes + `404.html` + `422` permanent `308` redirects in `vercel.json`):**
+3. **SEO Sitemap, `/llms.txt`, Route Shards & Static HTML Pre-rendering (`780` indexable sitemap URLs with per-route `<lastmod>` dates excluding `< 3`-file thin `noindex` routes, `176` shards, `783` canonical HTML routes + `404.html` + `565` permanent `308` redirects in `vercel.json`):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\prerender-seo.js`" 2>&1" | Write-Output
    ```
@@ -164,10 +164,10 @@ Core Conceptualist Systems contributors listed on `/about`:
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors with `"no-undef": "error"` in `.oxlintrc.json`) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, Board Switcher (`/`, `/cambridge`) Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.0.0` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.1.0` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
    - **Deploy & IndexNow:** Always run `scripts/deploy-vercel.js`, wait for `=== Production Deployment READY! ===` + `[IndexNow] Submitted ... canonical URLs`, and verify live deployment on `https://www.conceptualist.uk`.
 
-Enjoy working with this independent 22,891-file (19,030-unique-record) international Edexcel & Cambridge study archive!
+Enjoy working with this independent 78,739-file (74,877-unique-record) international Edexcel & Cambridge study archive!

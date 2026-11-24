@@ -82,6 +82,7 @@ function parseArgs(argv) {
     sinceYear: 0,
     qpdfPath: '',
     dumpJson: '',
+    fromJson: '',
     skipPack: false,
     skipIndex: false,
     limit: Infinity
@@ -107,6 +108,7 @@ function parseArgs(argv) {
     else if (arg.startsWith('--since=')) opts.sinceYear = Number(arg.slice(8)) || 0;
     else if (arg.startsWith('--qpdf=')) opts.qpdfPath = arg.slice(7);
     else if (arg.startsWith('--dump-json=')) opts.dumpJson = arg.slice(12).trim();
+    else if (arg.startsWith('--from-json=')) opts.fromJson = arg.slice(12).trim();
     else if (arg.startsWith('--limit=')) opts.limit = Number(arg.slice(8)) || Infinity;
   }
   if (!opts.sources) {
@@ -1978,26 +1980,69 @@ function validateMagic(buf, ext) {
   return null;
 }
 
-async function downloadBuffer(item) {
-  const hdrs = { 'User-Agent': UA };
-  if (item.cookie) hdrs.Cookie = item.cookie;
-  const res = await fetch(item.url, { headers: hdrs, signal: AbortSignal.timeout(45000) });
-  if (!res.ok) return { err: `HTTP_${res.status}` };
-  let buf = Buffer.from(await res.arrayBuffer());
-  if (item.url.includes('drive.google.com') && buf.length < 250000) {
-    const txt = buf.toString('utf8');
-    if (/download-form|uc-download-link|confirm=/i.test(txt)) {
-      const action = txt.match(/action="([^"]+)"/i)?.[1]?.replace(/&amp;/g, '&') || 'https://drive.usercontent.google.com/download';
-      const id = txt.match(/name="id"\s+value="([^"]+)"/i)?.[1] || item.id || '';
-      const conf = txt.match(/name="confirm"\s+value="([^"]+)"/i)?.[1] || 't';
-      const uuid = txt.match(/name="uuid"\s+value="([^"]+)"/i)?.[1] || '';
-      const u2 = `${action}?id=${encodeURIComponent(id)}&export=download&confirm=${encodeURIComponent(conf)}${uuid ? `&uuid=${encodeURIComponent(uuid)}` : ''}`;
-      const r2 = await fetch(u2, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(180000) });
-      if (!r2.ok) return { err: `HTTP2_${r2.status}` };
-      buf = Buffer.from(await r2.arrayBuffer());
+const HOST_LIMITS = {
+  'bestexamhelp.com': 6,
+  'pastpapers.papacambridge.com': 6,
+  'pmt.physicsandmathstutor.com': 3,
+  'www.physicsandmathstutor.com': 3,
+  'drive.google.com': 3,
+  'drive.usercontent.google.com': 3
+};
+const hostActive = new Map();
+const hostWaiters = new Map();
+
+async function withHostSlot(rawUrl, fn) {
+  let host = 'default';
+  try { host = new URL(rawUrl).hostname.toLowerCase(); } catch { /* fallback */ }
+  const cap = HOST_LIMITS[host] || 4;
+  const active = hostActive.get(host) || 0;
+  if (active >= cap) {
+    await new Promise(resolve => {
+      if (!hostWaiters.has(host)) hostWaiters.set(host, []);
+      hostWaiters.get(host).push(resolve);
+    });
+  }
+  hostActive.set(host, (hostActive.get(host) || 0) + 1);
+  try {
+    return await fn();
+  } finally {
+    const nextActive = (hostActive.get(host) || 1) - 1;
+    hostActive.set(host, nextActive);
+    const q = hostWaiters.get(host);
+    if (q && q.length > 0 && nextActive < cap) {
+      const wake = q.shift();
+      wake();
     }
   }
-  return { buf };
+}
+
+async function downloadBuffer(item) {
+  return withHostSlot(item.url, async () => {
+    const hdrs = { 'User-Agent': UA };
+    if (item.cookie) hdrs.Cookie = item.cookie;
+    let res = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      res = await fetch(item.url, { headers: hdrs, signal: AbortSignal.timeout(45000) });
+      if (res.status !== 429 && res.status !== 503) break;
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
+    if (!res || !res.ok) return { err: `HTTP_${res ? res.status : 'ERR'}` };
+    let buf = Buffer.from(await res.arrayBuffer());
+    if (item.url.includes('drive.google.com') && buf.length < 250000) {
+      const txt = buf.toString('utf8');
+      if (/download-form|uc-download-link|confirm=/i.test(txt)) {
+        const action = txt.match(/action="([^"]+)"/i)?.[1]?.replace(/&amp;/g, '&') || 'https://drive.usercontent.google.com/download';
+        const id = txt.match(/name="id"\s+value="([^"]+)"/i)?.[1] || item.id || '';
+        const conf = txt.match(/name="confirm"\s+value="([^"]+)"/i)?.[1] || 't';
+        const uuid = txt.match(/name="uuid"\s+value="([^"]+)"/i)?.[1] || '';
+        const u2 = `${action}?id=${encodeURIComponent(id)}&export=download&confirm=${encodeURIComponent(conf)}${uuid ? `&uuid=${encodeURIComponent(uuid)}` : ''}`;
+        const r2 = await fetch(u2, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(180000) });
+        if (!r2.ok) return { err: `HTTP2_${r2.status}` };
+        buf = Buffer.from(await r2.arrayBuffer());
+      }
+    }
+    return { buf };
+  });
 }
 
 function downloadViaCurl(item, tmpPath) {
@@ -2051,39 +2096,48 @@ function packLargePdf(qpdfExe, absPath, tmpPack) {
 async function run() {
   const opts = parseArgs(process.argv.slice(2));
   const isCambridge = opts.board === 'cambridge';
-  const crawlers = isCambridge
-    ? {
-        beh: (yr) => crawlBehCambridge(yr, opts.syllabuses),
-        elevare: (yr) => crawlElevareCambridge(yr, opts.syllabuses),
-        bsr: (yr) => crawlBsrCambridge(yr, opts.syllabuses),
-        pmt: (yr) => crawlPmtCambridge(yr, opts.syllabuses),
-        almr: (yr) => crawlAlmrCambridge(yr, opts.syllabuses),
-        cie: (yr) => crawlCieOfficial(yr, opts.syllabuses),
-        papa: (yr) => crawlPapaCambridge(yr, opts.syllabuses)
-      }
-    : {
-        bsr: crawlBsr,
-        dp: crawlDynamicPapers,
-        igexams: crawlIgExams,
-        ssc: crawlSsc,
-        pmt: crawlPmt,
-        pl: crawlPaperlords,
-        elevare: crawlElevare,
-        beh: crawlBehEdexcel,
-        almr: crawlAlmrEdexcel
-      };
+  let planned = [];
 
-  const raw = [];
-  for (const s of opts.sources) {
-    if (!crawlers[s]) { console.warn(`Unknown source ignored for board=${opts.board}: ${s}`); continue; }
-    raw.push(...(await crawlers[s](opts.sinceYear)));
+  if (opts.fromJson) {
+    const rawJson = JSON.parse(fs.readFileSync(opts.fromJson, 'utf8'));
+    const list = Array.isArray(rawJson) ? rawJson : (rawJson.items || []);
+    planned = list.slice(0, opts.limit);
+    console.log(`[FromJSON] Loaded ${planned.length} pre-planned items from ${opts.fromJson}`);
+  } else {
+    const crawlers = isCambridge
+      ? {
+          beh: (yr) => crawlBehCambridge(yr, opts.syllabuses),
+          elevare: (yr) => crawlElevareCambridge(yr, opts.syllabuses),
+          bsr: (yr) => crawlBsrCambridge(yr, opts.syllabuses),
+          pmt: (yr) => crawlPmtCambridge(yr, opts.syllabuses),
+          almr: (yr) => crawlAlmrCambridge(yr, opts.syllabuses),
+          cie: (yr) => crawlCieOfficial(yr, opts.syllabuses),
+          papa: (yr) => crawlPapaCambridge(yr, opts.syllabuses)
+        }
+      : {
+          bsr: crawlBsr,
+          dp: crawlDynamicPapers,
+          igexams: crawlIgExams,
+          ssc: crawlSsc,
+          pmt: crawlPmt,
+          pl: crawlPaperlords,
+          elevare: crawlElevare,
+          beh: crawlBehEdexcel,
+          almr: crawlAlmrEdexcel
+        };
+
+    const raw = [];
+    for (const s of opts.sources) {
+      if (!crawlers[s]) { console.warn(`Unknown source ignored for board=${opts.board}: ${s}`); continue; }
+      raw.push(...(await crawlers[s](opts.sinceYear)));
+    }
+
+    const state = isCambridge ? buildCambridgeDedupState() : buildLibraryDedupState();
+    planned = (isCambridge
+      ? planCambridgeItems(raw, state, opts.sinceYear, opts.syllabuses)
+      : planItems(raw, state, opts.sinceYear)
+    ).slice(0, opts.limit);
   }
-
-  const state = isCambridge ? buildCambridgeDedupState() : buildLibraryDedupState();
-  const planned = (isCambridge
-    ? planCambridgeItems(raw, state, opts.sinceYear, opts.syllabuses)
-    : planItems(raw, state, opts.sinceYear)
-  ).slice(0, opts.limit);
   if (opts.dumpJson) {
     fs.writeFileSync(opts.dumpJson, JSON.stringify(planned, null, 2));
     console.log(`Dumped ${planned.length} planned items to ${opts.dumpJson}`);
@@ -2094,8 +2148,10 @@ async function run() {
     bySubj[k] = (bySubj[k] || 0) + 1;
   }
 
-  console.log(`\n=== SYNC PLAN [${opts.board.toUpperCase()}] (${planned.length} new candidates across ${opts.sources.join(',')}) ===`);
-  for (const [k, v] of Object.entries(bySubj).sort()) console.log(`  ${k}: ${v}`);
+  console.log(`\n=== SYNC PLAN [${opts.fromJson ? 'UNIFIED-MANIFEST' : opts.board.toUpperCase()}] (${planned.length} new candidates) ===`);
+  if (!opts.fromJson) {
+    for (const [k, v] of Object.entries(bySubj).sort()) console.log(`  ${k}: ${v}`);
+  }
   if (opts.verbose && planned.length) {
     const cap = Math.min(planned.length, 300);
     console.log(`\nPlanned items (showing ${cap} of ${planned.length}):`);
@@ -2107,15 +2163,81 @@ async function run() {
     return;
   }
 
-  const { shaToPaths } = loadShaRegistry();
+  const { shaToPaths, nextCache } = loadShaRegistry();
   const qpdfExe = opts.skipPack ? '' : findQpdfExecutable(opts.qpdfPath);
-  const tmpFile = path.join(DATA_DIR, `sync_curl_${process.pid}.tmp`);
-  const tmpPack = path.join(DATA_DIR, `sync_qpdf_${process.pid}.pdf`);
+  const statusPath = path.join(DATA_DIR, 'download_status.json');
   const retryCurl = [];
   const failReasons = {};
-  let saved = 0, skippedDup = 0, copiedShared = 0, failed = 0;
+  const failedItems = [];
+  const recentSaved = [];
+  let saved = 0, alreadyOnDisk = 0, skippedDup = 0, copiedShared = 0, failed = 0, processed = 0, bytesDownloaded = 0;
+  const startedAtMs = Date.now();
 
-  const commitBuffer = (item, buf) => {
+  const qualStats = {};
+  for (const p of planned) {
+    if (!qualStats[p.spec]) qualStats[p.spec] = { total: 0, done: 0, saved: 0, skipped: 0, failed: 0 };
+    qualStats[p.spec].total++;
+  }
+
+  const writeStatusSnapshot = (phase = 'downloading') => {
+    const elapsedSec = Math.max(1, (Date.now() - startedAtMs) / 1000);
+    const filesPerMin = Number(((processed / elapsedSec) * 60).toFixed(1));
+    const remaining = Math.max(0, planned.length - processed);
+    const etaMinutes = filesPerMin > 0 ? Number((remaining / filesPerMin).toFixed(1)) : null;
+    const snap = {
+      phase,
+      startedAt: new Date(startedAtMs).toISOString(),
+      updatedAt: new Date().toISOString(),
+      elapsedSec: Math.round(elapsedSec),
+      totalPlanned: planned.length,
+      processed,
+      remaining,
+      percent: planned.length > 0 ? Number(((processed / planned.length) * 100).toFixed(2)) : 100,
+      saved,
+      alreadyOnDisk,
+      copiedSharedDA: copiedShared,
+      skippedDup,
+      queuedCurlRetry: retryCurl.length,
+      failed,
+      bytesDownloaded,
+      mbDownloaded: Number((bytesDownloaded / (1024 * 1024)).toFixed(2)),
+      filesPerMin,
+      etaMinutes,
+      byQualification: qualStats,
+      failReasons,
+      recentSaved: recentSaved.slice(-8),
+      recentFailed: failedItems.slice(-10)
+    };
+    try {
+      fs.writeFileSync(statusPath, JSON.stringify(snap, null, 2));
+    } catch { /* ignore transient status write error */ }
+  };
+
+  const flushShaCache = () => {
+    try {
+      fs.writeFileSync(SHA_CACHE_PATH, JSON.stringify({ updatedAt: new Date().toISOString(), files: nextCache }));
+    } catch { /* ignore */ }
+  };
+
+  let lastStatusMs = 0;
+  const maybeProgress = (phase = 'downloading') => {
+    const now = Date.now();
+    if (now - lastStatusMs >= 5000 || processed === planned.length) {
+      lastStatusMs = now;
+      writeStatusSnapshot(phase);
+    }
+    if (processed > 0 && (processed % 250 === 0 || processed === planned.length)) {
+      const elapsedMin = ((now - startedAtMs) / 60000).toFixed(1);
+      const rate = ((processed / Math.max(1, (now - startedAtMs) / 1000)) * 60).toFixed(0);
+      const mb = (bytesDownloaded / (1024 * 1024)).toFixed(1);
+      console.log(`[Progress] ${processed}/${planned.length} (${((processed / planned.length) * 100).toFixed(1)}%) | saved=${saved} disk=${alreadyOnDisk} dup=${skippedDup} retry=${retryCurl.length} fail=${failed} | ${mb} MB | ${rate}/min | ${elapsedMin}m`);
+    }
+    if (saved > 0 && saved % 2500 === 0) {
+      flushShaCache();
+    }
+  };
+
+  const commitBuffer = (item, buf, workerTmpPack) => {
     const ext = item.relDest.split('.').pop().toLowerCase();
     const merr = validateMagic(buf, ext);
     if (merr) return { ok: false, reason: merr };
@@ -2128,78 +2250,155 @@ async function run() {
         fs.copyFileSync(existingList[0], item.absDest);
         existingList.push(item.absDest);
         copiedShared++;
-        return { ok: true };
+        return { ok: true, kind: 'copied' };
       }
       skippedDup++;
-      return { ok: true };
+      return { ok: true, kind: 'dup' };
     }
     fs.mkdirSync(path.dirname(item.absDest), { recursive: true });
     fs.writeFileSync(item.absDest, buf);
+    bytesDownloaded += buf.length;
+    if (qpdfExe && workerTmpPack) {
+      packLargePdf(qpdfExe, item.absDest, workerTmpPack);
+      if (fs.existsSync(workerTmpPack)) {
+        try { fs.unlinkSync(workerTmpPack); } catch { /* ignore */ }
+      }
+    }
+    const st = fs.statSync(item.absDest);
+    const relFromPapers = path.relative(PAST_PAPERS, item.absDest).replace(/\\/g, '/');
+    nextCache[relFromPapers] = { size: st.size, mtimeMs: st.mtimeMs, sha };
     shaToPaths.set(sha, [item.absDest]);
-    if (qpdfExe) packLargePdf(qpdfExe, item.absDest, tmpPack);
     saved++;
-    return { ok: true };
+    recentSaved.push(item.relDest);
+    if (recentSaved.length > 20) recentSaved.shift();
+    return { ok: true, kind: 'saved' };
   };
 
+  writeStatusSnapshot('downloading');
   let cursor = 0;
-  await Promise.all(Array.from({ length: 10 }, async () => {
-    while (cursor < planned.length) {
-      const item = planned[cursor++];
-      const sourcesToTry = [item, ...(item.fallbacks || []).map(fb => ({ ...item, ...fb }))];
-      let done = false;
-      let lastReason = 'FETCH_ERR';
-      for (const candidate of sourcesToTry) {
-        try {
-          const res = await downloadBuffer(candidate);
-          if (res.buf) {
-            const c = commitBuffer(item, res.buf);
-            if (c.ok) { done = true; break; }
-            lastReason = c.reason;
-          } else {
-            lastReason = res.err || 'EMPTY';
+  const WORKER_COUNT = 16;
+  await Promise.all(Array.from({ length: WORKER_COUNT }, async (_, workerIdx) => {
+    const workerTmpPack = path.join(DATA_DIR, `sync_qpdf_${process.pid}_${workerIdx}.pdf`);
+    try {
+      while (cursor < planned.length) {
+        const item = planned[cursor++];
+        const qs = qualStats[item.spec];
+        // Resumability check: skip if valid file already exists at absDest
+        if (fs.existsSync(item.absDest)) {
+          try {
+            const existingBuf = fs.readFileSync(item.absDest);
+            const ext = item.relDest.split('.').pop().toLowerCase();
+            if (validateMagic(existingBuf, ext) === null) {
+              const sha = crypto.createHash('sha256').update(existingBuf).digest('hex');
+              if (!shaToPaths.has(sha)) shaToPaths.set(sha, [item.absDest]);
+              alreadyOnDisk++;
+              processed++;
+              if (qs) { qs.done++; qs.skipped++; }
+              maybeProgress('downloading');
+              continue;
+            }
+          } catch { /* re-download if unreadable */ }
+        }
+
+        const sourcesToTry = [item, ...(item.fallbacks || []).map(fb => ({ ...item, ...fb }))];
+        let done = false;
+        let resultKind = '';
+        let lastReason = 'FETCH_ERR';
+        for (const candidate of sourcesToTry) {
+          try {
+            const res = await downloadBuffer(candidate);
+            if (res.buf) {
+              const c = commitBuffer(item, res.buf, workerTmpPack);
+              if (c.ok) { done = true; resultKind = c.kind; break; }
+              lastReason = c.reason;
+            } else {
+              lastReason = res.err || 'EMPTY';
+            }
+          } catch {
+            lastReason = 'FETCH_TIMEOUT';
           }
-        } catch {
-          lastReason = 'FETCH_TIMEOUT';
         }
-      }
-      if (!done) {
-        if (lastReason === 'HTTP_404') {
-          failed++;
-          failReasons[lastReason] = (failReasons[lastReason] || 0) + 1;
+        processed++;
+        if (done) {
+          if (qs) {
+            qs.done++;
+            if (resultKind === 'saved' || resultKind === 'copied') qs.saved++;
+            else qs.skipped++;
+          }
         } else {
-          retryCurl.push({ item, lastReason });
+          if (lastReason === 'HTTP_404') {
+            failed++;
+            if (qs) { qs.done++; qs.failed++; }
+            failReasons[lastReason] = (failReasons[lastReason] || 0) + 1;
+            failedItems.push({ relDest: item.relDest, reason: lastReason, url: item.url });
+            if (failedItems.length > 50) failedItems.shift();
+          } else {
+            retryCurl.push({ item, lastReason });
+          }
         }
+        maybeProgress('downloading');
+      }
+    } finally {
+      if (fs.existsSync(workerTmpPack)) {
+        try { fs.unlinkSync(workerTmpPack); } catch { /* ignore */ }
       }
     }
   }));
 
-  for (const { item, lastReason } of retryCurl) {
-    let reason = lastReason;
-    let done = false;
-    const sourcesToTry = [item, ...(item.fallbacks || []).map(fb => ({ ...item, ...fb }))];
-    for (const candidate of sourcesToTry) {
+  if (retryCurl.length > 0) {
+    console.log(`[CurlRetry] Retrying ${retryCurl.length} items via curl.exe...`);
+    writeStatusSnapshot('retrying_curl');
+    let rCursor = 0;
+    await Promise.all(Array.from({ length: 4 }, async (_, wIdx) => {
+      const workerTmpCurl = path.join(DATA_DIR, `sync_curl_${process.pid}_${wIdx}.tmp`);
+      const workerTmpPack = path.join(DATA_DIR, `sync_qpdf_curl_${process.pid}_${wIdx}.pdf`);
       try {
-        const buf = downloadViaCurl(candidate, tmpFile);
-        const c = commitBuffer(item, buf);
-        if (c.ok) { done = true; break; }
-        reason = c.reason;
-      } catch {
-        reason = 'CURL_ERR';
+        while (rCursor < retryCurl.length) {
+          const { item, lastReason } = retryCurl[rCursor++];
+          const qs = qualStats[item.spec];
+          let reason = lastReason;
+          let done = false;
+          const sourcesToTry = [item, ...(item.fallbacks || []).map(fb => ({ ...item, ...fb }))];
+          for (const candidate of sourcesToTry) {
+            try {
+              const buf = downloadViaCurl(candidate, workerTmpCurl);
+              const c = commitBuffer(item, buf, workerTmpPack);
+              if (c.ok) { done = true; break; }
+              reason = c.reason;
+            } catch {
+              reason = 'CURL_ERR';
+            }
+          }
+          if (done) {
+            if (qs) { qs.done++; qs.saved++; }
+          } else {
+            failed++;
+            if (qs) { qs.done++; qs.failed++; }
+            failReasons[reason] = (failReasons[reason] || 0) + 1;
+            failedItems.push({ relDest: item.relDest, reason, url: item.url });
+            if (failedItems.length > 50) failedItems.shift();
+          }
+          writeStatusSnapshot('retrying_curl');
+        }
+      } finally {
+        for (const f of [workerTmpCurl, workerTmpPack]) {
+          if (fs.existsSync(f)) {
+            try { fs.unlinkSync(f); } catch { /* ignore */ }
+          }
+        }
       }
-    }
-    if (!done) {
-      failed++;
-      failReasons[reason] = (failReasons[reason] || 0) + 1;
-    }
+    }));
   }
-  for (const f of [tmpFile, tmpPack]) if (fs.existsSync(f)) fs.unlinkSync(f);
 
+  flushShaCache();
   const reasonStr = Object.keys(failReasons).length ? ` | reasons=${JSON.stringify(failReasons)}` : '';
-  console.log(`\n=== SYNC RESULT === saved=${saved}, copiedSharedDA=${copiedShared}, skippedDup=${skippedDup}, failed=${failed}${reasonStr}`);
+  console.log(`\n=== SYNC RESULT === saved=${saved}, alreadyOnDisk=${alreadyOnDisk}, copiedSharedDA=${copiedShared}, skippedDup=${skippedDup}, failed=${failed}${reasonStr}`);
   if (!opts.skipIndex && (saved > 0 || copiedShared > 0)) {
+    writeStatusSnapshot('indexing');
     console.log('Running generate-index.js...');
     execFileSync(process.execPath, [path.join(__dirname, 'generate-index.js')], { stdio: 'inherit' });
   }
+  writeStatusSnapshot('done');
 }
 
 run().catch((err) => {

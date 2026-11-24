@@ -1,6 +1,6 @@
 # Conceptualist Systems — International Exam Past Papers & Textbooks Library
 
-> Independent international exam study archive; not affiliated with, endorsed by, or sponsored by Pearson plc / Edexcel or Cambridge University Press & Assessment (CAIE). Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic archive indexing 19,030 unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), Grade Thresholds (GT), Inserts (IN), 73 Student Textbooks & Worked Solution Banks, 272 Listening Audio tracks with synced closed captions (CC), and 62 practical Data Files (22,891 total archived files).
+> Independent international exam study archive; not affiliated with, endorsed by, or sponsored by Pearson plc / Edexcel or Cambridge University Press & Assessment (CAIE). Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic archive indexing 74,877 unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), Grade Thresholds (GT), Inserts (IN), 73 Student Textbooks & Worked Solution Banks, 591 Listening Audio tracks with synced closed captions (CC), and 212 practical Data Files (78,739 total archived files).
 
 ## Core Platform Capabilities
 - **Board Switcher Architecture:** Isolated switching between Pearson Edexcel International (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) with zero cross-board search collisions.
@@ -14,23 +14,23 @@
 - [All Edexcel Past Papers](https://www.conceptualist.uk/papers): Searchable Pearson Edexcel catalog.
 - [Edexcel IAL Past Papers](https://www.conceptualist.uk/ial): 19 International A-Level subjects.
 - [Edexcel IGCSE Past Papers](https://www.conceptualist.uk/igcse): 43 International GCSE (9-1, Regional R, and Modular 4W*) subjects.
-- [Cambridge International Hub](https://www.conceptualist.uk/cambridge): Cambridge AS & A Level (6), IGCSE (7), and O Level (7) subjects.
+- [Cambridge International Hub](https://www.conceptualist.uk/cambridge): Cambridge AS & A Level (31), IGCSE (45), and O Level (31) subjects.
 - [Cambridge AS & A Level](https://www.conceptualist.uk/cambridge/a-level): International AS & A Level past papers, mark schemes & grade thresholds.
 - [Cambridge IGCSE](https://www.conceptualist.uk/cambridge/igcse): Cambridge IGCSE (A*-G & 9-1 equivalents) past papers, inserts & grade thresholds.
 - [Cambridge O Level](https://www.conceptualist.uk/cambridge/o-level): Cambridge O Level past papers, mark schemes & grade thresholds.
 - [Textbooks & Worked Solution Banks](https://www.conceptualist.uk/textbooks): 73 student books, answer PDFs, lab books, and IAL Maths Solution Banks.
-- [Listening Audio Archive (MP3 & Live CC)](https://www.conceptualist.uk/audio): 272 listening audio tracks and synced transcripts.
-- [IT & Computer Science Practical Data Files](https://www.conceptualist.uk/data-files): 62 practical exam source ZIPs.
+- [Listening Audio Archive (MP3 & Live CC)](https://www.conceptualist.uk/audio): 591 listening audio tracks and synced transcripts.
+- [IT & Computer Science Practical Data Files](https://www.conceptualist.uk/data-files): 212 practical exam source ZIPs.
 
 ## Edexcel International A-Level (IAL) Subjects (19)
 - [Edexcel IAL Accounting](https://www.conceptualist.uk/ial/accounting): 264 unique files across 2 units.
 - [Edexcel IAL Arabic](https://www.conceptualist.uk/ial/arabic): 102 unique files across 2 units.
 - [Edexcel IAL Biology](https://www.conceptualist.uk/ial/biology): 783 unique files across 12 units.
 - [Edexcel IAL Business](https://www.conceptualist.uk/ial/business): 409 unique files across 8 units.
-- [Edexcel IAL Chemistry](https://www.conceptualist.uk/ial/chemistry): 764 unique files across 13 units.
+- [Edexcel IAL Chemistry](https://www.conceptualist.uk/ial/chemistry): 765 unique files across 13 units.
 - [Edexcel IAL Economics](https://www.conceptualist.uk/ial/economics): 510 unique files across 11 units.
-- [Edexcel IAL English Language](https://www.conceptualist.uk/ial/english-language): 207 unique files across 4 units.
-- [Edexcel IAL English Literature](https://www.conceptualist.uk/ial/english-literature): 206 unique files across 4 units.
+- [Edexcel IAL English Language](https://www.conceptualist.uk/ial/english-language): 210 unique files across 4 units.
+- [Edexcel IAL English Literature](https://www.conceptualist.uk/ial/english-literature): 207 unique files across 4 units.
 - [Edexcel IAL French](https://www.conceptualist.uk/ial/french): 211 unique files across 4 units.
 - [Edexcel IAL Geography](https://www.conceptualist.uk/ial/geography): 185 unique files across 4 units.
 - [Edexcel IAL German](https://www.conceptualist.uk/ial/german): 171 unique files across 4 units.
@@ -40,26 +40,26 @@
 - [Edexcel IAL Law](https://www.conceptualist.uk/ial/law): 118 unique files across 2 units.
 - [Edexcel IAL Mathematics](https://www.conceptualist.uk/ial/mathematics): 2317 unique files across 20 units.
 - [Edexcel IAL Physics](https://www.conceptualist.uk/ial/physics): 845 unique files across 12 units.
-- [Edexcel IAL Psychology](https://www.conceptualist.uk/ial/psychology): 295 unique files across 4 units.
+- [Edexcel IAL Psychology](https://www.conceptualist.uk/ial/psychology): 296 unique files across 4 units.
 - [Edexcel IAL Spanish](https://www.conceptualist.uk/ial/spanish): 186 unique files across 4 units.
 
 ## Edexcel International GCSE (IGCSE) Subjects (43)
-- [Edexcel IGCSE Accounting (4AC1 / 4WAC1)](https://www.conceptualist.uk/igcse/accounting): 214 unique files.
+- [Edexcel IGCSE Accounting (4AC1 / 4WAC1)](https://www.conceptualist.uk/igcse/accounting): 223 unique files.
 - [Edexcel IGCSE Arabic (4AA1)](https://www.conceptualist.uk/igcse/arabic): 204 unique files.
 - [Edexcel IGCSE Art and Design (4FA1)](https://www.conceptualist.uk/igcse/art-and-design): 29 unique files.
 - [Edexcel IGCSE Bangla (4BA0 / 4BE0)](https://www.conceptualist.uk/igcse/bangla): 93 unique files.
-- [Edexcel IGCSE Bangladesh Studies (4BN1)](https://www.conceptualist.uk/igcse/bangladesh-studies): 83 unique files.
+- [Edexcel IGCSE Bangladesh Studies (4BN1)](https://www.conceptualist.uk/igcse/bangladesh-studies): 85 unique files.
 - [Edexcel IGCSE Biology (4BI1 / 4WBI1)](https://www.conceptualist.uk/igcse/biology): 332 unique files.
 - [Edexcel IGCSE Business (4BS1)](https://www.conceptualist.uk/igcse/business): 155 unique files.
 - [Edexcel IGCSE Chemistry (4CH1 / 4WCH1)](https://www.conceptualist.uk/igcse/chemistry): 323 unique files.
-- [Edexcel IGCSE Chinese (4CN1)](https://www.conceptualist.uk/igcse/chinese): 217 unique files.
+- [Edexcel IGCSE Chinese (4CN1)](https://www.conceptualist.uk/igcse/chinese): 219 unique files.
 - [Edexcel IGCSE Commerce (4CM1 / 4WCM1)](https://www.conceptualist.uk/igcse/commerce): 187 unique files.
-- [Edexcel IGCSE Computer Science (4CP0)](https://www.conceptualist.uk/igcse/computer-science): 82 unique files.
+- [Edexcel IGCSE Computer Science (4CP0)](https://www.conceptualist.uk/igcse/computer-science): 86 unique files.
 - [Edexcel IGCSE Economics (4EC1 / 4WEC1)](https://www.conceptualist.uk/igcse/economics): 241 unique files.
 - [Edexcel IGCSE English Language A (4EA1 / 4WEA1)](https://www.conceptualist.uk/igcse/english-language-a): 357 unique files.
-- [Edexcel IGCSE English Language B (4EB1)](https://www.conceptualist.uk/igcse/english-language-b): 158 unique files.
-- [Edexcel IGCSE English Literature (4ET1 / 4WET1)](https://www.conceptualist.uk/igcse/english-literature): 350 unique files.
-- [Edexcel IGCSE English as a Second Language (4ES1 / 4WES1)](https://www.conceptualist.uk/igcse/english-as-a-second-language): 352 unique files.
+- [Edexcel IGCSE English Language B (4EB1)](https://www.conceptualist.uk/igcse/english-language-b): 159 unique files.
+- [Edexcel IGCSE English Literature (4ET1 / 4WET1)](https://www.conceptualist.uk/igcse/english-literature): 355 unique files.
+- [Edexcel IGCSE English as a Second Language (4ES1 / 4WES1)](https://www.conceptualist.uk/igcse/english-as-a-second-language): 353 unique files.
 - [Edexcel IGCSE French (4FR1)](https://www.conceptualist.uk/igcse/french): 199 unique files.
 - [Edexcel IGCSE Further Pure Mathematics (4PM1)](https://www.conceptualist.uk/igcse/further-pure-mathematics): 266 unique files.
 - [Edexcel IGCSE Geography (4GE1 / 4WGE1)](https://www.conceptualist.uk/igcse/geography): 161 unique files.
@@ -68,7 +68,7 @@
 - [Edexcel IGCSE Greek (First Language) (4GK1)](https://www.conceptualist.uk/igcse/greek-first-language): 41 unique files.
 - [Edexcel IGCSE Gujarati (4GU0)](https://www.conceptualist.uk/igcse/gujarati): 27 unique files.
 - [Edexcel IGCSE Hindi (4HN0)](https://www.conceptualist.uk/igcse/hindi): 18 unique files.
-- [Edexcel IGCSE History (4HI1 / 4WHI1)](https://www.conceptualist.uk/igcse/history): 193 unique files.
+- [Edexcel IGCSE History (4HI1 / 4WHI1)](https://www.conceptualist.uk/igcse/history): 194 unique files.
 - [Edexcel IGCSE Human Biology (4HB1)](https://www.conceptualist.uk/igcse/human-biology): 260 unique files.
 - [Edexcel IGCSE Information Technology (4IT1)](https://www.conceptualist.uk/igcse/information-technology): 171 unique files.
 - [Edexcel IGCSE Islamic Studies (4IS1)](https://www.conceptualist.uk/igcse/islamic-studies): 20 unique files.
@@ -82,37 +82,124 @@
 - [Edexcel IGCSE Sciences (Double Award) (4SD0 / 4WSD1)](https://www.conceptualist.uk/igcse/sciences-double-award): 426 unique files.
 - [Edexcel IGCSE Sciences (Single Award) (4SS0)](https://www.conceptualist.uk/igcse/sciences-single-award): 70 unique files.
 - [Edexcel IGCSE Sinhala (4SI0)](https://www.conceptualist.uk/igcse/sinhala): 24 unique files.
-- [Edexcel IGCSE Spanish (4SP1)](https://www.conceptualist.uk/igcse/spanish): 172 unique files.
+- [Edexcel IGCSE Spanish (4SP1)](https://www.conceptualist.uk/igcse/spanish): 173 unique files.
 - [Edexcel IGCSE Swahili (4SW1)](https://www.conceptualist.uk/igcse/swahili): 81 unique files.
 - [Edexcel IGCSE Tamil (4TA0)](https://www.conceptualist.uk/igcse/tamil): 24 unique files.
 - [Edexcel IGCSE Turkish (4TU0)](https://www.conceptualist.uk/igcse/turkish): 27 unique files.
 - [Edexcel IGCSE Urdu (4UR0)](https://www.conceptualist.uk/igcse/urdu): 24 unique files.
 
-## Cambridge International AS & A Level Subjects (6)
-- [Cambridge AS & A Level Biology (9700)](https://www.conceptualist.uk/cambridge/a-level/biology-9700): 282 unique files.
-- [Cambridge AS & A Level Chemistry (9701)](https://www.conceptualist.uk/cambridge/a-level/chemistry-9701): 281 unique files.
-- [Cambridge AS & A Level Computer Science (9618)](https://www.conceptualist.uk/cambridge/a-level/computer-science-9618): 140 unique files.
-- [Cambridge AS & A Level Economics (9708)](https://www.conceptualist.uk/cambridge/a-level/economics-9708): 178 unique files.
-- [Cambridge AS & A Level Mathematics (9709)](https://www.conceptualist.uk/cambridge/a-level/mathematics-9709): 263 unique files.
-- [Cambridge AS & A Level Physics (9702)](https://www.conceptualist.uk/cambridge/a-level/physics-9702): 280 unique files.
+## Cambridge International AS & A Level Subjects (31)
+- [Cambridge AS & A Level Accounting (9706)](https://www.conceptualist.uk/cambridge/a-level/accounting-9706): 1091 unique files.
+- [Cambridge AS & A Level Arabic (9680)](https://www.conceptualist.uk/cambridge/a-level/arabic-9680): 241 unique files.
+- [Cambridge AS & A Level Biology (9700)](https://www.conceptualist.uk/cambridge/a-level/biology-9700): 1693 unique files.
+- [Cambridge AS & A Level Business (9609)](https://www.conceptualist.uk/cambridge/a-level/business-9609): 869 unique files.
+- [Cambridge AS & A Level Chemistry (9701)](https://www.conceptualist.uk/cambridge/a-level/chemistry-9701): 1706 unique files.
+- [Cambridge AS & A Level Chinese (9715)](https://www.conceptualist.uk/cambridge/a-level/chinese-9715): 302 unique files.
+- [Cambridge AS & A Level Computer Science (9618)](https://www.conceptualist.uk/cambridge/a-level/computer-science-9618): 968 unique files.
+- [Cambridge AS & A Level Design & Technology (9705)](https://www.conceptualist.uk/cambridge/a-level/design-and-technology-9705): 311 unique files.
+- [Cambridge AS & A Level Economics (9708)](https://www.conceptualist.uk/cambridge/a-level/economics-9708): 1138 unique files.
+- [Cambridge AS & A Level English General Paper (8021)](https://www.conceptualist.uk/cambridge/a-level/english-general-paper-8021): 275 unique files.
+- [Cambridge AS & A Level English Language (9093)](https://www.conceptualist.uk/cambridge/a-level/english-language-9093): 573 unique files.
+- [Cambridge AS & A Level Environmental Management (8291)](https://www.conceptualist.uk/cambridge/a-level/environmental-management-8291): 333 unique files.
+- [Cambridge AS & A Level French (9716)](https://www.conceptualist.uk/cambridge/a-level/french-9716): 550 unique files.
+- [Cambridge AS & A Level Further Mathematics (9231)](https://www.conceptualist.uk/cambridge/a-level/further-mathematics-9231): 713 unique files.
+- [Cambridge AS & A Level Geography (9696)](https://www.conceptualist.uk/cambridge/a-level/geography-9696): 981 unique files.
+- [Cambridge AS & A Level German (9717)](https://www.conceptualist.uk/cambridge/a-level/german-9717): 257 unique files.
+- [Cambridge AS & A Level Global Perspectives & Research (9239)](https://www.conceptualist.uk/cambridge/a-level/global-perspectives-and-research-9239): 279 unique files.
+- [Cambridge AS & A Level History (9489)](https://www.conceptualist.uk/cambridge/a-level/history-9489): 327 unique files.
+- [Cambridge AS & A Level Information Technology (9626)](https://www.conceptualist.uk/cambridge/a-level/information-technology-9626): 511 unique files.
+- [Cambridge AS & A Level Islamic Studies (9488)](https://www.conceptualist.uk/cambridge/a-level/islamic-studies-9488): 96 unique files.
+- [Cambridge AS & A Level Law (9084)](https://www.conceptualist.uk/cambridge/a-level/law-9084): 723 unique files.
+- [Cambridge AS & A Level Literature in English (9695)](https://www.conceptualist.uk/cambridge/a-level/literature-in-english-9695): 909 unique files.
+- [Cambridge AS & A Level Marine Science (9693)](https://www.conceptualist.uk/cambridge/a-level/marine-science-9693): 472 unique files.
+- [Cambridge AS & A Level Mathematics (9709)](https://www.conceptualist.uk/cambridge/a-level/mathematics-9709): 2053 unique files.
+- [Cambridge AS & A Level Media Studies (9607)](https://www.conceptualist.uk/cambridge/a-level/media-studies-9607): 138 unique files.
+- [Cambridge AS & A Level Physics (9702)](https://www.conceptualist.uk/cambridge/a-level/physics-9702): 1696 unique files.
+- [Cambridge AS & A Level Psychology (9990)](https://www.conceptualist.uk/cambridge/a-level/psychology-9990): 843 unique files.
+- [Cambridge AS & A Level Sociology (9699)](https://www.conceptualist.uk/cambridge/a-level/sociology-9699): 341 unique files.
+- [Cambridge AS & A Level Spanish (9719)](https://www.conceptualist.uk/cambridge/a-level/spanish-9719): 639 unique files.
+- [Cambridge AS & A Level Travel & Tourism (9395)](https://www.conceptualist.uk/cambridge/a-level/travel-and-tourism-9395): 786 unique files.
+- [Cambridge AS & A Level Urdu (9686)](https://www.conceptualist.uk/cambridge/a-level/urdu-9686): 333 unique files.
 
-## Cambridge IGCSE Subjects (7)
-- [Cambridge IGCSE Biology (0610)](https://www.conceptualist.uk/cambridge/igcse/biology-0610): 248 unique files.
-- [Cambridge IGCSE Chemistry (0620)](https://www.conceptualist.uk/cambridge/igcse/chemistry-0620): 242 unique files.
-- [Cambridge IGCSE Computer Science (0478)](https://www.conceptualist.uk/cambridge/igcse/computer-science-0478): 86 unique files.
-- [Cambridge IGCSE First Language English (0500)](https://www.conceptualist.uk/cambridge/igcse/first-language-english-0500): 122 unique files.
-- [Cambridge IGCSE ICT (0417)](https://www.conceptualist.uk/cambridge/igcse/ict-0417): 85 unique files.
-- [Cambridge IGCSE Mathematics (0580)](https://www.conceptualist.uk/cambridge/igcse/mathematics-0580): 157 unique files.
-- [Cambridge IGCSE Physics (0625)](https://www.conceptualist.uk/cambridge/igcse/physics-0625): 248 unique files.
+## Cambridge IGCSE Subjects (45)
+- [Cambridge IGCSE Accounting (0452)](https://www.conceptualist.uk/cambridge/igcse/accounting-0452): 637 unique files.
+- [Cambridge IGCSE Additional Mathematics (0606)](https://www.conceptualist.uk/cambridge/igcse/additional-mathematics-0606): 601 unique files.
+- [Cambridge IGCSE Agriculture (0600)](https://www.conceptualist.uk/cambridge/igcse/agriculture-0600): 35 unique files.
+- [Cambridge IGCSE Art & Design (0400)](https://www.conceptualist.uk/cambridge/igcse/art-and-design-0400): 344 unique files.
+- [Cambridge IGCSE Bangladesh Studies (0449)](https://www.conceptualist.uk/cambridge/igcse/bangladesh-studies-0449): 64 unique files.
+- [Cambridge IGCSE Biology (0610)](https://www.conceptualist.uk/cambridge/igcse/biology-0610): 1754 unique files.
+- [Cambridge IGCSE Business Studies (0450)](https://www.conceptualist.uk/cambridge/igcse/business-studies-0450): 725 unique files.
+- [Cambridge IGCSE Chemistry (0620)](https://www.conceptualist.uk/cambridge/igcse/chemistry-0620): 1759 unique files.
+- [Cambridge IGCSE Co-ordinated Sciences (Double Award) (0654)](https://www.conceptualist.uk/cambridge/igcse/co-ordinated-sciences-double-award-0654): 576 unique files.
+- [Cambridge IGCSE Combined Science (0653)](https://www.conceptualist.uk/cambridge/igcse/combined-science-0653): 1421 unique files.
+- [Cambridge IGCSE Computer Science (0478)](https://www.conceptualist.uk/cambridge/igcse/computer-science-0478): 445 unique files.
+- [Cambridge IGCSE Design & Technology (0445)](https://www.conceptualist.uk/cambridge/igcse/design-and-technology-0445): 987 unique files.
+- [Cambridge IGCSE Drama (0411)](https://www.conceptualist.uk/cambridge/igcse/drama-0411): 116 unique files.
+- [Cambridge IGCSE Economics (0455)](https://www.conceptualist.uk/cambridge/igcse/economics-0455): 783 unique files.
+- [Cambridge IGCSE English as a Second Language (0510)](https://www.conceptualist.uk/cambridge/igcse/english-as-a-second-language-0510): 1386 unique files.
+- [Cambridge IGCSE English as a Second Language (Count-in Speaking) (0511)](https://www.conceptualist.uk/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511): 823 unique files.
+- [Cambridge IGCSE Enterprise (0454)](https://www.conceptualist.uk/cambridge/igcse/enterprise-0454): 259 unique files.
+- [Cambridge IGCSE Environmental Management (0680)](https://www.conceptualist.uk/cambridge/igcse/environmental-management-0680): 679 unique files.
+- [Cambridge IGCSE First Language Arabic (0508)](https://www.conceptualist.uk/cambridge/igcse/first-language-arabic-0508): 350 unique files.
+- [Cambridge IGCSE First Language Chinese (0509)](https://www.conceptualist.uk/cambridge/igcse/first-language-chinese-0509): 92 unique files.
+- [Cambridge IGCSE First Language English (0500)](https://www.conceptualist.uk/cambridge/igcse/first-language-english-0500): 1135 unique files.
+- [Cambridge IGCSE First Language French (0501)](https://www.conceptualist.uk/cambridge/igcse/first-language-french-0501): 125 unique files.
+- [Cambridge IGCSE First Language Malay (0696)](https://www.conceptualist.uk/cambridge/igcse/first-language-malay-0696): 35 unique files.
+- [Cambridge IGCSE First Language Spanish (0502)](https://www.conceptualist.uk/cambridge/igcse/first-language-spanish-0502): 238 unique files.
+- [Cambridge IGCSE Food & Nutrition (0648)](https://www.conceptualist.uk/cambridge/igcse/food-and-nutrition-0648): 123 unique files.
+- [Cambridge IGCSE Foreign Language Arabic (0544)](https://www.conceptualist.uk/cambridge/igcse/foreign-language-arabic-0544): 323 unique files.
+- [Cambridge IGCSE French (0520)](https://www.conceptualist.uk/cambridge/igcse/french-0520): 998 unique files.
+- [Cambridge IGCSE Geography (0460)](https://www.conceptualist.uk/cambridge/igcse/geography-0460): 1046 unique files.
+- [Cambridge IGCSE German (0525)](https://www.conceptualist.uk/cambridge/igcse/german-0525): 568 unique files.
+- [Cambridge IGCSE Global Perspectives (0457)](https://www.conceptualist.uk/cambridge/igcse/global-perspectives-0457): 235 unique files.
+- [Cambridge IGCSE History (0470)](https://www.conceptualist.uk/cambridge/igcse/history-0470): 809 unique files.
+- [Cambridge IGCSE ICT (0417)](https://www.conceptualist.uk/cambridge/igcse/ict-0417): 650 unique files.
+- [Cambridge IGCSE International Mathematics (0607)](https://www.conceptualist.uk/cambridge/igcse/international-mathematics-0607): 966 unique files.
+- [Cambridge IGCSE Islamiyat (0493)](https://www.conceptualist.uk/cambridge/igcse/islamiyat-0493): 116 unique files.
+- [Cambridge IGCSE Literature in English (0475)](https://www.conceptualist.uk/cambridge/igcse/literature-in-english-0475): 1486 unique files.
+- [Cambridge IGCSE Mandarin Chinese (0547)](https://www.conceptualist.uk/cambridge/igcse/mandarin-chinese-0547): 422 unique files.
+- [Cambridge IGCSE Mathematics (0580)](https://www.conceptualist.uk/cambridge/igcse/mathematics-0580): 1265 unique files.
+- [Cambridge IGCSE Music (0410)](https://www.conceptualist.uk/cambridge/igcse/music-0410): 172 unique files.
+- [Cambridge IGCSE Pakistan Studies (0448)](https://www.conceptualist.uk/cambridge/igcse/pakistan-studies-0448): 148 unique files.
+- [Cambridge IGCSE Physical Education (0413)](https://www.conceptualist.uk/cambridge/igcse/physical-education-0413): 101 unique files.
+- [Cambridge IGCSE Physics (0625)](https://www.conceptualist.uk/cambridge/igcse/physics-0625): 1763 unique files.
+- [Cambridge IGCSE Religious Studies (0490)](https://www.conceptualist.uk/cambridge/igcse/religious-studies-0490): 59 unique files.
+- [Cambridge IGCSE Sociology (0495)](https://www.conceptualist.uk/cambridge/igcse/sociology-0495): 522 unique files.
+- [Cambridge IGCSE Spanish (0530)](https://www.conceptualist.uk/cambridge/igcse/spanish-0530): 924 unique files.
+- [Cambridge IGCSE Travel & Tourism (0471)](https://www.conceptualist.uk/cambridge/igcse/travel-and-tourism-0471): 236 unique files.
 
-## Cambridge O Level Subjects (7)
-- [Cambridge O Level Biology (5090)](https://www.conceptualist.uk/cambridge/o-level/biology-5090): 75 unique files.
-- [Cambridge O Level Chemistry (5070)](https://www.conceptualist.uk/cambridge/o-level/chemistry-5070): 76 unique files.
-- [Cambridge O Level English Language (1123)](https://www.conceptualist.uk/cambridge/o-level/english-language-1123): 40 unique files.
-- [Cambridge O Level Islamiyat (2058)](https://www.conceptualist.uk/cambridge/o-level/islamiyat-2058): 36 unique files.
-- [Cambridge O Level Mathematics D (4024)](https://www.conceptualist.uk/cambridge/o-level/mathematics-d-4024): 36 unique files.
-- [Cambridge O Level Pakistan Studies (2059)](https://www.conceptualist.uk/cambridge/o-level/pakistan-studies-2059): 28 unique files.
-- [Cambridge O Level Physics (5054)](https://www.conceptualist.uk/cambridge/o-level/physics-5054): 76 unique files.
+## Cambridge O Level Subjects (31)
+- [Cambridge O Level Accounting (7707)](https://www.conceptualist.uk/cambridge/o-level/accounting-7707): 302 unique files.
+- [Cambridge O Level Additional Mathematics (4037)](https://www.conceptualist.uk/cambridge/o-level/additional-mathematics-4037): 319 unique files.
+- [Cambridge O Level Arabic (3180)](https://www.conceptualist.uk/cambridge/o-level/arabic-3180): 137 unique files.
+- [Cambridge O Level Bangladesh Studies (7094)](https://www.conceptualist.uk/cambridge/o-level/bangladesh-studies-7094): 90 unique files.
+- [Cambridge O Level Bengali (3204)](https://www.conceptualist.uk/cambridge/o-level/bengali-3204): 97 unique files.
+- [Cambridge O Level Biology (5090)](https://www.conceptualist.uk/cambridge/o-level/biology-5090): 624 unique files.
+- [Cambridge O Level Business Studies (7115)](https://www.conceptualist.uk/cambridge/o-level/business-studies-7115): 381 unique files.
+- [Cambridge O Level Chemistry (5070)](https://www.conceptualist.uk/cambridge/o-level/chemistry-5070): 624 unique files.
+- [Cambridge O Level Combined Science (5129)](https://www.conceptualist.uk/cambridge/o-level/combined-science-5129): 354 unique files.
+- [Cambridge O Level Commerce (7100)](https://www.conceptualist.uk/cambridge/o-level/commerce-7100): 311 unique files.
+- [Cambridge O Level Computer Science (2210)](https://www.conceptualist.uk/cambridge/o-level/computer-science-2210): 324 unique files.
+- [Cambridge O Level Economics (2281)](https://www.conceptualist.uk/cambridge/o-level/economics-2281): 315 unique files.
+- [Cambridge O Level English Language (1123)](https://www.conceptualist.uk/cambridge/o-level/english-language-1123): 366 unique files.
+- [Cambridge O Level Environmental Management (5014)](https://www.conceptualist.uk/cambridge/o-level/environmental-management-5014): 311 unique files.
+- [Cambridge O Level First Language Urdu (3247)](https://www.conceptualist.uk/cambridge/o-level/first-language-urdu-3247): 129 unique files.
+- [Cambridge O Level French (3015)](https://www.conceptualist.uk/cambridge/o-level/french-3015): 176 unique files.
+- [Cambridge O Level Geography (2217)](https://www.conceptualist.uk/cambridge/o-level/geography-2217): 425 unique files.
+- [Cambridge O Level Global Perspectives (2069)](https://www.conceptualist.uk/cambridge/o-level/global-perspectives-2069): 52 unique files.
+- [Cambridge O Level History (2147)](https://www.conceptualist.uk/cambridge/o-level/history-2147): 98 unique files.
+- [Cambridge O Level Islamic Studies (2068)](https://www.conceptualist.uk/cambridge/o-level/islamic-studies-2068): 90 unique files.
+- [Cambridge O Level Islamiyat (2058)](https://www.conceptualist.uk/cambridge/o-level/islamiyat-2058): 345 unique files.
+- [Cambridge O Level Literature in English (2010)](https://www.conceptualist.uk/cambridge/o-level/literature-in-english-2010): 290 unique files.
+- [Cambridge O Level Mathematics D (4024)](https://www.conceptualist.uk/cambridge/o-level/mathematics-d-4024): 307 unique files.
+- [Cambridge O Level Pakistan Studies (2059)](https://www.conceptualist.uk/cambridge/o-level/pakistan-studies-2059): 237 unique files.
+- [Cambridge O Level Physics (5054)](https://www.conceptualist.uk/cambridge/o-level/physics-5054): 620 unique files.
+- [Cambridge O Level Second Language Urdu (3248)](https://www.conceptualist.uk/cambridge/o-level/second-language-urdu-3248): 234 unique files.
+- [Cambridge O Level Sinhala (3205)](https://www.conceptualist.uk/cambridge/o-level/sinhala-3205): 89 unique files.
+- [Cambridge O Level Sociology (2251)](https://www.conceptualist.uk/cambridge/o-level/sociology-2251): 327 unique files.
+- [Cambridge O Level Statistics (4040)](https://www.conceptualist.uk/cambridge/o-level/statistics-4040): 119 unique files.
+- [Cambridge O Level Tamil (3226)](https://www.conceptualist.uk/cambridge/o-level/tamil-3226): 58 unique files.
+- [Cambridge O Level Travel & Tourism (7096)](https://www.conceptualist.uk/cambridge/o-level/travel-and-tourism-7096): 195 unique files.
 
 ## Subject Textbooks & Solution Bank Collections
 - [Edexcel IAL Accounting Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/accounting): 4 books/solution banks.
