@@ -11,6 +11,25 @@ export const SUBJECTS_WITH_BOOKS_MAP = {
     'Accounting', 'Biology', 'Business', 'Chemistry', 'Commerce',
     'Economics', 'Further Pure Mathematics', 'Human Biology',
     'Information Technology', 'Mathematics A', 'Physics'
+  ]),
+  'Cambridge AS & A Level': new Set([
+    'Accounting (9706)', 'Biology (9700)', 'Business (9609)', 'Chemistry (9701)',
+    'Computer Science (9618)', 'Economics (9708)', 'Further Mathematics (9231)',
+    'Geography (9696)', 'Mathematics (9709)', 'Physics (9702)'
+  ]),
+  'Cambridge IGCSE': new Set([
+    'Biology (0610)', 'Business Studies (0450)', 'Chemistry (0620)',
+    'Computer Science (0478)', 'Economics (0455)',
+    'English as a Second Language (0510)',
+    'English as a Second Language (Count-in Speaking) (0511)',
+    'First Language English (0500)', 'French (0520)', 'Geography (0460)',
+    'German (0525)', 'History (0470)', 'ICT (0417)',
+    'International Mathematics (0607)', 'Mathematics (0580)',
+    'Physics (0625)', 'Spanish (0530)'
+  ]),
+  'Cambridge O Level': new Set([
+    'Additional Mathematics (4037)', 'Biology (5090)',
+    'First Language Urdu (3247)', 'Islamiyat (2058)', 'Pakistan Studies (2059)'
   ])
 };
 

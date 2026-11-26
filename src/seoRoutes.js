@@ -24,16 +24,17 @@ export * from './lib/routeCore.js';
 export function buildRouteFaqEntries({
   currentTab = 'library',
   activeBoard = 'edexcel',
+  scopeAllBoards = false,
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
   filterDocType = null,
   meta = null
 } = {}) {
-  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, dfCount, audioCount, cambridgeUnique } = getArchiveCounts(meta);
+  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, edexcelBooks, cambridgeBooks, dfCount, audioCount, cambridgeUnique } = getArchiveCounts(meta);
   const subjDisplay = formatSubjectName(filterSubject);
   const curr = filterCurriculum || (filterSubject ? inferCurriculumForSubject(filterSubject, 'Edexcel IAL') : '');
-  const isCie = isCambridgeCurriculum(curr) || (!curr && activeBoard === 'cambridge');
+  const isCie = isCambridgeCurriculum(curr) || (!curr && !scopeAllBoards && activeBoard === 'cambridge');
   const faqs = [];
 
   if (currentTab === 'about' || currentTab === 'changelog') {
@@ -45,7 +46,7 @@ export function buildRouteFaqEntries({
       const isIalMath = curr === 'Edexcel IAL' && filterSubject === 'Math';
       faqs.push({
         q: `How do I read ${curr} ${subjDisplay} textbooks${isIalMath ? ' and Worked Solution Banks' : ''} online?`,
-        a: `Click any ${curr} ${subjDisplay} Student Book${isIalMath ? ' or Worked Solution Bank ZIP (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : ' or Answer PDF'} on this page to open it directly in our 2-Page side-by-side WebPDF reader with zero ads or downloads required.`
+        a: `Click any ${curr} ${subjDisplay} ${isCie ? 'Coursebook, Workbook, Practical Book, or Answer Guide' : `Student Book${isIalMath ? ' or Worked Solution Bank ZIP (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : ' or Answer PDF'}`} on this page to open it directly in our 2-Page side-by-side WebPDF reader with zero ads or downloads required.`
       });
       if (isIalMath) {
         faqs.push({
@@ -53,10 +54,20 @@ export function buildRouteFaqEntries({
           a: 'All 14 Pearson Edexcel IAL Mathematics units are covered chapter-by-chapter: Pure Mathematics 1-4 (WMA11-WMA14), Mechanics 1-3 (WME01-WME03), Statistics 1-3 (WST01-WST03), Decision Mathematics 1 (WDM11), and Further Pure Mathematics 1-3 (WFM01-WFM03).'
         });
       }
+    } else if (isCie) {
+      faqs.push({
+        q: 'Which Cambridge International coursebooks and workbooks are in the archive?',
+        a: `The archive indexes ${cambridgeBooks} verified Cambridge International AS & A Level, IGCSE, and O Level coursebooks, workbooks, practical lab books, revision guides, and answer booklets, all viewable online in 2-Page book spread mode.`
+      });
+    } else if (scopeAllBoards) {
+      faqs.push({
+        q: 'How many international exam textbooks and Solution Banks are in the archive?',
+        a: `The library indexes ${totalBooks} verified resources across both boards: ${edexcelBooks} Pearson Edexcel (IAL & IGCSE) student books, lab books, answer PDFs, and Worked Solution Banks plus ${cambridgeBooks} Cambridge International (AS & A Level, IGCSE & O Level) coursebooks, workbooks, and revision guides.`
+      });
     } else {
       faqs.push({
-        q: 'How many textbooks and Solution Banks are in the archive?',
-        a: `The library indexes ${totalBooks} verified resources (${ialBooks} Edexcel IAL student books, lab books, answer PDFs, and Worked Solution Banks plus ${igcseBooks} Edexcel IGCSE 9-1 student books), all viewable in 2-Page book spread mode.`
+        q: 'How many Edexcel textbooks and Solution Banks are in the archive?',
+        a: `The Edexcel textbook collection indexes ${edexcelBooks} verified resources (${ialBooks} Edexcel IAL student books, lab books, answer PDFs, and Worked Solution Banks plus ${igcseBooks} Edexcel IGCSE 9-1 student books), all viewable in 2-Page book spread mode.`
       });
     }
     return faqs;
@@ -149,6 +160,7 @@ export function buildRouteFaqEntries({
 export function buildJsonLd({
   currentTab = 'library',
   activeBoard = 'edexcel',
+  scopeAllBoards = false,
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
@@ -161,7 +173,7 @@ export function buildJsonLd({
   const effBoard = filterCurriculum
     ? getBoardForCurriculum(filterCurriculum)
     : (activeBoard || 'edexcel');
-  const isCie = effBoard === 'cambridge';
+  const isCie = !scopeAllBoards && effBoard === 'cambridge';
 
   const breadcrumbs = [
     {
@@ -189,11 +201,26 @@ export function buildJsonLd({
     }
   } else if (filterDocType === 'Book' && !filterUnit) {
     breadcrumbs.push({ '@type': 'ListItem', position: 2, name: 'Textbooks & Solutions', item: `${SITE_URL}/textbooks` });
-    if (filterCurriculum) {
-      const currSlug = getCurriculumSlug(filterCurriculum);
+    if (!filterCurriculum && !scopeAllBoards) {
       breadcrumbs.push({
         '@type': 'ListItem',
         position: 3,
+        name: isCie ? 'Cambridge Textbooks' : 'Edexcel Textbooks',
+        item: `${SITE_URL}/textbooks/${isCie ? 'cambridge' : 'edexcel'}`
+      });
+    } else if (filterCurriculum) {
+      const currSlug = getCurriculumSlug(filterCurriculum);
+      if (isCambridgeCurriculum(filterCurriculum)) {
+        breadcrumbs.push({
+          '@type': 'ListItem',
+          position: breadcrumbs.length + 1,
+          name: 'Cambridge Textbooks',
+          item: `${SITE_URL}/textbooks/cambridge`
+        });
+      }
+      breadcrumbs.push({
+        '@type': 'ListItem',
+        position: breadcrumbs.length + 1,
         name: `${filterCurriculum} Textbooks`,
         item: `${SITE_URL}/textbooks/${currSlug}`
       });
@@ -201,7 +228,7 @@ export function buildJsonLd({
         const subjSlug = getSubjectSlug(filterSubject);
         breadcrumbs.push({
           '@type': 'ListItem',
-          position: 4,
+          position: breadcrumbs.length + 1,
           name: `${formatSubjectName(filterSubject)} Books`,
           item: `${SITE_URL}/textbooks/${currSlug}/${subjSlug}`
         });
@@ -316,16 +343,30 @@ export function buildJsonLd({
   }
 
   // Add rich Book / CreativeWork ItemList on Textbook routes using verified ISBNs & authors from bookCatalog.js
-  if (filterDocType === 'Book' && !filterUnit && !isCie) {
+  if (filterDocType === 'Book' && !filterUnit) {
     const matchingBooks = Object.entries(BOOK_CATALOG_BY_PATH).filter(([bookPath]) => {
-      const bookCurr = bookPath.startsWith('IGCSE Books/') ? 'Edexcel IGCSE' : 'Edexcel IAL';
+      const isCieBook = bookPath.startsWith('Cambridge Books/');
+      const bookBoard = isCieBook ? 'cambridge' : 'edexcel';
+      const bookCurr = isCieBook
+        ? (bookPath.startsWith('Cambridge Books/A-Level/')
+            ? 'Cambridge AS & A Level'
+            : bookPath.startsWith('Cambridge Books/O-Level/')
+              ? 'Cambridge O Level'
+              : 'Cambridge IGCSE')
+        : (bookPath.startsWith('IGCSE Books/') ? 'Edexcel IGCSE' : 'Edexcel IAL');
+      if (!scopeAllBoards && !filterCurriculum && bookBoard !== effBoard) return false;
       if (filterCurriculum && bookCurr !== filterCurriculum) return false;
       if (filterSubject) {
-        const folderSubj = bookPath.split('/')[1] || '';
-        const normFolder = folderSubj === 'Maths' ? (bookCurr === 'Edexcel IGCSE' ? 'Mathematics A' : 'Math')
-          : folderSubj === 'Further Pure Maths' ? 'Further Pure Mathematics'
-          : folderSubj;
-        if (normFolder !== filterSubject) return false;
+        if (isCieBook) {
+          const cieSubjFolder = bookPath.split('/')[2] || '';
+          if (cieSubjFolder !== filterSubject) return false;
+        } else {
+          const folderSubj = bookPath.split('/')[1] || '';
+          const normFolder = folderSubj === 'Maths' ? (bookCurr === 'Edexcel IGCSE' ? 'Mathematics A' : 'Math')
+            : folderSubj === 'Further Pure Maths' ? 'Further Pure Mathematics'
+            : folderSubj;
+          if (normFolder !== filterSubject) return false;
+        }
       }
       return true;
     });
@@ -374,6 +415,7 @@ export function buildJsonLd({
   const faqEntries = buildRouteFaqEntries({
     currentTab,
     activeBoard: effBoard,
+    scopeAllBoards,
     filterCurriculum,
     filterSubject,
     filterUnit,

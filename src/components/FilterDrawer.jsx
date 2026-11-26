@@ -95,7 +95,7 @@ export default function FilterDrawer({
         { value: 'GT', label: 'Thresholds (GT)' },
         { value: 'ER', label: 'Examiner Reports' },
         { value: 'SC', label: 'Inserts / CI' },
-        ...(boardScope === 'all' ? [{ value: 'Book', label: 'Textbooks' }] : []),
+        { value: 'Book', label: 'Textbooks' },
         { value: 'Extra', label: 'Audio / Data / SAMs' }
       ]
     : [

@@ -6,15 +6,15 @@ Welcome! If you are an AI assistant tasked with working on the curated document 
 
 ## 1. Directory Structure
 
-The library is an independent **strictly international exam-board** study archive indexing **Pearson Edexcel International** and **Cambridge International (CAIE)** resources containing **78,739 archived files** (**74,877 deduplicated unique documents**) across **169 international subjects**: **19 Edexcel IAL**, **43 Edexcel IGCSE** (`19,944` files / `16,083` unique, Jan 2003 – Jun 2026), **31 Cambridge AS & A Level**, **45 Cambridge IGCSE**, and **31 Cambridge O Level** (`58,795` files / `58,794` unique across all 107/107 international syllabuses, 2002 – May/June 2026). UK domestic boards (OCR, UK AQA, UK Edexcel GCE/GCSE, WJEC/Eduqas) are strictly excluded.
+The library is an independent **strictly international exam-board** study archive indexing **Pearson Edexcel International** and **Cambridge International (CAIE)** resources containing **78,820 archived files** (**74,958 deduplicated unique documents**) across **169 international subjects**: **19 Edexcel IAL**, **43 Edexcel IGCSE** (`19,944` files / `16,083` unique, Jan 2003 – Jun 2026), **31 Cambridge AS & A Level**, **45 Cambridge IGCSE**, and **31 Cambridge O Level** (`58,876` files / `58,875` unique across all 107/107 international syllabuses, 2002 – May/June 2026). UK domestic boards (OCR, UK AQA, UK Edexcel GCE/GCSE, WJEC/Eduqas) are strictly excluded.
 
 **Main Root Folders:**
 1. **`Past Papers\IAL`**: Contains Edexcel International A-Level (IAL) and legacy GCE Maths papers across 19 subjects (strictly excludes UK GCE non-Math specs and pre-launch years).
 2. **`Past Papers\IGCSE`**: Contains Edexcel International GCSE (9–1) Modular (`4W*`), Linear (`4*`), and Legacy (`4*0` / 4-digit) papers across 43 subjects (including `Sciences (Double Award)` `B`/`C`/`P` papers and merged `Bangla`/`Bengali`).
 3. **`Past Papers\Cambridge`**: Contains strictly international Cambridge Assessment International Education (CAIE) papers isolated under `A-Level\`, `IGCSE\`, and `O-Level\` (`<Subject (4-digit Code)>\<Year>\<Feb-March|May-June|Oct-Nov>\<canonicalFilename>`), unifying 9–1 equivalents (`09xx`/`71xx`) onto canonical A\*–G syllabuses and archiving `qp`, `ms`, `gt`, `er`, `in`, `ci`, `sf`, and `tn` files.
-4. **`IAL Books`**: Contains Edexcel IAL student textbooks, lab books, and solution banks sorted by subject.
-5. **`IGCSE Books`**: Contains Edexcel IGCSE (9–1) student textbooks sorted by subject.
-6. **`Cambridge Books`**: Reserved root directory for Cambridge International textbooks (`A-Level`, `IGCSE`, `O-Level`), already allowlisted in `generate-index.js`, `sync-hf.js`, and `vite.config.js`.
+4. **`IAL Books`**: Contains Edexcel IAL student textbooks, lab books, and solution banks sorted by subject (`60` files).
+5. **`IGCSE Books`**: Contains Edexcel IGCSE (9–1) student textbooks sorted by subject (`13` files).
+6. **`Cambridge Books`**: Contains verified, `qpdf`-linearized Cambridge International coursebooks, textbooks, workbooks, laboratory practical books, revision guides, and answer booklets sorted under `A-Level`, `IGCSE`, and `O-Level` (`81` files across `32` syllabuses; `154` total books across both boards).
 
 **Typical Hierarchy:**
 - `Past Papers \ IAL \ <Subject> \ <Unit or Year> \ <Session> \ <File.pdf>`
@@ -57,7 +57,7 @@ The scripts directory contains strictly **9 essential utilities**. Keep all temp
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output
    ```
-3. **SEO Sitemap, `/llms.txt`, Route Shards & Static HTML Pre-rendering (`780` indexable sitemap URLs with per-route `<lastmod>` dates excluding `< 3`-file thin `noindex` routes, `176` shards, `783` canonical HTML routes + `404.html` + `565` permanent `308` redirects in `vercel.json`):**
+3. **SEO Sitemap, `/llms.txt`, Route Shards & Static HTML Pre-rendering (`817` indexable sitemap URLs with per-route `<lastmod>` dates excluding `< 3`-file thin `noindex` routes, `176` shards, `820` canonical HTML routes + `404.html` + `683` permanent `308` redirects in `vercel.json`):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\prerender-seo.js`" 2>&1" | Write-Output
    ```
@@ -164,10 +164,10 @@ Core Conceptualist Systems contributors listed on `/about`:
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors with `"no-undef": "error"` in `.oxlintrc.json`) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, Board Switcher (`/`, `/cambridge`) Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.2.0` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.3.0` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
    - **Deploy & IndexNow:** Always run `scripts/deploy-vercel.js`, wait for `=== Production Deployment READY! ===` + `[IndexNow] Submitted ... canonical URLs`, and verify live deployment on `https://www.conceptualist.uk`.
 
-Enjoy working with this independent 78,739-file (74,877-unique-record) international Edexcel & Cambridge study archive!
+Enjoy working with this independent 78,820-file (74,958-unique-record) international Edexcel & Cambridge study archive!

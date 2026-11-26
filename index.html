@@ -6,7 +6,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="index, follow" />
-    <meta name="description" content="Study 74,877+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
+    <meta name="description" content="Study 74,958+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
     <title>Edexcel IAL &amp; IGCSE Past Papers &amp; Textbooks | Conceptualist</title>
     <link rel="canonical" href="https://www.conceptualist.uk/" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
@@ -14,7 +14,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Conceptualist Systems" />
     <meta property="og:title" content="Edexcel IAL &amp; IGCSE Past Papers &amp; Textbooks | Conceptualist" />
-    <meta property="og:description" content="Study 74,877+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
+    <meta property="og:description" content="Study 74,958+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
     <meta property="og:url" content="https://www.conceptualist.uk/" />
     <meta property="og:image" content="https://www.conceptualist.uk/og-card.png?v=2" />
     <meta property="og:image:type" content="image/png" />
@@ -23,7 +23,7 @@
     <meta property="og:image:alt" content="Conceptualist Systems — Pearson Edexcel IAL &amp; IGCSE Past Papers Split View Reader" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Edexcel IAL &amp; IGCSE Past Papers &amp; Textbooks | Conceptualist" />
-    <meta name="twitter:description" content="Study 74,877+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
+    <meta name="twitter:description" content="Study 74,958+ Edexcel IAL, Edexcel IGCSE &amp; Cambridge International past papers, mark schemes, examiner reports &amp; textbooks in Split View." />
     <meta name="twitter:image" content="https://www.conceptualist.uk/og-card.png?v=2" />
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
@@ -77,12 +77,21 @@
             var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
             var segs = p.split('/').filter(Boolean);
             if (!board) {
-              board = (segs[0] === 'cambridge' || segs[0] === 'caie' || segs[0] === 'cie') ? 'cambridge' : 'edexcel';
+              board = (
+                segs[0] === 'cambridge' || segs[0] === 'caie' || segs[0] === 'cie' ||
+                (segs[0] === 'textbooks' && (segs[1] === 'cambridge' || segs[1] === 'caie' || segs[1] === 'cie'))
+              ) ? 'cambridge' : 'edexcel';
             }
             if (!shard && !needsFull) {
-              if (p === '/textbooks' || p === '/textbooks/ial' || p === '/textbooks/igcse') shard = '/shards/textbooks.json';
+              if (
+                p === '/textbooks' || p === '/textbooks/edexcel' || p === '/textbooks/ial' || p === '/textbooks/igcse' ||
+                p === '/textbooks/cambridge' || p === '/textbooks/cambridge/a-level' || p === '/textbooks/cambridge/igcse' || p === '/textbooks/cambridge/o-level'
+              ) shard = '/shards/textbooks.json';
               else if (p === '/audio') shard = '/shards/audio.json';
               else if (p === '/data-files') shard = '/shards/data-files.json';
+              else if (segs[0] === 'textbooks' && (segs[1] === 'cambridge' || segs[1] === 'caie' || segs[1] === 'cie') && segs.length === 4) {
+                shard = '/shards/cambridge-' + segs[2].toLowerCase() + '-' + segs[3].toLowerCase() + '.json';
+              }
               else if (segs[0] === 'textbooks' && segs.length === 3) shard = '/shards/' + segs[1].toLowerCase() + '-' + segs[2].toLowerCase() + '.json';
               else if (segs[0] === 'cambridge' && (segs[1] === 'a-level' || segs[1] === 'igcse' || segs[1] === 'o-level') && segs.length >= 3) {
                 shard = '/shards/cambridge-' + segs[1].toLowerCase() + '-' + segs[2].toLowerCase() + '.json';
@@ -124,7 +133,7 @@
                 .catch(function() { return null; });
             } else if (needsFull) {
               var appVer = bootEl ? (bootEl.getAttribute('data-ver') || '') : '';
-              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v8.2.0';
+              var verTag = (appVer && appVer.indexOf('__CS_') !== 0) ? appVer : 'v8.3.0';
               var cacheKey = 'https://cs-cache.local/index_' + verTag + '_' + q + '_' + board + '.json';
               var indexFile = board === 'cambridge' ? '/index-cambridge.json' : '/index.json';
               var checkCache = (typeof caches !== 'undefined')

@@ -157,7 +157,7 @@ function writeDistShards(rawIndexes) {
   }
 
   for (const [shardName, itemsList] of buckets.entries()) {
-    const shardBoard = (shardName === 'audio.json' || shardName === 'data-files.json')
+    const shardBoard = (shardName === 'audio.json' || shardName === 'data-files.json' || shardName === 'textbooks.json')
       ? 'all'
       : shardName.startsWith('cambridge-')
         ? 'cambridge'
@@ -202,8 +202,11 @@ function collectAllRoutes(meta, indexLookup) {
   addRedirect('/cambridge/al', '/cambridge/a-level');
   addRedirect('/cambridge/as-a-level', '/cambridge/a-level');
   addRedirect('/cambridge/ol', '/cambridge/o-level');
-  addRedirect('/textbooks/cambridge', '/textbooks');
-  addRedirect('/textbooks/cambridge/:path*', '/textbooks');
+  addRedirect('/textbooks/caie', '/textbooks/cambridge');
+  addRedirect('/textbooks/cie', '/textbooks/cambridge');
+  addRedirect('/textbooks/cambridge/al', '/textbooks/cambridge/a-level');
+  addRedirect('/textbooks/cambridge/as-a-level', '/textbooks/cambridge/a-level');
+  addRedirect('/textbooks/cambridge/ol', '/textbooks/cambridge/o-level');
   addRedirect('/textbooks/edexcel-ial', '/textbooks/ial');
   addRedirect('/textbooks/edexcel-igcse', '/textbooks/igcse');
   const subjectAliasPairs = [
@@ -325,10 +328,18 @@ function collectAllRoutes(meta, indexLookup) {
 
   addRoute({
     path: '/textbooks',
-    priority: '0.90',
+    priority: '0.92',
     changefreq: 'weekly',
     includeInSitemap: true,
-    state: { currentTab: 'library', filterDocType: 'Book' }
+    state: { currentTab: 'library', scopeAllBoards: true, filterDocType: 'Book', forceShowTable: true }
+  });
+
+  addRoute({
+    path: '/textbooks/edexcel',
+    priority: '0.88',
+    changefreq: 'weekly',
+    includeInSitemap: true,
+    state: { currentTab: 'library', activeBoard: 'edexcel', filterDocType: 'Book', forceShowTable: true }
   });
 
   addRoute({
@@ -336,7 +347,7 @@ function collectAllRoutes(meta, indexLookup) {
     priority: '0.85',
     changefreq: 'weekly',
     includeInSitemap: true,
-    state: { currentTab: 'library', filterCurriculum: 'Edexcel IAL', filterDocType: 'Book' }
+    state: { currentTab: 'library', activeBoard: 'edexcel', filterCurriculum: 'Edexcel IAL', filterDocType: 'Book', forceShowTable: true }
   });
 
   addRoute({
@@ -344,7 +355,40 @@ function collectAllRoutes(meta, indexLookup) {
     priority: '0.85',
     changefreq: 'weekly',
     includeInSitemap: true,
-    state: { currentTab: 'library', filterCurriculum: 'Edexcel IGCSE', filterDocType: 'Book' }
+    state: { currentTab: 'library', activeBoard: 'edexcel', filterCurriculum: 'Edexcel IGCSE', filterDocType: 'Book', forceShowTable: true }
+  });
+
+  const hasCieBooks = (meta?.cambridgeBooks || meta?.boards?.cambridge?.totalBooks || 0) > 0;
+  addRoute({
+    path: '/textbooks/cambridge',
+    priority: '0.90',
+    changefreq: 'weekly',
+    includeInSitemap: hasCieBooks,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterDocType: 'Book', forceShowTable: true }
+  });
+
+  addRoute({
+    path: '/textbooks/cambridge/a-level',
+    priority: '0.85',
+    changefreq: 'weekly',
+    includeInSitemap: (meta?.cieAlBooks || meta?.boards?.cambridge?.alBooks || 0) > 0,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterCurriculum: 'Cambridge AS & A Level', filterDocType: 'Book', forceShowTable: true }
+  });
+
+  addRoute({
+    path: '/textbooks/cambridge/igcse',
+    priority: '0.85',
+    changefreq: 'weekly',
+    includeInSitemap: (meta?.cieIgcseBooks || meta?.boards?.cambridge?.igcseBooks || 0) > 0,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterCurriculum: 'Cambridge IGCSE', filterDocType: 'Book', forceShowTable: true }
+  });
+
+  addRoute({
+    path: '/textbooks/cambridge/o-level',
+    priority: '0.85',
+    changefreq: 'weekly',
+    includeInSitemap: (meta?.cieOlBooks || meta?.boards?.cambridge?.olBooks || 0) > 0,
+    state: { currentTab: 'library', activeBoard: 'cambridge', filterCurriculum: 'Cambridge O Level', filterDocType: 'Book', forceShowTable: true }
   });
 
   addRoute({
@@ -554,7 +598,8 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       '<li><a href="/ial">Edexcel International A-Level (IAL) Past Papers</a></li>',
       '<li><a href="/igcse">Edexcel International GCSE (IGCSE) Past Papers</a></li>',
       '<li><a href="/cambridge">Cambridge International (AS &amp; A Level, IGCSE &amp; O Level) Past Papers</a></li>',
-      '<li><a href="/textbooks">Edexcel IAL &amp; IGCSE Textbooks &amp; Solution Banks</a></li>',
+      '<li><a href="/textbooks">Edexcel &amp; Cambridge Textbooks &amp; Solution Banks</a></li>',
+      '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Workbooks</a></li>',
       '<li><a href="/audio">Listening Audio Archive with Synced Subtitles</a></li>',
       '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>'
     );
@@ -571,6 +616,10 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     );
   } else if (filterDocType === 'Book') {
     let bookItems = indexLookup?.booksAll || [];
+    if (!route.state.scopeAllBoards && !filterCurriculum) {
+      const targetB = route.state.activeBoard || 'edexcel';
+      bookItems = bookItems.filter(b => getBoardForCurriculum(b.curriculum) === targetB);
+    }
     if (filterCurriculum) {
       bookItems = bookItems.filter(b => b.curriculum === filterCurriculum);
     }
@@ -592,19 +641,21 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
         `<li><strong>${escapeHtml(cleanBookTitle)}</strong>: ${escapeHtml(subjLabel)} (${escapeHtml(label)})${metaDetails ? ` · <span>${escapeHtml(metaDetails)}</span>` : ''}</li>`
       );
     }
-    if (!filterCurriculum) {
-      links.push(
-        '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
-        '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
-      );
-    } else if (filterCurriculum === 'Edexcel IAL') {
-      links.push('<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>');
-    } else if (filterCurriculum === 'Edexcel IGCSE') {
-      links.push('<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>');
-    }
+    links.push(
+      '<li><a href="/textbooks">All Edexcel &amp; Cambridge Textbooks</a></li>',
+      '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
+      '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>',
+      '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Workbooks</a></li>',
+      '<li><a href="/textbooks/cambridge/a-level">Cambridge AS &amp; A Level Coursebooks</a></li>',
+      '<li><a href="/textbooks/cambridge/igcse">Cambridge IGCSE Coursebooks</a></li>',
+      '<li><a href="/textbooks/cambridge/o-level">Cambridge O Level Textbooks</a></li>'
+    );
     if (indexLookup?.booksByCurrSubj) {
       for (const key of [...indexLookup.booksByCurrSubj.keys()].sort()) {
         const [bCurr, bSubj] = key.split('::');
+        if (!route.state.scopeAllBoards && !filterCurriculum && getBoardForCurriculum(bCurr) !== (route.state.activeBoard || 'edexcel')) {
+          continue;
+        }
         links.push(
           `<li><a href="/textbooks/${getCurriculumSlug(bCurr)}/${getSubjectSlug(bSubj)}">${escapeHtml(`${bCurr} ${formatSubjectName(bSubj)} Textbooks & Solutions`)}</a></li>`
         );
@@ -725,11 +776,9 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     }
   } else if (filterCurriculum) {
     const currSlug = getCurriculumSlug(filterCurriculum);
-    if (!isCieRoute) {
-      links.push(
-        `<li><a href="/textbooks/${currSlug}">${escapeHtml(`${filterCurriculum} Textbooks & Worked Solution Banks`)}</a></li>`
-      );
-    }
+    links.push(
+      `<li><a href="/textbooks/${currSlug}">${escapeHtml(`${filterCurriculum} ${isCieRoute ? 'Coursebooks & Textbooks' : 'Textbooks & Worked Solution Banks'}`)}</a></li>`
+    );
     const subjectsObj = meta?.wizard?.[filterCurriculum] || {};
     for (const s of Object.keys(subjectsObj).sort()) {
       const subjSlug = getSubjectSlug(s);
@@ -749,7 +798,8 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       links.push(
         '<li><a href="/cambridge/a-level">Cambridge International AS &amp; A Level Past Papers</a></li>',
         '<li><a href="/cambridge/igcse">Cambridge IGCSE Past Papers (A*-G &amp; 9-1)</a></li>',
-        '<li><a href="/cambridge/o-level">Cambridge O Level Past Papers</a></li>'
+        '<li><a href="/cambridge/o-level">Cambridge O Level Past Papers</a></li>',
+        '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Textbooks</a></li>'
       );
       for (const curr of ['Cambridge AS & A Level', 'Cambridge IGCSE', 'Cambridge O Level']) {
         const currSlug = getCurriculumSlug(curr);
@@ -988,7 +1038,8 @@ function generateLlmsTxt(meta, indexLookup) {
     `- [Cambridge AS & A Level](${SITE_URL}/cambridge/a-level): International AS & A Level past papers, mark schemes & grade thresholds.`,
     `- [Cambridge IGCSE](${SITE_URL}/cambridge/igcse): Cambridge IGCSE (A*-G & 9-1 equivalents) past papers, inserts & grade thresholds.`,
     `- [Cambridge O Level](${SITE_URL}/cambridge/o-level): Cambridge O Level past papers, mark schemes & grade thresholds.`,
-    `- [Textbooks & Worked Solution Banks](${SITE_URL}/textbooks): ${booksCount} student books, answer PDFs, lab books, and IAL Maths Solution Banks.`,
+    `- [All International Textbooks & Solution Banks](${SITE_URL}/textbooks): ${booksCount} Edexcel & Cambridge student books, coursebooks, workbooks, lab books, and IAL Maths Solution Banks.`,
+    `- [Cambridge International Textbooks](${SITE_URL}/textbooks/cambridge): Cambridge AS & A Level, IGCSE & O Level coursebooks, workbooks & revision guides.`,
     `- [Listening Audio Archive (MP3 & Live CC)](${SITE_URL}/audio): ${audioCount} listening audio tracks and synced transcripts.`,
     `- [IT & Computer Science Practical Data Files](${SITE_URL}/data-files): ${dfCount} practical exam source ZIPs.`,
     '',

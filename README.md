@@ -1,6 +1,6 @@
 # Conceptualist Systems — International Exam Past Papers & Textbooks Library
 
-An independent, strictly international student study archive and high-speed web reader for searching, browsing, and studying **Pearson Edexcel International** (`IAL` & `IGCSE`) and **Cambridge International (CAIE)** (`AS & A Level`, `IGCSE`, and `O Level`) past papers, mark schemes, examiner reports, grade thresholds, inserts, textbooks, worked solution banks, IT/CS data files, and language listening audio. The curated repository spans **78,739 archived files** (**74,877 deduplicated unique records**) across **169 international subjects** — **19 Edexcel IAL** + **43 Edexcel IGCSE** (`19,944` files / `16,083` unique, Jan 2003 – Jun 2026) and **31 Cambridge AS & A Level** + **45 Cambridge IGCSE** + **31 Cambridge O Level** (`58,795` files / `58,794` unique across all `107/107` international syllabuses, 2002 – May/June 2026) — live at `https://www.conceptualist.uk`.
+An independent, strictly international student study archive and high-speed web reader for searching, browsing, and studying **Pearson Edexcel International** (`IAL` & `IGCSE`) and **Cambridge International (CAIE)** (`AS & A Level`, `IGCSE`, and `O Level`) past papers, mark schemes, examiner reports, grade thresholds, inserts, textbooks (`154` total: `73` Edexcel + `81` Cambridge), worked solution banks, IT/CS data files, and language listening audio. The curated repository spans **78,820 archived files** (**74,958 deduplicated unique records**) across **169 international subjects** — **19 Edexcel IAL** + **43 Edexcel IGCSE** (`19,944` files / `16,083` unique, Jan 2003 – Jun 2026) and **31 Cambridge AS & A Level** + **45 Cambridge IGCSE** + **31 Cambridge O Level** (`58,876` files / `58,875` unique across all `107/107` international syllabuses, 2002 – May/June 2026) — live at `https://www.conceptualist.uk`.
 
 > **Independent Study Archive:** Conceptualist Systems is an independent student study index and reader and is **not affiliated with, endorsed by, or sponsored by Pearson plc, Edexcel, or Cambridge University Press & Assessment (CAIE)**.
 
@@ -12,7 +12,7 @@ An independent, strictly international student study archive and high-speed web 
   - Lazy-loaded **Worked Solutions ZIP viewer** (`src/components/SolutionBankView.jsx`, `src/zipPdfExtractor.js`) streams only the ZIP Central Directory via HTTP `206` Range requests and extracts clicked chapter/exercise PDFs on demand across all 14 IAL Maths Solution Banks directly inside WebPDF.
   - Lazy-loaded **Audio Player Dock & Subtitles** (`src/components/AudioPlayerDock.jsx`, `src/zipAudioExtractor.js`, `src/audioSubtitles.js`) unpacks `.zip` / nested `.zip` listening archives in browser memory via `DecompressionStream` and resolves clickable synced captions across Tier 1 sharded `public/subtitles/` (`manifest.json` with `995` keys + **9 lazy subject shards** covering **100% of all 273/273 Edexcel IAL & IGCSE listening resources** — `368` unique SHA-256 tracks & `50,888` timed segments) → Tier 2 MongoDB `audio_subtitles` cache (up to 1,200 segments / 320 KB) → Tier 3 opt-in browser adaptive RMS VAD + `Xenova/whisper-tiny` WASM live generation across 15+ exam languages. Standard Past Paper QP/MS opens fetch zero audio or Solution Bank ZIP chunks.
 - **Three Academic Themes (Semantic CSS Custom Properties):** Automatically follows the visitor's OS `prefers-color-scheme` on first visit, with directional S-curve View Transitions cycling **Academic Light**, **Academic Dark** (slate charcoal), and **Pure OLED** (`#000000`), hue-preserving diagram/graph PDF canvas inversion, dual persistence (`localStorage` + 1-year cookie), and full `prefers-reduced-motion` support.
-- **Canonical SEO, Route Sharding, `/llms.txt` & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/cambridge/a-level/...`, `/cambridge/igcse/...`, `/cambridge/o-level/...`, `/textbooks/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **176 compact JSON route shards**, **783 pre-rendered canonical static HTML routes + `404.html`** (with `565` permanent `308` shorthand/code redirects), `Book` + `ItemList` + `FAQPage` Schema.org JSON-LD, `public/llms.txt`, a **780-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
+- **Canonical SEO, Route Sharding, `/llms.txt` & IndexNow:** Clean deep routes (`/ial/...`, `/igcse/...`, `/cambridge/a-level/...`, `/cambridge/igcse/...`, `/cambridge/o-level/...`, `/textbooks`, `/textbooks/edexcel`, `/textbooks/cambridge/...`, `/data-files`, `/audio`, `/about`, `/changelog`) backed by **176 compact JSON route shards**, **820 pre-rendered canonical static HTML routes + `404.html`** (with `683` permanent `308` shorthand/code redirects), `Book` + `ItemList` + `FAQPage` Schema.org JSON-LD, `public/llms.txt`, an **817-URL `sitemap.xml`**, and automated **IndexNow** URL submission on production deploys.
 - **View Tracking, History & Idle Telemetry:** Serverless `/api/views` & `/api/telemetry` endpoints backed by MongoDB Atlas (shared view counters, subtitle caching, 90-day anonymized session metrics, distributed rate limits, compact `allowlist.json` validation, and local `.data/*.json` fallbacks), browser Recent History cards, idle-deferred telemetry (`src/telemetry.js`), and Vercel Web Analytics & Speed Insights.
 - **Mobile & Desktop Polish:** Compact `1280px` desktop layout, collapsible lazy `FilterDrawer` (with Cambridge Variant `v1`/`v2`/`v3` & `Feb/March` filters), `100dvh` mobile reader modals, `3 × 3` mobile footer link grid, and `>= 16px` mobile inputs preventing iOS Safari zoom.
 
@@ -20,7 +20,7 @@ An independent, strictly international student study archive and high-speed web 
 
 The frontend eliminates startup waterfalls and keeps main-thread blocking minimal:
 
-1. **Zero-Waterfall `<head>` Early Fetch:** Strict SHA-256 CSP-hashed inline boot script starts `/meta.json?v=...` and the active route shard (or active board index) in parallel with CSS/JS downloads, with build version (`v8.1.0`) automatically synced via Vite `transformIndexHtml`.
+1. **Zero-Waterfall `<head>` Early Fetch:** Strict SHA-256 CSP-hashed inline boot script starts `/meta.json?v=...` and the active route shard (or active board index) in parallel with CSS/JS downloads, with build version (`v8.3.0`) automatically synced via Vite `transformIndexHtml`.
 2. **Route-Sharded Loading (`dist/shards/*.json`):** Deep subject, textbook, audio, or data-file pages across all 169 subjects hydrate immediately from compact route shards (`176` total shards).
 3. **Off-Thread Partitioned Catalog Upgrade (`public/index-edexcel.json` & `public/index-cambridge.json`):** `src/workers/catalog.worker.js` fetches, caches (`cs_index_cache`), parses, and indexes only the active board's tuple-encoded catalog off the main thread (with Hugging Face `live_index.json` & `live_index_cambridge.json` fallbacks).
 4. **Zero-Waste Pre-Warming & Virtualization:** `src/lib/pdfPrewarm.js` preloads lazy reader JS chunks once on first hover (zero Hugging Face traffic) and starts the clicked PDF's request only on `pointerdown`, while `VirtualPdfPage` renders visible canvases on demand and releases offscreen GPU textures.
@@ -67,7 +67,7 @@ npx oxlint src api scripts
 
 ### Building for Production
 
-Compile the Vite bundle, generate `public/sitemap.xml` (`780` canonical URLs) and `public/llms.txt`, sync `565` permanent `308` shorthand/legacy redirects into `vercel.json`, create `dist/shards/` (`176` route shards), and pre-render `783` canonical HTML pages plus `404.html` into `dist/`:
+Compile the Vite bundle, generate `public/sitemap.xml` (`817` canonical URLs) and `public/llms.txt`, sync `683` permanent `308` shorthand/legacy redirects into `vercel.json`, create `dist/shards/` (`176` route shards), and pre-render `820` canonical HTML pages plus `404.html` into `dist/`:
 
 ```bash
 npm run build
@@ -118,7 +118,7 @@ npm run indexnow
   - `src/styles/`: Lazy-loaded `welcome.css`, `filter-drawer.css`, `modal.css`, and `secondary.css`.
   - `src/workers/`: `catalog.worker.js`.
 - `index.html`: Entry HTML with parallel early-fetch bootstrap (`<meta name="cs-boot">`), preloads, and `<style id="critical-anti-fouc">` for zero-flicker Light/Dark/OLED boot.
-- `vercel.json`: Permanent `308` redirects (`565`), `allowlist.json` serverless bundling, strict SHA-256 CSP headers, and route cache policies.
+- `vercel.json`: Permanent `308` redirects (`683`), `allowlist.json` serverless bundling, strict SHA-256 CSP headers, and route cache policies.
 - `vite.config.js`: Vite 8 config, automatic `__CS_APP_VERSION__` / `__CS_BUILD_TIME__` HTML stamping, and local disk streaming middleware.
 
 ## Team

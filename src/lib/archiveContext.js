@@ -26,6 +26,7 @@ export function buildArchiveContextInfo({
   isNotFound,
   showWelcome,
   activeBoard = 'edexcel',
+  scopeAllBoards = false,
   filterCurriculum,
   filterSubject,
   filterUnit,
@@ -49,7 +50,7 @@ export function buildArchiveContextInfo({
   } = actions;
 
   const effCurr = filterCurriculum || inferCurriculumForSubject(filterSubject, '');
-  const isCie = isCambridgeCurriculum(effCurr) || (!effCurr && activeBoard === 'cambridge');
+  const isCie = isCambridgeCurriculum(effCurr) || (!effCurr && !scopeAllBoards && activeBoard === 'cambridge');
   const legacyInfo = getLegacyEquivalentsForState({
     filterCurriculum: effCurr,
     filterSubject,
@@ -151,30 +152,70 @@ export function buildArchiveContextInfo({
       }
     }
   } else if (filterDocType === 'Book') {
-    if (filterCurriculum !== 'Edexcel IAL') {
+    if (!scopeAllBoards) {
       pushLink({
-        href: '/textbooks/ial',
-        label: 'Edexcel IAL Textbooks & Solution Banks',
-        onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IAL'); setFilterDocType('Book'); setForceShowTable(true); }
+        href: '/textbooks',
+        label: 'All Edexcel & Cambridge Textbooks',
+        onClick: () => {
+          setIsNotFound(false);
+          setScopeAllBoards?.(true);
+          setFilterCurriculum('');
+          setFilterSubject('');
+          setFilterUnit('');
+          setFilterDocType('Book');
+          setForceShowTable(true);
+        }
       });
     }
-    if (filterCurriculum !== 'Edexcel IGCSE') {
+    const tbCurrHubs = [
+      { href: '/textbooks/ial', label: 'Edexcel IAL Textbooks & Solution Banks', board: 'edexcel', curr: 'Edexcel IAL' },
+      { href: '/textbooks/igcse', label: 'Edexcel IGCSE (9-1) Textbooks', board: 'edexcel', curr: 'Edexcel IGCSE' },
+      { href: '/textbooks/cambridge/a-level', label: 'Cambridge AS & A Level Coursebooks', board: 'cambridge', curr: 'Cambridge AS & A Level' },
+      { href: '/textbooks/cambridge/igcse', label: 'Cambridge IGCSE Coursebooks', board: 'cambridge', curr: 'Cambridge IGCSE' },
+      { href: '/textbooks/cambridge/o-level', label: 'Cambridge O Level Textbooks', board: 'cambridge', curr: 'Cambridge O Level' }
+    ];
+    for (const hub of tbCurrHubs) {
+      if (filterCurriculum === hub.curr) continue;
+      if ((SUBJECTS_WITH_BOOKS[hub.curr]?.size || 0) === 0 && hub.board === 'cambridge') continue;
       pushLink({
-        href: '/textbooks/igcse',
-        label: 'Edexcel IGCSE (9-1) Textbooks',
-        onClick: () => { setIsNotFound(false); setFilterCurriculum('Edexcel IGCSE'); setFilterDocType('Book'); setForceShowTable(true); }
+        href: hub.href,
+        label: hub.label,
+        onClick: () => {
+          setIsNotFound(false);
+          setScopeAllBoards?.(false);
+          setActiveBoard?.(hub.board);
+          setFilterCurriculum(hub.curr);
+          setFilterSubject('');
+          setFilterUnit('');
+          setFilterDocType('Book');
+          setForceShowTable(true);
+        }
       });
     }
-    const bookCurrs = filterCurriculum ? [filterCurriculum] : ['Edexcel IAL', 'Edexcel IGCSE'];
+    const bookCurrs = filterCurriculum
+      ? [filterCurriculum]
+      : scopeAllBoards
+        ? ['Edexcel IAL', 'Edexcel IGCSE', 'Cambridge AS & A Level', 'Cambridge IGCSE', 'Cambridge O Level']
+        : isCie
+          ? ['Cambridge AS & A Level', 'Cambridge IGCSE', 'Cambridge O Level']
+          : ['Edexcel IAL', 'Edexcel IGCSE'];
     for (const bCurr of bookCurrs) {
       const bCurrSlug = getCurriculumSlug(bCurr);
+      const bBoard = isCambridgeCurriculum(bCurr) ? 'cambridge' : 'edexcel';
+      const bShort = bCurr === 'Edexcel IGCSE' ? 'IGCSE'
+        : bCurr === 'Edexcel IAL' ? 'IAL'
+        : bCurr === 'Cambridge AS & A Level' ? 'CAIE A-Level'
+        : bCurr === 'Cambridge O Level' ? 'CAIE O-Level'
+        : 'CAIE IGCSE';
       const bSubjects = Array.from(SUBJECTS_WITH_BOOKS[bCurr] || []).sort();
       for (const bSubj of bSubjects) {
         pushLink({
           href: `/textbooks/${bCurrSlug}/${getSubjectSlug(bSubj)}`,
-          label: `${bCurr === 'Edexcel IGCSE' ? 'IGCSE' : 'IAL'} ${formatSubjectDisplay(bSubj)} Books`,
+          label: `${bShort} ${formatSubjectDisplay(bSubj)} Books`,
           onClick: () => {
             setIsNotFound(false);
+            setScopeAllBoards?.(false);
+            setActiveBoard?.(bBoard);
             setFilterCurriculum(bCurr);
             setFilterSubject(bSubj);
             setFilterUnit('');
@@ -237,11 +278,11 @@ export function buildArchiveContextInfo({
       });
     }
   } else if (filterCurriculum) {
-    if (!isCie) {
+    if (!isCie || (SUBJECTS_WITH_BOOKS[filterCurriculum]?.size || 0) > 0) {
       pushLink({
-        href: filterCurriculum === 'Edexcel IAL' ? '/textbooks/ial' : '/textbooks/igcse',
+        href: `/textbooks/${currSlug}`,
         label: `${filterCurriculum} Textbooks`,
-        onClick: () => { setIsNotFound(false); setFilterDocType('Book'); setForceShowTable(true); }
+        onClick: () => { setIsNotFound(false); setScopeAllBoards?.(false); setFilterDocType('Book'); setForceShowTable(true); }
       });
     }
     pushLink({

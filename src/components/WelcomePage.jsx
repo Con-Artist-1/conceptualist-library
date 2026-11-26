@@ -14,6 +14,7 @@ import {
 } from '../data/cambridgeCatalog.js';
 import { compareUnitLabels, isLegacyUnitLabel } from '../lib/unitSort.js';
 import {
+  SUBJECTS_WITH_BOOKS,
   shouldHandleClientNavigation,
   formatSubjectDisplay,
   getDisplayTitle,
@@ -48,6 +49,7 @@ const WelcomePage = ({
   const isCie = activeBoard === 'cambridge';
   const hasHistory = Array.isArray(recentHistory) && recentHistory.length > 0;
   const bookCount = data.meta?.boards?.edexcel?.totalBooks ?? data.meta?.totalBooks ?? 73;
+  const cambridgeBookCount = data.meta?.boards?.cambridge?.totalBooks ?? data.meta?.cambridgeBooks ?? 0;
   const audioCount = data.meta?.boards?.edexcel?.audioCount ?? data.meta?.audioCount ?? 272;
 
   const ialSubjects = data.meta?.ialSubjects || IAL_SUBJECTS_DEFAULT;
@@ -262,9 +264,9 @@ const WelcomePage = ({
           <div>
             {isCie ? (
               <>
-                <h1>Cambridge International Past Exam Papers</h1>
+                <h1>Cambridge International Past Papers &amp; Textbooks</h1>
                 <p>
-                  Independent Cambridge International (CAIE) study archive covering AS &amp; A Level, IGCSE (A*–G &amp; 9–1), and O Level — filter by variant, inspect Grade Thresholds, and read paired papers in Split View.
+                  Independent Cambridge International (CAIE) study archive covering AS &amp; A Level, IGCSE (A*–G &amp; 9–1), and O Level — filter by variant, inspect Grade Thresholds, browse coursebooks, and read paired papers in Split View.
                 </p>
               </>
             ) : (
@@ -355,12 +357,12 @@ const WelcomePage = ({
             </p>
             <div className="pillar-actions">
               <a
-                href="/textbooks"
+                href="/textbooks/edexcel"
                 className="pillar-btn"
                 onClick={(e) => {
                   if (!shouldHandleClientNavigation(e)) return;
                   e.preventDefault();
-                  onBrowseTextbooks();
+                  onBrowseTextbooks('edexcel');
                 }}
               >
                 Browse Textbooks →
@@ -448,24 +450,36 @@ const WelcomePage = ({
             <div className="pillar-card-head">
               <div className="pillar-title-row">
                 <svg className="pillar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="18" y1="20" x2="18" y2="10" />
-                  <line x1="12" y1="20" x2="12" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="14" />
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                 </svg>
-                <h2>Grade Thresholds &amp; Inserts</h2>
+                <h2>Coursebooks &amp; Thresholds</h2>
               </div>
-              <span className="pillar-badge pillar-badge-books">GT + IN Split</span>
+              <span className="pillar-badge pillar-badge-books">
+                {cambridgeBookCount > 0 ? `${cambridgeBookCount} Books · GT` : 'GT + IN Split'}
+              </span>
             </div>
             <p className="pillar-desc">
-              Session-wide Grade Thresholds (GT) and Examiner Reports attach to every paper sitting, alongside QP + Insert Split View.
+              Read Cambridge AS &amp; A Level, IGCSE &amp; O Level coursebooks and workbooks in 2-Page spread mode, or inspect session Grade Thresholds (GT).
             </p>
             <div className="pillar-actions">
+              <a
+                href="/textbooks/cambridge"
+                className="pillar-btn primary"
+                onClick={(e) => {
+                  if (!shouldHandleClientNavigation(e)) return;
+                  e.preventDefault();
+                  onBrowseTextbooks('cambridge');
+                }}
+              >
+                Browse Textbooks →
+              </a>
               <button
                 type="button"
                 className="pillar-btn"
                 onClick={() => onBrowseThresholds && onBrowseThresholds()}
               >
-                Browse Thresholds (GT) →
+                Thresholds (GT) →
               </button>
             </div>
           </div>
@@ -766,7 +780,7 @@ const WelcomePage = ({
                 >
                   <span>
                     {isCambridgeCurriculum(selectedSubject.curriculum)
-                      ? `View All ${formatSubjectDisplay(selectedSubject.name)} Papers, Thresholds & Reports →`
+                      ? `View All ${formatSubjectDisplay(selectedSubject.name)} Papers, Thresholds${SUBJECTS_WITH_BOOKS[selectedSubject.curriculum]?.has(selectedSubject.name) ? ' & Textbooks' : ' & Reports'} →`
                       : `View All ${formatSubjectDisplay(selectedSubject.name)} Units, Papers & Textbooks →`}
                   </span>
                 </a>

@@ -2,99 +2,321 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.conceptualist.uk/</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/papers</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/ial</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/igcse</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/cambridge</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/cambridge/papers</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/cambridge/a-level</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.92</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/cambridge/igcse</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.92</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/cambridge/o-level</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.92</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/textbooks</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.90</priority>
+    <priority>0.92</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/edexcel</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.88</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/textbooks/ial</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/textbooks/igcse</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse</loc>
+    <lastmod>2026-11-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/o-level</loc>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/data-files</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/audio</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/about</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/changelog</loc>
-    <lastmod>2026-11-24</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.60</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/accounting-9706</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/biology-9700</loc>
+    <lastmod>2014-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/business-9609</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/chemistry-9701</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/computer-science-9618</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/economics-9708</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/further-mathematics-9231</loc>
+    <lastmod>2001-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/geography-9696</loc>
+    <lastmod>2011-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/mathematics-9709</loc>
+    <lastmod>2018-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/a-level/physics-9702</loc>
+    <lastmod>2016-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/biology-0610</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/business-studies-0450</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/chemistry-0620</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/computer-science-0478</loc>
+    <lastmod>2014-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/economics-0455</loc>
+    <lastmod>2014-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/english-as-a-second-language-0510</loc>
+    <lastmod>2014-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511</loc>
+    <lastmod>2007-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/first-language-english-0500</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/french-0520</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/geography-0460</loc>
+    <lastmod>2014-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/german-0525</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/history-0470</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/ict-0417</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/international-mathematics-0607</loc>
+    <lastmod>2011-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/mathematics-0580</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/physics-0625</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/igcse/spanish-0530</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/o-level/additional-mathematics-4037</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/o-level/biology-5090</loc>
+    <lastmod>2013-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/o-level/first-language-urdu-3247</loc>
+    <lastmod>2015-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/o-level/islamiyat-2058</loc>
+    <lastmod>2008-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://www.conceptualist.uk/textbooks/cambridge/o-level/pakistan-studies-2059</loc>
+    <lastmod>2014-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
   </url>
   <url>
     <loc>https://www.conceptualist.uk/textbooks/ial/accounting</loc>

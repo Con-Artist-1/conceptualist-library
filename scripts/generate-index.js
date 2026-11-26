@@ -121,12 +121,16 @@ function buildTree(dirPath, rootPath) {
           : null;
 
         const computedYear = bookMeta?.year || (sessionDate ? sessionDate.year : extractYear(relPath, spec));
+        const rawDocType = detectDocType(item.name, relPath, spec);
+        const docType = isBookCategory(category)
+          ? (rawDocType === 'SOL' ? 'SOL' : 'Book')
+          : rawDocType;
         node.children.push({
           name: displayFileName,
           path: relPath,
           size: fs.statSync(fullPath).size,
           subject,
-          docType: detectDocType(item.name, relPath, spec),
+          docType,
           year: computedYear,
           session: sessionDate ? sessionDate.label : fallbackSession,
           sortKey: sessionDate ? sessionDate.sortKey : (computedYear ? computedYear * 100 : 200000),
@@ -347,6 +351,9 @@ const totalBooks = dedupedFiles.filter((f) => isBookCategory(f.category)).length
 const ialBooks = edexcelDeduped.filter((f) => f.category === CATEGORY_BOOKS).length;
 const igcseBooks = edexcelDeduped.filter((f) => f.category === CATEGORY_IGCSE).length;
 const cambridgeBooks = cambridgeDeduped.filter((f) => isBookCategory(f.category)).length;
+const cieAlBooks = cieAlDeduped.filter((f) => isBookCategory(f.category)).length;
+const cieIgcseBooks = cieIgcseDeduped.filter((f) => isBookCategory(f.category)).length;
+const cieOlBooks = cieOlDeduped.filter((f) => isBookCategory(f.category)).length;
 const dfCount = dedupedFiles.filter((f) => f.docType === 'DF').length;
 const audioCount = dedupedFiles.filter((f) => f.docType === 'AUD').length;
 
@@ -357,6 +364,9 @@ const metaInfo = {
   ialBooks,
   igcseBooks,
   cambridgeBooks,
+  cieAlBooks,
+  cieIgcseBooks,
+  cieOlBooks,
   dfCount,
   audioCount,
   subjects: allSubjects,
@@ -390,6 +400,9 @@ const metaInfo = {
       totalFiles: cambridgeFlat.length,
       uniqueFiles: cambridgeDeduped.length,
       totalBooks: cambridgeBooks,
+      alBooks: cieAlBooks,
+      igcseBooks: cieIgcseBooks,
+      olBooks: cieOlBooks,
       dfCount: cambridgeDeduped.filter((f) => f.docType === 'DF').length,
       audioCount: cambridgeDeduped.filter((f) => f.docType === 'AUD').length,
       subjectCount: cieAlSubjects.length + cieIgcseSubjects.length + cieOlSubjects.length,

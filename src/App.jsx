@@ -532,6 +532,7 @@ function App() {
   const seoMeta = useMemo(() => getSeoMetadata({
     currentTab,
     activeBoard,
+    scopeAllBoards,
     filterCurriculum: effectiveRouteCurriculum,
     filterSubject: effectiveRouteSubject,
     filterUnit: effectiveRouteUnit,
@@ -545,6 +546,7 @@ function App() {
   }), [
     currentTab,
     activeBoard,
+    scopeAllBoards,
     effectiveRouteCurriculum,
     effectiveRouteSubject,
     effectiveRouteUnit,
@@ -561,6 +563,7 @@ function App() {
   useSeoHeadSync({
     currentTab,
     activeBoard,
+    scopeAllBoards,
     isNotFound,
     isWizardRouteActive,
     wizardSubject,
@@ -596,6 +599,7 @@ function App() {
     return buildRoutePath({
       currentTab: 'library',
       activeBoard: fileBoard,
+      scopeAllBoards,
       filterCurriculum: filterCurriculum || fileObj?.curriculum || '',
       filterSubject: filterSubject || fileObj?.subject || '',
       filterUnit: filterUnit || fileObj?.cleanUnitLabel || '',
@@ -607,7 +611,7 @@ function App() {
       previewMode: preferredView,
       forceShowTable
     });
-  }, [activeBoard, filterCurriculum, filterSubject, filterUnit, filterYear, filterVariant, filterDocType, deferredSearchQuery, forceShowTable]);
+  }, [activeBoard, scopeAllBoards, filterCurriculum, filterSubject, filterUnit, filterYear, filterVariant, filterDocType, deferredSearchQuery, forceShowTable]);
 
   // Multi-board zero-waterfall catalog hydration via Web Worker
   useEffect(() => {
@@ -754,7 +758,11 @@ function App() {
 
     ensureBoardIndexRef.current = ensureBoardIndex;
 
-    const isCrossBoardShard = (sp) => sp === '/shards/audio.json' || sp === '/shards/data-files.json';
+    const isCrossBoardShard = (sp) => (
+      sp === '/shards/audio.json' ||
+      sp === '/shards/data-files.json' ||
+      sp === '/shards/textbooks.json'
+    );
 
     const hydrateInitialShard = async () => {
       if (!initialShardRoute) return;
@@ -1030,11 +1038,14 @@ function App() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
   }, [clearFilters]);
 
-  const handleBrowseTextbooks = useCallback(() => {
+  const handleBrowseTextbooks = useCallback((targetBoard = null) => {
+    const nextBoard = targetBoard === 'cambridge' || targetBoard === 'edexcel'
+      ? targetBoard
+      : (activeBoardRef.current || 'edexcel');
     setCurrentTab('library');
-    persistBoardPreference('edexcel');
-    setActiveBoard('edexcel');
-    clearFilters({ pushUrl: false, targetBoard: 'edexcel' });
+    persistBoardPreference(nextBoard);
+    setActiveBoard(nextBoard);
+    clearFilters({ pushUrl: false, targetBoard: nextBoard });
     setFilterDocType('Book');
     setForceShowTable(true);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
@@ -1361,7 +1372,11 @@ function App() {
       filterDocType,
       notFound: currentTab === 'library' && isNotFound
     });
-    const isCrossBoardHubShard = activeShard === '/shards/audio.json' || activeShard === '/shards/data-files.json';
+    const isCrossBoardHubShard = (
+      activeShard === '/shards/audio.json' ||
+      activeShard === '/shards/data-files.json' ||
+      activeShard === '/shards/textbooks.json'
+    );
     const shardBoardTarget = isCrossBoardHubShard ? 'all' : activeBoard;
     const hasActiveSearch = Boolean(deferredSearchQuery && deferredSearchQuery.trim());
     const canServeFromShard = Boolean(
@@ -1489,13 +1504,14 @@ function App() {
     isNotFound,
     showWelcome,
     activeBoard,
+    scopeAllBoards,
     filterCurriculum,
     filterSubject,
     filterUnit,
     filterDocType,
     meta,
     actions: archiveContextActions
-  }), [currentTab, isNotFound, showWelcome, activeBoard, filterCurriculum, filterSubject, filterUnit, filterDocType, meta, archiveContextActions]);
+  }), [currentTab, isNotFound, showWelcome, activeBoard, scopeAllBoards, filterCurriculum, filterSubject, filterUnit, filterDocType, meta, archiveContextActions]);
 
   const welcomeDataProp = useMemo(() => ({ meta }), [meta]);
 
@@ -1551,9 +1567,8 @@ function App() {
       return;
     }
     if (action === 'textbooks') {
-      persistBoardPreference('edexcel');
-      setActiveBoard('edexcel');
-      clearFilters({ pushUrl: false, targetBoard: 'edexcel' });
+      clearFilters({ pushUrl: false });
+      setScopeAllBoards(true);
       setFilterDocType('Book');
       setForceShowTable(true);
       return;

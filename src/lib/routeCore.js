@@ -306,6 +306,7 @@ export function getShardPathForRoute({
 export function buildRoutePath({
   currentTab = 'library',
   activeBoard = 'edexcel',
+  scopeAllBoards = false,
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
@@ -332,18 +333,22 @@ export function buildRoutePath({
     pathname = '/audio';
   } else if (filterDocType === 'Book' && !filterUnit) {
     if (!filterCurriculum && !filterSubject) {
-      pathname = '/textbooks';
+      if (scopeAllBoards) {
+        pathname = '/textbooks';
+      } else if (effBoard === 'cambridge') {
+        pathname = '/textbooks/cambridge';
+      } else {
+        pathname = '/textbooks/edexcel';
+      }
     } else {
       const curr = inferCurriculumForSubject(filterSubject, filterCurriculum);
       const currSlug = getCurriculumSlug(curr);
-      if (isCambridgeCurriculum(curr)) {
-        pathname = '/textbooks';
-      } else if (filterSubject && currSlug) {
+      if (filterSubject && currSlug) {
         pathname = `/textbooks/${currSlug}/${getSubjectSlug(filterSubject)}`;
       } else if (currSlug) {
         pathname = `/textbooks/${currSlug}`;
       } else {
-        pathname = '/textbooks';
+        pathname = (!scopeAllBoards && effBoard === 'cambridge') ? '/textbooks/cambridge' : '/textbooks';
       }
     }
   } else if (filterCurriculum || filterSubject) {
@@ -468,7 +473,11 @@ export function getArchiveCounts(meta) {
   const totalBooks = meta?.totalBooks || 73;
   const ialBooks = meta?.ialBooks || 60;
   const igcseBooks = meta?.igcseBooks || 13;
-  const cambridgeBooks = meta?.cambridgeBooks || 0;
+  const edexcelBooks = meta?.boards?.edexcel?.totalBooks ?? (ialBooks + igcseBooks);
+  const cambridgeBooks = meta?.cambridgeBooks ?? meta?.boards?.cambridge?.totalBooks ?? 0;
+  const cieAlBooks = meta?.cieAlBooks ?? meta?.boards?.cambridge?.alBooks ?? 0;
+  const cieIgcseBooks = meta?.cieIgcseBooks ?? meta?.boards?.cambridge?.igcseBooks ?? 0;
+  const cieOlBooks = meta?.cieOlBooks ?? meta?.boards?.cambridge?.olBooks ?? 0;
   const dfCount = meta?.dfCount || 46;
   const audioCount = meta?.audioCount || 272;
   const edexcelUnique = meta?.boards?.edexcel?.uniqueFiles ?? uniqueFiles;
@@ -481,7 +490,11 @@ export function getArchiveCounts(meta) {
     totalBooks,
     ialBooks,
     igcseBooks,
+    edexcelBooks,
     cambridgeBooks,
+    cieAlBooks,
+    cieIgcseBooks,
+    cieOlBooks,
     dfCount,
     audioCount,
     edexcelUnique,
@@ -557,9 +570,17 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null,
   if (segments.length > 0 && segments[0].toLowerCase() === 'textbooks') {
     result.filterDocType = 'Book';
     result.forceShowTable = true;
-    if (segments.length === 1) return result;
+    if (segments.length === 1) {
+      result.scopeAllBoards = true;
+      return result;
+    }
     const tbCurr = segments[1].toLowerCase();
-    if (tbCurr === 'ial' || tbCurr === 'edexcel-ial') {
+    if (tbCurr === 'edexcel') {
+      result.activeBoard = 'edexcel';
+      if (segments.length === 2) return result;
+      result.notFound = true;
+      return result;
+    } else if (tbCurr === 'ial' || tbCurr === 'edexcel-ial') {
       result.activeBoard = 'edexcel';
       result.filterCurriculum = 'Edexcel IAL';
     } else if (tbCurr === 'igcse' || tbCurr === 'edexcel-igcse') {
@@ -728,6 +749,7 @@ export function parseRouteFromLocation(pathname = '/', search = '', meta = null,
 export function getSeoMetadata({
   currentTab = 'library',
   activeBoard = 'edexcel',
+  scopeAllBoards = false,
   filterCurriculum = '',
   filterSubject = '',
   filterUnit = '',
@@ -744,6 +766,11 @@ export function getSeoMetadata({
     totalBooks,
     ialBooks,
     igcseBooks,
+    edexcelBooks,
+    cambridgeBooks,
+    cieAlBooks,
+    cieIgcseBooks,
+    cieOlBooks,
     dfCount,
     audioCount,
     edexcelUnique,
@@ -775,6 +802,7 @@ export function getSeoMetadata({
   const canonicalPath = buildRoutePath({
     currentTab,
     activeBoard: effBoard,
+    scopeAllBoards,
     filterCurriculum,
     filterSubject,
     filterUnit,
@@ -889,6 +917,7 @@ export function getSeoMetadata({
   if (filterDocType === 'Book' && !filterUnit) {
     if (filterSubject) {
       const curr = inferCurriculumForSubject(filterSubject, filterCurriculum);
+      const isCieSubj = isCambridgeCurriculum(curr);
       const isIal = curr === 'Edexcel IAL';
       const isIalMath = isIal && filterSubject === 'Math';
       const hasAnswerBooks = isIal && ['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Physics'].includes(filterSubject);
@@ -906,8 +935,16 @@ export function getSeoMetadata({
               ]
             : [
                 `${curr} ${subjDisplay} Textbooks PDF | Conceptualist`,
-                `${curr} ${subjShort} Textbooks & Student Books PDF | Conceptualist`,
-                `${curr.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjDisplay} Textbooks PDF | Conceptualist`
+                `${currShort} ${subjDisplay} Textbooks PDF | Conceptualist`,
+                `${currShort} ${subjShort} Textbooks PDF | Conceptualist`,
+                `${currTiny} ${subjShort} Textbooks PDF | Conceptualist`,
+                `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjShort} Textbooks PDF | Conceptualist`,
+                cieCodeInSubj
+                  ? `CAIE ${subjShort} Textbooks PDF | Conceptualist`
+                  : `${subjShort} Textbooks PDF | Conceptualist`,
+                cieCodeInSubj
+                  ? `Cambridge ${cieCodeInSubj} Textbooks PDF | Conceptualist`
+                  : `${subjShort} Textbooks PDF`
               ],
         62
       );
@@ -916,50 +953,86 @@ export function getSeoMetadata({
           ? 'Read and download all 28 Edexcel IAL Mathematics Student Books & step-by-step Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3) free in our 2-Page WebPDF reader.'
           : hasAnswerBooks
             ? `Read and download ${curr} ${subjDisplay} Student Book 1 & 2 PDFs, worked answers, and lab books free online in our 2-Page WebPDF reader.`
-            : `Read and download ${curr} ${subjDisplay} student textbooks and revision guides free online in our 2-Page WebPDF reader.`,
-        `Study ${curr} ${subjDisplay} student books${isIalMath ? ' & Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : hasAnswerBooks ? ', Student Book 1 & 2 answers & guides' : ' & answers'} in WebPDF reader.`
+            : isCieSubj
+              ? `Read and download ${currShort} ${subjDisplay} coursebooks, workbooks, practical guides, and worked answers free online in our 2-Page WebPDF reader.`
+              : `Read and download ${curr} ${subjDisplay} student textbooks and revision guides free online in our 2-Page WebPDF reader.`,
+        fitDescription(`Study ${currShort} ${subjDisplay} coursebooks${isIalMath ? ' & Worked Solution Banks (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : hasAnswerBooks ? ', Student Book 1 & 2 answers & guides' : ', workbooks & revision guides'} in 2-Page WebPDF reader.`)
       ], 158);
       return {
         title,
         description,
         keywords: [
-          `${curr} ${subjDisplay} textbook pdf`,
-          `${curr} ${subjDisplay} student book 1 pdf`,
-          `${curr} ${subjDisplay} student book 2 answers pdf`,
-          isIalMath ? 'Edexcel IAL solution bank pdf' : `${curr} ${subjDisplay} solution manual`,
-          isIalMath ? 'Pure Maths P1 P2 P3 P4 M1 M2 S1 D1 FP1 Solution Bank' : `${curr} ${subjDisplay} past papers`
-        ].join(', '),
+          `${currShort} ${subjDisplay} textbook pdf`,
+          isCieSubj ? `${currShort} ${subjDisplay} coursebook pdf` : `${curr} ${subjDisplay} student book 1 pdf`,
+          isCieSubj ? `${cieCodeInSubj || subjShort} workbook pdf` : `${curr} ${subjDisplay} student book 2 answers pdf`,
+          isIalMath ? 'Edexcel IAL solution bank pdf' : `${currShort} ${subjDisplay} revision guide`,
+          isIalMath ? 'Pure Maths P1 P2 P3 P4 M1 M2 S1 D1 FP1 Solution Bank' : `${currShort} ${subjDisplay} past papers`
+        ].filter(Boolean).join(', '),
         canonicalUrl,
         robots,
-        h1: `${curr} ${subjDisplay} Textbooks${isIalMath ? ' & Worked Solution Banks' : hasAnswerBooks ? ', Student Books & Answers' : ' & Study Books'}`,
-        subtitle: `Archived ${curr} ${subjDisplay} student books${isIalMath ? ' and chapter-by-chapter P1-P4, M1-M3, S1-S3, D1 & FP1-FP3 Solution Banks' : hasAnswerBooks ? ', Student Book 1 & 2 answer PDFs, and lab books' : ''} with instant 2-Page book spread viewing.`
+        h1: `${currShort} ${subjDisplay} ${isCieSubj ? 'Coursebooks & Workbooks' : `Textbooks${isIalMath ? ' & Worked Solution Banks' : hasAnswerBooks ? ', Student Books & Answers' : ' & Study Books'}`}`,
+        subtitle: `Archived ${curr} ${subjDisplay} ${isCieSubj ? 'coursebooks, workbooks, practical guides, and revision books' : `student books${isIalMath ? ' and chapter-by-chapter P1-P4, M1-M3, S1-S3, D1 & FP1-FP3 Solution Banks' : hasAnswerBooks ? ', Student Book 1 & 2 answer PDFs, and lab books' : ''}`} with instant 2-Page book spread viewing.`
       };
     }
     if (filterCurriculum) {
       const isIal = filterCurriculum === 'Edexcel IAL';
       const isIgcseEdx = filterCurriculum === 'Edexcel IGCSE';
+      const currBookCount = isIal
+        ? ialBooks
+        : isIgcseEdx
+          ? igcseBooks
+          : filterCurriculum === 'Cambridge AS & A Level'
+            ? cieAlBooks
+            : filterCurriculum === 'Cambridge O Level'
+              ? cieOlBooks
+              : cieIgcseBooks;
       return {
-        title: `${currShort} Textbooks${isIal ? ' & Solution Banks' : isIgcseEdx ? ' (9-1) PDF' : ' PDF'} | Conceptualist`,
+        title: pickTitleVariant([
+          `${currShort} Textbooks${isIal ? ' & Solution Banks' : isIgcseEdx ? ' (9-1) PDF' : ' & Coursebooks PDF'} | Conceptualist`,
+          `${currShort} Textbooks PDF | Conceptualist`
+        ], 64),
         description: isIal
           ? `Browse ${ialBooks} Edexcel IAL student textbooks, answer books & Maths Solution Banks across 9 subjects in our 2-Page WebPDF reader.`
           : isIgcseEdx
             ? `Browse ${igcseBooks} Edexcel IGCSE (9-1) student textbooks across Sciences, Mathematics, Business, Commerce & IT free online.`
-            : `Browse ${filterCurriculum} student textbooks and revision guides in our 2-Page WebPDF reader.`,
-        keywords: `${filterCurriculum} textbooks pdf, ${isIal ? 'Edexcel IAL solution banks, IAL Maths solution bank, student book 1 2 answers pdf' : `${filterCurriculum} student books pdf`}`,
+            : fitDescription(`Browse ${currBookCount > 0 ? `${currBookCount} ` : ''}${filterCurriculum} coursebooks, workbooks, practical books & revision guides free online in 2-Page WebPDF reader.`),
+        keywords: `${filterCurriculum} textbooks pdf, ${isIal ? 'Edexcel IAL solution banks, IAL Maths solution bank, student book 1 2 answers pdf' : `${filterCurriculum} coursebooks pdf, ${currShort} workbooks pdf`}`,
         canonicalUrl,
         robots,
-        h1: `${filterCurriculum} Textbooks${isIal ? ' & Worked Solution Banks' : isIgcseEdx ? ' (9-1)' : ''}`,
-        subtitle: `Read ${isIal ? ialBooks : isIgcseEdx ? igcseBooks : (counts.cambridgeBooks || totalBooks)} ${filterCurriculum} student textbooks, lab guides, and worked answers online in 2-Page spread mode.`
+        h1: `${filterCurriculum} ${isCie ? 'Coursebooks & Textbooks' : `Textbooks${isIal ? ' & Worked Solution Banks' : isIgcseEdx ? ' (9-1)' : ''}`}`,
+        subtitle: `Read ${currBookCount || (isCie ? cambridgeBooks : edexcelBooks)} ${filterCurriculum} ${isCie ? 'coursebooks, workbooks, lab practical books, and revision guides' : 'student textbooks, lab guides, and worked answers'} online in 2-Page spread mode.`
+      };
+    }
+    if (scopeAllBoards) {
+      return {
+        title: 'Edexcel & Cambridge Textbooks & Solutions PDF | Conceptualist',
+        description: fitDescription(`Read ${totalBooks} Pearson Edexcel (IAL & IGCSE) and Cambridge International (A-Level, IGCSE & O Level) coursebooks, workbooks & Solution Banks in 2-Page WebPDF reader.`),
+        keywords: 'Edexcel IAL textbooks pdf, Cambridge IGCSE coursebooks pdf, Cambridge A Level textbooks pdf, O Level textbooks pdf, Edexcel solution bank',
+        canonicalUrl,
+        robots,
+        h1: 'International Exam Textbooks, Coursebooks & Solution Banks',
+        subtitle: `${totalBooks} archived resources (${edexcelBooks} Edexcel IAL & IGCSE student books and Solution Banks + ${cambridgeBooks} Cambridge International coursebooks, workbooks & guides) viewable in 2-Page book spread mode.`
+      };
+    }
+    if (isCie) {
+      return {
+        title: 'Cambridge IGCSE, O Level & A-Level Textbooks | Conceptualist',
+        description: fitDescription(`Read ${cambridgeBooks > 0 ? `${cambridgeBooks} ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE & O Level coursebooks, workbooks, practical books & revision guides in 2-Page WebPDF reader.`),
+        keywords: 'Cambridge A Level textbooks pdf, Cambridge IGCSE coursebook pdf, Cambridge O Level textbooks pdf, CAIE biology chemistry physics maths coursebook',
+        canonicalUrl,
+        robots,
+        h1: 'Cambridge International Coursebooks, Workbooks & Textbooks',
+        subtitle: `${cambridgeBooks} verified Cambridge International AS & A Level (${cieAlBooks}), IGCSE (${cieIgcseBooks}), and O Level (${cieOlBooks}) coursebooks, workbooks, lab books, and answer guides.`
       };
     }
     return {
       title: 'Edexcel IAL & IGCSE Textbooks & Solutions | Conceptualist',
-      description: fitDescription(`Read ${totalBooks} Edexcel IAL and IGCSE (9-1) student textbooks, answer PDFs, and Maths worked solution banks free online in 2-Page WebPDF reader.`),
+      description: fitDescription(`Read ${edexcelBooks} Edexcel IAL and IGCSE (9-1) student textbooks, answer PDFs, and Maths worked solution banks free online in 2-Page WebPDF reader.`),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
       robots,
       h1: 'Edexcel IAL & IGCSE Textbooks & Solution Banks',
-      subtitle: `${totalBooks} course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Commerce, Economics, Accounting, Psychology, and IT.`
+      subtitle: `${edexcelBooks} course textbooks, laboratory books, and worked solution manuals across Mathematics, Sciences, Business, Commerce, Economics, Accounting, Psychology, and IT.`
     };
   }
 
@@ -1100,12 +1173,12 @@ export function getSeoMetadata({
     ], 64);
 
     const resourceTail = isCie
-      ? 'past papers, mark schemes, inserts, grade thresholds & examiner reports'
+      ? (hasBooks ? 'past papers, mark schemes, inserts, grade thresholds & textbooks' : 'past papers, mark schemes, inserts, grade thresholds & examiner reports')
       : hasBooks
         ? 'past exam papers, mark schemes, examiner reports & textbooks'
         : 'past exam papers, mark schemes & examiner reports';
     const resourceTailShort = isCie
-      ? 'past papers, mark schemes & grade thresholds'
+      ? (hasBooks ? 'past papers, mark schemes, thresholds & textbooks' : 'past papers, mark schemes & grade thresholds')
       : hasBooks
         ? 'past papers, mark schemes & textbooks'
         : 'past papers, mark schemes & examiner reports';

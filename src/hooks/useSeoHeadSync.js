@@ -22,6 +22,7 @@ function getModalTitleSuffix(file, viewModeStr) {
 export function useSeoHeadSync({
   currentTab,
   activeBoard = 'edexcel',
+  scopeAllBoards = false,
   isNotFound,
   isWizardRouteActive,
   wizardSubject,
@@ -57,6 +58,7 @@ export function useSeoHeadSync({
       const nextUrl = buildRoutePath({
         currentTab,
         activeBoard,
+        scopeAllBoards,
         filterCurriculum: effectiveRouteCurriculum,
         filterSubject: effectiveRouteSubject,
         filterUnit: effectiveRouteUnit,
@@ -188,6 +190,7 @@ export function useSeoHeadSync({
         const jsonLdObj = buildJsonLd({
           currentTab,
           activeBoard,
+          scopeAllBoards,
           filterCurriculum: effectiveRouteCurriculum,
           filterSubject: effectiveRouteSubject,
           filterUnit: effectiveRouteUnit,
@@ -206,6 +209,7 @@ export function useSeoHeadSync({
   }, [
     currentTab,
     activeBoard,
+    scopeAllBoards,
     isNotFound,
     isWizardRouteActive,
     wizardSubject,

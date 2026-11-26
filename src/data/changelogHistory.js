@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.3.0',
+    date: '2026-11-26T07:30:00+06:00',
+    title: 'Cambridge International Textbook Collection (81 Coursebooks, Workbooks & Lab Books)',
+    summary: 'Added 81 verified, qpdf-linearized Cambridge International (CAIE) coursebooks, textbooks, workbooks, laboratory practical books, revision guides, and answer booklets across 32 syllabuses (154 total books across Edexcel & Cambridge), alongside dedicated /textbooks/cambridge and /textbooks/edexcel routes.',
+    changes: [
+      '81 Verified & Linearized Cambridge Textbooks: Curated, cover-verified, and qpdf-linearized 81 complete Cambridge International books across 32 syllabuses — 38 AS & A Level (Accounting 9706, Biology 9700, Business 9609, Chemistry 9701, Computer Science 9618, Economics 9708, Further Mathematics 9231, Geography 9696, Mathematics 9709, Physics 9702), 38 IGCSE (17 syllabuses), and 5 O Level (4037, 5090, 3247, 2058, 2059) — strictly filtering out publisher sample excerpts and domestic UK GCE/GCSE books.',
+      'Cross-Board & Per-Board Textbook Routing: Added canonical /textbooks (all 154 international books), /textbooks/edexcel (73 books), /textbooks/cambridge (81 books), /textbooks/cambridge/{a-level,igcse,o-level}, and 32 per-syllabus Cambridge textbook routes backed by a unified cross-board dist/shards/textbooks.json shard and Schema.org/Book structured data.',
+      'Catalog & UI Polish: Hardened generate-index.js book docType classification so textbook titles containing "Syllabus", "Questions", or "Insert" always index cleanly as Book/SOL, enabled the Cambridge FilterDrawer Textbooks pill, and added Cambridge WelcomePage and ArchiveContextStrip textbook navigation.'
+    ]
+  },
+  {
     version: 'v8.2.0',
     date: '2026-11-24T22:30:00+06:00',
     title: 'Compact v2 Catalog Engine, Instant Shard Navigation & Search/SEO Hardening',

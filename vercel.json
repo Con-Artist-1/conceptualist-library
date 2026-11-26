@@ -171,7 +171,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-eb4K/mizn4bvLzOCekBIb/D5EnFD2Qy4V8CGhYNmzSo=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-hYbh6hByibR3Q2Ftmdfuw8vFkX9eGY4SKcMYHa39PGg=' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/ blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net/npm/ blob:; worker-src 'self' blob:; media-src 'self' https://huggingface.co https://*.hf.co blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     }
@@ -3518,13 +3518,28 @@
       "permanent": true
     },
     {
-      "source": "/textbooks/cambridge",
-      "destination": "/textbooks",
+      "source": "/textbooks/caie",
+      "destination": "/textbooks/cambridge",
       "permanent": true
     },
     {
-      "source": "/textbooks/cambridge/:path*",
-      "destination": "/textbooks",
+      "source": "/textbooks/cambridge/al",
+      "destination": "/textbooks/cambridge/a-level",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/cambridge/as-a-level",
+      "destination": "/textbooks/cambridge/a-level",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/cambridge/ol",
+      "destination": "/textbooks/cambridge/o-level",
+      "permanent": true
+    },
+    {
+      "source": "/textbooks/cie",
+      "destination": "/textbooks/cambridge",
       "permanent": true
     },
     {

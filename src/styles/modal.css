@@ -2494,7 +2494,7 @@
   position: relative;
 }
 
-.modal-single-pane > .custom-pdf-pane {
+.modal-single-pane>.custom-pdf-pane {
   flex: 1;
   min-height: 0;
   height: auto;
@@ -3240,6 +3240,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1520px) {
+
   .modal-view-tabs .modal-btn .btn-desktop-text,
   .modal-view-extras .modal-btn .btn-desktop-text {
     display: none;
