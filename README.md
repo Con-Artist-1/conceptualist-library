@@ -20,7 +20,7 @@ An independent, strictly international student study archive and high-speed web 
 
 The frontend eliminates startup waterfalls and keeps main-thread blocking minimal:
 
-1. **Zero-Waterfall `<head>` Early Fetch:** Strict SHA-256 CSP-hashed inline boot script starts `/meta.json?v=...` and the active route shard (or active board index) in parallel with CSS/JS downloads, with build version (`v8.3.0`) automatically synced via Vite `transformIndexHtml`.
+1. **Zero-Waterfall `<head>` Early Fetch:** Strict SHA-256 CSP-hashed inline boot script starts `/meta.json?v=...` and the active route shard (or active board index) in parallel with CSS/JS downloads, with build version (`v8.3.1`) automatically synced via Vite `transformIndexHtml`.
 2. **Route-Sharded Loading (`dist/shards/*.json`):** Deep subject, textbook, audio, or data-file pages across all 169 subjects hydrate immediately from compact route shards (`176` total shards).
 3. **Off-Thread Partitioned Catalog Upgrade (`public/index-edexcel.json` & `public/index-cambridge.json`):** `src/workers/catalog.worker.js` fetches, caches (`cs_index_cache`), parses, and indexes only the active board's tuple-encoded catalog off the main thread (with Hugging Face `live_index.json` & `live_index_cambridge.json` fallbacks).
 4. **Zero-Waste Pre-Warming & Virtualization:** `src/lib/pdfPrewarm.js` preloads lazy reader JS chunks once on first hover (zero Hugging Face traffic) and starts the clicked PDF's request only on `pointerdown`, while `VirtualPdfPage` renders visible canvases on demand and releases offscreen GPU textures.

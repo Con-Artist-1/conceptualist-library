@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import './styles/modal.css';
-import { preloadPdfJsModule, consumePrewarmedPdfBytes } from './lib/pdfPrewarm.js';
+import {
+  preloadPdfJsModule,
+  acquirePdfWorker,
+  releasePdfWorker,
+  consumePrewarmedPdfBytes
+} from './lib/pdfPrewarm.js';
 import {
   LARGE_PDF_STREAM_THRESHOLD,
+  shouldUseRangeStreaming,
   STREAM_CHUNK_SIZE,
   createLargePdfRangeTransport
 } from './lib/pdfRangeTransport.js';
@@ -50,6 +56,8 @@ export const PdfViewerPane = ({
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [streamStats, setStreamStats] = useState(null);
   const [firstPagePainted, setFirstPagePainted] = useState(false);
+  const [neighborsArmed, setNeighborsArmed] = useState(false);
+  const [paintTick, setPaintTick] = useState(0);
   const [loadError, setLoadError] = useState(null);
   const [containerWidth, setContainerWidth] = useState(() => (
     typeof window !== 'undefined' ? (isMobile ? Math.min(window.innerWidth, 390) : 640) : 640
@@ -95,6 +103,7 @@ export const PdfViewerPane = ({
   const dragBadgeRef = useRef(null);
   const activeDragCleanupRef = useRef(null);
   const observerRef = useRef(null);
+  const paintedPagesRef = useRef(new Set());
 
   const currentPageRef = useRef(currentPage);
   const initialPageRef = useRef(initialPage);
@@ -397,20 +406,23 @@ export const PdfViewerPane = ({
     return () => el.removeEventListener('wheel', handleWheel);
   }, [recordZoomAnchor, getCurrentBaseScale]);
 
-  // Fetch and parse document with PDF.js (byte-range streaming for >= 5 MB PDFs; in-memory data or single-pass for smaller papers)
+  // Fetch and parse document with PDF.js (parallel byte-range streaming for >= 2.5 MB PDFs; in-memory data or single-pass for smaller papers)
   const loadDocument = useCallback(() => {
     if (!url && !pdfData) return;
     let active = true;
     let loadingTask = null;
     let loadedDoc = null;
     let activeTransport = null;
+    let pooledWorker = null;
     const bootCtrl = new AbortController();
-    const shouldStreamLargePdf = !pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
+    const shouldStreamLargePdf = !pdfData && shouldUseRangeStreaming(fileSize, docType === 'Book');
 
+    paintedPagesRef.current = new Set();
     setLoading(true);
     setDownloadProgress(null);
     setStreamStats(shouldStreamLargePdf ? { loadedBytes: 0, totalBytes: Number(fileSize) } : null);
     setFirstPagePainted(false);
+    setNeighborsArmed(false);
     setRotation(0);
     setLoadError(null);
     if (scrollAreaRef.current) {
@@ -424,45 +436,46 @@ export const PdfViewerPane = ({
       return null;
     });
 
-    preloadPdfJsModule().then(async (pdfjsLib) => {
-      if (!active) return;
+    // Kick off PDF.js module/worker load AND Hugging Face Head+Tail range bootstrap in parallel (zero waterfall!)
+    const pdfjsPromise = preloadPdfJsModule();
+    const rangeSetupPromise = shouldStreamLargePdf
+      ? createLargePdfRangeTransport(
+          pdfjsPromise,
+          url,
+          Number(fileSize) || 0,
+          bootCtrl.signal,
+          (loadedBytes, totalBytes) => {
+            if (!active) return;
+            setStreamStats({ loadedBytes, totalBytes });
+          },
+          (rangeErr) => {
+            if (!active) return;
+            console.error('[WebPDF] Streaming failure for URL', url, rangeErr);
+            try { activeTransport?.abort(); } catch { /* ignore abort error */ }
+            try { loadingTask?.destroy(); } catch { /* ignore teardown error */ }
+            setLoadError(rangeErr?.message || 'Failed to stream PDF preview');
+            setLoading(false);
+          }
+        ).catch((bootErr) => {
+          if (!active || bootErr?.name === 'AbortError') return null;
+          console.warn('[WebPDF] Range bootstrap fell back to standard load:', bootErr);
+          return null;
+        })
+      : Promise.resolve(null);
+
+    Promise.all([pdfjsPromise, rangeSetupPromise]).then(async ([pdfjsLib, streamSetup]) => {
+      if (!active) {
+        try { streamSetup?.transport?.abort(); } catch { /* ignore abort error */ }
+        return;
+      }
 
       if (shouldStreamLargePdf) {
-        try {
-          const streamSetup = await createLargePdfRangeTransport(
-            pdfjsLib,
-            url,
-            bootCtrl.signal,
-            (loadedBytes, totalBytes) => {
-              if (!active) return;
-              setStreamStats({ loadedBytes, totalBytes });
-            },
-            (rangeErr) => {
-              if (!active) return;
-              console.error('[WebPDF] Streaming failure for URL', url, rangeErr);
-              try { activeTransport?.abort(); } catch { /* ignore abort error */ }
-              try { loadingTask?.destroy(); } catch { /* ignore teardown error */ }
-              setLoadError(rangeErr?.message || 'Failed to stream PDF preview');
-              setLoading(false);
-            }
-          );
-          if (!active) {
-            try { streamSetup?.transport?.abort(); } catch { /* ignore abort error */ }
-            return;
-          }
-          if (streamSetup?.transport) {
-            activeTransport = streamSetup.transport;
-          } else {
-            setStreamStats(null);
-          }
-        } catch (bootErr) {
-          if (!active || bootErr?.name === 'AbortError') return;
-          console.warn('[WebPDF] Range bootstrap fell back to standard load:', bootErr);
+        if (streamSetup?.transport) {
+          activeTransport = streamSetup.transport;
+        } else {
           setStreamStats(null);
         }
       }
-
-      if (!active) return;
 
       let prewarmedBytes = null;
       if (!activeTransport && !pdfData && url) {
@@ -477,6 +490,8 @@ export const PdfViewerPane = ({
         }
       }
 
+      pooledWorker = acquirePdfWorker(pdfjsLib);
+      const workerOpt = pooledWorker ? { worker: pooledWorker } : {};
       const pdfVerbosity = pdfjsLib.VerbosityLevel?.ERRORS ?? 0;
       const inMemoryData = pdfData ? pdfData.slice() : prewarmedBytes;
       const localCmapUrl =
@@ -484,6 +499,7 @@ export const PdfViewerPane = ({
       loadingTask = pdfjsLib.getDocument(
         activeTransport
           ? {
+            ...workerOpt,
             range: activeTransport,
             length: activeTransport.length,
             rangeChunkSize: activeTransport.chunkSize || STREAM_CHUNK_SIZE,
@@ -496,6 +512,7 @@ export const PdfViewerPane = ({
           }
           : inMemoryData
             ? {
+              ...workerOpt,
               data: inMemoryData,
               cMapUrl: localCmapUrl,
               cMapPacked: true,
@@ -503,6 +520,7 @@ export const PdfViewerPane = ({
               verbosity: pdfVerbosity
             }
             : {
+              ...workerOpt,
               url,
               cMapUrl: localCmapUrl,
               cMapPacked: true,
@@ -599,8 +617,12 @@ export const PdfViewerPane = ({
       if (loadedDoc) {
         try { loadedDoc.destroy(); } catch { /* ignore teardown error */ }
       }
+      if (pooledWorker) {
+        releasePdfWorker(pooledWorker);
+        pooledWorker = null;
+      }
     };
-  }, [url, pdfData, fileSize]);
+  }, [url, pdfData, fileSize, docType]);
 
   const [retrySeq, setRetrySeq] = useState(0);
 
@@ -610,6 +632,8 @@ export const PdfViewerPane = ({
       if (cleanup) cleanup();
     };
   }, [loadDocument, retrySeq]);
+
+  const isLargePdfDoc = !pdfData && (shouldUseRangeStreaming(fileSize, docType === 'Book') || Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD);
 
   // Setup IntersectionObserver for smooth progressive page rendering with bounded canvas memory
   useEffect(() => {
@@ -625,8 +649,17 @@ export const PdfViewerPane = ({
           const pageNum = parseInt(entry.target.getAttribute('data-page-number'), 10);
           if (entry.isIntersecting) {
             next.add(pageNum);
-            // Preload neighbors for instant smooth scrolling
-            if (isTwoPageActive) {
+            if (isLargePdfDoc) {
+              // On streamed large PDFs, keep visiblePages strictly limited to intersecting viewport pages
+              // (plus spread partner) so jumping/scrolling never triggers an 8-page range request stampede!
+              if (isTwoPageActive) {
+                const start = getSpreadStartPage(pageNum, coverSpreadOffsetRef.current);
+                next.add(start);
+                if (!(coverSpreadOffsetRef.current && start === 1) && start + 1 <= numPages) {
+                  next.add(start + 1);
+                }
+              }
+            } else if (isTwoPageActive) {
               for (let d = -2; d <= 3; d++) {
                 const candidate = pageNum + d;
                 if (candidate >= 1 && candidate <= numPages) next.add(candidate);
@@ -643,7 +676,7 @@ export const PdfViewerPane = ({
       });
     }, {
       root,
-      rootMargin: '600px 0px 600px 0px',
+      rootMargin: isLargePdfDoc ? '120px 0px 180px 0px' : '600px 0px 600px 0px',
       threshold: [0.01, 0.4]
     });
 
@@ -653,7 +686,7 @@ export const PdfViewerPane = ({
     return () => {
       if (observerRef.current) observerRef.current.disconnect();
     };
-  }, [pdfDoc, numPages, isTwoPageActive]);
+  }, [pdfDoc, numPages, isTwoPageActive, isLargePdfDoc]);
 
   // Precise focal-line scroll listener for current page indicator
   useEffect(() => {
@@ -736,11 +769,15 @@ export const PdfViewerPane = ({
     setCurrentPage(clamped);
     setInputPage(String(clamped));
     if (isFarJump) {
+      setNeighborsArmed(false);
       setVisiblePages(() => {
         const next = new Set([clamped]);
-        if (clamped + 1 <= (numPages || clamped)) next.add(clamped + 1);
-        if (isTwoPageActiveRef.current && clamped + 2 <= (numPages || clamped)) next.add(clamped + 2);
-        if (clamped - 1 >= 1) next.add(clamped - 1);
+        if (isTwoPageActiveRef.current && !(coverSpreadOffsetRef.current && clamped === 1) && clamped + 1 <= (numPages || clamped)) {
+          next.add(clamped + 1);
+        } else if (!isLargePdfDoc && clamped + 1 <= (numPages || clamped)) {
+          next.add(clamped + 1);
+        }
+        if (!isLargePdfDoc && clamped - 1 >= 1) next.add(clamped - 1);
         return next;
       });
     }
@@ -766,7 +803,7 @@ export const PdfViewerPane = ({
         isProgrammaticScrollRef.current = false;
       }, isFarJump ? 150 : 600);
     }
-  }, [numPages]);
+  }, [numPages, isLargePdfDoc]);
 
   const handleStepPage = useCallback((direction) => {
     if (!isTwoPageActiveRef.current) {
@@ -862,9 +899,40 @@ export const PdfViewerPane = ({
     return () => clearTimeout(t);
   }, [loading, firstPagePainted, loadError]);
 
-  const handlePageRendered = useCallback(() => {
+  const handlePageRendered = useCallback((renderedPageNum) => {
+    if (typeof renderedPageNum === 'number') {
+      paintedPagesRef.current.add(renderedPageNum);
+      setPaintTick((t) => t + 1);
+    }
     setFirstPagePainted(true);
   }, []);
+
+  // Arm background +1/+2 forward neighbor warming ONLY after the active viewport page/spread finishes painting
+  useEffect(() => {
+    if (!isLargePdfDoc) {
+      setNeighborsArmed(firstPagePainted);
+      return undefined;
+    }
+    if (!firstPagePainted || loading || numPages <= 0) {
+      setNeighborsArmed(false);
+      return undefined;
+    }
+    const spreadStart = isTwoPageActive ? getSpreadStartPage(currentPage, coverSpreadOffset) : currentPage;
+    const partner =
+      isTwoPageActive && !(coverSpreadOffset && spreadStart === 1) && spreadStart + 1 <= numPages
+        ? spreadStart + 1
+        : null;
+    const activeReady =
+      paintedPagesRef.current.has(spreadStart) &&
+      (partner === null || paintedPagesRef.current.has(partner));
+
+    if (!activeReady) {
+      setNeighborsArmed(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setNeighborsArmed(true), 240);
+    return () => clearTimeout(timer);
+  }, [isLargePdfDoc, firstPagePainted, loading, numPages, isTwoPageActive, currentPage, coverSpreadOffset, paintTick]);
 
   const handleRotateClockwise = useCallback(() => {
     setRotation((prev) => (prev + 90) % 360);
@@ -975,7 +1043,6 @@ export const PdfViewerPane = ({
   const isAtLastPage = isTwoPageActive
     ? (coverSpreadOffset && currentSpreadStart === 1 ? numPages <= 1 : currentSpreadStart + 1 >= numPages)
     : currentPage >= numPages;
-  const isLargePdfDoc = !pdfData && Number(fileSize) >= LARGE_PDF_STREAM_THRESHOLD;
 
   const markPaneActive = () => {
     activePaneId = paneIdRef.current;
@@ -1240,7 +1307,11 @@ export const PdfViewerPane = ({
                         visiblePages.has(leftPage) &&
                         (firstPagePainted || leftPage === currentSpreadStart)
                       }
-                      isNear={firstPagePainted && Math.abs(leftPage - currentSpreadStart) <= 3}
+                      isNear={
+                        isLargePdfDoc
+                          ? (neighborsArmed && leftPage > currentSpreadStart && leftPage - currentSpreadStart <= 2)
+                          : (firstPagePainted && Math.abs(leftPage - currentSpreadStart) <= 3)
+                      }
                       isMobile={isMobile}
                       isLargePdf={isLargePdfDoc}
                       defaultAspectRatio={defaultAspectRatio}
@@ -1261,9 +1332,15 @@ export const PdfViewerPane = ({
                         fluidWidthFraction={spreadLayout.rightWidthFraction}
                         isVisible={
                           visiblePages.has(rightPage) &&
-                          (firstPagePainted || getSpreadStartPage(rightPage, coverSpreadOffset) === currentSpreadStart)
+                          (!isLargePdfDoc
+                            ? (firstPagePainted || getSpreadStartPage(rightPage, coverSpreadOffset) === currentSpreadStart)
+                            : firstPagePainted)
                         }
-                        isNear={firstPagePainted && Math.abs(rightPage - currentSpreadStart) <= 4}
+                        isNear={
+                          isLargePdfDoc
+                            ? (neighborsArmed && rightPage > currentSpreadStart && rightPage - currentSpreadStart <= 3)
+                            : (firstPagePainted && Math.abs(rightPage - currentSpreadStart) <= 4)
+                        }
                         isMobile={isMobile}
                         isLargePdf={isLargePdfDoc}
                         defaultAspectRatio={defaultAspectRatio}
@@ -1312,7 +1389,11 @@ export const PdfViewerPane = ({
                 rotation={rotation}
                 containerWidth={containerWidth}
                 isVisible={visiblePages.has(pageNum) && (firstPagePainted || pageNum === currentPage)}
-                isNear={firstPagePainted && Math.abs(pageNum - currentPage) <= 2}
+                isNear={
+                  isLargePdfDoc
+                    ? (neighborsArmed && pageNum === currentPage + 1)
+                    : (firstPagePainted && Math.abs(pageNum - currentPage) <= 2)
+                }
                 isMobile={isMobile}
                 isLargePdf={isLargePdfDoc}
                 defaultAspectRatio={defaultAspectRatio}

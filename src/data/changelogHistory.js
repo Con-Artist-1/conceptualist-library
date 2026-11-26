@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.3.1',
+    date: '2026-11-26T21:20:00+06:00',
+    title: 'Full-Archive PDF Linearization & High-Speed WebPDF Streaming Overhaul',
+    summary: 'Linearized 100% of all books and >= 5 MB past papers across both Edexcel and Cambridge (430 additional PDFs, saving 481.6 MB) and overhauled WebPDF byte-range streaming with parallel Head+EOF bootstrap, pooled PDFWorkers, LIFO jump prioritization, and visible-spread-first scheduling.',
+    changes: [
+      '100% Archive-Wide Book & Large-PDF Linearization: Linearized and object-stream packed all 430 remaining non-linearized PDFs across IAL Books and >= 5 MB Edexcel/Cambridge Past Papers (shrinking 3,177.7 MB to 2,696.1 MB — 481.6 MB saved with 0 page-count drift), bringing 100% of all 140 textbook PDFs and 100% of all >= 5 MB exam papers/inserts to verified /Linearized + /ObjStm status.',
+      'Parallel Head+EOF Range Bootstrap & Persistent Worker Pool: Pre-spawned a reusable 2-slot PDFWorker pool (eliminating the 1.34 MB worker startup delay), cached resolved Hugging Face CDN redirect URLs, and paired 512 KB–1 MB head bootstraps with parallel EOF chunk prefetches and 2-chunk ReadableStream read-ahead.',
+      'LIFO Jump Prioritization & Anti-Stampede Virtualization: Replaced the 8-page neighbor prefetch storm with visible-spread-first rendering, 240ms post-paint forward warmup, bounded 96-chunk LRU RAM caching, and a LIFO concurrency-4 range queue tailored to prevent Hugging Face XetHub TTFB queueing on distant page jumps.'
+    ]
+  },
+  {
     version: 'v8.3.0',
     date: '2026-11-26T07:30:00+06:00',
     title: 'Cambridge International Textbook Collection (81 Coursebooks, Workbooks & Lab Books)',

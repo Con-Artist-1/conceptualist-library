@@ -168,12 +168,11 @@ export const VirtualPdfPage = React.memo(({
         setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
       }
 
-      // High-DPI scaling capped adaptively on zoomed mobile to preserve GPU memory
-      const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : 2.5;
+      // High-DPI scaling capped adaptively on zoomed mobile & large scanned textbooks to preserve GPU & CPU headroom
+      const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : (isLargePdf ? 2.0 : 2.5);
       const fullDpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-      const useTwoPass = isLargePdf || fullDpr > 1.05;
-      const fastDpr = fullDpr > 1.05 ? 1 : 0.72;
-      const firstPassDpr = useTwoPass ? fastDpr : fullDpr;
+      const useTwoPass = fullDpr > 1.15;
+      const firstPassDpr = useTwoPass ? 1.0 : fullDpr;
 
       drawPass(page, unscaledViewport, totalRotation, firstPassDpr, true).then((painted) => {
         if (!painted || !active || !useTwoPass || Math.abs(fullDpr - firstPassDpr) <= 0.05) return;
@@ -184,9 +183,9 @@ export const VirtualPdfPage = React.memo(({
         };
         if (typeof window.requestIdleCallback === 'function') {
           usedIdleCallback = true;
-          idleHandle = window.requestIdleCallback(startHiRes, { timeout: 600 });
+          idleHandle = window.requestIdleCallback(startHiRes, { timeout: isLargePdf ? 900 : 600 });
         } else {
-          idleHandle = setTimeout(startHiRes, 140);
+          idleHandle = setTimeout(startHiRes, isLargePdf ? 320 : 140);
         }
       });
     }).catch((err) => {

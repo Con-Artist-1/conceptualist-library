@@ -70,12 +70,12 @@ const SEARCH_DEBOUNCE_MS = 80;
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
-  totalFiles: 19912,
-  uniqueFiles: 16051,
-  totalBooks: 73,
+  totalFiles: 78820,
+  uniqueFiles: 74958,
+  totalBooks: 154,
   ialBooks: 60,
   igcseBooks: 13,
-  cambridgeBooks: 0,
+  cambridgeBooks: 81,
   dfCount: 46,
   audioCount: 272,
   subjects: DEFAULT_ALL_SUBJECTS,
