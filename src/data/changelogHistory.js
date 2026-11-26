@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.4.1',
+    date: '2026-11-27T04:30:00+06:00',
+    title: 'Second-Pass SEO Polish, Subject-Preserving Cambridge Titles & Hydrated WRS Parity',
+    summary: 'Restored subject names on 62 Cambridge unit titles, aligned hydrated React FAQPage and contextual links with static prerendered HTML, deduplicated sitting rows, and collapsed multi-hop legacy query redirects.',
+    changes: [
+      'Subject-Preserving Cambridge Titles & Concise H1s: Added compact syllabus short forms so all 62 previously code-only Cambridge unit titles keep their subject name within 56 characters, and tightened long unit H1 headings.',
+      'Hydrated WRS Parity & Semantic Prerender Cleanup: Rendered visible FAQs and hub links on /papers and /cambridge/papers in ArchiveContextStrip, mirrored <= 3-unit links and textbook hub/unit cross-links in React, moved prerendered sitting/link sections outside <nav>, and deduplicated 2,313 repeated sitting list items across 124 pages.',
+      'Single-Pass Legacy Redirects & Copy Hygiene: Generated api/_redirects.js for direct alias resolution inside api/redirect.js, updated llms.txt hub coverage and pluralization, and removed AI copy tells across Welcome, About, and metadata.'
+    ]
+  },
+  {
     version: 'v8.4.0',
     date: '2026-11-26T23:35:00+06:00',
     title: 'SEO Roast Remediation, Edge 308 Query Consolidation & SERP Title Overhaul',

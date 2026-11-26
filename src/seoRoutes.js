@@ -149,7 +149,7 @@ export function buildJsonLd({
       '@type': 'WebSite',
       '@id': `${SITE_URL}/#website`,
       url: `${SITE_URL}/`,
-      name: 'Conceptualist Systems — International Exam Past Papers & Textbooks Library',
+      name: 'Conceptualist Systems: International Exam Past Papers & Textbooks Library',
       alternateName: ['Conceptualist Systems', 'Conceptualist Exam Archive'],
       description: `Independent international exam study archive indexing ${uniqueFiles.toLocaleString()}+ unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) past papers, mark schemes, examiner reports, grade thresholds, and textbooks (${totalFiles.toLocaleString()} archived files).`,
       potentialAction: {
@@ -194,7 +194,7 @@ export function buildJsonLd({
         itemListElement: unitKeys.map((u, idx) => ({
           '@type': 'ListItem',
           position: idx + 1,
-          name: `${curr} ${formatSubjectName(filterSubject)} — ${u}`,
+          name: `${curr} ${formatSubjectName(filterSubject)}: ${u}`,
           url: `${SITE_URL}/${currSlug}/${subjSlug}/${getUnitSlug(u, { isCambridge: isCie })}`
         }))
       });

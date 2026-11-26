@@ -272,14 +272,14 @@ const WelcomePage = ({
               <>
                 <h1>Cambridge International Past Papers &amp; Textbooks</h1>
                 <p>
-                  Independent Cambridge International (CAIE) study archive covering AS &amp; A Level, IGCSE (A*–G &amp; 9–1), and O Level — filter by variant, inspect Grade Thresholds, browse coursebooks, and read paired papers in Split View.
+                  Independent Cambridge International (CAIE) study archive covering AS &amp; A Level, IGCSE (A*–G &amp; 9–1), and O Level. Filter by variant, inspect Grade Thresholds, browse coursebooks, and read paired papers in Split View.
                 </p>
               </>
             ) : (
               <>
                 <h1>Edexcel IAL &amp; IGCSE Past Exam Papers &amp; Textbooks</h1>
                 <p>
-                  Independent Edexcel IAL &amp; IGCSE study archive — read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
+                  Independent Edexcel IAL &amp; IGCSE study archive. Read paired papers in Split View, browse worked solution textbooks, or stream listening exams with live subtitles in-browser.
                 </p>
               </>
             )}
@@ -735,7 +735,7 @@ const WelcomePage = ({
                           e.stopPropagation();
                           onOpenPaper(item, 'split');
                         }}
-                        aria-label={`Split View — ${title}`}
+                        aria-label={`Split View: ${title}`}
                         title="Open side by side in Split View"
                       >
                         <span className="btn-desktop-text">Split View</span>

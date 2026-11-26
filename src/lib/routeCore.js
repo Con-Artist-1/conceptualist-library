@@ -719,7 +719,7 @@ export function buildRouteFaqEntries({
       });
       faqs.push({
         q: `How can I study Edexcel IGCSE ${subjDisplay} papers with Mark Schemes?`,
-        a: `Every sitting pairs the Question Paper (QP), Mark Scheme (MS), and Examiner Report (ER) on one row—click Split View to view the paper and mark scheme side-by-side${hasBooks ? `, or switch to ${subjDisplay} Student Textbooks` : ''}.`
+        a: `Every sitting pairs the Question Paper (QP), Mark Scheme (MS), and Examiner Report (ER) on one row. Click Split View to view the paper and mark scheme side-by-side${hasBooks ? `, or switch to ${subjDisplay} Student Textbooks` : ''}.`
       });
     } else {
       faqs.push({
@@ -1200,8 +1200,19 @@ export function getSeoMetadata({
     'Literature in English': 'English Lit',
     'English Literature': 'English Lit',
     'English Language': 'English Lang',
-    'Co-ordinated Sciences (Double Award)': 'Co-ord Science',
-    'Combined Science': 'Combined Sci',
+    'English General Paper': 'General Paper',
+    'First Language Arabic': '1st Lang Arabic',
+    'First Language Chinese': '1st Lang Chinese',
+    'First Language French': '1st Lang French',
+    'First Language Malay': '1st Lang Malay',
+    'First Language Spanish': '1st Lang Spanish',
+    'Foreign Language Arabic': 'Arabic',
+    'First Language Urdu': '1st Lang Urdu',
+    'Second Language Urdu': '2nd Lang Urdu',
+    'Islamic Studies': 'Islamic St',
+    'Media Studies': 'Media',
+    'Co-ordinated Sciences (Double Award)': 'Co-ord Sci',
+    'Combined Science': 'Comb Sci',
     'Sciences (Double Award)': 'Double Science',
     'Sciences (Single Award)': 'Single Science',
     'Environmental Management': 'Env Management',
@@ -1214,7 +1225,7 @@ export function getSeoMetadata({
     'Religious Studies': 'RS',
     'Bangladesh Studies': 'Bangladesh St',
     'Pakistan Studies': 'Pakistan St',
-    'Travel & Tourism': 'Travel & Tourism',
+    'Travel & Tourism': 'Travel',
     'Greek (First Language)': 'Greek 1st Lang'
   };
   const mappedShortBase = SUBJECT_SHORT_MAP[baseSubjNoCode] || baseSubjNoCode.replace(/\s*\([^)]*\)/g, '').trim();
@@ -1394,6 +1405,13 @@ export function getSeoMetadata({
       : isCie
         ? (/Pre-2020/i.test(unitClean) && unitCode ? `Pre-2020 ${unitCode}` : compactClean)
         : (unitCode || unitShort);
+    const veryShortUnit = String(ultraShortUnit || '')
+      .replace(/\(Extended\)/gi, '(Ext)')
+      .replace(/^Further\s+(Mechanics|Prob & Stats|Pure)/i, '$1')
+      .replace(/^Legacy\s+Mechanics\s+(\d+)/i, 'Legacy M$1')
+      .replace(/^Legacy\s+Pure\s+(\d+)/i, 'Legacy P$1')
+      .replace(/^Legacy\s+Paper\s+(\d+)/i, 'Legacy P$1')
+      .trim();
 
     const currSlug = filterCurriculum || 'Edexcel IAL';
     const unitObj = meta?.wizard?.[currSlug]?.[filterSubject]?.units?.[filterUnit];
@@ -1433,9 +1451,18 @@ export function getSeoMetadata({
             `${currShort} ${subjShort} ${unitShort}${igcseTitleCode} Past Papers`,
             `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers & MS`,
             `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers`,
+            `${currTiny} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers & MS`,
             `${currTiny} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers`,
             `${currTiny} ${subjShort} ${ultraShortUnit} Past Papers`,
-            cieCode ? `CAIE ${cieCode} ${ultraShortUnit} Past Papers` : `${currTiny} ${subjShort} ${unitCode || ultraShortUnit} Past Papers`
+            `${currTiny} ${subjShort} ${veryShortUnit} Past Papers & MS`,
+            `${currTiny} ${subjShort} ${veryShortUnit} Past Papers`,
+            ...(isCie ? [
+              `CAIE ${subjShort} ${ultraShortUnit} Past Papers & MS`,
+              `CAIE ${subjShort} ${ultraShortUnit} Past Papers`,
+              `CAIE ${subjShort} ${veryShortUnit} Past Papers & MS`,
+              `CAIE ${subjShort} ${veryShortUnit} Past Papers`
+            ] : []),
+            `${currTiny} ${subjShort} ${unitCode || veryShortUnit} Papers`
           ],
       56
     );
@@ -1462,6 +1489,14 @@ export function getSeoMetadata({
       isCie ? 'Cambridge CAIE split view past papers' : 'Edexcel split view past papers'
     ].filter(Boolean).join(', ');
 
+    const h1Sep = unitWithCode.includes(':') ? ' - ' : ': ';
+    const unitH1 = pickTitleVariant([
+      `${currShort} ${subjDisplay}${h1Sep}${unitWithCode} Past Papers (${yrSpan})`,
+      `${currShort} ${subjDisplay}${h1Sep}${unitWithCode} Past Papers`,
+      `${currShort} ${subjShort}${h1Sep}${unitWithCode} Past Papers`,
+      `${currShort} ${subjShort}${h1Sep}${unitShort} Past Papers`
+    ], 88);
+
     return {
       title,
       description,
@@ -1469,7 +1504,7 @@ export function getSeoMetadata({
       canonicalUrl,
       consolidatingCanonical: false,
       robots,
-      h1: `${currShort} ${subjDisplay} — ${unitWithCode} Past Papers (${yrSpan})`,
+      h1: unitH1,
       subtitle: `${docCount} verified Question Papers, ${extras} covering ${yrSpan}. Click any sitting to study side-by-side in Split View.`
     };
   }
@@ -1492,7 +1527,7 @@ export function getSeoMetadata({
       : curr === 'Cambridge AS & A Level' ? meta?.cieAlSubjectCoverage?.[filterSubject]
       : curr === 'Cambridge O Level' ? meta?.cieOlSubjectCoverage?.[filterSubject]
       : meta?.cieIgcseSubjectCoverage?.[filterSubject]
-    ) || (isCie ? '2018 – 2025' : '2014 – June 2026');
+    ) || (isCie ? '2018–2025' : '2014–2026');
     const hasBooks = subjectHasBooks(curr, filterSubject);
 
     const fullCodeStr = curr === 'Edexcel IGCSE' && igcseCode
@@ -1640,7 +1675,7 @@ export function getSeoMetadata({
       canonicalUrl,
       robots,
       h1: 'Edexcel International A-Level (IAL) Past Papers & Textbooks',
-      subtitle: `Complete archive across ${ialSubjCount} IAL subjects (${meta?.boards?.edexcel?.coverage || meta?.coverage || 'January 2003 – June 2026'}) with instant side-by-side Question Paper and Mark Scheme Split View.`
+      subtitle: `Complete archive across ${ialSubjCount} IAL subjects (${meta?.boards?.edexcel?.coverage || meta?.coverage || 'January 2003 to June 2026'}) with instant side-by-side Question Paper and Mark Scheme Split View.`
     };
   }
 

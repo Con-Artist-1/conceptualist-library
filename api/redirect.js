@@ -1,4 +1,16 @@
+import { REDIRECT_MAP } from './_redirects.js';
+
 const SITE_ORIGIN = 'https://www.conceptualist.uk';
+
+const BOOK_TYPE_DESTINATIONS = {
+  '/': '/textbooks',
+  '/cambridge': '/textbooks/cambridge',
+  '/ial': '/textbooks/ial',
+  '/igcse': '/textbooks/igcse',
+  '/cambridge/a-level': '/textbooks/cambridge/a-level',
+  '/cambridge/igcse': '/textbooks/cambridge/igcse',
+  '/cambridge/o-level': '/textbooks/cambridge/o-level'
+};
 
 function sanitizePathname(rawPath) {
   let clean = String(rawPath || '')
@@ -25,6 +37,10 @@ export default function handler(req, res) {
   const reqUrl = new URL(req.url || '/', SITE_ORIGIN);
   const rawPath = req.query?.__pathname ?? reqUrl.searchParams.get('__pathname') ?? reqUrl.pathname;
   let destPath = sanitizePathname(rawPath);
+  if (destPath !== '/') destPath = destPath.toLowerCase();
+  for (let hop = 0; hop < 3 && REDIRECT_MAP[destPath]; hop++) {
+    destPath = REDIRECT_MAP[destPath];
+  }
 
   const q = String(req.query?.q ?? reqUrl.searchParams.get('q') ?? '').trim();
   if (q) {
@@ -39,10 +55,14 @@ export default function handler(req, res) {
   const view = String(req.query?.view ?? reqUrl.searchParams.get('view') ?? '').trim();
   const type = String(req.query?.type ?? reqUrl.searchParams.get('type') ?? '').trim();
 
-  if (!paper && destPath === '/') {
-    if (type === 'Book') destPath = '/textbooks';
-    else if (type === 'DF') destPath = '/data-files';
-    else if (type === 'AUD') destPath = '/audio';
+  if (!paper) {
+    if (type === 'Book' && BOOK_TYPE_DESTINATIONS[destPath]) {
+      destPath = BOOK_TYPE_DESTINATIONS[destPath];
+    } else if (destPath === '/' && type === 'DF') {
+      destPath = '/data-files';
+    } else if (destPath === '/' && type === 'AUD') {
+      destPath = '/audio';
+    }
   }
 
   let hashStr = '';

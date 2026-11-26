@@ -1,4 +1,4 @@
-# Conceptualist Systems — International Exam Past Papers & Textbooks Library
+# Conceptualist Systems: International Exam Past Papers & Textbooks Library
 
 > Independent international exam study archive; not affiliated with, endorsed by, or sponsored by Pearson plc / Edexcel or Cambridge University Press & Assessment (CAIE). Conceptualist Systems (https://www.conceptualist.uk) is a free, zero-ad academic archive indexing 74,958 unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), Grade Thresholds (GT), Inserts (IN), 154 Student Textbooks & Worked Solution Banks, 591 Listening Audio tracks with synced closed captions (CC), and 212 practical Data Files (78,820 total archived files).
 
@@ -15,10 +15,12 @@
 - [Edexcel IAL Past Papers](https://www.conceptualist.uk/ial): 19 International A-Level subjects.
 - [Edexcel IGCSE Past Papers](https://www.conceptualist.uk/igcse): 43 International GCSE (9-1, Regional R, and Modular 4W*) subjects.
 - [Cambridge International Hub](https://www.conceptualist.uk/cambridge): Cambridge AS & A Level (31), IGCSE (45), and O Level (31) subjects.
+- [All Cambridge Past Papers](https://www.conceptualist.uk/cambridge/papers): Searchable Cambridge International (CAIE) catalog.
 - [Cambridge AS & A Level](https://www.conceptualist.uk/cambridge/a-level): International AS & A Level past papers, mark schemes & grade thresholds.
 - [Cambridge IGCSE](https://www.conceptualist.uk/cambridge/igcse): Cambridge IGCSE (A*-G & 9-1 equivalents) past papers, inserts & grade thresholds.
 - [Cambridge O Level](https://www.conceptualist.uk/cambridge/o-level): Cambridge O Level past papers, mark schemes & grade thresholds.
 - [All International Textbooks & Solution Banks](https://www.conceptualist.uk/textbooks): 154 Edexcel & Cambridge student books, coursebooks, workbooks, lab books, and IAL Maths Solution Banks.
+- [Edexcel Textbooks & Solution Banks](https://www.conceptualist.uk/textbooks/edexcel): Pearson Edexcel IAL & IGCSE student books, answer PDFs, and Worked Solution Banks.
 - [Cambridge International Textbooks](https://www.conceptualist.uk/textbooks/cambridge): Cambridge AS & A Level, IGCSE & O Level coursebooks, workbooks & revision guides.
 - [Listening Audio Archive (MP3 & Live CC)](https://www.conceptualist.uk/audio): 591 listening audio tracks and synced transcripts.
 - [IT & Computer Science Practical Data Files](https://www.conceptualist.uk/data-files): 212 practical exam source ZIPs.
@@ -207,34 +209,34 @@
 - [Cambridge AS & A Level Biology (9700) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/biology-9700): 3 books/solution banks.
 - [Cambridge AS & A Level Business (9609) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/business-9609): 3 books/solution banks.
 - [Cambridge AS & A Level Chemistry (9701) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/chemistry-9701): 2 books/solution banks.
-- [Cambridge AS & A Level Computer Science (9618) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/computer-science-9618): 1 books/solution banks.
+- [Cambridge AS & A Level Computer Science (9618) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/computer-science-9618): 1 book/solution bank.
 - [Cambridge AS & A Level Economics (9708) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/economics-9708): 3 books/solution banks.
-- [Cambridge AS & A Level Further Mathematics (9231) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/further-mathematics-9231): 1 books/solution banks.
-- [Cambridge AS & A Level Geography (9696) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/geography-9696): 1 books/solution banks.
+- [Cambridge AS & A Level Further Mathematics (9231) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/further-mathematics-9231): 1 book/solution bank.
+- [Cambridge AS & A Level Geography (9696) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/geography-9696): 1 book/solution bank.
 - [Cambridge AS & A Level Mathematics (9709) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/mathematics-9709): 19 books/solution banks.
 - [Cambridge AS & A Level Physics (9702) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/a-level/physics-9702): 3 books/solution banks.
 - [Cambridge IGCSE Biology (0610) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/biology-0610): 3 books/solution banks.
-- [Cambridge IGCSE Business Studies (0450) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/business-studies-0450): 1 books/solution banks.
+- [Cambridge IGCSE Business Studies (0450) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/business-studies-0450): 1 book/solution bank.
 - [Cambridge IGCSE Chemistry (0620) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/chemistry-0620): 6 books/solution banks.
-- [Cambridge IGCSE Computer Science (0478) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/computer-science-0478): 1 books/solution banks.
+- [Cambridge IGCSE Computer Science (0478) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/computer-science-0478): 1 book/solution bank.
 - [Cambridge IGCSE Economics (0455) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/economics-0455): 3 books/solution banks.
 - [Cambridge IGCSE English as a Second Language (0510) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/english-as-a-second-language-0510): 2 books/solution banks.
-- [Cambridge IGCSE English as a Second Language (Count-in Speaking) (0511) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511): 1 books/solution banks.
-- [Cambridge IGCSE First Language English (0500) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/first-language-english-0500): 1 books/solution banks.
+- [Cambridge IGCSE English as a Second Language (Count-in Speaking) (0511) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511): 1 book/solution bank.
+- [Cambridge IGCSE First Language English (0500) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/first-language-english-0500): 1 book/solution bank.
 - [Cambridge IGCSE French (0520) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/french-0520): 2 books/solution banks.
 - [Cambridge IGCSE Geography (0460) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/geography-0460): 2 books/solution banks.
 - [Cambridge IGCSE German (0525) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/german-0525): 3 books/solution banks.
-- [Cambridge IGCSE History (0470) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/history-0470): 1 books/solution banks.
+- [Cambridge IGCSE History (0470) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/history-0470): 1 book/solution bank.
 - [Cambridge IGCSE ICT (0417) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/ict-0417): 2 books/solution banks.
-- [Cambridge IGCSE International Mathematics (0607) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/international-mathematics-0607): 1 books/solution banks.
+- [Cambridge IGCSE International Mathematics (0607) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/international-mathematics-0607): 1 book/solution bank.
 - [Cambridge IGCSE Mathematics (0580) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/mathematics-0580): 3 books/solution banks.
 - [Cambridge IGCSE Physics (0625) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/physics-0625): 4 books/solution banks.
 - [Cambridge IGCSE Spanish (0530) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/igcse/spanish-0530): 2 books/solution banks.
-- [Cambridge O Level Additional Mathematics (4037) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/additional-mathematics-4037): 1 books/solution banks.
-- [Cambridge O Level Biology (5090) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/biology-5090): 1 books/solution banks.
-- [Cambridge O Level First Language Urdu (3247) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/first-language-urdu-3247): 1 books/solution banks.
-- [Cambridge O Level Islamiyat (2058) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/islamiyat-2058): 1 books/solution banks.
-- [Cambridge O Level Pakistan Studies (2059) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/pakistan-studies-2059): 1 books/solution banks.
+- [Cambridge O Level Additional Mathematics (4037) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/additional-mathematics-4037): 1 book/solution bank.
+- [Cambridge O Level Biology (5090) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/biology-5090): 1 book/solution bank.
+- [Cambridge O Level First Language Urdu (3247) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/first-language-urdu-3247): 1 book/solution bank.
+- [Cambridge O Level Islamiyat (2058) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/islamiyat-2058): 1 book/solution bank.
+- [Cambridge O Level Pakistan Studies (2059) Textbooks & Solutions](https://www.conceptualist.uk/textbooks/cambridge/o-level/pakistan-studies-2059): 1 book/solution bank.
 - [Edexcel IAL Accounting Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/accounting): 4 books/solution banks.
 - [Edexcel IAL Biology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/biology): 5 books/solution banks.
 - [Edexcel IAL Business Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/business): 4 books/solution banks.
@@ -244,14 +246,14 @@
 - [Edexcel IAL Mathematics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/mathematics): 28 books/solution banks.
 - [Edexcel IAL Physics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/physics): 5 books/solution banks.
 - [Edexcel IAL Psychology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/ial/psychology): 3 books/solution banks.
-- [Edexcel IGCSE Accounting Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/accounting): 1 books/solution banks.
-- [Edexcel IGCSE Biology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/biology): 1 books/solution banks.
-- [Edexcel IGCSE Business Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/business): 1 books/solution banks.
-- [Edexcel IGCSE Chemistry Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/chemistry): 1 books/solution banks.
-- [Edexcel IGCSE Commerce Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/commerce): 1 books/solution banks.
-- [Edexcel IGCSE Economics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/economics): 1 books/solution banks.
-- [Edexcel IGCSE Further Pure Mathematics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/further-pure-mathematics): 1 books/solution banks.
+- [Edexcel IGCSE Accounting Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/accounting): 1 book/solution bank.
+- [Edexcel IGCSE Biology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/biology): 1 book/solution bank.
+- [Edexcel IGCSE Business Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/business): 1 book/solution bank.
+- [Edexcel IGCSE Chemistry Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/chemistry): 1 book/solution bank.
+- [Edexcel IGCSE Commerce Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/commerce): 1 book/solution bank.
+- [Edexcel IGCSE Economics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/economics): 1 book/solution bank.
+- [Edexcel IGCSE Further Pure Mathematics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/further-pure-mathematics): 1 book/solution bank.
 - [Edexcel IGCSE Human Biology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/human-biology): 2 books/solution banks.
-- [Edexcel IGCSE Information Technology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/information-technology): 1 books/solution banks.
+- [Edexcel IGCSE Information Technology Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/information-technology): 1 book/solution bank.
 - [Edexcel IGCSE Mathematics A Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/mathematics-a): 2 books/solution banks.
-- [Edexcel IGCSE Physics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/physics): 1 books/solution banks.
+- [Edexcel IGCSE Physics Textbooks & Solutions](https://www.conceptualist.uk/textbooks/igcse/physics): 1 book/solution bank.

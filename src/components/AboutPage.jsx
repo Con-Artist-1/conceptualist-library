@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import '../styles/secondary.css';
 import { getArchiveCounts } from '../lib/routeCore.js';
 
-const CITATION_HTML_SNIPPET = '<a href="https://www.conceptualist.uk/">Conceptualist Systems — International Exam Archive</a>';
+const CITATION_HTML_SNIPPET = '<a href="https://www.conceptualist.uk/">Conceptualist Systems: International Exam Archive</a>';
 
 const AboutPage = ({ meta = null, onGoHome }) => {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
@@ -63,8 +63,8 @@ const AboutPage = ({ meta = null, onGoHome }) => {
         <div className="about-section">
           <h2>Our Mission &amp; Archive Scope</h2>
           <p>
-            Navigating past papers, mark schemes, examiner reports, grade thresholds, inserts, and reference books should be effortless.
-            Our platform indexes <strong>{uniqueFiles.toLocaleString()}</strong> unique international examination resources ({totalFiles.toLocaleString()} total archived files) across 169 subjects — including Pearson Edexcel International A-Level (IAL) &amp; IGCSE and Cambridge International (CAIE) AS &amp; A Level, IGCSE, and O Level — alongside <strong>{totalBooks}</strong> textbooks &amp; Solution Banks, <strong>{audioCount}</strong> listening audio tracks, and <strong>{dfCount}</strong> practical data packs.
+            Finding paired past papers, mark schemes, examiner reports, grade thresholds, inserts, and reference books should take seconds, not dozens of tabs.
+            Conceptualist Systems indexes <strong>{uniqueFiles.toLocaleString()}</strong> unique international examination resources ({totalFiles.toLocaleString()} total archived files) across 169 subjects, covering Pearson Edexcel International A-Level (IAL) &amp; IGCSE and Cambridge International (CAIE) AS &amp; A Level, IGCSE, and O Level, alongside <strong>{totalBooks}</strong> textbooks &amp; Solution Banks, <strong>{audioCount}</strong> listening audio tracks, and <strong>{dfCount}</strong> practical data packs.
           </p>
         </div>
 

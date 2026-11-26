@@ -587,6 +587,29 @@ function groupSittingsForHtml(items, limit = 80) {
     .slice(0, limit);
 }
 
+function groupSubjectSittingsForHtml(items, limit = 45) {
+  const sittingMap = new Map();
+  for (const item of items) {
+    const key = `${item.session || item.year || item.name}|${item.cleanUnitLabel || ''}`;
+    let grp = sittingMap.get(key);
+    if (!grp) {
+      grp = {
+        sortKey: Number(item.sortKey) || (Number(item.year) || 0) * 100,
+        session: item.session || (item.year ? `Year ${item.year}` : item.name),
+        unitLabel: item.cleanUnitLabel || item.unitCode || '',
+        variants: new Set(),
+        docTypes: new Set()
+      };
+      sittingMap.set(key, grp);
+    }
+    if (item.variant) grp.variants.add(item.variant);
+    if (item.docType) grp.docTypes.add(item.docType);
+  }
+  return [...sittingMap.values()]
+    .sort((a, b) => b.sortKey - a.sortKey || a.session.localeCompare(b.session) || a.unitLabel.localeCompare(b.unitLabel))
+    .slice(0, limit);
+}
+
 function buildStaticSemanticBody(route, seo, meta, indexLookup) {
   const {
     activeBoard = 'edexcel',
@@ -619,23 +642,29 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       '<li><strong>Educational Notice:</strong> Independent student study archive; not affiliated with or endorsed by Pearson plc/Edexcel or Cambridge University Press &amp; Assessment (CAIE).</li>'
     );
     links.push(
+      '<li><a href="/papers">All Edexcel Past Papers</a></li>',
       '<li><a href="/ial">Edexcel International A-Level (IAL) Past Papers</a></li>',
       '<li><a href="/igcse">Edexcel International GCSE (IGCSE) Past Papers</a></li>',
       '<li><a href="/cambridge">Cambridge International (AS &amp; A Level, IGCSE &amp; O Level) Past Papers</a></li>',
+      '<li><a href="/cambridge/papers">All Cambridge Past Papers</a></li>',
       '<li><a href="/textbooks">Edexcel &amp; Cambridge Textbooks &amp; Solution Banks</a></li>',
       '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Workbooks</a></li>',
       '<li><a href="/audio">Listening Audio Archive with Synced Subtitles</a></li>',
-      '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>'
+      '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>',
+      '<li><a href="/changelog">Site Changelog &amp; Archive Updates</a></li>'
     );
   } else if (currentTab === 'changelog') {
     for (const entry of CHANGELOG_HISTORY.slice(0, 8)) {
       itemEntries.push(
-        `<li><strong>${escapeHtml(entry.version)}:</strong> ${escapeHtml(entry.title)} — ${escapeHtml(entry.summary)}</li>`
+        `<li><strong>${escapeHtml(entry.version)}:</strong> ${escapeHtml(entry.title)}: ${escapeHtml(entry.summary)}</li>`
       );
     }
     links.push(
       '<li><a href="/papers">Browse All Edexcel IAL &amp; IGCSE Past Papers</a></li>',
+      '<li><a href="/cambridge/papers">Browse All Cambridge International Past Papers</a></li>',
       '<li><a href="/textbooks">Browse Textbooks &amp; Worked Solution Banks</a></li>',
+      '<li><a href="/audio">Listening Audio Archive</a></li>',
+      '<li><a href="/data-files">IT &amp; CS Practical Data Files</a></li>',
       '<li><a href="/about">About Conceptualist Systems</a></li>'
     );
   } else if (filterDocType === 'Book') {
@@ -803,12 +832,14 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       );
     }
     const subjItems = indexLookup?.byCurrSubj?.get(`${filterCurriculum}::${filterSubject}`) || [];
-    for (const grp of groupSittingsForHtml(subjItems, 45)) {
+    for (const grp of groupSubjectSittingsForHtml(subjItems, 45)) {
       const dtLabels = ['QP', 'MS', 'ER', 'GT', 'SC', 'AUD', 'DF', 'SAM', 'SOL']
         .filter(t => grp.docTypes.has(t))
         .map(t => DOC_TYPE_HUMAN[t] || t);
+      const variantList = [...grp.variants].filter(Boolean).sort();
+      const variantSuffix = variantList.length > 0 ? ` [${variantList.join(', ')}]` : '';
       itemEntries.push(
-        `<li><strong>${escapeHtml(grp.session)}${grp.unitLabel ? ` (${escapeHtml(grp.unitLabel)})` : ''}</strong>: ${escapeHtml(dtLabels.join(', '))}</li>`
+        `<li><strong>${escapeHtml(grp.session)}${grp.unitLabel ? ` (${escapeHtml(grp.unitLabel)})` : ''}${escapeHtml(variantSuffix)}</strong>: ${escapeHtml(dtLabels.join(', '))}</li>`
       );
     }
   } else if (filterCurriculum) {
@@ -835,11 +866,19 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     const isCieHome = route.state.activeBoard === 'cambridge';
     if (isCieHome) {
       links.push(
+        ...(route.path !== '/cambridge' ? ['<li><a href="/cambridge">Cambridge International Archive Hub</a></li>'] : []),
         '<li><a href="/cambridge/papers">All Cambridge International Past Papers</a></li>',
         '<li><a href="/cambridge/a-level">Cambridge International AS &amp; A Level Past Papers</a></li>',
         '<li><a href="/cambridge/igcse">Cambridge IGCSE Past Papers (A*-G &amp; 9-1)</a></li>',
         '<li><a href="/cambridge/o-level">Cambridge O Level Past Papers</a></li>',
-        '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Textbooks</a></li>'
+        '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Textbooks</a></li>',
+        '<li><a href="/papers">Edexcel IAL &amp; IGCSE Past Papers</a></li>',
+        '<li><a href="/textbooks">All International Textbooks &amp; Solution Banks</a></li>',
+        '<li><a href="/textbooks/edexcel">Edexcel Textbooks &amp; Solution Banks</a></li>',
+        '<li><a href="/audio">Listening Audio Archive</a></li>',
+        '<li><a href="/data-files">IT &amp; CS Practical Data Files</a></li>',
+        '<li><a href="/about">About Conceptualist Systems</a></li>',
+        '<li><a href="/changelog">Site Changelog &amp; Release History</a></li>'
       );
       for (const curr of ['Cambridge AS & A Level', 'Cambridge IGCSE', 'Cambridge O Level']) {
         const currSlug = getCurriculumSlug(curr);
@@ -861,11 +900,22 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       }
     } else {
       links.push(
+        ...(route.path !== '/papers' ? ['<li><a href="/papers">All Edexcel IAL &amp; IGCSE Past Papers</a></li>'] : []),
+        '<li><a href="/ial">Edexcel International A-Level (IAL) Hub</a></li>',
+        '<li><a href="/igcse">Edexcel International GCSE (IGCSE) Hub</a></li>',
         '<li><a href="/cambridge">Cambridge International (CAIE) Past Papers Archive</a></li>',
         '<li><a href="/cambridge/papers">All Cambridge International Past Papers</a></li>',
+        '<li><a href="/cambridge/a-level">Cambridge International AS &amp; A Level Past Papers</a></li>',
+        '<li><a href="/cambridge/igcse">Cambridge IGCSE Past Papers</a></li>',
+        '<li><a href="/cambridge/o-level">Cambridge O Level Past Papers</a></li>',
+        '<li><a href="/textbooks">All International Textbooks &amp; Solution Banks</a></li>',
         '<li><a href="/textbooks/edexcel">Edexcel IAL &amp; IGCSE Textbooks &amp; Solution Banks</a></li>',
         '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
-        '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
+        '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>',
+        '<li><a href="/audio">Listening Audio Archive with Synced Subtitles</a></li>',
+        '<li><a href="/data-files">IT &amp; Computer Science Practical Data Files</a></li>',
+        '<li><a href="/about">About Conceptualist Systems</a></li>',
+        '<li><a href="/changelog">Site Changelog &amp; Release History</a></li>'
       );
       for (const curr of ['Edexcel IAL', 'Edexcel IGCSE']) {
         const currSlug = getCurriculumSlug(curr);
@@ -887,6 +937,10 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       }
     }
   }
+
+  const uniqueItemEntries = [...new Set(itemEntries)];
+  const selfHrefToken = `href="${route.path}"`;
+  const uniqueLinks = [...new Set(links)].filter((li) => !li.includes(selfHrefToken));
 
   const faqHtml = faqEntries.length > 0
     ? `<section aria-label="Frequently Asked Questions"><h2>Frequently Asked Questions</h2>${faqEntries.map(f => `<article><h3>${escapeHtml(f.q)}</h3><p>${escapeHtml(f.a)}</p></article>`).join('\n        ')}</section>`
@@ -927,9 +981,9 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
           <a href="/about">About</a> |
           <a href="/changelog">Changelog</a>
         </p>
-        ${itemEntries.length > 0 ? `<section><h2>Archived Documents &amp; Examination Sittings</h2><ul>${itemEntries.join('\n          ')}</ul></section>` : ''}
-        ${links.length > 0 ? `<section><h2>Browse Related Subjects &amp; Resources</h2><ul>${links.join('\n          ')}</ul></section>` : ''}
       </nav>
+      ${uniqueItemEntries.length > 0 ? `<section><h2>Archived Documents &amp; Examination Sittings</h2><ul>${uniqueItemEntries.join('\n          ')}</ul></section>` : ''}
+      ${uniqueLinks.length > 0 ? `<section><h2>Browse Related Subjects &amp; Resources</h2><ul>${uniqueLinks.join('\n          ')}</ul></section>` : ''}
     </main>`;
 }
 
@@ -1039,7 +1093,7 @@ function injectSeoIntoHtml(templateHtml, route, meta, indexLookup) {
     html = setOrInsertTag(
       html,
       /<meta\s+property="og:image:alt"\s+content="[^"]*"\s*\/?>/i,
-      '<meta property="og:image:alt" content="Conceptualist Systems — Cambridge International IGCSE, O Level &amp; A-Level Past Papers Reader" />'
+      '<meta property="og:image:alt" content="Conceptualist Systems: Cambridge International IGCSE, O Level &amp; A-Level Past Papers Reader" />'
     );
   }
 
@@ -1072,7 +1126,7 @@ function generateLlmsTxt(meta, indexLookup) {
   const cieOlSubjects = Object.keys(meta?.wizard?.['Cambridge O Level'] || {}).sort();
 
   const lines = [
-    '# Conceptualist Systems — International Exam Past Papers & Textbooks Library',
+    '# Conceptualist Systems: International Exam Past Papers & Textbooks Library',
     '',
     `> Independent international exam study archive; not affiliated with, endorsed by, or sponsored by Pearson plc / Edexcel or Cambridge University Press & Assessment (CAIE). Conceptualist Systems (${SITE_URL}) is a free, zero-ad academic archive indexing ${uniqueFiles.toLocaleString()} unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers (QP), Mark Schemes (MS), Examiner Reports (ER), Grade Thresholds (GT), Inserts (IN), ${booksCount} Student Textbooks & Worked Solution Banks, ${audioCount} Listening Audio tracks with synced closed captions (CC), and ${dfCount} practical Data Files (${totalFiles.toLocaleString()} total archived files).`,
     '',
@@ -1089,10 +1143,12 @@ function generateLlmsTxt(meta, indexLookup) {
     `- [Edexcel IAL Past Papers](${SITE_URL}/ial): ${ialSubjects.length} International A-Level subjects.`,
     `- [Edexcel IGCSE Past Papers](${SITE_URL}/igcse): ${igcseSubjects.length} International GCSE (9-1, Regional R, and Modular 4W*) subjects.`,
     `- [Cambridge International Hub](${SITE_URL}/cambridge): Cambridge AS & A Level (${cieAlSubjects.length}), IGCSE (${cieIgcseSubjects.length}), and O Level (${cieOlSubjects.length}) subjects.`,
+    `- [All Cambridge Past Papers](${SITE_URL}/cambridge/papers): Searchable Cambridge International (CAIE) catalog.`,
     `- [Cambridge AS & A Level](${SITE_URL}/cambridge/a-level): International AS & A Level past papers, mark schemes & grade thresholds.`,
     `- [Cambridge IGCSE](${SITE_URL}/cambridge/igcse): Cambridge IGCSE (A*-G & 9-1 equivalents) past papers, inserts & grade thresholds.`,
     `- [Cambridge O Level](${SITE_URL}/cambridge/o-level): Cambridge O Level past papers, mark schemes & grade thresholds.`,
     `- [All International Textbooks & Solution Banks](${SITE_URL}/textbooks): ${booksCount} Edexcel & Cambridge student books, coursebooks, workbooks, lab books, and IAL Maths Solution Banks.`,
+    `- [Edexcel Textbooks & Solution Banks](${SITE_URL}/textbooks/edexcel): Pearson Edexcel IAL & IGCSE student books, answer PDFs, and Worked Solution Banks.`,
     `- [Cambridge International Textbooks](${SITE_URL}/textbooks/cambridge): Cambridge AS & A Level, IGCSE & O Level coursebooks, workbooks & revision guides.`,
     `- [Listening Audio Archive (MP3 & Live CC)](${SITE_URL}/audio): ${audioCount} listening audio tracks and synced transcripts.`,
     `- [IT & Computer Science Practical Data Files](${SITE_URL}/data-files): ${dfCount} practical exam source ZIPs.`,
@@ -1143,7 +1199,7 @@ function generateLlmsTxt(meta, indexLookup) {
     ...[...(indexLookup?.booksByCurrSubj?.keys() || [])].sort().map((key) => {
       const [curr, subj] = key.split('::');
       const list = indexLookup.booksByCurrSubj.get(key) || [];
-      return `- [${curr} ${formatSubjectName(subj)} Textbooks & Solutions](${SITE_URL}/textbooks/${getCurriculumSlug(curr)}/${getSubjectSlug(subj)}): ${list.length} books/solution banks.`;
+      return `- [${curr} ${formatSubjectName(subj)} Textbooks & Solutions](${SITE_URL}/textbooks/${getCurriculumSlug(curr)}/${getSubjectSlug(subj)}): ${list.length} ${list.length === 1 ? 'book/solution bank' : 'books/solution banks'}.`;
     }),
     ''
   );
@@ -1234,6 +1290,13 @@ function run() {
 
   const { routes, aliasRedirects } = collectAllRoutes(meta, indexLookup);
   const lastmodDate = new Date().toISOString().split('T')[0];
+
+  const sortedAllRedirects = [...aliasRedirects].sort((a, b) => a.source.localeCompare(b.source));
+  const redirectEntries = sortedAllRedirects
+    .map((r) => `  ${JSON.stringify(r.source)}: ${JSON.stringify(r.destination)}`)
+    .join(',\n');
+  const redirectsModuleCode = `// Auto-generated by scripts/prerender-seo.js — do not edit manually.\nexport const REDIRECT_MAP = {\n${redirectEntries}\n};\n`;
+  fs.writeFileSync(path.join(ROOT_DIR, 'api', '_redirects.js'), redirectsModuleCode, 'utf8');
 
   // Sync permanent 308 alias redirects, private allowlist function bundle, and inline <script> CSP SHA-256 into vercel.json
   const syncVercelConfig = (inlineScriptCspHash = '') => {

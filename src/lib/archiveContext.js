@@ -33,6 +33,7 @@ export function buildArchiveContextInfo({
   filterSubject,
   filterUnit,
   filterDocType,
+  searchQuery = '',
   meta,
   actions
 }) {
@@ -103,6 +104,44 @@ export function buildArchiveContextInfo({
           setForceShowTable(true);
         }
       });
+      pushLink({
+        href: `/textbooks/${currSlug}`,
+        label: `All ${effCurr} ${isCie ? 'Coursebooks' : 'Textbooks'}`,
+        onClick: () => {
+          setIsNotFound(false);
+          setFilterSubject('');
+          setFilterUnit('');
+          setFilterDocType('Book');
+          setForceShowTable(true);
+        }
+      });
+      pushLink({
+        href: `/textbooks/${isCie ? 'cambridge' : 'edexcel'}`,
+        label: `${isCie ? 'Cambridge' : 'Edexcel'} Textbooks Hub`,
+        onClick: () => {
+          setIsNotFound(false);
+          setScopeAllBoards?.(false);
+          setActiveBoard?.(isCie ? 'cambridge' : 'edexcel');
+          setFilterCurriculum('');
+          setFilterSubject('');
+          setFilterUnit('');
+          setFilterDocType('Book');
+          setForceShowTable(true);
+        }
+      });
+      pushLink({
+        href: '/textbooks',
+        label: 'All International Textbooks',
+        onClick: () => {
+          setIsNotFound(false);
+          setScopeAllBoards?.(true);
+          setFilterCurriculum('');
+          setFilterSubject('');
+          setFilterUnit('');
+          setFilterDocType('Book');
+          setForceShowTable(true);
+        }
+      });
     }
     if (hasDataFilesForCourse(effCurr, filterSubject) && filterDocType !== 'DF') {
       pushLink({
@@ -129,30 +168,28 @@ export function buildArchiveContextInfo({
       });
     }
 
-    if (filterDocType !== 'Book') {
-      const unitsObj = meta?.wizard?.[effCurr]?.[filterSubject]?.units;
-      const unitList = (unitsObj
-        ? Object.keys(unitsObj)
-        : (DEFAULT_UNIT_LABELS[effCurr]?.[filterSubject] || [])
-      ).slice().sort((a, b) => compareUnitLabels(a, b, filterSubject));
-      for (const uLabel of unitList) {
-        if (uLabel === filterUnit) continue;
-        if (isThinUnitRoute(meta, effCurr, filterSubject, uLabel)) continue;
-        const uSlug = getUnitSlug(uLabel, { isCambridge: isCie });
-        if (!uSlug) continue;
-        pushLink({
-          href: `/${currSlug}/${subjSlug}/${uSlug}`,
-          label: uLabel,
-          onClick: () => {
-            setIsNotFound(false);
-            setFilterCurriculum(effCurr);
-            setFilterSubject(filterSubject);
-            setFilterUnit(uLabel);
-            setFilterDocType(null);
-            setForceShowTable(true);
-          }
-        });
-      }
+    const unitsObj = meta?.wizard?.[effCurr]?.[filterSubject]?.units;
+    const unitList = (unitsObj
+      ? Object.keys(unitsObj)
+      : (DEFAULT_UNIT_LABELS[effCurr]?.[filterSubject] || [])
+    ).slice().sort((a, b) => compareUnitLabels(a, b, filterSubject));
+    for (const uLabel of unitList) {
+      if (uLabel === filterUnit && filterDocType !== 'Book') continue;
+      if (isThinUnitRoute(meta, effCurr, filterSubject, uLabel)) continue;
+      const uSlug = getUnitSlug(uLabel, { isCambridge: isCie });
+      if (!uSlug) continue;
+      pushLink({
+        href: `/${currSlug}/${subjSlug}/${uSlug}`,
+        label: uLabel,
+        onClick: () => {
+          setIsNotFound(false);
+          setFilterCurriculum(effCurr);
+          setFilterSubject(filterSubject);
+          setFilterUnit(uLabel);
+          setFilterDocType(null);
+          setForceShowTable(true);
+        }
+      });
     }
   } else if (filterDocType === 'Book') {
     if (!scopeAllBoards) {
@@ -321,8 +358,9 @@ export function buildArchiveContextInfo({
       : filterCurriculum === 'Cambridge O Level' ? (meta?.cieOlSubjects || [])
       : (meta?.cieIgcseSubjects || []);
     for (const sName of subjPool) {
+      const sSlug = getSubjectSlug(sName);
       pushLink({
-        href: `/${currSlug}/${getSubjectSlug(sName)}`,
+        href: `/${currSlug}/${sSlug}`,
         label: formatSubjectDisplay(sName),
         onClick: () => {
           setIsNotFound(false);
@@ -331,6 +369,86 @@ export function buildArchiveContextInfo({
           setFilterUnit('');
           setFilterDocType(null);
           setForceShowTable(true);
+        }
+      });
+      const sUnitsObj = meta?.wizard?.[filterCurriculum]?.[sName]?.units || {};
+      const nonThinUnits = Object.keys(sUnitsObj)
+        .filter((u) => !isThinUnitRoute(meta, filterCurriculum, sName, u))
+        .sort((a, b) => compareUnitLabels(a, b, sName));
+      if (nonThinUnits.length > 0 && nonThinUnits.length <= 3) {
+        for (const u of nonThinUnits) {
+          const uSlug = getUnitSlug(u, { isCambridge: isCie });
+          if (!uSlug) continue;
+          pushLink({
+            href: `/${currSlug}/${sSlug}/${uSlug}`,
+            label: `${formatSubjectDisplay(sName)}: ${u}`,
+            onClick: () => {
+              setIsNotFound(false);
+              setFilterCurriculum(filterCurriculum);
+              setFilterSubject(sName);
+              setFilterUnit(u);
+              setFilterDocType(null);
+              setForceShowTable(true);
+            }
+          });
+        }
+      }
+    }
+  } else if (isCie) {
+    const cieHubs = [
+      { href: '/cambridge', label: 'Cambridge Archive Home', board: 'cambridge', curr: '', doc: null, show: false },
+      { href: '/cambridge/a-level', label: 'Cambridge AS & A Level', board: 'cambridge', curr: 'Cambridge AS & A Level', doc: null, show: true },
+      { href: '/cambridge/igcse', label: 'Cambridge IGCSE', board: 'cambridge', curr: 'Cambridge IGCSE', doc: null, show: true },
+      { href: '/cambridge/o-level', label: 'Cambridge O Level', board: 'cambridge', curr: 'Cambridge O Level', doc: null, show: true },
+      { href: '/textbooks/cambridge', label: 'Cambridge Coursebooks', board: 'cambridge', curr: '', doc: 'Book', show: true },
+      { href: '/audio', label: 'Listening Audio MP3s', all: true, curr: '', doc: 'AUD', show: true },
+      { href: '/data-files', label: 'IT & CS Data Files', all: true, curr: '', doc: 'DF', show: true },
+      { href: '/papers', label: 'Edexcel Past Papers', board: 'edexcel', curr: '', doc: null, show: true }
+    ];
+    for (const h of cieHubs) {
+      pushLink({
+        href: h.href,
+        label: h.label,
+        onClick: () => {
+          clearFilters({ pushUrl: false });
+          if (h.all) {
+            setScopeAllBoards?.(true);
+          } else {
+            setScopeAllBoards?.(false);
+            setActiveBoard?.(h.board);
+          }
+          setFilterCurriculum(h.curr);
+          setFilterDocType(h.doc);
+          setForceShowTable(h.show);
+        }
+      });
+    }
+  } else {
+    const edxHubs = [
+      { href: '/', label: 'Edexcel Archive Home', board: 'edexcel', curr: '', doc: null, show: false },
+      { href: '/ial', label: 'Edexcel IAL Past Papers', board: 'edexcel', curr: 'Edexcel IAL', doc: null, show: true },
+      { href: '/igcse', label: 'Edexcel IGCSE Past Papers', board: 'edexcel', curr: 'Edexcel IGCSE', doc: null, show: true },
+      { href: '/textbooks/edexcel', label: 'Edexcel Textbooks & Solution Banks', board: 'edexcel', curr: '', doc: 'Book', show: true },
+      { href: '/audio', label: 'Listening Audio & Subtitles', all: true, curr: '', doc: 'AUD', show: true },
+      { href: '/data-files', label: 'IT & CS Data Files', all: true, curr: '', doc: 'DF', show: true },
+      { href: '/cambridge', label: 'Cambridge International Archive', board: 'cambridge', curr: '', doc: null, show: false },
+      { href: '/cambridge/papers', label: 'All Cambridge Past Papers', board: 'cambridge', curr: '', doc: null, show: true }
+    ];
+    for (const h of edxHubs) {
+      pushLink({
+        href: h.href,
+        label: h.label,
+        onClick: () => {
+          clearFilters({ pushUrl: false });
+          if (h.all) {
+            setScopeAllBoards?.(true);
+          } else {
+            setScopeAllBoards?.(false);
+            setActiveBoard?.(h.board);
+          }
+          setFilterCurriculum(h.curr);
+          setFilterDocType(h.doc);
+          setForceShowTable(h.show);
         }
       });
     }
@@ -350,7 +468,7 @@ export function buildArchiveContextInfo({
   if (!legacyInfo && links.length === 0 && !filterCurriculum && !filterSubject) return null;
 
   const heading = filterUnit
-    ? `${effCurr} ${subjDisplay} — ${filterUnit}`
+    ? `${effCurr} ${subjDisplay}: ${filterUnit}`
     : filterSubject
       ? `${effCurr} ${subjDisplay} Specification & Resources`
       : filterDocType === 'Book'
@@ -369,6 +487,7 @@ export function buildArchiveContextInfo({
     filterSubject,
     filterUnit,
     filterDocType,
+    searchQuery,
     meta
   });
 

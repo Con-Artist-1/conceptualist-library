@@ -18,7 +18,7 @@ export function ArchiveContextStrip({ archiveContextInfo }) {
         <p className="archive-context-note">{archiveContextInfo.note}</p>
       </div>
       {archiveContextInfo.links.length > 0 && (
-        <nav className="archive-context-links" aria-label="Related course resources">
+        <div className="archive-context-links" role="group" aria-label="Related course resources">
           {archiveContextInfo.links.map((item) => (
             <a
               key={item.href}
@@ -34,7 +34,7 @@ export function ArchiveContextStrip({ archiveContextInfo }) {
               {item.label} →
             </a>
           ))}
-        </nav>
+        </div>
       )}
       {Array.isArray(archiveContextInfo.faqs) && archiveContextInfo.faqs.length > 0 && (
         <div className="archive-context-faqs">

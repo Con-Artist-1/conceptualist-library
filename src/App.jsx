@@ -1510,9 +1510,10 @@ function App() {
     filterSubject,
     filterUnit,
     filterDocType,
+    searchQuery,
     meta,
     actions: archiveContextActions
-  }), [currentTab, isNotFound, showWelcome, activeBoard, scopeAllBoards, filterCurriculum, filterSubject, filterUnit, filterDocType, meta, archiveContextActions]);
+  }), [currentTab, isNotFound, showWelcome, activeBoard, scopeAllBoards, filterCurriculum, filterSubject, filterUnit, filterDocType, searchQuery, meta, archiveContextActions]);
 
   const welcomeDataProp = useMemo(() => ({ meta }), [meta]);
 
