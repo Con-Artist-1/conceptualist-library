@@ -57,7 +57,7 @@ The scripts directory contains strictly **9 essential utilities**. Keep all temp
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\build.js`" 2>&1" | Write-Output
    ```
-3. **SEO Sitemap, `/llms.txt`, Route Shards & Static HTML Pre-rendering (`817` indexable sitemap URLs with per-route `<lastmod>` dates excluding `< 3`-file thin `noindex` routes, `176` shards, `820` canonical HTML routes + `404.html` + `683` permanent `308` redirects in `vercel.json`):**
+3. **SEO Sitemap, `/llms.txt`, Route Shards & Static HTML Pre-rendering (`817` indexable sitemap URLs with per-route `<lastmod>` dates excluding `< 3`-file thin `noindex` routes, `176` shards, `820` canonical HTML routes + `404.html` + `1,339` permanent `308` redirects in `vercel.json` including `api/redirect.js` query consolidation):**
    ```powershell
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" `"e:\The Library\search-app\scripts\prerender-seo.js`" 2>&1" | Write-Output
    ```
@@ -168,7 +168,7 @@ Core Conceptualist Systems contributors listed on `/about`:
    $env:ELECTRON_RUN_AS_NODE="1"; cmd /c "`"C:\Users\Diavlon\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe`" <script.js> 2>&1" | Write-Output
    ```
 7. **Lint & Headless Testing:** Pass `oxlint src api scripts` (`0` warnings/errors with `"no-undef": "error"` in `.oxlintrc.json`) and test desktop (`1366x768`, `1440x900`) & mobile (`390x844`) views in Brave Origin Headless CDP (`--headless=new`, `--user-data-dir=<temp>`, navigate past initial `chrome://brave-origin-startup/` via `Page.navigate`) across Light, Dark, Pure OLED, Board Switcher (`/`, `/cambridge`) Back/Forward history, and both `prefers-reduced-motion: no-preference` and `reduce` via CDP before shipping. Verify `.data/audio_subtitles.json` is unpolluted by tests.
-8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.3.2` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
+8. **Version & Changelog Discipline:** Increment `APP_VERSION` (`v8.4.0` for current release in `search-app/src/lib/appMeta.js`; Vite automatically stamps `__CS_APP_VERSION__` in `index.html`) and keep `CHANGELOG_HISTORY` in `search-app/src/data/changelogHistory.js` human, brief, and concise with fixed release timestamps when shipping features.
 9. **Mandatory Release, Local Git Sync & Production Deploy Order:**
    - **Push:** Always run `scripts/push-github.js "<commit message>"` (NEVER run CLI `git push`, which hangs on interactive credential prompts).
    - **Sync Local `.git`:** Immediately run `git fetch origin` followed by `git reset --mixed origin/main` using GitHub Desktop's bundled `git.exe` (`$env:LOCALAPPDATA\GitHubDesktop\app-*\resources\app\git\cmd\git.exe` with `$env:GIT_TERMINAL_PROMPT="0"`) so local `main` stays synced to `origin/main`.
