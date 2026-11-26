@@ -5,72 +5,7 @@
       "includeFiles": "api/_allowlist.json"
     }
   },
-  "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "has": [
-        {
-          "type": "query",
-          "key": "paper"
-        }
-      ],
-      "missing": [
-        {
-          "type": "query",
-          "key": "q"
-        }
-      ],
-      "destination": "/api/redirect?__pathname=/$1"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "has": [
-        {
-          "type": "query",
-          "key": "year"
-        }
-      ],
-      "missing": [
-        {
-          "type": "query",
-          "key": "q"
-        }
-      ],
-      "destination": "/api/redirect?__pathname=/$1"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "has": [
-        {
-          "type": "query",
-          "key": "variant"
-        }
-      ],
-      "missing": [
-        {
-          "type": "query",
-          "key": "q"
-        }
-      ],
-      "destination": "/api/redirect?__pathname=/$1"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "has": [
-        {
-          "type": "query",
-          "key": "type"
-        }
-      ],
-      "missing": [
-        {
-          "type": "query",
-          "key": "q"
-        }
-      ],
-      "destination": "/api/redirect?__pathname=/$1"
-    }
-  ],
+  "rewrites": [],
   "headers": [
     {
       "source": "/(.*)",
@@ -257,6 +192,74 @@
     }
   ],
   "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "paper"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "year"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "variant"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "type"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1",
+      "permanent": true
+    },
     {
       "source": "/caie",
       "destination": "/cambridge",

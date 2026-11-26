@@ -1241,13 +1241,15 @@ function run() {
     try {
       const vercelCfg = JSON.parse(fs.readFileSync(VERCEL_CONFIG_PATH, 'utf8'));
       const sortedRedirects = [...aliasRedirects].sort((a, b) => a.source.localeCompare(b.source));
-      vercelCfg.rewrites = ['paper', 'year', 'variant', 'type'].map((key) => ({
+      const queryRedirects = ['paper', 'year', 'variant', 'type'].map((key) => ({
         source: '/((?!api/).*)',
         has: [{ type: 'query', key }],
         missing: [{ type: 'query', key: 'q' }],
-        destination: '/api/redirect?__pathname=/$1'
+        destination: '/api/redirect?__pathname=/$1',
+        permanent: true
       }));
-      vercelCfg.redirects = sortedRedirects;
+      vercelCfg.rewrites = [];
+      vercelCfg.redirects = [...queryRedirects, ...sortedRedirects];
       if (vercelCfg.functions && vercelCfg.functions['api/*.js']) {
         vercelCfg.functions['api/*.js'].includeFiles = 'api/_allowlist.json';
       }
