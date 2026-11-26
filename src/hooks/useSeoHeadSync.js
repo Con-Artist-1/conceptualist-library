@@ -128,7 +128,7 @@ export function useSeoHeadSync({
           : getUnifiedSittingTitle(previewFile))
       : '';
     const pageTitle = modalBaseTitle
-      ? `${modalBaseTitle} — ${getModalTitleSuffix(previewFile, previewInitialView)} | Conceptualist`
+      ? `${modalBaseTitle} - ${getModalTitleSuffix(previewFile, previewInitialView)} | Conceptualist`
       : seoMeta.title;
     document.title = pageTitle;
 
@@ -172,7 +172,7 @@ export function useSeoHeadSync({
     // On initial cold mount, prerender-seo.js has already embedded the exact JSON-LD in <head>.
     // Only lazily import seoRoutes.js (with bookCatalog ISBNs & FAQs) on SPA navigations or if absent.
     const existingLd = document.getElementById('seo-json-ld');
-    const isColdWithPrerenderedLd = !didInitialSeoSyncRef.current && Boolean(existingLd?.textContent) && !previewFile && !deferredSearchQuery;
+    const isColdWithPrerenderedLd = !didInitialSeoSyncRef.current && Boolean(existingLd?.textContent) && !previewFile && !deferredSearchQuery && !activeNotFound;
     didInitialSeoSyncRef.current = true;
     if (isColdWithPrerenderedLd) return undefined;
 
@@ -196,6 +196,8 @@ export function useSeoHeadSync({
           filterUnit: effectiveRouteUnit,
           filterDocType,
           forceShowTable,
+          searchQuery: deferredSearchQuery,
+          notFound: activeNotFound,
           seo: seoMeta,
           meta
         });

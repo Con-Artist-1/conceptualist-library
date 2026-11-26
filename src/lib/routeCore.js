@@ -595,7 +595,7 @@ export function buildRouteFaqEntries({
       } else {
         faqs.push({
           q: `Are ${hasAnswerBooks ? 'Student Book 1 & 2 answer PDFs' : 'worked answers and past papers'} linked with ${curr} ${subjDisplay} books?`,
-          a: `Yes. ${hasAnswerBooks ? `Both Student Book 1 and Student Book 2 PDFs plus official answer booklets for ${curr} ${subjDisplay} are indexed here, ` : `Every ${curr} ${subjDisplay} resource on this page is cover-verified and linearized for fast loading, `}and you can jump straight to the matching past papers and mark schemes below.`
+          a: `Yes. ${hasAnswerBooks ? `Both Student Book 1 and Student Book 2 PDFs plus worked answer booklets for ${curr} ${subjDisplay} are indexed here, ` : `Every ${curr} ${subjDisplay} resource on this page is cover-verified and linearized for fast loading, `}and you can jump straight to the matching past papers and mark schemes below.`
         });
       }
       return faqs;

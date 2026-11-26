@@ -375,13 +375,18 @@ export function buildArchiveContextInfo({
       const nonThinUnits = Object.keys(sUnitsObj)
         .filter((u) => !isThinUnitRoute(meta, filterCurriculum, sName, u))
         .sort((a, b) => compareUnitLabels(a, b, sName));
-      if (nonThinUnits.length > 0 && nonThinUnits.length <= 3) {
+      if (nonThinUnits.length > 0 && nonThinUnits.length <= 2) {
+        const compactSubj = formatSubjectDisplay(sName)
+          .replace(/^First Language\s+/i, '1st Lang ')
+          .replace(/^Second Language\s+/i, '2nd Lang ')
+          .replace(/^Foreign Language\s+/i, '');
         for (const u of nonThinUnits) {
           const uSlug = getUnitSlug(u, { isCambridge: isCie });
           if (!uSlug) continue;
+          const compactUnit = u.replace(/^(Paper\s+\d+|Unit\s+\d+):\s+.+?(\s*\([^)]+\))?$/i, '$1$2');
           pushLink({
             href: `/${currSlug}/${sSlug}/${uSlug}`,
-            label: `${formatSubjectDisplay(sName)}: ${u}`,
+            label: `${compactSubj} · ${compactUnit}`,
             onClick: () => {
               setIsNotFound(false);
               setFilterCurriculum(filterCurriculum);
@@ -423,6 +428,32 @@ export function buildArchiveContextInfo({
         }
       });
     }
+    for (const cCurr of ['Cambridge AS & A Level', 'Cambridge IGCSE', 'Cambridge O Level']) {
+      const cCurrSlug = getCurriculumSlug(cCurr);
+      const subjectsMap = meta?.wizard?.[cCurr] || {};
+      for (const sName of Object.keys(subjectsMap).sort()) {
+        const nonThin = Object.keys(subjectsMap[sName]?.units || {}).filter((u) => !isThinUnitRoute(meta, cCurr, sName, u));
+        if (nonThin.length === 1) {
+          const u = nonThin[0];
+          const uSlug = getUnitSlug(u, { isCambridge: true });
+          if (!uSlug) continue;
+          pushLink({
+            href: `/${cCurrSlug}/${getSubjectSlug(sName)}/${uSlug}`,
+            label: `${formatSubjectDisplay(sName)} · ${u.replace(/^(Paper\s+\d+):.+$/i, '$1')}`,
+            onClick: () => {
+              setIsNotFound(false);
+              setScopeAllBoards?.(false);
+              setActiveBoard?.('cambridge');
+              setFilterCurriculum(cCurr);
+              setFilterSubject(sName);
+              setFilterUnit(u);
+              setFilterDocType(null);
+              setForceShowTable(true);
+            }
+          });
+        }
+      }
+    }
   } else {
     const edxHubs = [
       { href: '/', label: 'Edexcel Archive Home', board: 'edexcel', curr: '', doc: null, show: false },
@@ -451,6 +482,32 @@ export function buildArchiveContextInfo({
           setForceShowTable(h.show);
         }
       });
+    }
+    for (const eCurr of ['Edexcel IAL', 'Edexcel IGCSE']) {
+      const eCurrSlug = getCurriculumSlug(eCurr);
+      const subjectsMap = meta?.wizard?.[eCurr] || {};
+      for (const sName of Object.keys(subjectsMap).sort()) {
+        const nonThin = Object.keys(subjectsMap[sName]?.units || {}).filter((u) => !isThinUnitRoute(meta, eCurr, sName, u));
+        if (nonThin.length === 1) {
+          const u = nonThin[0];
+          const uSlug = getUnitSlug(u, { isCambridge: false });
+          if (!uSlug) continue;
+          pushLink({
+            href: `/${eCurrSlug}/${getSubjectSlug(sName)}/${uSlug}`,
+            label: `${formatSubjectDisplay(sName)} · ${u}`,
+            onClick: () => {
+              setIsNotFound(false);
+              setScopeAllBoards?.(false);
+              setActiveBoard?.('edexcel');
+              setFilterCurriculum(eCurr);
+              setFilterSubject(sName);
+              setFilterUnit(u);
+              setFilterDocType(null);
+              setForceShowTable(true);
+            }
+          });
+        }
+      }
     }
   }
 

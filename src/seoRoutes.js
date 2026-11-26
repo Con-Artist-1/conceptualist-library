@@ -25,6 +25,8 @@ export function buildJsonLd({
   filterUnit = '',
   filterDocType = null,
   forceShowTable = false,
+  searchQuery = '',
+  notFound = false,
   seo,
   meta = null
 }) {
@@ -279,6 +281,8 @@ export function buildJsonLd({
     filterSubject,
     filterUnit,
     filterDocType,
+    searchQuery,
+    notFound,
     meta
   });
   if (faqEntries.length > 0) {

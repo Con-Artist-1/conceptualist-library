@@ -627,10 +627,12 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
   const faqEntries = buildRouteFaqEntries({
     currentTab,
     activeBoard,
+    scopeAllBoards: Boolean(route.state.scopeAllBoards),
     filterCurriculum,
     filterSubject,
     filterUnit,
     filterDocType,
+    notFound: Boolean(route.state.notFound),
     meta
   });
 
