@@ -4,13 +4,16 @@ import {
   preloadPdfJsModule,
   acquirePdfWorker,
   releasePdfWorker,
-  consumePrewarmedPdfBytes
+  consumePrewarmedPdfBytes,
+  fetchPdfBytesWithProgress,
+  isLiveUint8Array
 } from './lib/pdfPrewarm.js';
 import {
   LARGE_PDF_STREAM_THRESHOLD,
   shouldUseRangeStreaming,
   STREAM_CHUNK_SIZE,
-  createLargePdfRangeTransport
+  createLargePdfRangeTransport,
+  invalidateSessionPdfCache
 } from './lib/pdfRangeTransport.js';
 import {
   SPREAD_MIN_PCT,
@@ -53,8 +56,10 @@ export const PdfViewerPane = ({
   const [scale, setScale] = useState('fit-width'); // 'fit-width' | 'fit-page' | number
   const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [downloadProgress, setDownloadProgress] = useState(null);
-  const [streamStats, setStreamStats] = useState(null);
+  const [loadProgress, setLoadProgress] = useState(4);
+  const [loadPhaseLabel, setLoadPhaseLabel] = useState('Preparing Reader...');
+  const [loadSubtext, setLoadSubtext] = useState('');
+  const [activeStreamBurst, setActiveStreamBurst] = useState(null);
   const [firstPagePainted, setFirstPagePainted] = useState(false);
   const [neighborsArmed, setNeighborsArmed] = useState(false);
   const [paintTick, setPaintTick] = useState(0);
@@ -107,6 +112,7 @@ export const PdfViewerPane = ({
 
   const currentPageRef = useRef(currentPage);
   const initialPageRef = useRef(initialPage);
+  const titleRef = useRef(title);
   const pendingInitialJumpRef = useRef(null);
   const pendingLayoutJumpRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
@@ -124,6 +130,10 @@ export const PdfViewerPane = ({
   useEffect(() => {
     initialPageRef.current = initialPage;
   }, [initialPage]);
+
+  useEffect(() => {
+    titleRef.current = title;
+  }, [title]);
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -406,7 +416,7 @@ export const PdfViewerPane = ({
     return () => el.removeEventListener('wheel', handleWheel);
   }, [recordZoomAnchor, getCurrentBaseScale]);
 
-  // Fetch and parse document with PDF.js (parallel byte-range streaming for >= 2.5 MB PDFs; in-memory data or single-pass for smaller papers)
+  // Fetch and parse document with PDF.js (parallel Head+2-chunk EOF range streaming for large PDFs; live-progress parallel fetch for smaller papers)
   const loadDocument = useCallback(() => {
     if (!url && !pdfData) return;
     let active = true;
@@ -414,13 +424,33 @@ export const PdfViewerPane = ({
     let loadedDoc = null;
     let activeTransport = null;
     let pooledWorker = null;
+    let hadWorkerFailure = false;
     const bootCtrl = new AbortController();
-    const shouldStreamLargePdf = !pdfData && shouldUseRangeStreaming(fileSize, docType === 'Book');
+    const numericFileSize = Number(fileSize) || 0;
+    const shouldStreamLargePdf = !pdfData && shouldUseRangeStreaming(numericFileSize, docType === 'Book');
+    const canFallbackToFullFetch = !pdfData && (numericFileSize === 0 || numericFileSize <= 25 * 1024 * 1024);
+
+    const formatMb = (bytes) => (bytes / 1048576).toFixed(1);
+    const advanceProgress = (pct, label, subtext) => {
+      if (!active) return;
+      const clamped = Math.max(4, Math.min(100, Math.round(pct)));
+      setLoadProgress((prev) => (clamped > prev ? clamped : prev));
+      if (label) setLoadPhaseLabel(label);
+      if (subtext !== undefined) setLoadSubtext(subtext);
+    };
 
     paintedPagesRef.current = new Set();
     setLoading(true);
-    setDownloadProgress(null);
-    setStreamStats(shouldStreamLargePdf ? { loadedBytes: 0, totalBytes: Number(fileSize) } : null);
+    setLoadProgress(4);
+    setLoadPhaseLabel(
+      pdfData
+        ? 'Opening Document...'
+        : shouldStreamLargePdf
+          ? 'Connecting to Stream...'
+          : 'Downloading Document...'
+    );
+    setLoadSubtext(titleRef.current || 'Preparing vector pages...');
+    setActiveStreamBurst(null);
     setFirstPagePainted(false);
     setNeighborsArmed(false);
     setRotation(0);
@@ -436,174 +466,278 @@ export const PdfViewerPane = ({
       return null;
     });
 
-    // Kick off PDF.js module/worker load AND Hugging Face Head+Tail range bootstrap in parallel (zero waterfall!)
-    const pdfjsPromise = preloadPdfJsModule();
-    const rangeSetupPromise = shouldStreamLargePdf
-      ? createLargePdfRangeTransport(
-          pdfjsPromise,
-          url,
-          Number(fileSize) || 0,
-          bootCtrl.signal,
-          (loadedBytes, totalBytes) => {
-            if (!active) return;
-            setStreamStats({ loadedBytes, totalBytes });
-          },
-          (rangeErr) => {
-            if (!active) return;
-            console.error('[WebPDF] Streaming failure for URL', url, rangeErr);
-            try { activeTransport?.abort(); } catch { /* ignore abort error */ }
-            try { loadingTask?.destroy(); } catch { /* ignore teardown error */ }
-            setLoadError(rangeErr?.message || 'Failed to stream PDF preview');
-            setLoading(false);
-          }
-        ).catch((bootErr) => {
-          if (!active || bootErr?.name === 'AbortError') return null;
-          console.warn('[WebPDF] Range bootstrap fell back to standard load:', bootErr);
-          return null;
-        })
-      : Promise.resolve(null);
+    const onDlProgress = (loadedBytes, totalBytes) => {
+      const effectiveTotal = totalBytes > 0 ? totalBytes : numericFileSize;
+      if (effectiveTotal > 0) {
+        const ratio = Math.min(1, loadedBytes / effectiveTotal);
+        advanceProgress(
+          5 + ratio * 79,
+          'Downloading Document...',
+          `${formatMb(loadedBytes)} / ${formatMb(effectiveTotal)} MB`
+        );
+      } else {
+        advanceProgress(45, 'Downloading Document...', `${formatMb(loadedBytes)} MB downloaded`);
+      }
+    };
 
-    Promise.all([pdfjsPromise, rangeSetupPromise]).then(async ([pdfjsLib, streamSetup]) => {
-      if (!active) {
-        try { streamSetup?.transport?.abort(); } catch { /* ignore abort error */ }
+    const handleStreamState = (st) => {
+      if (!active || !st) return;
+      if (!activeTransport?.docReady && !loadedDoc) {
+        if (st.docChunksResolved === 0 && st.bootstrapRatio < 1) {
+          const totalSub = st.totalBytes > 0 ? ` / ${formatMb(st.totalBytes)} MB` : '';
+          advanceProgress(
+            5 + st.bootstrapRatio * 41,
+            'Streaming Header & Index...',
+            st.loadedBytes > 0 ? `${formatMb(st.loadedBytes)} MB${totalSub}` : (titleRef.current || 'Connecting...')
+          );
+        } else {
+          const totalSub = st.totalBytes > 0 ? ` · ${formatMb(st.totalBytes)} MB` : '';
+          advanceProgress(
+            46 + Math.min(30, st.docChunksResolved * 8),
+            'Loading Document Structure...',
+            `${formatMb(st.loadedBytes)} MB streamed${totalSub}`
+          );
+        }
+      } else if (st.activeRequests > 0) {
+        const burstPct =
+          st.burstTotal > 0
+            ? Math.min(96, Math.max(8, Math.round((st.burstDone / st.burstTotal) * 100)))
+            : 25;
+        setActiveStreamBurst({ inFlight: st.activeRequests, pct: burstPct });
+      } else {
+        setActiveStreamBurst(null);
+      }
+    };
+
+    const fetchFullBytes = async () => {
+      const prewarmed = consumePrewarmedPdfBytes(url, onDlProgress);
+      if (prewarmed) {
+        const preBytes = await prewarmed;
+        if (isLiveUint8Array(preBytes)) return preBytes;
+      }
+      return fetchPdfBytesWithProgress(url, numericFileSize, bootCtrl.signal, onDlProgress);
+    };
+
+    const pdfjsPromise = preloadPdfJsModule();
+    const initialDataPromise = pdfData
+      ? Promise.resolve(pdfData.slice())
+      : !shouldStreamLargePdf
+        ? fetchFullBytes()
+        : null;
+    if (initialDataPromise) {
+      initialDataPromise.catch(() => {});
+    }
+
+    if (pdfData) {
+      advanceProgress(24, 'Opening Document...', titleRef.current || 'Preparing vector pages...');
+    }
+
+    const openWithConfig = (pdfjsLib, docConfig) => {
+      if (!pooledWorker || pooledWorker.destroyed) {
+        pooledWorker = acquirePdfWorker(pdfjsLib);
+      }
+      const workerOpt = pooledWorker ? { worker: pooledWorker } : {};
+      const localCmapUrl =
+        typeof window !== 'undefined' ? `${window.location.origin}/pdfjs/cmaps/` : '/pdfjs/cmaps/';
+      const pdfVerbosity = pdfjsLib.VerbosityLevel?.ERRORS ?? 0;
+
+      loadingTask = pdfjsLib.getDocument({
+        ...workerOpt,
+        ...docConfig,
+        cMapUrl: localCmapUrl,
+        cMapPacked: true,
+        enableXfa: false,
+        verbosity: pdfVerbosity
+      });
+      return loadingTask.promise;
+    };
+
+    (async () => {
+      let pdfjsLib;
+      try {
+        pdfjsLib = await pdfjsPromise;
+      } catch (err) {
+        if (!active) return;
+        console.warn('[WebPDF] Failed to initialize PDF.js engine:', err);
+        setLoadError('Failed to load WebPDF engine');
+        setLoading(false);
+        return;
+      }
+      if (!active) return;
+
+      let doc = null;
+
+      if (initialDataPromise) {
+        try {
+          const rawBytes = await initialDataPromise;
+          if (!active) return;
+          if (!isLiveUint8Array(rawBytes)) {
+            throw new Error('Failed to load PDF document bytes');
+          }
+          advanceProgress(86, 'Parsing Document...', titleRef.current || 'Preparing vector pages...');
+          doc = await openWithConfig(pdfjsLib, { data: rawBytes.slice() });
+        } catch (err) {
+          if (!active || err?.name === 'AbortError') return;
+          hadWorkerFailure = true;
+          console.error('[WebPDF] Load error for URL', url, err);
+          setLoadError(err?.message || 'Failed to load PDF preview');
+          setLoading(false);
+          return;
+        }
+      } else {
+        let rangeStreamFailedPreReady = false;
+        let rangeErrorRef = null;
+        try {
+          const streamSetup = await createLargePdfRangeTransport(
+            pdfjsLib,
+            url,
+            numericFileSize,
+            bootCtrl.signal,
+            handleStreamState,
+            (rangeErr, docWasReady) => {
+              if (!active) return;
+              if (!docWasReady) {
+                rangeStreamFailedPreReady = true;
+                rangeErrorRef = rangeErr;
+                try { activeTransport?.abort(); } catch { /* ignore */ }
+                try { loadingTask?.destroy(); } catch { /* ignore */ }
+              } else {
+                console.error('[WebPDF] Post-ready range streaming error for URL', url, rangeErr);
+                setActiveStreamBurst(null);
+                setLoadError(rangeErr?.message || 'Connection lost while streaming PDF pages');
+              }
+            }
+          ).catch((bootErr) => {
+            if (!active || bootErr?.name === 'AbortError') return null;
+            rangeErrorRef = bootErr;
+            return null;
+          });
+
+          if (!active) {
+            try { streamSetup?.transport?.abort(); } catch { /* ignore */ }
+            return;
+          }
+
+          if (streamSetup?.transport) {
+            activeTransport = streamSetup.transport;
+            doc = await openWithConfig(pdfjsLib, {
+              range: activeTransport,
+              length: activeTransport.length,
+              rangeChunkSize: activeTransport.chunkSize || STREAM_CHUNK_SIZE,
+              disableAutoFetch: true,
+              disableStream: true
+            });
+          } else {
+            rangeStreamFailedPreReady = true;
+          }
+        } catch (err) {
+          if (!active || err?.name === 'AbortError') return;
+          rangeStreamFailedPreReady = true;
+          rangeErrorRef = err;
+          hadWorkerFailure = true;
+        }
+
+        if (!doc && active && rangeStreamFailedPreReady) {
+          if (activeTransport) {
+            try { activeTransport.abort(); } catch { /* ignore */ }
+            activeTransport = null;
+          }
+          if (loadingTask) {
+            try { await loadingTask.destroy(); } catch { /* ignore */ }
+            loadingTask = null;
+          }
+          if (hadWorkerFailure && pooledWorker) {
+            releasePdfWorker(pooledWorker, null, { discard: true });
+            pooledWorker = null;
+            hadWorkerFailure = false;
+          }
+
+          if (!canFallbackToFullFetch) {
+            console.error('[WebPDF] Streaming failure for large URL', url, rangeErrorRef);
+            setLoadError(rangeErrorRef?.message || 'Failed to stream PDF preview');
+            setLoading(false);
+            return;
+          }
+
+          try {
+            advanceProgress(20, 'Downloading Full Document...', titleRef.current || 'Falling back to direct download');
+            const fallbackBytes = await fetchFullBytes();
+            if (!active) return;
+            if (!isLiveUint8Array(fallbackBytes)) {
+              throw new Error('Empty fallback PDF response');
+            }
+            advanceProgress(86, 'Parsing Document...', titleRef.current || 'Preparing vector pages...');
+            doc = await openWithConfig(pdfjsLib, { data: fallbackBytes.slice() });
+          } catch (fbErr) {
+            if (!active || fbErr?.name === 'AbortError') return;
+            hadWorkerFailure = true;
+            console.error('[WebPDF] Fallback load error for URL', url, fbErr);
+            setLoadError(fbErr?.message || rangeErrorRef?.message || 'Failed to stream PDF preview');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      if (!active || !doc) {
+        if (doc) {
+          try { doc.destroy(); } catch { /* ignore */ }
+        }
         return;
       }
 
-      if (shouldStreamLargePdf) {
-        if (streamSetup?.transport) {
-          activeTransport = streamSetup.transport;
-        } else {
-          setStreamStats(null);
-        }
+      if (activeTransport) {
+        activeTransport.setDocReady();
       }
+      loadedDoc = doc;
 
-      let prewarmedBytes = null;
-      if (!activeTransport && !pdfData && url) {
-        const preBytesPromise = consumePrewarmedPdfBytes(url);
-        if (preBytesPromise) {
-          try {
-            prewarmedBytes = await preBytesPromise;
-          } catch {
-            prewarmedBytes = null;
-          }
-          if (!active) return;
-        }
-      }
+      const totalPages = doc.numPages || 1;
+      const pageCountLabel = `${totalPages} ${totalPages === 1 ? 'page' : 'pages'}`;
+      advanceProgress(88, 'Loading Page Layout...', pageCountLabel);
 
-      pooledWorker = acquirePdfWorker(pdfjsLib);
-      const workerOpt = pooledWorker ? { worker: pooledWorker } : {};
-      const pdfVerbosity = pdfjsLib.VerbosityLevel?.ERRORS ?? 0;
-      const inMemoryData = pdfData ? pdfData.slice() : prewarmedBytes;
-      const localCmapUrl =
-        typeof window !== 'undefined' ? `${window.location.origin}/pdfjs/cmaps/` : '/pdfjs/cmaps/';
-      loadingTask = pdfjsLib.getDocument(
-        activeTransport
-          ? {
-            ...workerOpt,
-            range: activeTransport,
-            length: activeTransport.length,
-            rangeChunkSize: activeTransport.chunkSize || STREAM_CHUNK_SIZE,
-            disableAutoFetch: true,
-            disableStream: true,
-            cMapUrl: localCmapUrl,
-            cMapPacked: true,
-            enableXfa: false,
-            verbosity: pdfVerbosity
-          }
-          : inMemoryData
-            ? {
-              ...workerOpt,
-              data: inMemoryData,
-              cMapUrl: localCmapUrl,
-              cMapPacked: true,
-              enableXfa: false,
-              verbosity: pdfVerbosity
-            }
-            : {
-              ...workerOpt,
-              url,
-              cMapUrl: localCmapUrl,
-              cMapPacked: true,
-              enableXfa: false,
-              disableAutoFetch: false,
-              rangeChunkSize: 262144,
-              verbosity: pdfVerbosity
-            }
-      );
+      const requestedStart = Number(initialPageRef.current) || 1;
+      const rawStartPage = Math.max(1, Math.min(requestedStart, totalPages));
+      const willBeTwoPage = Boolean(twoPageModeRef.current && totalPages > 1);
+      const startPage = willBeTwoPage ? getSpreadStartPage(rawStartPage, coverSpreadOffsetRef.current) : rawStartPage;
 
-      if (!activeTransport && !inMemoryData) {
-        loadingTask.onProgress = (progressData) => {
-          if (!active || !progressData) return;
-          if (typeof progressData.total === 'number' && progressData.total > 0) {
-            const pct = Math.min(99, Math.max(0, Math.round((progressData.loaded / progressData.total) * 100)));
-            setDownloadProgress(pct);
-          }
-        };
-      }
-
-      loadingTask.promise.then(async (doc) => {
+      // Probe startPage dimensions BEFORE mounting pages so placeholders have exact heights in 1 render
+      let measuredRatio = null;
+      try {
+        const pStart = await doc.getPage(startPage);
         if (!active) {
-          try { doc.destroy(); } catch { /* ignore teardown error */ }
+          try { doc.destroy(); } catch { /* ignore */ }
           return;
         }
-        if (activeTransport) {
-          activeTransport.docReady = true;
+        const vp = pStart.getViewport({ scale: 1 });
+        if (vp && vp.width > 0) {
+          measuredRatio = vp.height / vp.width;
         }
-        loadedDoc = doc;
+      } catch {
+        // Fallback to default ratio if initial page probe fails
+      }
 
-        // Fetch page 1 dimensions BEFORE mounting pages so all placeholders have exact heights in 1 render
-        let measuredRatio = null;
-        try {
-          const p1 = await doc.getPage(1);
-          if (!active) {
-            try { doc.destroy(); } catch { /* ignore teardown error */ }
-            return;
-          }
-          const vp = p1.getViewport({ scale: 1 });
-          if (vp && vp.width > 0) {
-            measuredRatio = vp.height / vp.width;
-          }
-        } catch {
-          // Fallback to default ratio if page 1 probe fails
-        }
-
-        if (!active) return;
-        const requestedStart = Number(initialPageRef.current) || 1;
-        const rawStartPage = Math.max(1, Math.min(requestedStart, doc.numPages || 1));
-        const willBeTwoPage = Boolean(twoPageModeRef.current && doc.numPages > 1);
-        const startPage = willBeTwoPage ? getSpreadStartPage(rawStartPage, coverSpreadOffsetRef.current) : rawStartPage;
-        const initialWindow = new Set([startPage]);
-        if (willBeTwoPage && startPage + 1 <= doc.numPages) {
-          initialWindow.add(startPage + 1);
-        }
-
-        pendingInitialJumpRef.current = startPage > 1 ? startPage : null;
-        if (measuredRatio) {
-          setDefaultAspectRatio(measuredRatio);
-        }
-        if (scrollAreaRef.current && startPage <= 1) {
-          scrollAreaRef.current.scrollTop = 0;
-          scrollAreaRef.current.scrollLeft = 0;
-        }
-        setPdfDoc(doc);
-        setNumPages(doc.numPages);
-        setCurrentPage(startPage);
-        setInputPage(String(startPage));
-        setVisiblePages(initialWindow);
-        setDownloadProgress(100);
-        setLoading(false);
-      }).catch((err) => {
-        if (!active) return;
-        console.error('[WebPDF] Load error for URL', url, err);
-        setLoadError(err?.message || 'Failed to stream PDF preview');
-        setLoading(false);
-      });
-    }).catch((err) => {
       if (!active) return;
-      console.warn('[WebPDF] Failed to initialize PDF.js engine:', err);
-      setLoadError('Failed to load WebPDF engine');
+      const initialWindow = new Set([startPage]);
+      if (willBeTwoPage && startPage + 1 <= totalPages) {
+        initialWindow.add(startPage + 1);
+      }
+
+      pendingInitialJumpRef.current = startPage > 1 ? startPage : null;
+      if (measuredRatio) {
+        setDefaultAspectRatio(measuredRatio);
+      }
+      if (scrollAreaRef.current && startPage <= 1) {
+        scrollAreaRef.current.scrollTop = 0;
+        scrollAreaRef.current.scrollLeft = 0;
+      }
+      advanceProgress(94, 'Rendering First Page...', pageCountLabel);
+      setPdfDoc(doc);
+      setNumPages(totalPages);
+      setCurrentPage(startPage);
+      setInputPage(String(startPage));
+      setVisiblePages(initialWindow);
       setLoading(false);
-    });
+    })();
 
     return () => {
       active = false;
@@ -611,14 +745,16 @@ export const PdfViewerPane = ({
       if (activeTransport) {
         try { activeTransport.abort(); } catch { /* ignore abort error */ }
       }
+      const teardowns = [];
       if (loadingTask) {
-        try { loadingTask.destroy(); } catch { /* ignore teardown error */ }
+        try { teardowns.push(loadingTask.destroy()); } catch { hadWorkerFailure = true; }
       }
       if (loadedDoc) {
-        try { loadedDoc.destroy(); } catch { /* ignore teardown error */ }
+        try { teardowns.push(loadedDoc.destroy()); } catch { hadWorkerFailure = true; }
       }
       if (pooledWorker) {
-        releasePdfWorker(pooledWorker);
+        const allTeardown = teardowns.length > 0 ? Promise.allSettled(teardowns) : null;
+        releasePdfWorker(pooledWorker, allTeardown, { discard: hadWorkerFailure });
         pooledWorker = null;
       }
     };
@@ -895,7 +1031,10 @@ export const PdfViewerPane = ({
   // Safety reveal if a page takes unusually long after metadata resolves
   useEffect(() => {
     if (loading || firstPagePainted || loadError) return;
-    const t = setTimeout(() => setFirstPagePainted(true), 2200);
+    const t = setTimeout(() => {
+      setLoadProgress(100);
+      setFirstPagePainted(true);
+    }, 2200);
     return () => clearTimeout(t);
   }, [loading, firstPagePainted, loadError]);
 
@@ -904,6 +1043,7 @@ export const PdfViewerPane = ({
       paintedPagesRef.current.add(renderedPageNum);
       setPaintTick((t) => t + 1);
     }
+    setLoadProgress(100);
     setFirstPagePainted(true);
   }, []);
 
@@ -1213,6 +1353,22 @@ export const PdfViewerPane = ({
             </a>
           )}
         </div>
+
+        {firstPagePainted && activeStreamBurst && activeStreamBurst.inFlight > 0 && (
+          <div
+            className="pdf-toolbar-stream-bar"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={activeStreamBurst.pct}
+            aria-label="Streaming jumped pages"
+          >
+            <div
+              className="pdf-toolbar-stream-fill"
+              style={{ width: `${activeStreamBurst.pct}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Main PDF Scrollable Stage */}
@@ -1223,29 +1379,25 @@ export const PdfViewerPane = ({
         {(loading || !firstPagePainted) && !loadError && (
           <div className="pdf-loading-overlay">
             <div className="pdf-loading-card">
-              <div className="pdf-loading-bar-track">
-                {streamStats ? (
-                  <div className="pdf-loading-bar-fill" />
-                ) : typeof downloadProgress === 'number' ? (
-                  <div
-                    className="pdf-loading-bar-fill determinate"
-                    style={{ width: `${Math.max(8, downloadProgress)}%` }}
-                  />
-                ) : (
-                  <div className="pdf-loading-bar-fill" />
-                )}
+              <div className="pdf-loading-header">
+                <span className="pdf-loading-title">{loadPhaseLabel}</span>
+                <span className="pdf-loading-pct">{loadProgress}%</span>
               </div>
-              <div className="pdf-loading-title">
-                {streamStats
-                  ? (loading ? 'Streaming Pages...' : 'Rendering Document')
-                  : typeof downloadProgress === 'number' && downloadProgress < 100
-                    ? `Downloading Document (${downloadProgress}%)`
-                    : 'Rendering Document'}
+              <div
+                className="pdf-loading-bar-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={loadProgress}
+                aria-label="PDF loading progress"
+              >
+                <div
+                  className="pdf-loading-bar-fill determinate"
+                  style={{ width: `${Math.max(4, loadProgress)}%` }}
+                />
               </div>
               <div className="pdf-loading-subtext">
-                {streamStats && streamStats.loadedBytes > 0
-                  ? `Streaming ${(streamStats.loadedBytes / 1048576).toFixed(1)} MB...`
-                  : (title || 'Preparing vector pages...')}
+                {loadSubtext || title || 'Preparing vector pages...'}
               </div>
             </div>
           </div>
@@ -1258,8 +1410,11 @@ export const PdfViewerPane = ({
             <div className="pdf-error-actions">
               <button
                 type="button"
-                className="modal-action-link"
-                onClick={() => setRetrySeq((n) => n + 1)}
+                className="modal-action-link primary"
+                onClick={() => {
+                  if (url) invalidateSessionPdfCache(url);
+                  setRetrySeq((n) => n + 1);
+                }}
               >
                 Retry
               </button>

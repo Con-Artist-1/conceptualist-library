@@ -26,9 +26,11 @@ export const PdfPaneSkeleton = ({ title, subtitle }) => (
         ))}
       </div>
       <div className="pdf-skeleton-status-pill">
-        <span className="pdf-skeleton-spinner" />
+        <div className="pdf-skeleton-progress-track" aria-hidden="true">
+          <div className="pdf-skeleton-progress-fill" />
+        </div>
         <span>{title || 'Loading Examination PDF...'}</span>
-        {subtitle && <small style={{ marginLeft: 6, opacity: 0.8 }}>{subtitle}</small>}
+        {subtitle && <small style={{ marginLeft: 4, opacity: 0.8 }}>{subtitle}</small>}
       </div>
     </div>
   </div>

@@ -1,9 +1,9 @@
-// High-speed HTTP byte-range streaming transport for PDFs (>= 2.5 MB) in WebPDF viewer:
-// - Parallel Head (512 KB–1 MB) + EOF Tail chunk bootstrap eliminates Wave 1 & Page-1 head misses.
-// - LIFO concurrency-4 range scheduler prevents Hugging Face XetHub queueing spikes & prioritizes active jumps.
-// - Streaming 2-chunk read-ahead via ReadableStream.getReader() delivers the requested chunk immediately
-//   while warming the adjacent chunk on the same HTTP/2 stream with zero extra RTT.
-// - Bounded LRU chunk cache makes scrolling back to visited pages instant (0 ms, 0 network requests).
+// High-speed HTTP byte-range streaming transport for large PDFs in WebPDF viewer:
+// - Parallel Head (512 KB–1 MB) + 2-chunk EOF Tail bootstrap eliminates Wave 1 & Catalog/Pages head misses.
+// - Priority-partitioned LIFO concurrency-6 range scheduler puts viewport jumps ahead of speculative read-ahead.
+// - 100% transfer-safe buffer ownership: every chunk stored in or served from sessionChunkCache is an isolated
+//   Uint8Array copy so PDF.js postMessage ArrayBuffer transfers NEVER detach cached session memory.
+// - Strict byte-length validation + 12s timeout + 3-attempt exponential retries prevent partial-206 deadlocks.
 
 import {
   LARGE_PDF_STREAM_THRESHOLD,
@@ -12,15 +12,19 @@ import {
   setCachedCdnMeta,
   invalidateCachedCdnMeta,
   consumePrewarmedRangeBootstrap,
-  fetchRangeBootstrapBundle
+  fetchRangeBootstrapBundle,
+  isLiveUint8Array,
+  cloneUint8Array
 } from './pdfPrewarm.js';
 
 export { LARGE_PDF_STREAM_THRESHOLD, shouldUseRangeStreaming, getStreamChunkSize };
 export const STREAM_CHUNK_SIZE = 262144;
 
 const UNLINEARIZED_SINGLE_STREAM_MAX = 15 * 1024 * 1024;
-const MAX_CONCURRENT_RANGE_FETCHES = 4; // Avoids xet-bridge-us 6-stream TTFB throttling cliff
-const MAX_SESSION_CACHED_CHUNKS = 128; // Bounded session-wide LRU (~32-64 MB) so reopens & back-jumps hit RAM in 0ms
+const MAX_CONCURRENT_RANGE_FETCHES = 6;
+const MAX_SESSION_CACHED_CHUNKS = 160;
+const CHUNK_FETCH_TIMEOUT_MS = 12000;
+const CHUNK_RETRY_BACKOFFS_MS = [180, 450, 950];
 
 // Session-level LRU cache keyed by `${originalUrl}::${chunkSize}::${chunkIdx}`
 const sessionChunkCache = new Map();
@@ -28,9 +32,12 @@ const sessionInitialCache = new Map(); // url -> { resolvedCdnUrl, totalLength, 
 const SESSION_INITIAL_TTL_MS = 8 * 60 * 1000;
 
 function putSessionChunk(cachePrefix, chunkIdx, u8) {
+  if (!isLiveUint8Array(u8)) return;
+  const owned =
+    u8.byteOffset !== 0 || u8.byteLength !== u8.buffer.byteLength ? u8.slice() : u8;
   const key = `${cachePrefix}${chunkIdx}`;
   if (sessionChunkCache.has(key)) sessionChunkCache.delete(key);
-  sessionChunkCache.set(key, u8);
+  sessionChunkCache.set(key, owned);
   while (sessionChunkCache.size > MAX_SESSION_CACHED_CHUNKS) {
     const oldest = sessionChunkCache.keys().next().value;
     if (oldest === undefined) break;
@@ -41,10 +48,25 @@ function putSessionChunk(cachePrefix, chunkIdx, u8) {
 function getSessionChunk(cachePrefix, chunkIdx) {
   const key = `${cachePrefix}${chunkIdx}`;
   const hit = sessionChunkCache.get(key);
-  if (!hit) return null;
+  if (!isLiveUint8Array(hit)) {
+    if (hit !== undefined) sessionChunkCache.delete(key);
+    return null;
+  }
   sessionChunkCache.delete(key);
   sessionChunkCache.set(key, hit);
   return hit;
+}
+
+export function invalidateSessionPdfCache(url) {
+  if (!url) return;
+  sessionInitialCache.delete(url);
+  invalidateCachedCdnMeta(url);
+  const prefix = `${url}::`;
+  for (const key of sessionChunkCache.keys()) {
+    if (key.startsWith(prefix)) {
+      sessionChunkCache.delete(key);
+    }
+  }
 }
 
 function bufferSliceContainsAscii(u8, needle) {
@@ -56,8 +78,25 @@ function bufferSliceContainsAscii(u8, needle) {
   return header.includes(needle);
 }
 
+function sleepWithAbort(ms, signal) {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException('Aborted', 'AbortError'));
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (signal) signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    }
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 /**
- * Resolve redirects once, pre-fetch Head + EOF Tail in parallel, and stream byte ranges on demand.
+ * Resolve redirects once, pre-fetch Head + 2-chunk EOF Tail in parallel, and stream byte ranges on demand.
  * Accepts either pdfjsLib or a Promise resolving to pdfjsLib so network bootstrap runs in parallel with module load!
  */
 export async function createLargePdfRangeTransport(
@@ -65,22 +104,44 @@ export async function createLargePdfRangeTransport(
   url,
   fileSize,
   signal,
-  onBytesProgress,
-  onInitialRangeError
+  onStreamState,
+  onRangeError
 ) {
+  const emitBootProgress = (loaded, total) => {
+    const safeTotal = Number(fileSize) || total || 0;
+    onStreamState?.({
+      loadedBytes: loaded,
+      totalBytes: safeTotal,
+      bootstrapRatio: total > 0 ? Math.min(1, loaded / total) : 0,
+      docChunksResolved: 0,
+      activeRequests: 1,
+      burstDone: 0,
+      burstTotal: 0
+    });
+  };
+
   const bootTask = (async () => {
     const cachedBoot = sessionInitialCache.get(url);
-    if (cachedBoot && Date.now() - cachedBoot.ts <= SESSION_INITIAL_TTL_MS) {
-      return { ...cachedBoot, tailChunksPromise: null };
+    if (
+      cachedBoot &&
+      Date.now() - cachedBoot.ts <= SESSION_INITIAL_TTL_MS &&
+      isLiveUint8Array(cachedBoot.initialData)
+    ) {
+      return {
+        ...cachedBoot,
+        initialData: cloneUint8Array(cachedBoot.initialData),
+        tailChunksPromise: null
+      };
     }
-    const prewarmedPromise = consumePrewarmedRangeBootstrap(url);
+    sessionInitialCache.delete(url);
+    const prewarmedPromise = consumePrewarmedRangeBootstrap(url, emitBootProgress);
     if (prewarmedPromise) {
       const pre = await prewarmedPromise;
-      if (pre && pre.initialData && pre.totalLength > pre.chunkSize * 2) {
+      if (pre && isLiveUint8Array(pre.initialData) && pre.totalLength > pre.chunkSize * 2) {
         return pre;
       }
     }
-    return fetchRangeBootstrapBundle(url, fileSize, signal);
+    return fetchRangeBootstrapBundle(url, fileSize, signal, emitBootProgress);
   })();
 
   const [pdfjsLib, bootBundle] = await Promise.all([
@@ -88,7 +149,7 @@ export async function createLargePdfRangeTransport(
     bootTask
   ]);
 
-  if (!bootBundle || !bootBundle.initialData) {
+  if (!bootBundle || !isLiveUint8Array(bootBundle.initialData)) {
     return null;
   }
 
@@ -96,11 +157,14 @@ export async function createLargePdfRangeTransport(
     resolvedCdnUrl,
     totalLength,
     chunkSize: baseChunkSize,
-    initialData,
+    initialData: rawInitialData,
     tailChunksPromise
   } = bootBundle;
 
-  const isLinearized = bufferSliceContainsAscii(initialData, '/Linearized');
+  const bootBytes = cloneUint8Array(rawInitialData);
+  if (!bootBytes) return null;
+
+  const isLinearized = bufferSliceContainsAscii(bootBytes, '/Linearized');
   if (!isLinearized && totalLength <= UNLINEARIZED_SINGLE_STREAM_MAX) {
     return null;
   }
@@ -115,64 +179,107 @@ export async function createLargePdfRangeTransport(
     resolvedCdnUrl,
     totalLength,
     chunkSize: baseChunkSize,
-    initialData,
+    initialData: bootBytes.slice(),
     ts: Date.now()
   });
 
-  let loadedBytes = initialData.byteLength;
+  let loadedBytes = bootBytes.byteLength;
   const countedChunks = new Set();
-  onBytesProgress?.(loadedBytes, totalLength);
 
   class DirectRangeTransport extends pdfjsLib.PDFDataRangeTransport {
     constructor() {
-      super(totalLength, initialData);
+      // Pass an isolated slice to PDF.js so transferring its ArrayBuffer to the worker never detaches bootBytes
+      super(totalLength, bootBytes.slice());
       this.cdnUrl = resolvedCdnUrl;
       this.originalUrl = url;
       this.chunkSize = chunkSize;
       this.activeCtrls = new Set();
-      this.pendingQueue = []; // LIFO stack so newest visible page/jump always executes next
+      this.requiredQueue = []; // LIFO stack for active viewport / requested ranges
+      this.speculativeQueue = []; // LIFO stack for background read-ahead
       this.inFlightCount = 0;
-      this.inflightChunks = new Map(); // chunkIdx -> Promise<Uint8Array>
+      this.inflightChunks = new Map(); // chunkIdx -> Promise<Uint8Array | null>
       this.aborted = false;
       this.docReady = false;
+      this.docChunksResolved = 0;
+      this.burstDone = 0;
+      this.burstTotal = 0;
       this.refreshPromise = null;
 
-      // Seed sessionChunkCache with initialData slices
-      for (let off = 0; off + chunkSize <= initialData.byteLength; off += chunkSize) {
+      // Seed sessionChunkCache with isolated chunk copies of bootBytes
+      for (let off = 0; off + chunkSize <= bootBytes.byteLength; off += chunkSize) {
         const idx = off / chunkSize;
         countedChunks.add(idx);
-        putSessionChunk(cachePrefix, idx, initialData.subarray(off, off + chunkSize));
+        putSessionChunk(cachePrefix, idx, bootBytes.slice(off, off + chunkSize));
       }
 
-      // Wire parallel EOF tail chunk into cache/inflight map so Wave 1 resolves in 0 extra RTTs!
+      this.emitState(1);
+
+      // Wire parallel 2-chunk EOF tail into cache/inflight map so Wave 1 resolves in 0 extra RTTs
       if (tailChunksPromise && chunkSize === baseChunkSize) {
         const lastIdx = Math.floor((totalLength - 1) / chunkSize);
-        if (lastIdx * chunkSize >= initialData.byteLength && !getSessionChunk(cachePrefix, lastIdx)) {
-          const perChunkPromise = tailChunksPromise.then((slices) => {
-            this.inflightChunks.delete(lastIdx);
-            const hit = Array.isArray(slices) ? slices.find((s) => s.chunkIndex === lastIdx) : null;
-            if (hit?.data && !this.aborted) {
-              this.putCachedChunk(lastIdx, hit.data);
-              return hit.data;
+        const firstTailIdx = Math.max(Math.ceil(bootBytes.byteLength / chunkSize), lastIdx - 1);
+        const tailShared = tailChunksPromise.then((slices) => {
+          if (!Array.isArray(slices) || this.aborted) return null;
+          for (const s of slices) {
+            if (isLiveUint8Array(s.data)) {
+              this.putCachedChunk(s.chunkIndex, s.data.slice());
             }
-            return null;
-          });
-          this.inflightChunks.set(lastIdx, perChunkPromise);
+          }
+          return slices;
+        });
+        tailShared.catch(() => {});
+
+        for (let idx = firstTailIdx; idx <= lastIdx; idx++) {
+          if (idx * chunkSize >= bootBytes.byteLength && !this.hasCachedChunk(idx)) {
+            const perChunkPromise = tailShared.then((slices) => {
+              this.inflightChunks.delete(idx);
+              const hit = Array.isArray(slices) ? slices.find((s) => s.chunkIndex === idx) : null;
+              return hit && isLiveUint8Array(hit.data) ? hit.data : null;
+            });
+            perChunkPromise.catch(() => {});
+            this.inflightChunks.set(idx, perChunkPromise);
+          }
         }
       }
     }
 
+    emitState(bootstrapRatio = 1) {
+      if (this.aborted) return;
+      onStreamState?.({
+        loadedBytes,
+        totalBytes: totalLength,
+        bootstrapRatio,
+        docChunksResolved: this.docChunksResolved,
+        activeRequests: this.inFlightCount + this.requiredQueue.length + this.speculativeQueue.length,
+        burstDone: this.burstDone,
+        burstTotal: this.burstTotal
+      });
+    }
+
+    setDocReady() {
+      this.docReady = true;
+      this.burstDone = 0;
+      this.burstTotal = 0;
+      this.emitState(1);
+    }
+
     hasCachedChunk(chunkIdx) {
-      return sessionChunkCache.has(`${cachePrefix}${chunkIdx}`);
+      return getSessionChunk(cachePrefix, chunkIdx) !== null;
     }
 
     putCachedChunk(chunkIdx, u8) {
+      if (!isLiveUint8Array(u8)) return;
       if (!countedChunks.has(chunkIdx)) {
         countedChunks.add(chunkIdx);
         loadedBytes = Math.min(totalLength, loadedBytes + u8.byteLength);
-        onBytesProgress?.(loadedBytes, totalLength);
       }
       putSessionChunk(cachePrefix, chunkIdx, u8);
+      if (!this.docReady) {
+        this.docChunksResolved += 1;
+      } else if (this.burstTotal > 0) {
+        this.burstDone = Math.min(this.burstTotal, this.burstDone + 1);
+      }
+      this.emitState(1);
     }
 
     getCachedChunk(chunkIdx) {
@@ -201,12 +308,23 @@ export async function createLargePdfRangeTransport(
     }
 
     pumpQueue() {
-      while (!this.aborted && this.inFlightCount < MAX_CONCURRENT_RANGE_FETCHES && this.pendingQueue.length > 0) {
-        // LIFO pop prioritizes the user's current viewport / page jump ahead of older offscreen requests
-        const job = this.pendingQueue.pop();
+      while (
+        !this.aborted &&
+        this.inFlightCount < MAX_CONCURRENT_RANGE_FETCHES &&
+        (this.requiredQueue.length > 0 || this.speculativeQueue.length > 0)
+      ) {
+        const job =
+          this.requiredQueue.length > 0
+            ? this.requiredQueue.pop()
+            : this.speculativeQueue.pop();
         this.inFlightCount++;
         job().finally(() => {
           this.inFlightCount = Math.max(0, this.inFlightCount - 1);
+          if (this.inFlightCount === 0 && this.requiredQueue.length === 0 && this.speculativeQueue.length === 0) {
+            this.burstDone = 0;
+            this.burstTotal = 0;
+          }
+          this.emitState(1);
           this.pumpQueue();
         });
       }
@@ -219,12 +337,12 @@ export async function createLargePdfRangeTransport(
           c++;
           continue;
         }
-        // Coalesce up to 2 contiguous missing chunks (or +1 forward read-ahead chunk) streamed via ReadableStream.getReader()
-        // so chunk 1 resolves IMMEDIATELY while chunk 2 warms on the same HTTP/2 stream with zero extra RTT!
+        // Coalesce up to 2 contiguous chunks; only attach speculative +1 read-ahead after initial docReady
         let batchEnd = c;
         if (c + 1 <= endChunk && !this.hasCachedChunk(c + 1) && !this.inflightChunks.has(c + 1)) {
           batchEnd = c + 1;
         } else if (
+          this.docReady &&
           c === endChunk &&
           (c + 1) * chunkSize < totalLength &&
           !this.hasCachedChunk(c + 1) &&
@@ -243,15 +361,18 @@ export async function createLargePdfRangeTransport(
             resolveFn = res;
             rejectFn = rej;
           });
-          // Attach noop catch so speculative read-ahead chunk never triggers unhandledRejection on abort
           p.catch(() => {});
           this.inflightChunks.set(k, p);
           resolvers.set(k, { resolveFn, rejectFn });
         }
 
-        this.pendingQueue.push(() => this.fetchChunkBatch(batchFirst, batchLast, resolvers));
+        if (this.docReady) {
+          this.burstTotal += batchLast - batchFirst + 1;
+        }
+        this.requiredQueue.push(() => this.fetchChunkBatch(batchFirst, batchLast, resolvers));
         c = batchLast + 1;
       }
+      this.emitState(1);
       this.pumpQueue();
     }
 
@@ -267,20 +388,40 @@ export async function createLargePdfRangeTransport(
       const byteBegin = batchFirst * chunkSize;
       const byteEnd = Math.min(totalLength, (batchLast + 1) * chunkSize);
       const expectedTotal = byteEnd - byteBegin;
-      const ctrl = new AbortController();
-      this.activeCtrls.add(ctrl);
+      let lastError = null;
 
-      const attemptFetch = async (attempt = 0) => {
+      for (let attempt = 0; attempt <= CHUNK_RETRY_BACKOFFS_MS.length; attempt++) {
+        if (this.aborted) {
+          for (const [k, rv] of resolvers.entries()) {
+            this.inflightChunks.delete(k);
+            rv.rejectFn(new DOMException('Aborted', 'AbortError'));
+          }
+          return;
+        }
+
+        const attemptCtrl = new AbortController();
+        this.activeCtrls.add(attemptCtrl);
+        let timedOut = false;
+        const timeoutId = setTimeout(() => {
+          timedOut = true;
+          attemptCtrl.abort(new Error(`Range chunk timeout (${byteBegin}-${byteEnd - 1})`));
+        }, CHUNK_FETCH_TIMEOUT_MS);
+
         try {
-          const res = await fetch(this.cdnUrl, {
+          let res = await fetch(this.cdnUrl, {
             headers: { Range: `bytes=${byteBegin}-${byteEnd - 1}` },
-            signal: ctrl.signal
+            signal: attemptCtrl.signal
           });
-          if ((res.status === 401 || res.status === 403) && attempt === 0 && this.cdnUrl !== this.originalUrl) {
-            await this.refreshCdnUrl(ctrl.signal);
-            return attemptFetch(1);
+          if ((res.status === 401 || res.status === 403) && this.cdnUrl !== this.originalUrl) {
+            try { await res.body?.cancel?.(); } catch { /* ignore */ }
+            await this.refreshCdnUrl(attemptCtrl.signal);
+            res = await fetch(this.cdnUrl, {
+              headers: { Range: `bytes=${byteBegin}-${byteEnd - 1}` },
+              signal: attemptCtrl.signal
+            });
           }
           if (!res.ok) {
+            try { await res.body?.cancel?.(); } catch { /* ignore */ }
             throw new Error(`HTTP ${res.status}`);
           }
 
@@ -290,8 +431,10 @@ export async function createLargePdfRangeTransport(
             for (let k = batchFirst; k <= batchLast; k++) {
               const s = k * chunkSize;
               const e = Math.min(totalLength, (k + 1) * chunkSize);
-              if (s >= fullBuf.byteLength) throw new Error('HTTP 200 payload shorter than requested offset');
-              const slice = fullBuf.slice(s, Math.min(e, fullBuf.byteLength));
+              if (s >= fullBuf.byteLength || fullBuf.byteLength < e) {
+                throw new Error('HTTP 200 payload shorter than requested offset');
+              }
+              const slice = fullBuf.slice(s, e);
               this.putCachedChunk(k, slice);
               const rv = resolvers.get(k);
               if (rv) {
@@ -304,7 +447,13 @@ export async function createLargePdfRangeTransport(
           }
 
           if (res.status !== 206) {
+            try { await res.body?.cancel?.(); } catch { /* ignore */ }
             throw new Error(`Unexpected HTTP ${res.status} on range request`);
+          }
+
+          if (res.url) {
+            this.cdnUrl = res.url;
+            setCachedCdnMeta(this.originalUrl, res.url, totalLength);
           }
 
           if (res.body && typeof res.body.getReader === 'function' && batchLast > batchFirst) {
@@ -313,12 +462,12 @@ export async function createLargePdfRangeTransport(
             let filled = 0;
             let nextChunk = batchFirst;
 
-            const flushReadyChunks = (streamFinished) => {
+            const flushReadyChunks = () => {
               while (nextChunk <= batchLast) {
                 const relStart = (nextChunk - batchFirst) * chunkSize;
                 const relEnd = Math.min(expectedTotal, relStart + chunkSize);
-                if (filled >= relEnd || (streamFinished && filled > relStart)) {
-                  const slice = buffer.slice(relStart, Math.min(filled, relEnd));
+                if (filled >= relEnd) {
+                  const slice = buffer.slice(relStart, relEnd);
                   this.putCachedChunk(nextChunk, slice);
                   const rv = resolvers.get(nextChunk);
                   if (rv) {
@@ -341,20 +490,25 @@ export async function createLargePdfRangeTransport(
                 if (copyLen > 0) {
                   buffer.set(value.subarray(0, copyLen), filled);
                   filled += copyLen;
-                  flushReadyChunks(false);
+                  flushReadyChunks();
                 }
               }
             }
-            if (!this.aborted) {
-              flushReadyChunks(true);
+            if (this.aborted) return;
+            flushReadyChunks();
+            if (filled < expectedTotal || nextChunk <= batchLast) {
+              throw new Error(`Truncated HTTP 206 range response (${filled}/${expectedTotal} bytes)`);
             }
           } else {
             const ab = await res.arrayBuffer();
             if (this.aborted) return;
             const raw = new Uint8Array(ab);
+            if (raw.byteLength < expectedTotal) {
+              throw new Error(`Truncated HTTP 206 range response (${raw.byteLength}/${expectedTotal} bytes)`);
+            }
             for (let k = batchFirst; k <= batchLast; k++) {
               const relStart = (k - batchFirst) * chunkSize;
-              const relEnd = Math.min(raw.byteLength, relStart + chunkSize);
+              const relEnd = Math.min(expectedTotal, relStart + chunkSize);
               const slice = raw.slice(relStart, relEnd);
               this.putCachedChunk(k, slice);
               const rv = resolvers.get(k);
@@ -365,40 +519,60 @@ export async function createLargePdfRangeTransport(
               }
             }
           }
+          return;
         } catch (err) {
-          if (this.aborted || err?.name === 'AbortError') {
+          if (this.aborted) {
+            for (const [k, rv] of resolvers.entries()) {
+              this.inflightChunks.delete(k);
+              rv.rejectFn(new DOMException('Aborted', 'AbortError'));
+            }
+            return;
+          }
+          if (err?.name === 'AbortError' && !timedOut) {
             for (const [k, rv] of resolvers.entries()) {
               this.inflightChunks.delete(k);
               rv.rejectFn(err);
             }
             return;
           }
-          if (attempt === 0 && this.cdnUrl !== this.originalUrl) {
+          lastError = timedOut ? new Error(`Range request timed out (${byteBegin}-${byteEnd - 1})`) : err;
+          if (this.cdnUrl !== this.originalUrl) {
+            invalidateCachedCdnMeta(this.originalUrl);
             this.cdnUrl = this.originalUrl;
-            return attemptFetch(1);
           }
-          for (const [k, rv] of resolvers.entries()) {
-            this.inflightChunks.delete(k);
-            rv.rejectFn(err);
-          }
-          console.warn(`[WebPDF] Range request failed (${byteBegin}-${byteEnd}):`, err);
-          if (!this.docReady && !this.aborted) {
-            onInitialRangeError?.(err);
+          if (attempt < CHUNK_RETRY_BACKOFFS_MS.length) {
+            try {
+              await sleepWithAbort(CHUNK_RETRY_BACKOFFS_MS[attempt], signal);
+            } catch {
+              for (const [k, rv] of resolvers.entries()) {
+                this.inflightChunks.delete(k);
+                rv.rejectFn(new DOMException('Aborted', 'AbortError'));
+              }
+              return;
+            }
           }
         } finally {
-          this.activeCtrls.delete(ctrl);
+          clearTimeout(timeoutId);
+          this.activeCtrls.delete(attemptCtrl);
         }
-      };
+      }
 
-      await attemptFetch(0);
+      for (const [k, rv] of resolvers.entries()) {
+        this.inflightChunks.delete(k);
+        rv.rejectFn(lastError || new Error('Range request failed'));
+      }
+      console.warn(`[WebPDF] Range request failed (${byteBegin}-${byteEnd}):`, lastError);
+      if (!this.aborted) {
+        onRangeError?.(lastError || new Error('Range request failed'), this.docReady);
+      }
     }
 
     requestDataRange(begin, end) {
       if (this.aborted) return;
 
       // Always defer synchronous cache hits by one microtask so PDF.js finishes registering its RangeReader first!
-      if (end <= initialData.byteLength && begin >= 0) {
-        const slice = initialData.slice(begin, end);
+      if (end <= bootBytes.byteLength && begin >= 0) {
+        const slice = bootBytes.slice(begin, end);
         queueMicrotask(() => {
           if (!this.aborted) this.onDataRange(begin, slice);
         });
@@ -422,10 +596,12 @@ export async function createLargePdfRangeTransport(
 
       if (allCached) {
         const slice = this.assembleRangeFromChunks(begin, safeEnd, startChunk, endChunk);
-        queueMicrotask(() => {
-          if (!this.aborted && slice) this.onDataRange(begin, slice);
-        });
-        return;
+        if (slice) {
+          queueMicrotask(() => {
+            if (!this.aborted) this.onDataRange(begin, slice);
+          });
+          return;
+        }
       }
 
       this.ensureChunksScheduled(startChunk, endChunk);
@@ -439,69 +615,70 @@ export async function createLargePdfRangeTransport(
               const p = this.inflightChunks.get(c);
               if (p) chunkBuf = await p;
             }
-            if (!chunkBuf) {
-              // Tail prefetch may have returned null if status != 206; schedule normal fetch
+            if (!isLiveUint8Array(chunkBuf)) {
+              // Tail prefetch or stale entry missed; schedule clean chunk fetch
               this.ensureChunksScheduled(c, c);
               const retryP = this.inflightChunks.get(c);
               chunkBuf = retryP ? await retryP : this.getCachedChunk(c);
             }
-            if (!chunkBuf || this.aborted) return;
+            if (!isLiveUint8Array(chunkBuf) || this.aborted) return;
             parts.push(chunkBuf);
           }
           if (this.aborted) return;
-          const alignedBegin = startChunk * chunkSize;
-          let combined;
-          if (parts.length === 1) {
-            combined = parts[0];
-          } else {
-            const sumLen = parts.reduce((acc, p) => acc + p.byteLength, 0);
-            combined = new Uint8Array(sumLen);
-            let offset = 0;
-            for (const p of parts) {
-              combined.set(p, offset);
-              offset += p.byteLength;
-            }
+
+          const slice = this.assembleRangeFromParts(begin, safeEnd, startChunk, parts);
+          if (!this.aborted && slice) {
+            this.onDataRange(begin, slice);
           }
-          const subStart = Math.max(0, begin - alignedBegin);
-          const subEnd = Math.min(combined.byteLength, subStart + (safeEnd - begin));
-          this.onDataRange(begin, combined.subarray(subStart, subEnd));
         } catch {
           // Handled in fetchChunkBatch error handler
         }
       });
     }
 
-    assembleRangeFromChunks(begin, safeEnd, startChunk, endChunk) {
+    assembleRangeFromParts(begin, safeEnd, startChunk, parts) {
+      const targetLen = safeEnd - begin;
+      if (targetLen <= 0 || parts.length === 0) return null;
       const alignedBegin = startChunk * chunkSize;
-      if (startChunk === endChunk) {
-        const buf = this.getCachedChunk(startChunk);
-        if (!buf) return null;
+      if (parts.length === 1) {
+        const buf = parts[0];
+        if (!isLiveUint8Array(buf)) return null;
         const s = Math.max(0, begin - alignedBegin);
-        const e = Math.min(buf.byteLength, s + (safeEnd - begin));
+        const e = Math.min(buf.byteLength, s + targetLen);
+        // Always return an owned slice so PDF.js transferring buffer to worker never detaches cached chunk!
         return buf.slice(s, e);
       }
+
+      const out = new Uint8Array(targetLen);
+      let writePos = 0;
+      for (let idx = 0; idx < parts.length; idx++) {
+        const buf = parts[idx];
+        if (!isLiveUint8Array(buf)) return null;
+        const chunkGlobalStart = (startChunk + idx) * chunkSize;
+        const s = Math.max(0, begin - chunkGlobalStart);
+        const e = Math.min(buf.byteLength, safeEnd - chunkGlobalStart);
+        if (e > s) {
+          out.set(buf.subarray(s, e), writePos);
+          writePos += e - s;
+        }
+      }
+      return writePos === targetLen ? out : out.slice(0, writePos);
+    }
+
+    assembleRangeFromChunks(begin, safeEnd, startChunk, endChunk) {
       const parts = [];
-      let sumLen = 0;
       for (let c = startChunk; c <= endChunk; c++) {
         const buf = this.getCachedChunk(c);
-        if (!buf) return null;
+        if (!isLiveUint8Array(buf)) return null;
         parts.push(buf);
-        sumLen += buf.byteLength;
       }
-      const combined = new Uint8Array(sumLen);
-      let offset = 0;
-      for (const p of parts) {
-        combined.set(p, offset);
-        offset += p.byteLength;
-      }
-      const s = Math.max(0, begin - alignedBegin);
-      const e = Math.min(combined.byteLength, s + (safeEnd - begin));
-      return combined.subarray(s, e);
+      return this.assembleRangeFromParts(begin, safeEnd, startChunk, parts);
     }
 
     abort() {
       this.aborted = true;
-      this.pendingQueue.length = 0;
+      this.requiredQueue.length = 0;
+      this.speculativeQueue.length = 0;
       for (const ctrl of this.activeCtrls) {
         try { ctrl.abort(); } catch { /* ignore */ }
       }

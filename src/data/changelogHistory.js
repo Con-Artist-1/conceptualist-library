@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.3.2',
+    date: '2026-11-26T22:50:00+06:00',
+    title: 'WebPDF Streaming Crash Fix, Flat Pages O(1) Lookup & Determinate Progress Bar',
+    summary: 'Eliminated the detached ArrayBuffer crash on cached/streamed PDFs, patched PDF.js flat /Pages-tree O(1) lookup so large textbooks open Page 1 in 1–2 range chunks instead of 50–90 MB bursts, and replaced indeterminate spinners/sliders with a real 0%–100% progress bar.',
+    changes: [
+      'Transfer-Safe Range & Prewarm Cache: Isolated every cached chunk, Head bootstrap, and prewarmed buffer with fresh slice copies so PDF.js worker postMessage ArrayBuffer transfers never detach session memory or crash on reopens and chunk 0 reads.',
+      'O(1) Flat /Pages Lookup & Resilient Streaming: Patched PDF.js worker getPageDict to resolve flat /Pages kids directly in O(1) (slashing 29 large textbooks such as the 91.4 MB Mechanics Coursebook from 179 requests / 90.4 MB down to 2 requests / 1.9 MB on Page 1), added 2-chunk EOF tail prefetching, strict byte-length validation, 12s–15s timeouts with 3-attempt retries, async worker pool teardown guards, <= 25 MB direct-download fallback, and canvas memory clamping.',
+      'Real 0%–100% Progress Bar & Error Polish: Replaced indeterminate loading sliders across both streamed and < 5 MB papers (including prewarmed table clicks) with a live monotonic 0%–100% progress bar, subtle toolbar jump-stream indicator, and styled .modal-action-link Retry/Download buttons across Light, Dark, and Pure OLED.'
+    ]
+  },
+  {
     version: 'v8.3.1',
     date: '2026-11-26T21:20:00+06:00',
     title: 'Full-Archive PDF Linearization & High-Speed WebPDF Streaming Overhaul',

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 're
 import { computePageTargetWidth } from '../lib/pdfLayoutMath.js';
 
 /**
- * Single page canvas renderer component with two-pass progressive offscreen painting
- * and IntersectionObserver-driven canvas GPU release when scrolled far out of view.
+ * Single page canvas renderer component with two-pass progressive offscreen painting,
+ * canvas memory clamping, 1-time transient error retry, and IntersectionObserver-driven GPU release.
  */
 export const VirtualPdfPage = React.memo(({
   pdfDoc,
@@ -66,6 +66,7 @@ export const VirtualPdfPage = React.memo(({
     let active = true;
     let offscreenCanvas = null;
     let idleHandle = null;
+    let retryTimer = null;
     let usedIdleCallback = false;
 
     const cancelScheduledIdle = () => {
@@ -78,8 +79,18 @@ export const VirtualPdfPage = React.memo(({
       idleHandle = null;
     };
 
+    const isFatalTeardownErr = (err) => {
+      const msg = String(err?.message || '');
+      return (
+        err?.name === 'RenderingCancelledException' ||
+        msg.includes('destroyed') ||
+        msg.includes('terminated') ||
+        msg.includes('Aborted')
+      );
+    };
+
     const drawPass = (page, unscaledViewport, totalRotation, dprValue, notifyPainted) => {
-      if (!active || !canvasRef.current) return Promise.resolve(false);
+      if (!active || !canvasRef.current) return Promise.resolve({ ok: false, cancelled: true });
       const targetWidth =
         typeof targetWidthOverride === 'number' && targetWidthOverride > 0
           ? targetWidthOverride
@@ -87,19 +98,31 @@ export const VirtualPdfPage = React.memo(({
       const computedScale = targetWidth / unscaledViewport.width;
       const viewport = page.getViewport({ scale: computedScale, rotation: totalRotation });
 
-      const pixelW = Math.max(1, Math.floor(viewport.width * dprValue));
-      const pixelH = Math.max(1, Math.floor(viewport.height * dprValue));
+      const maxDim = isMobile ? 4096 : 6144;
+      const maxArea = isMobile ? 12582912 : 25165824;
+      const rawW = Math.max(1, viewport.width);
+      const rawH = Math.max(1, viewport.height);
+      let safeDpr = dprValue;
+      if (rawW * safeDpr > maxDim) safeDpr = Math.min(safeDpr, maxDim / rawW);
+      if (rawH * safeDpr > maxDim) safeDpr = Math.min(safeDpr, maxDim / rawH);
+      if (rawW * rawH * safeDpr * safeDpr > maxArea) {
+        safeDpr = Math.min(safeDpr, Math.sqrt(maxArea / (rawW * rawH)));
+      }
+      safeDpr = Math.max(0.5, safeDpr);
+
+      const pixelW = Math.max(1, Math.floor(rawW * safeDpr));
+      const pixelH = Math.max(1, Math.floor(rawH * safeDpr));
 
       offscreenCanvas = document.createElement('canvas');
       offscreenCanvas.width = pixelW;
       offscreenCanvas.height = pixelH;
       const offscreenCtx = offscreenCanvas.getContext('2d');
-      if (!offscreenCtx) return Promise.resolve(false);
+      if (!offscreenCtx) return Promise.resolve({ ok: false, cancelled: false });
 
       offscreenCtx.fillStyle = '#FFFFFF';
       offscreenCtx.fillRect(0, 0, pixelW, pixelH);
 
-      const transform = dprValue !== 1 ? [dprValue, 0, 0, dprValue, 0, 0] : null;
+      const transform = Math.abs(safeDpr - 1) > 0.01 ? [safeDpr, 0, 0, safeDpr, 0, 0] : null;
 
       if (renderTaskRef.current) {
         try { renderTaskRef.current.cancel(); } catch { /* noop */ }
@@ -114,10 +137,10 @@ export const VirtualPdfPage = React.memo(({
       renderTaskRef.current = renderTask;
 
       return renderTask.promise.then(() => {
-        if (!active || !canvasRef.current) return false;
+        if (!active || !canvasRef.current) return { ok: false, cancelled: true };
         const targetCanvas = canvasRef.current;
         const targetCtx = targetCanvas.getContext('2d');
-        if (!targetCtx) return false;
+        if (!targetCtx) return { ok: false, cancelled: false };
 
         targetCanvas.width = pixelW;
         targetCanvas.height = pixelH;
@@ -138,63 +161,82 @@ export const VirtualPdfPage = React.memo(({
           setRendered(true);
           if (onPageRendered) onPageRendered(pageNum);
         }
-        return true;
+        return { ok: true, cancelled: false };
       }).catch((err) => {
         if (offscreenCanvas) {
           offscreenCanvas.width = 0;
           offscreenCanvas.height = 0;
           offscreenCanvas = null;
         }
-        if (err?.name !== 'RenderingCancelledException') {
-          console.warn(`[WebPDF] Render error on page ${pageNum}:`, err);
+        if (isFatalTeardownErr(err)) {
+          return { ok: false, cancelled: true };
         }
-        return false;
+        console.warn(`[WebPDF] Render error on page ${pageNum}:`, err);
+        return { ok: false, cancelled: false };
       });
     };
 
-    pdfDoc.getPage(pageNum).then((page) => {
-      if (!active || !canvasRef.current) {
-        if (page && typeof page.cleanup === 'function') {
-          try { page.cleanup(); } catch { /* noop */ }
+    const runPageRender = (attempt = 0) => {
+      if (!active) return;
+      pdfDoc.getPage(pageNum).then((page) => {
+        if (!active || !canvasRef.current) {
+          if (page && typeof page.cleanup === 'function') {
+            try { page.cleanup(); } catch { /* noop */ }
+          }
+          return;
         }
-        return;
-      }
-      loadedPageRef.current = page;
+        loadedPageRef.current = page;
 
-      const totalRotation = ((page.rotate || 0) + rotation) % 360;
-      const unscaledViewport = page.getViewport({ scale: 1, rotation: totalRotation });
-      if (unscaledViewport && unscaledViewport.width > 0) {
-        const ratio = unscaledViewport.height / unscaledViewport.width;
-        setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
-      }
+        const totalRotation = ((page.rotate || 0) + rotation) % 360;
+        const unscaledViewport = page.getViewport({ scale: 1, rotation: totalRotation });
+        if (unscaledViewport && unscaledViewport.width > 0) {
+          const ratio = unscaledViewport.height / unscaledViewport.width;
+          setAspectRatio((prev) => (prev && Math.abs(prev - ratio) < 0.002 ? prev : ratio));
+        }
 
-      // High-DPI scaling capped adaptively on zoomed mobile & large scanned textbooks to preserve GPU & CPU headroom
-      const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : (isLargePdf ? 2.0 : 2.5);
-      const fullDpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-      const useTwoPass = fullDpr > 1.15;
-      const firstPassDpr = useTwoPass ? 1.0 : fullDpr;
+        // High-DPI scaling capped adaptively on zoomed mobile & large scanned textbooks to preserve GPU & CPU headroom
+        const maxDpr = isMobile && typeof scale === 'number' && scale > 1.6 ? 1.75 : (isLargePdf ? 2.0 : 2.5);
+        const fullDpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+        const useTwoPass = fullDpr > 1.15;
+        const firstPassDpr = useTwoPass ? 1.0 : fullDpr;
 
-      drawPass(page, unscaledViewport, totalRotation, firstPassDpr, true).then((painted) => {
-        if (!painted || !active || !useTwoPass || Math.abs(fullDpr - firstPassDpr) <= 0.05) return;
-        const startHiRes = () => {
-          idleHandle = null;
-          if (!active || !canvasRef.current) return;
-          drawPass(page, unscaledViewport, totalRotation, fullDpr, false);
-        };
-        if (typeof window.requestIdleCallback === 'function') {
-          usedIdleCallback = true;
-          idleHandle = window.requestIdleCallback(startHiRes, { timeout: isLargePdf ? 900 : 600 });
+        drawPass(page, unscaledViewport, totalRotation, firstPassDpr, true).then((res) => {
+          if (!active) return;
+          if (!res.ok) {
+            if (!res.cancelled && attempt === 0) {
+              retryTimer = setTimeout(() => runPageRender(1), 250);
+            }
+            return;
+          }
+          if (!useTwoPass || Math.abs(fullDpr - firstPassDpr) <= 0.05) return;
+          const startHiRes = () => {
+            idleHandle = null;
+            if (!active || !canvasRef.current) return;
+            drawPass(page, unscaledViewport, totalRotation, fullDpr, false);
+          };
+          if (typeof window.requestIdleCallback === 'function') {
+            usedIdleCallback = true;
+            idleHandle = window.requestIdleCallback(startHiRes, { timeout: isLargePdf ? 900 : 600 });
+          } else {
+            idleHandle = setTimeout(startHiRes, isLargePdf ? 320 : 140);
+          }
+        });
+      }).catch((err) => {
+        if (!active || isFatalTeardownErr(err)) return;
+        if (attempt === 0) {
+          retryTimer = setTimeout(() => runPageRender(1), 250);
         } else {
-          idleHandle = setTimeout(startHiRes, isLargePdf ? 320 : 140);
+          console.warn(`[WebPDF] GetPage failed on page ${pageNum}:`, err);
         }
       });
-    }).catch((err) => {
-      console.warn(`[WebPDF] GetPage failed on page ${pageNum}:`, err);
-    });
+    };
+
+    runPageRender(0);
 
     return () => {
       active = false;
       cancelScheduledIdle();
+      if (retryTimer !== null) clearTimeout(retryTimer);
       if (renderTaskRef.current) {
         try { renderTaskRef.current.cancel(); } catch { /* noop */ }
       }
