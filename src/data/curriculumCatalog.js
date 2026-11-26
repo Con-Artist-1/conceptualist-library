@@ -454,3 +454,34 @@ export const MATH_CODE_PRIORITY = [
   'WDM11', 'WMA01', 'WMA02',
   '6663', '6664', '6665', '6666'
 ];
+
+export const ARCHIVE_FALLBACK_COUNTS = {
+  totalFiles: 78820,
+  uniqueFiles: 74958,
+  totalBooks: 154,
+  ialBooks: 60,
+  igcseBooks: 13,
+  edexcelBooks: 73,
+  cambridgeBooks: 81,
+  cieAlBooks: 38,
+  cieIgcseBooks: 38,
+  cieOlBooks: 5,
+  dfCount: 212,
+  edexcelDfCount: 46,
+  cambridgeDfCount: 166,
+  audioCount: 591,
+  edexcelAudioCount: 273,
+  cambridgeAudioCount: 318,
+  edexcelUnique: 16083,
+  edexcelTotal: 19944,
+  cambridgeUnique: 58875,
+  cambridgeTotal: 58876
+};
+
+export const THIN_UNIT_MIN_FILES = 3;
+
+export function isThinUnitRoute(meta, curriculum, subject, unitLabel) {
+  if (!curriculum || !subject || !unitLabel) return false;
+  const count = meta?.wizard?.[curriculum]?.[subject]?.units?.[unitLabel]?.count;
+  return typeof count === 'number' && count < THIN_UNIT_MIN_FILES;
+}

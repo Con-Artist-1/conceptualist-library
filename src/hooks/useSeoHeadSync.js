@@ -122,7 +122,7 @@ export function useSeoHeadSync({
       }
     }
 
-    const modalBaseTitle = previewFile && !previewFile.isNotFound
+    const modalBaseTitle = previewFile && !previewFile.isNotFound && !window.location.search.includes('paper=')
       ? (isBookCategory(previewFile.category) || !previewFile.isUnifiedSitting
           ? getDisplayTitle(previewFile)
           : getUnifiedSittingTitle(previewFile))
@@ -150,11 +150,11 @@ export function useSeoHeadSync({
     setMetaTag('meta[name="description"]', 'name', 'description', seoMeta.description);
     setMetaTag('meta[name="keywords"]', 'name', 'keywords', '');
     setMetaTag('meta[name="robots"]', 'name', 'robots', robotsVal);
-    setMetaTag('meta[property="og:title"]', 'property', 'og:title', pageTitle);
+    setMetaTag('meta[property="og:title"]', 'property', 'og:title', seoMeta.title);
     setMetaTag('meta[property="og:description"]', 'property', 'og:description', seoMeta.description);
     setMetaTag('meta[property="og:url"]', 'property', 'og:url', seoMeta.canonicalUrl);
     setMetaTag('meta[property="og:type"]', 'property', 'og:type', 'website');
-    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', pageTitle);
+    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', seoMeta.title);
     setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', seoMeta.description);
 
     let canonicalEl = document.querySelector('link[rel="canonical"]');

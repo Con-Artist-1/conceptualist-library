@@ -99,6 +99,29 @@ async function attachApiAndLibraryMiddlewares(server) {
     return { handled: false, sendJson }
   }
 
+  server.middlewares.use(async (req, res, next) => {
+    const rawUrl = req.url || '/'
+    const qIdx = rawUrl.indexOf('?')
+    if (qIdx === -1) return next()
+    const pathOnly = rawUrl.slice(0, qIdx) || '/'
+    if (pathOnly.startsWith('/api/') || pathOnly.startsWith('/assets/') || pathOnly.startsWith('/shards/') || pathOnly.startsWith('/library-files/') || pathOnly.startsWith('/pdfjs/') || pathOnly.startsWith('/@')) {
+      return next()
+    }
+    const urlObj = new URL(rawUrl, 'http://localhost')
+    const hasLegacyParam = ['paper', 'year', 'variant', 'type'].some((k) => urlObj.searchParams.has(k))
+    if (!hasLegacyParam || urlObj.searchParams.has('q')) return next()
+
+    const { handled } = await loadAndRunApiHandler(
+      'redirect.js',
+      { attempted: false, handler: null },
+      req,
+      res,
+      '/api/redirect'
+    )
+    if (handled) return
+    next()
+  })
+
   const telemetryHandlerState = { attempted: false, handler: null }
   server.middlewares.use('/api/telemetry', async (req, res) => {
     const { handled, sendJson } = await loadAndRunApiHandler(

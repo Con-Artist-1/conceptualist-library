@@ -23,6 +23,7 @@ export function ArchiveContextStrip({ archiveContextInfo }) {
             <a
               key={item.href}
               href={item.href}
+              rel={item.nofollow ? 'nofollow' : undefined}
               className="archive-context-link"
               onClick={(e) => {
                 if (!shouldHandleClientNavigation(e)) return;
@@ -34,6 +35,16 @@ export function ArchiveContextStrip({ archiveContextInfo }) {
             </a>
           ))}
         </nav>
+      )}
+      {Array.isArray(archiveContextInfo.faqs) && archiveContextInfo.faqs.length > 0 && (
+        <div className="archive-context-faqs">
+          {archiveContextInfo.faqs.map((item) => (
+            <div key={item.q} className="archive-faq-item">
+              <h3 className="archive-faq-q">{item.q}</h3>
+              <p className="archive-faq-a">{item.a}</p>
+            </div>
+          ))}
+        </div>
       )}
     </section>
   );

@@ -5,8 +5,88 @@
       "includeFiles": "api/_allowlist.json"
     }
   },
-  "rewrites": [],
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "paper"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "year"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "variant"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "type"
+        }
+      ],
+      "missing": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "destination": "/api/redirect?__pathname=/$1"
+    }
+  ],
   "headers": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "q"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
     {
       "source": "/ial/(.*)",
       "headers": [
@@ -893,8 +973,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/accounting-9706/p1",
+      "destination": "/cambridge/a-level/accounting-9706/paper-1-as-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/p2",
+      "destination": "/cambridge/a-level/accounting-9706/paper-2-fundamentals-of-accounting-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/p3",
+      "destination": "/cambridge/a-level/accounting-9706/paper-3-financial-accounting-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/p4",
+      "destination": "/cambridge/a-level/accounting-9706/paper-4-cost-and-management-accounting-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/paper-1",
+      "destination": "/cambridge/a-level/accounting-9706/paper-1-as-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/paper-2",
+      "destination": "/cambridge/a-level/accounting-9706/paper-2-fundamentals-of-accounting-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/paper-3",
+      "destination": "/cambridge/a-level/accounting-9706/paper-3-financial-accounting-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/accounting-9706/paper-4",
+      "destination": "/cambridge/a-level/accounting-9706/paper-4-cost-and-management-accounting-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/arabic",
       "destination": "/cambridge/a-level/arabic-9680",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/p2",
+      "destination": "/cambridge/a-level/arabic-9680/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/p3",
+      "destination": "/cambridge/a-level/arabic-9680/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/p4",
+      "destination": "/cambridge/a-level/arabic-9680/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/p5",
+      "destination": "/cambridge/a-level/arabic-9680/paper-5-prose",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/paper-2",
+      "destination": "/cambridge/a-level/arabic-9680/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/paper-3",
+      "destination": "/cambridge/a-level/arabic-9680/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/paper-4",
+      "destination": "/cambridge/a-level/arabic-9680/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/arabic-9680/paper-5",
+      "destination": "/cambridge/a-level/arabic-9680/paper-5-prose",
       "permanent": true
     },
     {
@@ -903,8 +1063,103 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/biology-9700/p1",
+      "destination": "/cambridge/a-level/biology-9700/paper-1-multiple-choice-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/p2",
+      "destination": "/cambridge/a-level/biology-9700/paper-2-as-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/p3",
+      "destination": "/cambridge/a-level/biology-9700/paper-3-advanced-practical-skills-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/p4",
+      "destination": "/cambridge/a-level/biology-9700/paper-4-a-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/p5",
+      "destination": "/cambridge/a-level/biology-9700/paper-5-planning-analysis-and-evaluation-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/p6",
+      "destination": "/cambridge/a-level/biology-9700/paper-6",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/paper-1",
+      "destination": "/cambridge/a-level/biology-9700/paper-1-multiple-choice-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/paper-2",
+      "destination": "/cambridge/a-level/biology-9700/paper-2-as-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/paper-3",
+      "destination": "/cambridge/a-level/biology-9700/paper-3-advanced-practical-skills-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/paper-4",
+      "destination": "/cambridge/a-level/biology-9700/paper-4-a-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/biology-9700/paper-5",
+      "destination": "/cambridge/a-level/biology-9700/paper-5-planning-analysis-and-evaluation-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/business",
       "destination": "/cambridge/a-level/business-9609",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/p1",
+      "destination": "/cambridge/a-level/business-9609/paper-1-business-concepts-1-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/p2",
+      "destination": "/cambridge/a-level/business-9609/paper-2-business-concepts-2-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/p3",
+      "destination": "/cambridge/a-level/business-9609/paper-3-business-decision-making-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/p4",
+      "destination": "/cambridge/a-level/business-9609/paper-4-business-strategy-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/paper-1",
+      "destination": "/cambridge/a-level/business-9609/paper-1-business-concepts-1-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/paper-2",
+      "destination": "/cambridge/a-level/business-9609/paper-2-business-concepts-2-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/paper-3",
+      "destination": "/cambridge/a-level/business-9609/paper-3-business-decision-making-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/business-9609/paper-4",
+      "destination": "/cambridge/a-level/business-9609/paper-4-business-strategy-a2",
       "permanent": true
     },
     {
@@ -913,8 +1168,98 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/chemistry-9701/p1",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-1-multiple-choice-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/p2",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-2-as-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/p3",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-3-advanced-practical-skills-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/p4",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-4-a-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/p5",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-5-planning-analysis-and-evaluation-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/p6",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-6",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/paper-1",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-1-multiple-choice-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/paper-2",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-2-as-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/paper-3",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-3-advanced-practical-skills-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/paper-4",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-4-a-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chemistry-9701/paper-5",
+      "destination": "/cambridge/a-level/chemistry-9701/paper-5-planning-analysis-and-evaluation-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/chinese",
       "destination": "/cambridge/a-level/chinese-9715",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/p2",
+      "destination": "/cambridge/a-level/chinese-9715/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/p3",
+      "destination": "/cambridge/a-level/chinese-9715/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/p4",
+      "destination": "/cambridge/a-level/chinese-9715/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/p5",
+      "destination": "/cambridge/a-level/chinese-9715/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/paper-2",
+      "destination": "/cambridge/a-level/chinese-9715/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/paper-3",
+      "destination": "/cambridge/a-level/chinese-9715/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/chinese-9715/paper-4",
+      "destination": "/cambridge/a-level/chinese-9715/paper-4-texts",
       "permanent": true
     },
     {
@@ -923,8 +1268,68 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/computer-science-9618/p1",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-1-theory-fundamentals-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/p2",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-2-problem-solving-and-programming-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/p3",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-3-advanced-theory-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/p4",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-4-practical-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/paper-1",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-1-theory-fundamentals-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/paper-2",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-2-problem-solving-and-programming-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/paper-3",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-3-advanced-theory-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/computer-science-9618/paper-4",
+      "destination": "/cambridge/a-level/computer-science-9618/paper-4-practical-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/design-and-technology",
       "destination": "/cambridge/a-level/design-and-technology-9705",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/design-and-technology-9705/p1",
+      "destination": "/cambridge/a-level/design-and-technology-9705/paper-1-product-design-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/design-and-technology-9705/p3",
+      "destination": "/cambridge/a-level/design-and-technology-9705/paper-3-design-and-manufacture-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/design-and-technology-9705/paper-1",
+      "destination": "/cambridge/a-level/design-and-technology-9705/paper-1-product-design-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/design-and-technology-9705/paper-3",
+      "destination": "/cambridge/a-level/design-and-technology-9705/paper-3-design-and-manufacture-a2",
       "permanent": true
     },
     {
@@ -933,8 +1338,68 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/economics-9708/p1",
+      "destination": "/cambridge/a-level/economics-9708/paper-1-as-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/p2",
+      "destination": "/cambridge/a-level/economics-9708/paper-2-as-data-response-and-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/p3",
+      "destination": "/cambridge/a-level/economics-9708/paper-3-a-level-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/p4",
+      "destination": "/cambridge/a-level/economics-9708/paper-4-a-level-data-response-and-essays",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/paper-1",
+      "destination": "/cambridge/a-level/economics-9708/paper-1-as-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/paper-2",
+      "destination": "/cambridge/a-level/economics-9708/paper-2-as-data-response-and-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/paper-3",
+      "destination": "/cambridge/a-level/economics-9708/paper-3-a-level-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/economics-9708/paper-4",
+      "destination": "/cambridge/a-level/economics-9708/paper-4-a-level-data-response-and-essays",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/english-general-paper",
       "destination": "/cambridge/a-level/english-general-paper-8021",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-general-paper-8021/p1",
+      "destination": "/cambridge/a-level/english-general-paper-8021/paper-1-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-general-paper-8021/p2",
+      "destination": "/cambridge/a-level/english-general-paper-8021/paper-2-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-general-paper-8021/paper-1",
+      "destination": "/cambridge/a-level/english-general-paper-8021/paper-1-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-general-paper-8021/paper-2",
+      "destination": "/cambridge/a-level/english-general-paper-8021/paper-2-comprehension",
       "permanent": true
     },
     {
@@ -943,13 +1408,113 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/english-language-9093/p1",
+      "destination": "/cambridge/a-level/english-language-9093/paper-1-reading-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/p2",
+      "destination": "/cambridge/a-level/english-language-9093/paper-2-writing-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/p3",
+      "destination": "/cambridge/a-level/english-language-9093/paper-3-language-analysis-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/p4",
+      "destination": "/cambridge/a-level/english-language-9093/paper-4-language-topics-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/paper-1",
+      "destination": "/cambridge/a-level/english-language-9093/paper-1-reading-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/paper-2",
+      "destination": "/cambridge/a-level/english-language-9093/paper-2-writing-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/paper-3",
+      "destination": "/cambridge/a-level/english-language-9093/paper-3-language-analysis-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/english-language-9093/paper-4",
+      "destination": "/cambridge/a-level/english-language-9093/paper-4-language-topics-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/environmental-management",
       "destination": "/cambridge/a-level/environmental-management-8291",
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/environmental-management-8291/p1",
+      "destination": "/cambridge/a-level/environmental-management-8291/paper-1-principles-of-environmental-management",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/environmental-management-8291/p2",
+      "destination": "/cambridge/a-level/environmental-management-8291/paper-2-management-in-context",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/environmental-management-8291/paper-1",
+      "destination": "/cambridge/a-level/environmental-management-8291/paper-1-principles-of-environmental-management",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/environmental-management-8291/paper-2",
+      "destination": "/cambridge/a-level/environmental-management-8291/paper-2-management-in-context",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/french",
       "destination": "/cambridge/a-level/french-9716",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/p1",
+      "destination": "/cambridge/a-level/french-9716/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/p2",
+      "destination": "/cambridge/a-level/french-9716/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/p3",
+      "destination": "/cambridge/a-level/french-9716/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/p4",
+      "destination": "/cambridge/a-level/french-9716/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/paper-1",
+      "destination": "/cambridge/a-level/french-9716/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/paper-2",
+      "destination": "/cambridge/a-level/french-9716/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/paper-3",
+      "destination": "/cambridge/a-level/french-9716/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/french-9716/paper-4",
+      "destination": "/cambridge/a-level/french-9716/paper-4-texts",
       "permanent": true
     },
     {
@@ -963,8 +1528,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/geography-9696/p1",
+      "destination": "/cambridge/a-level/geography-9696/paper-1-core-physical-geography-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/p2",
+      "destination": "/cambridge/a-level/geography-9696/paper-2-core-human-geography-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/p3",
+      "destination": "/cambridge/a-level/geography-9696/paper-3-advanced-physical-geography-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/p4",
+      "destination": "/cambridge/a-level/geography-9696/paper-4-advanced-human-geography-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/paper-1",
+      "destination": "/cambridge/a-level/geography-9696/paper-1-core-physical-geography-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/paper-2",
+      "destination": "/cambridge/a-level/geography-9696/paper-2-core-human-geography-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/paper-3",
+      "destination": "/cambridge/a-level/geography-9696/paper-3-advanced-physical-geography-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/geography-9696/paper-4",
+      "destination": "/cambridge/a-level/geography-9696/paper-4-advanced-human-geography-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/german",
       "destination": "/cambridge/a-level/german-9717",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/p1",
+      "destination": "/cambridge/a-level/german-9717/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/p2",
+      "destination": "/cambridge/a-level/german-9717/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/p3",
+      "destination": "/cambridge/a-level/german-9717/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/p4",
+      "destination": "/cambridge/a-level/german-9717/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/paper-1",
+      "destination": "/cambridge/a-level/german-9717/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/paper-2",
+      "destination": "/cambridge/a-level/german-9717/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/paper-3",
+      "destination": "/cambridge/a-level/german-9717/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/german-9717/paper-4",
+      "destination": "/cambridge/a-level/german-9717/paper-4-texts",
       "permanent": true
     },
     {
@@ -973,8 +1618,73 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/global-perspectives-and-research-9239/p1",
+      "destination": "/cambridge/a-level/global-perspectives-and-research-9239/paper-1-written-examination",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/global-perspectives-and-research-9239/p2",
+      "destination": "/cambridge/a-level/global-perspectives-and-research-9239/paper-2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/global-perspectives-and-research-9239/p3",
+      "destination": "/cambridge/a-level/global-perspectives-and-research-9239/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/global-perspectives-and-research-9239/p4",
+      "destination": "/cambridge/a-level/global-perspectives-and-research-9239/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/global-perspectives-and-research-9239/paper-1",
+      "destination": "/cambridge/a-level/global-perspectives-and-research-9239/paper-1-written-examination",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/history",
       "destination": "/cambridge/a-level/history-9489",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/p1",
+      "destination": "/cambridge/a-level/history-9489/paper-1-document-question-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/p2",
+      "destination": "/cambridge/a-level/history-9489/paper-2-outline-study-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/p3",
+      "destination": "/cambridge/a-level/history-9489/paper-3-interpretations-question-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/p4",
+      "destination": "/cambridge/a-level/history-9489/paper-4-depth-study-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/paper-1",
+      "destination": "/cambridge/a-level/history-9489/paper-1-document-question-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/paper-2",
+      "destination": "/cambridge/a-level/history-9489/paper-2-outline-study-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/paper-3",
+      "destination": "/cambridge/a-level/history-9489/paper-3-interpretations-question-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/history-9489/paper-4",
+      "destination": "/cambridge/a-level/history-9489/paper-4-depth-study-a2",
       "permanent": true
     },
     {
@@ -983,8 +1693,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/information-technology-9626/p1",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-1-theory-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/p2",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-2-practical-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/p3",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-3-advanced-theory-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/p4",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-4-advanced-practical-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/paper-1",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-1-theory-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/paper-2",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-2-practical-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/paper-3",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-3-advanced-theory-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/information-technology-9626/paper-4",
+      "destination": "/cambridge/a-level/information-technology-9626/paper-4-advanced-practical-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/islamic-studies",
       "destination": "/cambridge/a-level/islamic-studies-9488",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/p1",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-1-islamic-texts-and-early-history-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/p2",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-2-islamic-thought-and-civilization-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/p3",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-3-beliefs-practices-and-contemporary-islam-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/p4",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-4-islamic-texts-and-scholarship-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/paper-1",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-1-islamic-texts-and-early-history-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/paper-2",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-2-islamic-thought-and-civilization-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/paper-3",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-3-beliefs-practices-and-contemporary-islam-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/islamic-studies-9488/paper-4",
+      "destination": "/cambridge/a-level/islamic-studies-9488/paper-4-islamic-texts-and-scholarship-a2",
       "permanent": true
     },
     {
@@ -993,8 +1783,103 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/law-9084/p1",
+      "destination": "/cambridge/a-level/law-9084/paper-1-english-legal-system-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/p2",
+      "destination": "/cambridge/a-level/law-9084/paper-2-criminal-law-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/p3",
+      "destination": "/cambridge/a-level/law-9084/paper-3-law-of-contract-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/p4",
+      "destination": "/cambridge/a-level/law-9084/paper-4-law-of-tort-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/paper-1",
+      "destination": "/cambridge/a-level/law-9084/paper-1-english-legal-system-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/paper-2",
+      "destination": "/cambridge/a-level/law-9084/paper-2-criminal-law-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/paper-3",
+      "destination": "/cambridge/a-level/law-9084/paper-3-law-of-contract-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/law-9084/paper-4",
+      "destination": "/cambridge/a-level/law-9084/paper-4-law-of-tort-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/literature-in-english",
       "destination": "/cambridge/a-level/literature-in-english-9695",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p1",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-1-drama-and-poetry-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p2",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-2-prose-and-unseen-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p3",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-3-shakespeare-and-drama-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p4",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-4-pre-and-post-1900-poetry-and-prose-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p5",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p6",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-6",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/p7",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-7",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/paper-1",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-1-drama-and-poetry-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/paper-2",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-2-prose-and-unseen-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/paper-3",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-3-shakespeare-and-drama-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/literature-in-english-9695/paper-4",
+      "destination": "/cambridge/a-level/literature-in-english-9695/paper-4-pre-and-post-1900-poetry-and-prose-a2",
       "permanent": true
     },
     {
@@ -1003,8 +1888,53 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/marine-science-9693/p1",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-1-as-level-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/p2",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-2-as-data-handling-and-investigative-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/p3",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-3-a-level-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/p4",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-4-a-level-data-handling-and-investigative-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/paper-1",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-1-as-level-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/paper-2",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-2-as-data-handling-and-investigative-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/paper-3",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-3-a-level-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/marine-science-9693/paper-4",
+      "destination": "/cambridge/a-level/marine-science-9693/paper-4-a-level-data-handling-and-investigative-skills",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/mathematics",
       "destination": "/cambridge/a-level/mathematics-9709",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/mathematics-9709/p7",
+      "destination": "/cambridge/a-level/mathematics-9709/paper-7",
       "permanent": true
     },
     {
@@ -1028,8 +1958,83 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/media-studies-9607/p2",
+      "destination": "/cambridge/a-level/media-studies-9607/paper-2-media-texts-and-contexts-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/media-studies-9607/p4",
+      "destination": "/cambridge/a-level/media-studies-9607/paper-4-critical-perspectives-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/media-studies-9607/paper-2",
+      "destination": "/cambridge/a-level/media-studies-9607/paper-2-media-texts-and-contexts-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/media-studies-9607/paper-4",
+      "destination": "/cambridge/a-level/media-studies-9607/paper-4-critical-perspectives-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/physics",
       "destination": "/cambridge/a-level/physics-9702",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/p1",
+      "destination": "/cambridge/a-level/physics-9702/paper-1-multiple-choice-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/p2",
+      "destination": "/cambridge/a-level/physics-9702/paper-2-as-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/p3",
+      "destination": "/cambridge/a-level/physics-9702/paper-3-advanced-practical-skills-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/p4",
+      "destination": "/cambridge/a-level/physics-9702/paper-4-a-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/p5",
+      "destination": "/cambridge/a-level/physics-9702/paper-5-planning-analysis-and-evaluation-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/p6",
+      "destination": "/cambridge/a-level/physics-9702/paper-6",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/paper-1",
+      "destination": "/cambridge/a-level/physics-9702/paper-1-multiple-choice-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/paper-2",
+      "destination": "/cambridge/a-level/physics-9702/paper-2-as-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/paper-3",
+      "destination": "/cambridge/a-level/physics-9702/paper-3-advanced-practical-skills-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/paper-4",
+      "destination": "/cambridge/a-level/physics-9702/paper-4-a-level-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/physics-9702/paper-5",
+      "destination": "/cambridge/a-level/physics-9702/paper-5-planning-analysis-and-evaluation-a2",
       "permanent": true
     },
     {
@@ -1038,8 +2043,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/psychology-9990/p1",
+      "destination": "/cambridge/a-level/psychology-9990/paper-1-approaches-issues-and-debates-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/p2",
+      "destination": "/cambridge/a-level/psychology-9990/paper-2-research-methods-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/p3",
+      "destination": "/cambridge/a-level/psychology-9990/paper-3-specialist-options-theory-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/p4",
+      "destination": "/cambridge/a-level/psychology-9990/paper-4-specialist-options-application-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/paper-1",
+      "destination": "/cambridge/a-level/psychology-9990/paper-1-approaches-issues-and-debates-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/paper-2",
+      "destination": "/cambridge/a-level/psychology-9990/paper-2-research-methods-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/paper-3",
+      "destination": "/cambridge/a-level/psychology-9990/paper-3-specialist-options-theory-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/psychology-9990/paper-4",
+      "destination": "/cambridge/a-level/psychology-9990/paper-4-specialist-options-application-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/sociology",
       "destination": "/cambridge/a-level/sociology-9699",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/p1",
+      "destination": "/cambridge/a-level/sociology-9699/paper-1-socialisation-identity-and-research-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/p2",
+      "destination": "/cambridge/a-level/sociology-9699/paper-2-the-family-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/p3",
+      "destination": "/cambridge/a-level/sociology-9699/paper-3-education-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/p4",
+      "destination": "/cambridge/a-level/sociology-9699/paper-4-globalisation-media-and-religion-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/paper-1",
+      "destination": "/cambridge/a-level/sociology-9699/paper-1-socialisation-identity-and-research-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/paper-2",
+      "destination": "/cambridge/a-level/sociology-9699/paper-2-the-family-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/paper-3",
+      "destination": "/cambridge/a-level/sociology-9699/paper-3-education-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/sociology-9699/paper-4",
+      "destination": "/cambridge/a-level/sociology-9699/paper-4-globalisation-media-and-religion-a2",
       "permanent": true
     },
     {
@@ -1048,13 +2133,118 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/spanish-9719/p1",
+      "destination": "/cambridge/a-level/spanish-9719/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/p2",
+      "destination": "/cambridge/a-level/spanish-9719/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/p3",
+      "destination": "/cambridge/a-level/spanish-9719/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/p4",
+      "destination": "/cambridge/a-level/spanish-9719/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/paper-1",
+      "destination": "/cambridge/a-level/spanish-9719/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/paper-2",
+      "destination": "/cambridge/a-level/spanish-9719/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/paper-3",
+      "destination": "/cambridge/a-level/spanish-9719/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/spanish-9719/paper-4",
+      "destination": "/cambridge/a-level/spanish-9719/paper-4-texts",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/travel-and-tourism",
       "destination": "/cambridge/a-level/travel-and-tourism-9395",
       "permanent": true
     },
     {
+      "source": "/cambridge/a-level/travel-and-tourism-9395/p1",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395/paper-1-the-industry-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/travel-and-tourism-9395/p3",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395/paper-3-destination-marketing-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/travel-and-tourism-9395/p4",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395/paper-4-destination-development-and-management-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/travel-and-tourism-9395/paper-1",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395/paper-1-the-industry-as",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/travel-and-tourism-9395/paper-3",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395/paper-3-destination-marketing-a2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/travel-and-tourism-9395/paper-4",
+      "destination": "/cambridge/a-level/travel-and-tourism-9395/paper-4-destination-development-and-management-a2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/a-level/urdu",
       "destination": "/cambridge/a-level/urdu-9686",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/p2",
+      "destination": "/cambridge/a-level/urdu-9686/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/p3",
+      "destination": "/cambridge/a-level/urdu-9686/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/p4",
+      "destination": "/cambridge/a-level/urdu-9686/paper-4-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/p5",
+      "destination": "/cambridge/a-level/urdu-9686/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/paper-2",
+      "destination": "/cambridge/a-level/urdu-9686/paper-2-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/paper-3",
+      "destination": "/cambridge/a-level/urdu-9686/paper-3-essay",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/a-level/urdu-9686/paper-4",
+      "destination": "/cambridge/a-level/urdu-9686/paper-4-texts",
       "permanent": true
     },
     {
@@ -1073,8 +2263,43 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/accounting-0452/p1",
+      "destination": "/cambridge/igcse/accounting-0452/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/accounting-0452/p2",
+      "destination": "/cambridge/igcse/accounting-0452/paper-2-structured-written-paper",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/accounting-0452/p3",
+      "destination": "/cambridge/igcse/accounting-0452/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/accounting-0452/paper-1",
+      "destination": "/cambridge/igcse/accounting-0452/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/accounting-0452/paper-2",
+      "destination": "/cambridge/igcse/accounting-0452/paper-2-structured-written-paper",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/additional-mathematics",
       "destination": "/cambridge/igcse/additional-mathematics-0606",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/additional-mathematics-0606/p1",
+      "destination": "/cambridge/igcse/additional-mathematics-0606/paper-1",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/additional-mathematics-0606/p2",
+      "destination": "/cambridge/igcse/additional-mathematics-0606/paper-2",
       "permanent": true
     },
     {
@@ -1083,8 +2308,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/agriculture-0600/p1",
+      "destination": "/cambridge/igcse/agriculture-0600/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/agriculture-0600/paper-1",
+      "destination": "/cambridge/igcse/agriculture-0600/paper-1-theory",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/art-and-design",
       "destination": "/cambridge/igcse/art-and-design-0400",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design-0400/p1",
+      "destination": "/cambridge/igcse/art-and-design-0400/paper-1-coursework",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design-0400/p2",
+      "destination": "/cambridge/igcse/art-and-design-0400/paper-2-externally-set-assignment",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design-0400/p3",
+      "destination": "/cambridge/igcse/art-and-design-0400/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design-0400/p4",
+      "destination": "/cambridge/igcse/art-and-design-0400/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design-0400/paper-1",
+      "destination": "/cambridge/igcse/art-and-design-0400/paper-1-coursework",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/art-and-design-0400/paper-2",
+      "destination": "/cambridge/igcse/art-and-design-0400/paper-2-externally-set-assignment",
       "permanent": true
     },
     {
@@ -1093,8 +2358,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/bangladesh-studies-0449/p1",
+      "destination": "/cambridge/igcse/bangladesh-studies-0449/paper-1-history-and-culture-of-bangladesh",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/bangladesh-studies-0449/p2",
+      "destination": "/cambridge/igcse/bangladesh-studies-0449/paper-2-environment-and-development-of-bangladesh",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/bangladesh-studies-0449/paper-1",
+      "destination": "/cambridge/igcse/bangladesh-studies-0449/paper-1-history-and-culture-of-bangladesh",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/bangladesh-studies-0449/paper-2",
+      "destination": "/cambridge/igcse/bangladesh-studies-0449/paper-2-environment-and-development-of-bangladesh",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/biology",
       "destination": "/cambridge/igcse/biology-0610",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/p1",
+      "destination": "/cambridge/igcse/biology-0610/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/p2",
+      "destination": "/cambridge/igcse/biology-0610/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/p3",
+      "destination": "/cambridge/igcse/biology-0610/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/p4",
+      "destination": "/cambridge/igcse/biology-0610/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/p5",
+      "destination": "/cambridge/igcse/biology-0610/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/p6",
+      "destination": "/cambridge/igcse/biology-0610/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/paper-1",
+      "destination": "/cambridge/igcse/biology-0610/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/paper-2",
+      "destination": "/cambridge/igcse/biology-0610/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/paper-3",
+      "destination": "/cambridge/igcse/biology-0610/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/paper-4",
+      "destination": "/cambridge/igcse/biology-0610/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/paper-5",
+      "destination": "/cambridge/igcse/biology-0610/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/biology-0610/paper-6",
+      "destination": "/cambridge/igcse/biology-0610/paper-6-alternative-to-practical",
       "permanent": true
     },
     {
@@ -1103,8 +2448,93 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/business-studies-0450/p1",
+      "destination": "/cambridge/igcse/business-studies-0450/paper-1-short-answer-and-data-response",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/business-studies-0450/p2",
+      "destination": "/cambridge/igcse/business-studies-0450/paper-2-case-study",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/business-studies-0450/p4",
+      "destination": "/cambridge/igcse/business-studies-0450/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/business-studies-0450/paper-1",
+      "destination": "/cambridge/igcse/business-studies-0450/paper-1-short-answer-and-data-response",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/business-studies-0450/paper-2",
+      "destination": "/cambridge/igcse/business-studies-0450/paper-2-case-study",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/chemistry",
       "destination": "/cambridge/igcse/chemistry-0620",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/p1",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/p2",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/p3",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/p4",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/p5",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/p6",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/paper-1",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/paper-2",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/paper-3",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/paper-4",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/paper-5",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/chemistry-0620/paper-6",
+      "destination": "/cambridge/igcse/chemistry-0620/paper-6-alternative-to-practical",
       "permanent": true
     },
     {
@@ -1113,8 +2543,128 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/p1",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/p2",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/p3",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/p4",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/p5",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/p6",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-1",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-2",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-3",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-4",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-5",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-6",
+      "destination": "/cambridge/igcse/co-ordinated-sciences-double-award-0654/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/combined-science",
       "destination": "/cambridge/igcse/combined-science-0653",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/p1",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/p2",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/p3",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/p4",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/p5",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/p6",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/paper-1",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/paper-2",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/paper-3",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/paper-4",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/paper-5",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/combined-science-0653/paper-6",
+      "destination": "/cambridge/igcse/combined-science-0653/paper-6-alternative-to-practical",
       "permanent": true
     },
     {
@@ -1123,8 +2673,73 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/computer-science-0478/p1",
+      "destination": "/cambridge/igcse/computer-science-0478/paper-1-computer-systems",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/computer-science-0478/p2",
+      "destination": "/cambridge/igcse/computer-science-0478/paper-2-algorithms-programming-and-logic",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/computer-science-0478/paper-1",
+      "destination": "/cambridge/igcse/computer-science-0478/paper-1-computer-systems",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/computer-science-0478/paper-2",
+      "destination": "/cambridge/igcse/computer-science-0478/paper-2-algorithms-programming-and-logic",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/design-and-technology",
       "destination": "/cambridge/igcse/design-and-technology-0445",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/p1",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-1-product-design",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/p2",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/p3",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-3-resistant-materials",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/p4",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-4-systems-and-control",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/p5",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-5-graphic-products",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/paper-1",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-1-product-design",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/paper-3",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-3-resistant-materials",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/paper-4",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-4-systems-and-control",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/design-and-technology-0445/paper-5",
+      "destination": "/cambridge/igcse/design-and-technology-0445/paper-5-graphic-products",
       "permanent": true
     },
     {
@@ -1133,8 +2748,53 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/drama-0411/p1",
+      "destination": "/cambridge/igcse/drama-0411/paper-1-written-examination",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/drama-0411/paper-1",
+      "destination": "/cambridge/igcse/drama-0411/paper-1-written-examination",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/economics",
       "destination": "/cambridge/igcse/economics-0455",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/p1",
+      "destination": "/cambridge/igcse/economics-0455/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/p2",
+      "destination": "/cambridge/igcse/economics-0455/paper-2-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/p3",
+      "destination": "/cambridge/igcse/economics-0455/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/p4",
+      "destination": "/cambridge/igcse/economics-0455/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/p6",
+      "destination": "/cambridge/igcse/economics-0455/paper-6",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/paper-1",
+      "destination": "/cambridge/igcse/economics-0455/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/economics-0455/paper-2",
+      "destination": "/cambridge/igcse/economics-0455/paper-2-structured-questions",
       "permanent": true
     },
     {
@@ -1143,8 +2803,68 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/english-as-a-second-language-0510/p1",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510/paper-1-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-0510/p2",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510/paper-2-listening-mcq",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-0510/p3",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-0510/p5",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-0510/paper-1",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510/paper-1-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-0510/paper-2",
+      "destination": "/cambridge/igcse/english-as-a-second-language-0510/paper-2-listening-mcq",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking",
       "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/p1",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-1-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/p2",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-2-listening-mcq",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/p3",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/p5",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-1",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-1-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-2",
+      "destination": "/cambridge/igcse/english-as-a-second-language-count-in-speaking-0511/paper-2-listening-mcq",
       "permanent": true
     },
     {
@@ -1153,8 +2873,43 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/enterprise-0454/p1",
+      "destination": "/cambridge/igcse/enterprise-0454/paper-1-case-study",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/enterprise-0454/paper-1",
+      "destination": "/cambridge/igcse/enterprise-0454/paper-1-case-study",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/environmental-management",
       "destination": "/cambridge/igcse/environmental-management-0680",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/environmental-management-0680/p1",
+      "destination": "/cambridge/igcse/environmental-management-0680/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/environmental-management-0680/p2",
+      "destination": "/cambridge/igcse/environmental-management-0680/paper-2-management-in-context",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/environmental-management-0680/p4",
+      "destination": "/cambridge/igcse/environmental-management-0680/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/environmental-management-0680/paper-1",
+      "destination": "/cambridge/igcse/environmental-management-0680/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/environmental-management-0680/paper-2",
+      "destination": "/cambridge/igcse/environmental-management-0680/paper-2-management-in-context",
       "permanent": true
     },
     {
@@ -1163,8 +2918,53 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/first-language-arabic-0508/p1",
+      "destination": "/cambridge/igcse/first-language-arabic-0508/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-arabic-0508/p2",
+      "destination": "/cambridge/igcse/first-language-arabic-0508/paper-2-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-arabic-0508/p3",
+      "destination": "/cambridge/igcse/first-language-arabic-0508/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-arabic-0508/paper-1",
+      "destination": "/cambridge/igcse/first-language-arabic-0508/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-arabic-0508/paper-2",
+      "destination": "/cambridge/igcse/first-language-arabic-0508/paper-2-writing",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/first-language-chinese",
       "destination": "/cambridge/igcse/first-language-chinese-0509",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-chinese-0509/p1",
+      "destination": "/cambridge/igcse/first-language-chinese-0509/paper-1-reading-directed-writing-and-classical-chinese",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-chinese-0509/p2",
+      "destination": "/cambridge/igcse/first-language-chinese-0509/paper-2-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-chinese-0509/paper-1",
+      "destination": "/cambridge/igcse/first-language-chinese-0509/paper-1-reading-directed-writing-and-classical-chinese",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-chinese-0509/paper-2",
+      "destination": "/cambridge/igcse/first-language-chinese-0509/paper-2-writing",
       "permanent": true
     },
     {
@@ -1173,8 +2973,63 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/first-language-english-0500/p1",
+      "destination": "/cambridge/igcse/first-language-english-0500/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-english-0500/p2",
+      "destination": "/cambridge/igcse/first-language-english-0500/paper-2-directed-writing-and-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-english-0500/p3",
+      "destination": "/cambridge/igcse/first-language-english-0500/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-english-0500/p5",
+      "destination": "/cambridge/igcse/first-language-english-0500/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-english-0500/paper-1",
+      "destination": "/cambridge/igcse/first-language-english-0500/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-english-0500/paper-2",
+      "destination": "/cambridge/igcse/first-language-english-0500/paper-2-directed-writing-and-composition",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/first-language-french",
       "destination": "/cambridge/igcse/first-language-french-0501",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-french-0501/p1",
+      "destination": "/cambridge/igcse/first-language-french-0501/paper-1-reading-and-directed-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-french-0501/p2",
+      "destination": "/cambridge/igcse/first-language-french-0501/paper-2-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-french-0501/p3",
+      "destination": "/cambridge/igcse/first-language-french-0501/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-french-0501/paper-1",
+      "destination": "/cambridge/igcse/first-language-french-0501/paper-1-reading-and-directed-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-french-0501/paper-2",
+      "destination": "/cambridge/igcse/first-language-french-0501/paper-2-writing",
       "permanent": true
     },
     {
@@ -1183,8 +3038,53 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/first-language-malay-0696/p1",
+      "destination": "/cambridge/igcse/first-language-malay-0696/paper-1-reading-and-directed-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-malay-0696/p2",
+      "destination": "/cambridge/igcse/first-language-malay-0696/paper-2-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-malay-0696/paper-1",
+      "destination": "/cambridge/igcse/first-language-malay-0696/paper-1-reading-and-directed-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-malay-0696/paper-2",
+      "destination": "/cambridge/igcse/first-language-malay-0696/paper-2-composition",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/first-language-spanish",
       "destination": "/cambridge/igcse/first-language-spanish-0502",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-spanish-0502/p1",
+      "destination": "/cambridge/igcse/first-language-spanish-0502/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-spanish-0502/p2",
+      "destination": "/cambridge/igcse/first-language-spanish-0502/paper-2-directed-writing-and-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-spanish-0502/p3",
+      "destination": "/cambridge/igcse/first-language-spanish-0502/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-spanish-0502/paper-1",
+      "destination": "/cambridge/igcse/first-language-spanish-0502/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/first-language-spanish-0502/paper-2",
+      "destination": "/cambridge/igcse/first-language-spanish-0502/paper-2-directed-writing-and-composition",
       "permanent": true
     },
     {
@@ -1193,8 +3093,68 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/food-and-nutrition-0648/p1",
+      "destination": "/cambridge/igcse/food-and-nutrition-0648/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/food-and-nutrition-0648/p2",
+      "destination": "/cambridge/igcse/food-and-nutrition-0648/paper-2-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/food-and-nutrition-0648/paper-1",
+      "destination": "/cambridge/igcse/food-and-nutrition-0648/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/food-and-nutrition-0648/paper-2",
+      "destination": "/cambridge/igcse/food-and-nutrition-0648/paper-2-practical-test",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/foreign-language-arabic",
       "destination": "/cambridge/igcse/foreign-language-arabic-0544",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/p1",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/p2",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/p3",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/p4",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-4-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/paper-1",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/paper-2",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/paper-3",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/foreign-language-arabic-0544/paper-4",
+      "destination": "/cambridge/igcse/foreign-language-arabic-0544/paper-4-writing",
       "permanent": true
     },
     {
@@ -1203,8 +3163,78 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/french-0520/p1",
+      "destination": "/cambridge/igcse/french-0520/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/p2",
+      "destination": "/cambridge/igcse/french-0520/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/p3",
+      "destination": "/cambridge/igcse/french-0520/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/p4",
+      "destination": "/cambridge/igcse/french-0520/paper-4-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/paper-1",
+      "destination": "/cambridge/igcse/french-0520/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/paper-2",
+      "destination": "/cambridge/igcse/french-0520/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/paper-3",
+      "destination": "/cambridge/igcse/french-0520/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/french-0520/paper-4",
+      "destination": "/cambridge/igcse/french-0520/paper-4-writing",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/geography",
       "destination": "/cambridge/igcse/geography-0460",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography-0460/p1",
+      "destination": "/cambridge/igcse/geography-0460/paper-1-geographical-themes",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography-0460/p2",
+      "destination": "/cambridge/igcse/geography-0460/paper-2-geographical-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography-0460/p4",
+      "destination": "/cambridge/igcse/geography-0460/paper-4-alternative-to-coursework",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography-0460/paper-1",
+      "destination": "/cambridge/igcse/geography-0460/paper-1-geographical-themes",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography-0460/paper-2",
+      "destination": "/cambridge/igcse/geography-0460/paper-2-geographical-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/geography-0460/paper-4",
+      "destination": "/cambridge/igcse/geography-0460/paper-4-alternative-to-coursework",
       "permanent": true
     },
     {
@@ -1213,8 +3243,63 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/german-0525/p1",
+      "destination": "/cambridge/igcse/german-0525/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/p2",
+      "destination": "/cambridge/igcse/german-0525/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/p3",
+      "destination": "/cambridge/igcse/german-0525/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/p4",
+      "destination": "/cambridge/igcse/german-0525/paper-4-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/paper-1",
+      "destination": "/cambridge/igcse/german-0525/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/paper-2",
+      "destination": "/cambridge/igcse/german-0525/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/paper-3",
+      "destination": "/cambridge/igcse/german-0525/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/german-0525/paper-4",
+      "destination": "/cambridge/igcse/german-0525/paper-4-writing",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/global-perspectives",
       "destination": "/cambridge/igcse/global-perspectives-0457",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/global-perspectives-0457/p1",
+      "destination": "/cambridge/igcse/global-perspectives-0457/paper-1-written-examination",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/global-perspectives-0457/p2",
+      "destination": "/cambridge/igcse/global-perspectives-0457/paper-2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/global-perspectives-0457/paper-1",
+      "destination": "/cambridge/igcse/global-perspectives-0457/paper-1-written-examination",
       "permanent": true
     },
     {
@@ -1223,8 +3308,68 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/history-0470/p1",
+      "destination": "/cambridge/igcse/history-0470/paper-1-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/history-0470/p2",
+      "destination": "/cambridge/igcse/history-0470/paper-2-document-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/history-0470/p4",
+      "destination": "/cambridge/igcse/history-0470/paper-4-alternative-to-coursework",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/history-0470/paper-1",
+      "destination": "/cambridge/igcse/history-0470/paper-1-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/history-0470/paper-2",
+      "destination": "/cambridge/igcse/history-0470/paper-2-document-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/history-0470/paper-4",
+      "destination": "/cambridge/igcse/history-0470/paper-4-alternative-to-coursework",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/ict",
       "destination": "/cambridge/igcse/ict-0417",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict-0417/p1",
+      "destination": "/cambridge/igcse/ict-0417/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict-0417/p2",
+      "destination": "/cambridge/igcse/ict-0417/paper-2-document-production-databases-and-presentations",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict-0417/p3",
+      "destination": "/cambridge/igcse/ict-0417/paper-3-spreadsheets-and-website-authoring",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict-0417/paper-1",
+      "destination": "/cambridge/igcse/ict-0417/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict-0417/paper-2",
+      "destination": "/cambridge/igcse/ict-0417/paper-2-document-production-databases-and-presentations",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/ict-0417/paper-3",
+      "destination": "/cambridge/igcse/ict-0417/paper-3-spreadsheets-and-website-authoring",
       "permanent": true
     },
     {
@@ -1233,8 +3378,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/international-mathematics-0607/p1",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-1-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/p2",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-2-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/p3",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-3-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/p4",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-4-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/p5",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-5-investigation-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/p6",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-6-investigation-and-modelling-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/paper-1",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-1-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/paper-2",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-2-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/paper-3",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-3-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/paper-4",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-4-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/paper-5",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-5-investigation-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/international-mathematics-0607/paper-6",
+      "destination": "/cambridge/igcse/international-mathematics-0607/paper-6-investigation-and-modelling-extended",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/islamiyat",
       "destination": "/cambridge/igcse/islamiyat-0493",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/islamiyat-0493/p1",
+      "destination": "/cambridge/igcse/islamiyat-0493/paper-1-major-themes-of-the-qur-an-and-history",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/islamiyat-0493/p2",
+      "destination": "/cambridge/igcse/islamiyat-0493/paper-2-hadith-caliphate-and-articles-of-faith",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/islamiyat-0493/paper-1",
+      "destination": "/cambridge/igcse/islamiyat-0493/paper-1-major-themes-of-the-qur-an-and-history",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/islamiyat-0493/paper-2",
+      "destination": "/cambridge/igcse/islamiyat-0493/paper-2-hadith-caliphate-and-articles-of-faith",
       "permanent": true
     },
     {
@@ -1243,8 +3468,93 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/literature-in-english-0475/p1",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-1-poetry-and-prose",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/p2",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-2-drama",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/p3",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-3-drama-open-text",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/p4",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-4-unseen",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/p5",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-5",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/paper-1",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-1-poetry-and-prose",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/paper-2",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-2-drama",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/paper-3",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-3-drama-open-text",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/literature-in-english-0475/paper-4",
+      "destination": "/cambridge/igcse/literature-in-english-0475/paper-4-unseen",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/mandarin-chinese",
       "destination": "/cambridge/igcse/mandarin-chinese-0547",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/p1",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/p2",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/p3",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/p4",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-4-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/paper-1",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/paper-2",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/paper-3",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mandarin-chinese-0547/paper-4",
+      "destination": "/cambridge/igcse/mandarin-chinese-0547/paper-4-writing",
       "permanent": true
     },
     {
@@ -1253,8 +3563,78 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/mathematics-0580/p1",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-1-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/p2",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-2-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/p3",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-3-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/p4",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-4-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-1",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-1-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-1-core-p1",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-1-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-2",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-2-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-2-extended-p2",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-2-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-3",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-3-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-3-core-p3",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-3-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-4",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-4-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/mathematics-0580/paper-4-extended-p4",
+      "destination": "/cambridge/igcse/mathematics-0580/paper-4-extended",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/music",
       "destination": "/cambridge/igcse/music-0410",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/music-0410/p1",
+      "destination": "/cambridge/igcse/music-0410/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/music-0410/paper-1",
+      "destination": "/cambridge/igcse/music-0410/paper-1-listening",
       "permanent": true
     },
     {
@@ -1263,8 +3643,43 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/pakistan-studies-0448/p1",
+      "destination": "/cambridge/igcse/pakistan-studies-0448/paper-1-history-and-culture-of-pakistan",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/pakistan-studies-0448/p2",
+      "destination": "/cambridge/igcse/pakistan-studies-0448/paper-2-environment-of-pakistan",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/pakistan-studies-0448/p4",
+      "destination": "/cambridge/igcse/pakistan-studies-0448/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/pakistan-studies-0448/paper-1",
+      "destination": "/cambridge/igcse/pakistan-studies-0448/paper-1-history-and-culture-of-pakistan",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/pakistan-studies-0448/paper-2",
+      "destination": "/cambridge/igcse/pakistan-studies-0448/paper-2-environment-of-pakistan",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/physical-education",
       "destination": "/cambridge/igcse/physical-education-0413",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physical-education-0413/p1",
+      "destination": "/cambridge/igcse/physical-education-0413/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physical-education-0413/paper-1",
+      "destination": "/cambridge/igcse/physical-education-0413/paper-1-theory",
       "permanent": true
     },
     {
@@ -1273,8 +3688,88 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/physics-0625/p1",
+      "destination": "/cambridge/igcse/physics-0625/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/p2",
+      "destination": "/cambridge/igcse/physics-0625/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/p3",
+      "destination": "/cambridge/igcse/physics-0625/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/p4",
+      "destination": "/cambridge/igcse/physics-0625/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/p5",
+      "destination": "/cambridge/igcse/physics-0625/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/p6",
+      "destination": "/cambridge/igcse/physics-0625/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/paper-1",
+      "destination": "/cambridge/igcse/physics-0625/paper-1-multiple-choice-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/paper-2",
+      "destination": "/cambridge/igcse/physics-0625/paper-2-multiple-choice-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/paper-3",
+      "destination": "/cambridge/igcse/physics-0625/paper-3-theory-core",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/paper-4",
+      "destination": "/cambridge/igcse/physics-0625/paper-4-theory-extended",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/paper-5",
+      "destination": "/cambridge/igcse/physics-0625/paper-5-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/physics-0625/paper-6",
+      "destination": "/cambridge/igcse/physics-0625/paper-6-alternative-to-practical",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/religious-studies",
       "destination": "/cambridge/igcse/religious-studies-0490",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/religious-studies-0490/p1",
+      "destination": "/cambridge/igcse/religious-studies-0490/paper-1-beliefs-and-practices",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/religious-studies-0490/p2",
+      "destination": "/cambridge/igcse/religious-studies-0490/paper-2-religious-themes",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/religious-studies-0490/paper-1",
+      "destination": "/cambridge/igcse/religious-studies-0490/paper-1-beliefs-and-practices",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/religious-studies-0490/paper-2",
+      "destination": "/cambridge/igcse/religious-studies-0490/paper-2-religious-themes",
       "permanent": true
     },
     {
@@ -1283,8 +3778,73 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/sociology-0495/p1",
+      "destination": "/cambridge/igcse/sociology-0495/paper-1-research-methods-identity-and-inequality",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/sociology-0495/p2",
+      "destination": "/cambridge/igcse/sociology-0495/paper-2-family-education-and-crime",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/sociology-0495/p4",
+      "destination": "/cambridge/igcse/sociology-0495/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/sociology-0495/paper-1",
+      "destination": "/cambridge/igcse/sociology-0495/paper-1-research-methods-identity-and-inequality",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/sociology-0495/paper-2",
+      "destination": "/cambridge/igcse/sociology-0495/paper-2-family-education-and-crime",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/igcse/spanish",
       "destination": "/cambridge/igcse/spanish-0530",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/p1",
+      "destination": "/cambridge/igcse/spanish-0530/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/p2",
+      "destination": "/cambridge/igcse/spanish-0530/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/p3",
+      "destination": "/cambridge/igcse/spanish-0530/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/p4",
+      "destination": "/cambridge/igcse/spanish-0530/paper-4-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/paper-1",
+      "destination": "/cambridge/igcse/spanish-0530/paper-1-listening",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/paper-2",
+      "destination": "/cambridge/igcse/spanish-0530/paper-2-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/paper-3",
+      "destination": "/cambridge/igcse/spanish-0530/paper-3-speaking",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/spanish-0530/paper-4",
+      "destination": "/cambridge/igcse/spanish-0530/paper-4-writing",
       "permanent": true
     },
     {
@@ -1293,8 +3853,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/igcse/travel-and-tourism-0471/p1",
+      "destination": "/cambridge/igcse/travel-and-tourism-0471/paper-1-key-terms-and-concepts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/travel-and-tourism-0471/p2",
+      "destination": "/cambridge/igcse/travel-and-tourism-0471/paper-2-managing-and-marketing-destinations",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/travel-and-tourism-0471/paper-1",
+      "destination": "/cambridge/igcse/travel-and-tourism-0471/paper-1-key-terms-and-concepts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/igcse/travel-and-tourism-0471/paper-2",
+      "destination": "/cambridge/igcse/travel-and-tourism-0471/paper-2-managing-and-marketing-destinations",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/accounting",
       "destination": "/cambridge/o-level/accounting-7707",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/accounting-7707/p1",
+      "destination": "/cambridge/o-level/accounting-7707/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/accounting-7707/p2",
+      "destination": "/cambridge/o-level/accounting-7707/paper-2-structured-written-paper",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/accounting-7707/paper-1",
+      "destination": "/cambridge/o-level/accounting-7707/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/accounting-7707/paper-2",
+      "destination": "/cambridge/o-level/accounting-7707/paper-2-structured-written-paper",
       "permanent": true
     },
     {
@@ -1303,8 +3903,38 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/additional-mathematics-4037/p1",
+      "destination": "/cambridge/o-level/additional-mathematics-4037/paper-1",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/additional-mathematics-4037/p2",
+      "destination": "/cambridge/o-level/additional-mathematics-4037/paper-2",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/arabic",
       "destination": "/cambridge/o-level/arabic-3180",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/arabic-3180/p1",
+      "destination": "/cambridge/o-level/arabic-3180/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/arabic-3180/p2",
+      "destination": "/cambridge/o-level/arabic-3180/paper-2-translation-and-reading-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/arabic-3180/paper-1",
+      "destination": "/cambridge/o-level/arabic-3180/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/arabic-3180/paper-2",
+      "destination": "/cambridge/o-level/arabic-3180/paper-2-translation-and-reading-comprehension",
       "permanent": true
     },
     {
@@ -1313,8 +3943,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/bangladesh-studies-7094/p1",
+      "destination": "/cambridge/o-level/bangladesh-studies-7094/paper-1-history-and-culture-of-bangladesh",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bangladesh-studies-7094/p2",
+      "destination": "/cambridge/o-level/bangladesh-studies-7094/paper-2-environment-and-development-of-bangladesh",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bangladesh-studies-7094/paper-1",
+      "destination": "/cambridge/o-level/bangladesh-studies-7094/paper-1-history-and-culture-of-bangladesh",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bangladesh-studies-7094/paper-2",
+      "destination": "/cambridge/o-level/bangladesh-studies-7094/paper-2-environment-and-development-of-bangladesh",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/bengali",
       "destination": "/cambridge/o-level/bengali-3204",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bengali-3204/p1",
+      "destination": "/cambridge/o-level/bengali-3204/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bengali-3204/p2",
+      "destination": "/cambridge/o-level/bengali-3204/paper-2-language-usage-and-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bengali-3204/paper-1",
+      "destination": "/cambridge/o-level/bengali-3204/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/bengali-3204/paper-2",
+      "destination": "/cambridge/o-level/bengali-3204/paper-2-language-usage-and-comprehension",
       "permanent": true
     },
     {
@@ -1323,8 +3993,73 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/biology-5090/p1",
+      "destination": "/cambridge/o-level/biology-5090/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/p2",
+      "destination": "/cambridge/o-level/biology-5090/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/p3",
+      "destination": "/cambridge/o-level/biology-5090/paper-3-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/p4",
+      "destination": "/cambridge/o-level/biology-5090/paper-4-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/p6",
+      "destination": "/cambridge/o-level/biology-5090/paper-6",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/paper-1",
+      "destination": "/cambridge/o-level/biology-5090/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/paper-2",
+      "destination": "/cambridge/o-level/biology-5090/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/paper-3",
+      "destination": "/cambridge/o-level/biology-5090/paper-3-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/biology-5090/paper-4",
+      "destination": "/cambridge/o-level/biology-5090/paper-4-alternative-to-practical",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/business-studies",
       "destination": "/cambridge/o-level/business-studies-7115",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/business-studies-7115/p1",
+      "destination": "/cambridge/o-level/business-studies-7115/paper-1-short-answer-and-data-response",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/business-studies-7115/p2",
+      "destination": "/cambridge/o-level/business-studies-7115/paper-2-case-study",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/business-studies-7115/paper-1",
+      "destination": "/cambridge/o-level/business-studies-7115/paper-1-short-answer-and-data-response",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/business-studies-7115/paper-2",
+      "destination": "/cambridge/o-level/business-studies-7115/paper-2-case-study",
       "permanent": true
     },
     {
@@ -1333,8 +4068,73 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/chemistry-5070/p1",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/p2",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/p3",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-3-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/p4",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-4-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/paper-1",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/paper-2",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/paper-3",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-3-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/chemistry-5070/paper-4",
+      "destination": "/cambridge/o-level/chemistry-5070/paper-4-alternative-to-practical",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/combined-science",
       "destination": "/cambridge/o-level/combined-science-5129",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/combined-science-5129/p1",
+      "destination": "/cambridge/o-level/combined-science-5129/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/combined-science-5129/p2",
+      "destination": "/cambridge/o-level/combined-science-5129/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/combined-science-5129/p3",
+      "destination": "/cambridge/o-level/combined-science-5129/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/combined-science-5129/paper-1",
+      "destination": "/cambridge/o-level/combined-science-5129/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/combined-science-5129/paper-2",
+      "destination": "/cambridge/o-level/combined-science-5129/paper-2-theory",
       "permanent": true
     },
     {
@@ -1343,8 +4143,53 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/commerce-7100/p1",
+      "destination": "/cambridge/o-level/commerce-7100/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/commerce-7100/p2",
+      "destination": "/cambridge/o-level/commerce-7100/paper-2-written",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/commerce-7100/paper-1",
+      "destination": "/cambridge/o-level/commerce-7100/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/commerce-7100/paper-2",
+      "destination": "/cambridge/o-level/commerce-7100/paper-2-written",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/computer-science",
       "destination": "/cambridge/o-level/computer-science-2210",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/computer-science-2210/p1",
+      "destination": "/cambridge/o-level/computer-science-2210/paper-1-computer-systems",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/computer-science-2210/p2",
+      "destination": "/cambridge/o-level/computer-science-2210/paper-2-algorithms-programming-and-logic",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/computer-science-2210/p3",
+      "destination": "/cambridge/o-level/computer-science-2210/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/computer-science-2210/paper-1",
+      "destination": "/cambridge/o-level/computer-science-2210/paper-1-computer-systems",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/computer-science-2210/paper-2",
+      "destination": "/cambridge/o-level/computer-science-2210/paper-2-algorithms-programming-and-logic",
       "permanent": true
     },
     {
@@ -1353,8 +4198,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/economics-2281/p1",
+      "destination": "/cambridge/o-level/economics-2281/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/economics-2281/p2",
+      "destination": "/cambridge/o-level/economics-2281/paper-2-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/economics-2281/paper-1",
+      "destination": "/cambridge/o-level/economics-2281/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/economics-2281/paper-2",
+      "destination": "/cambridge/o-level/economics-2281/paper-2-structured-questions",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/english-language",
       "destination": "/cambridge/o-level/english-language-1123",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/english-language-1123/p1",
+      "destination": "/cambridge/o-level/english-language-1123/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/english-language-1123/p2",
+      "destination": "/cambridge/o-level/english-language-1123/paper-2-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/english-language-1123/paper-1",
+      "destination": "/cambridge/o-level/english-language-1123/paper-1-reading",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/english-language-1123/paper-2",
+      "destination": "/cambridge/o-level/english-language-1123/paper-2-writing",
       "permanent": true
     },
     {
@@ -1363,8 +4248,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/environmental-management-5014/p1",
+      "destination": "/cambridge/o-level/environmental-management-5014/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/environmental-management-5014/p2",
+      "destination": "/cambridge/o-level/environmental-management-5014/paper-2-management-in-context",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/environmental-management-5014/paper-1",
+      "destination": "/cambridge/o-level/environmental-management-5014/paper-1-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/environmental-management-5014/paper-2",
+      "destination": "/cambridge/o-level/environmental-management-5014/paper-2-management-in-context",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/first-language-urdu",
       "destination": "/cambridge/o-level/first-language-urdu-3247",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/first-language-urdu-3247/p1",
+      "destination": "/cambridge/o-level/first-language-urdu-3247/paper-1-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/first-language-urdu-3247/p2",
+      "destination": "/cambridge/o-level/first-language-urdu-3247/paper-2-texts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/first-language-urdu-3247/paper-1",
+      "destination": "/cambridge/o-level/first-language-urdu-3247/paper-1-reading-and-writing",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/first-language-urdu-3247/paper-2",
+      "destination": "/cambridge/o-level/first-language-urdu-3247/paper-2-texts",
       "permanent": true
     },
     {
@@ -1373,8 +4298,68 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/french-3015/p1",
+      "destination": "/cambridge/o-level/french-3015/paper-1-translation-and-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/french-3015/p2",
+      "destination": "/cambridge/o-level/french-3015/paper-2-reading-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/french-3015/p3",
+      "destination": "/cambridge/o-level/french-3015/paper-3",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/french-3015/p4",
+      "destination": "/cambridge/o-level/french-3015/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/french-3015/paper-1",
+      "destination": "/cambridge/o-level/french-3015/paper-1-translation-and-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/french-3015/paper-2",
+      "destination": "/cambridge/o-level/french-3015/paper-2-reading-comprehension",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/geography",
       "destination": "/cambridge/o-level/geography-2217",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography-2217/p1",
+      "destination": "/cambridge/o-level/geography-2217/paper-1-geographical-themes",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography-2217/p2",
+      "destination": "/cambridge/o-level/geography-2217/paper-2-geographical-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography-2217/p3",
+      "destination": "/cambridge/o-level/geography-2217/paper-3-geographical-investigations",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography-2217/paper-1",
+      "destination": "/cambridge/o-level/geography-2217/paper-1-geographical-themes",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography-2217/paper-2",
+      "destination": "/cambridge/o-level/geography-2217/paper-2-geographical-skills",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/geography-2217/paper-3",
+      "destination": "/cambridge/o-level/geography-2217/paper-3-geographical-investigations",
       "permanent": true
     },
     {
@@ -1383,8 +4368,43 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/global-perspectives-2069/p1",
+      "destination": "/cambridge/o-level/global-perspectives-2069/paper-1-written-examination",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/global-perspectives-2069/p2",
+      "destination": "/cambridge/o-level/global-perspectives-2069/paper-2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/global-perspectives-2069/paper-1",
+      "destination": "/cambridge/o-level/global-perspectives-2069/paper-1-written-examination",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/history",
       "destination": "/cambridge/o-level/history-2147",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/history-2147/p1",
+      "destination": "/cambridge/o-level/history-2147/paper-1-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/history-2147/p2",
+      "destination": "/cambridge/o-level/history-2147/paper-2-document-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/history-2147/paper-1",
+      "destination": "/cambridge/o-level/history-2147/paper-1-structured-questions",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/history-2147/paper-2",
+      "destination": "/cambridge/o-level/history-2147/paper-2-document-questions",
       "permanent": true
     },
     {
@@ -1393,8 +4413,63 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/islamic-studies-2068/p1",
+      "destination": "/cambridge/o-level/islamic-studies-2068/paper-1-history-and-scriptures",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamic-studies-2068/p2",
+      "destination": "/cambridge/o-level/islamic-studies-2068/paper-2-development-sources-beliefs-and-observances",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamic-studies-2068/paper-1",
+      "destination": "/cambridge/o-level/islamic-studies-2068/paper-1-history-and-scriptures",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamic-studies-2068/paper-2",
+      "destination": "/cambridge/o-level/islamic-studies-2068/paper-2-development-sources-beliefs-and-observances",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/islamiyat",
       "destination": "/cambridge/o-level/islamiyat-2058",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/p1",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-1-major-themes-of-the-qur-an-and-history",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/p2",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-2-hadith-caliphate-and-articles-of-faith",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/p4",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/paper-1",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-1-major-themes-of-the-qur-an-and-history",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/paper-1-p1",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-1-major-themes-of-the-qur-an-and-history",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/paper-2",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-2-hadith-caliphate-and-articles-of-faith",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/islamiyat-2058/paper-2-p2",
+      "destination": "/cambridge/o-level/islamiyat-2058/paper-2-hadith-caliphate-and-articles-of-faith",
       "permanent": true
     },
     {
@@ -1403,8 +4478,58 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/literature-in-english-2010/p1",
+      "destination": "/cambridge/o-level/literature-in-english-2010/paper-1-poetry-and-prose",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/literature-in-english-2010/p2",
+      "destination": "/cambridge/o-level/literature-in-english-2010/paper-2-drama",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/literature-in-english-2010/paper-1",
+      "destination": "/cambridge/o-level/literature-in-english-2010/paper-1-poetry-and-prose",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/literature-in-english-2010/paper-2",
+      "destination": "/cambridge/o-level/literature-in-english-2010/paper-2-drama",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/mathematics-d",
       "destination": "/cambridge/o-level/mathematics-d-4024",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d-4024/p1",
+      "destination": "/cambridge/o-level/mathematics-d-4024/paper-1-non-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d-4024/p2",
+      "destination": "/cambridge/o-level/mathematics-d-4024/paper-2-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d-4024/paper-1",
+      "destination": "/cambridge/o-level/mathematics-d-4024/paper-1-non-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d-4024/paper-1-non-calculator-p1",
+      "destination": "/cambridge/o-level/mathematics-d-4024/paper-1-non-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d-4024/paper-2",
+      "destination": "/cambridge/o-level/mathematics-d-4024/paper-2-calculator",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/mathematics-d-4024/paper-2-calculator-p2",
+      "destination": "/cambridge/o-level/mathematics-d-4024/paper-2-calculator",
       "permanent": true
     },
     {
@@ -1413,8 +4538,73 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/pakistan-studies-2059/p1",
+      "destination": "/cambridge/o-level/pakistan-studies-2059/paper-1-history-and-culture-of-pakistan",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/pakistan-studies-2059/p2",
+      "destination": "/cambridge/o-level/pakistan-studies-2059/paper-2-environment-of-pakistan",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/pakistan-studies-2059/p4",
+      "destination": "/cambridge/o-level/pakistan-studies-2059/paper-4",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/pakistan-studies-2059/paper-1",
+      "destination": "/cambridge/o-level/pakistan-studies-2059/paper-1-history-and-culture-of-pakistan",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/pakistan-studies-2059/paper-2",
+      "destination": "/cambridge/o-level/pakistan-studies-2059/paper-2-environment-of-pakistan",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/physics",
       "destination": "/cambridge/o-level/physics-5054",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/p1",
+      "destination": "/cambridge/o-level/physics-5054/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/p2",
+      "destination": "/cambridge/o-level/physics-5054/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/p3",
+      "destination": "/cambridge/o-level/physics-5054/paper-3-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/p4",
+      "destination": "/cambridge/o-level/physics-5054/paper-4-alternative-to-practical",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/paper-1",
+      "destination": "/cambridge/o-level/physics-5054/paper-1-multiple-choice",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/paper-2",
+      "destination": "/cambridge/o-level/physics-5054/paper-2-theory",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/paper-3",
+      "destination": "/cambridge/o-level/physics-5054/paper-3-practical-test",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/physics-5054/paper-4",
+      "destination": "/cambridge/o-level/physics-5054/paper-4-alternative-to-practical",
       "permanent": true
     },
     {
@@ -1423,8 +4613,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/second-language-urdu-3248/p1",
+      "destination": "/cambridge/o-level/second-language-urdu-3248/paper-1-composition-and-translation",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/second-language-urdu-3248/p2",
+      "destination": "/cambridge/o-level/second-language-urdu-3248/paper-2-language-usage-summary-and-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/second-language-urdu-3248/paper-1",
+      "destination": "/cambridge/o-level/second-language-urdu-3248/paper-1-composition-and-translation",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/second-language-urdu-3248/paper-2",
+      "destination": "/cambridge/o-level/second-language-urdu-3248/paper-2-language-usage-summary-and-comprehension",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/sinhala",
       "destination": "/cambridge/o-level/sinhala-3205",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sinhala-3205/p1",
+      "destination": "/cambridge/o-level/sinhala-3205/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sinhala-3205/p2",
+      "destination": "/cambridge/o-level/sinhala-3205/paper-2-translation-and-reading-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sinhala-3205/paper-1",
+      "destination": "/cambridge/o-level/sinhala-3205/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sinhala-3205/paper-2",
+      "destination": "/cambridge/o-level/sinhala-3205/paper-2-translation-and-reading-comprehension",
       "permanent": true
     },
     {
@@ -1433,8 +4663,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/sociology-2251/p1",
+      "destination": "/cambridge/o-level/sociology-2251/paper-1-research-methods-identity-and-inequality",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sociology-2251/p2",
+      "destination": "/cambridge/o-level/sociology-2251/paper-2-family-education-and-crime",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sociology-2251/paper-1",
+      "destination": "/cambridge/o-level/sociology-2251/paper-1-research-methods-identity-and-inequality",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/sociology-2251/paper-2",
+      "destination": "/cambridge/o-level/sociology-2251/paper-2-family-education-and-crime",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/statistics",
       "destination": "/cambridge/o-level/statistics-4040",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/statistics-4040/p1",
+      "destination": "/cambridge/o-level/statistics-4040/paper-1-written-paper-1",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/statistics-4040/p2",
+      "destination": "/cambridge/o-level/statistics-4040/paper-2-written-paper-2",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/statistics-4040/paper-1",
+      "destination": "/cambridge/o-level/statistics-4040/paper-1-written-paper-1",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/statistics-4040/paper-2",
+      "destination": "/cambridge/o-level/statistics-4040/paper-2-written-paper-2",
       "permanent": true
     },
     {
@@ -1443,8 +4713,48 @@
       "permanent": true
     },
     {
+      "source": "/cambridge/o-level/tamil-3226/p1",
+      "destination": "/cambridge/o-level/tamil-3226/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/tamil-3226/p2",
+      "destination": "/cambridge/o-level/tamil-3226/paper-2-translation-and-reading-comprehension",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/tamil-3226/paper-1",
+      "destination": "/cambridge/o-level/tamil-3226/paper-1-composition",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/tamil-3226/paper-2",
+      "destination": "/cambridge/o-level/tamil-3226/paper-2-translation-and-reading-comprehension",
+      "permanent": true
+    },
+    {
       "source": "/cambridge/o-level/travel-and-tourism",
       "destination": "/cambridge/o-level/travel-and-tourism-7096",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/travel-and-tourism-7096/p1",
+      "destination": "/cambridge/o-level/travel-and-tourism-7096/paper-1-key-terms-and-concepts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/travel-and-tourism-7096/p2",
+      "destination": "/cambridge/o-level/travel-and-tourism-7096/paper-2-managing-and-marketing-destinations",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/travel-and-tourism-7096/paper-1",
+      "destination": "/cambridge/o-level/travel-and-tourism-7096/paper-1-key-terms-and-concepts",
+      "permanent": true
+    },
+    {
+      "source": "/cambridge/o-level/travel-and-tourism-7096/paper-2",
+      "destination": "/cambridge/o-level/travel-and-tourism-7096/paper-2-managing-and-marketing-destinations",
       "permanent": true
     },
     {
@@ -1889,7 +5199,7 @@
     },
     {
       "source": "/ial/chemistry/unit-wch07",
-      "destination": "/ial/chemistry/unit-7-chemistry-practical-examination-wch07",
+      "destination": "/ial/chemistry",
       "permanent": true
     },
     {
@@ -1924,7 +5234,7 @@
     },
     {
       "source": "/ial/chemistry/wch07",
-      "destination": "/ial/chemistry/unit-7-chemistry-practical-examination-wch07",
+      "destination": "/ial/chemistry",
       "permanent": true
     },
     {
@@ -2878,6 +6188,11 @@
       "permanent": true
     },
     {
+      "source": "/ial/physics/unit-wph07",
+      "destination": "/ial/physics/unit-3-practical-physics-i-wph13",
+      "permanent": true
+    },
+    {
       "source": "/ial/physics/wph01",
       "destination": "/ial/physics/unit-1-physics-on-the-go-wph01",
       "permanent": true
@@ -2905,6 +6220,11 @@
     {
       "source": "/ial/physics/wph06",
       "destination": "/ial/physics/unit-6-experimental-physics-wph06",
+      "permanent": true
+    },
+    {
+      "source": "/ial/physics/wph07",
+      "destination": "/ial/physics/unit-3-practical-physics-i-wph13",
       "permanent": true
     },
     {
@@ -3103,6 +6423,26 @@
       "permanent": true
     },
     {
+      "source": "/igcse/bengali",
+      "destination": "/igcse/bangla",
+      "permanent": true
+    },
+    {
+      "source": "/igcse/bengali/p1",
+      "destination": "/igcse/bangla/paper-1-p1",
+      "permanent": true
+    },
+    {
+      "source": "/igcse/bengali/paper-1",
+      "destination": "/igcse/bangla/paper-1-p1",
+      "permanent": true
+    },
+    {
+      "source": "/igcse/bengali/paper-1-p1",
+      "destination": "/igcse/bangla/paper-1-p1",
+      "permanent": true
+    },
+    {
       "source": "/igcse/biology/p1",
       "destination": "/igcse/biology/paper-1-p1",
       "permanent": true
@@ -3204,7 +6544,7 @@
     },
     {
       "source": "/igcse/english-as-a-second-language/p4",
-      "destination": "/igcse/english-as-a-second-language/paper-4-p4",
+      "destination": "/igcse/english-as-a-second-language",
       "permanent": true
     },
     {
@@ -3229,7 +6569,7 @@
     },
     {
       "source": "/igcse/english-language-b/p2",
-      "destination": "/igcse/english-language-b/paper-2-p2",
+      "destination": "/igcse/english-language-b",
       "permanent": true
     },
     {

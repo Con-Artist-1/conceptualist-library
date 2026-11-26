@@ -12,6 +12,7 @@ import {
 } from './data/boards.js';
 import { detectLikelyQueryBoard } from './lib/queryBoardDetect.js';
 import {
+  ARCHIVE_FALLBACK_COUNTS,
   buildRoutePath,
   parseRouteFromLocation,
   getSeoMetadata,
@@ -70,14 +71,14 @@ const SEARCH_DEBOUNCE_MS = 80;
 const DEFAULT_ALL_SUBJECTS = Array.from(new Set([...IAL_SUBJECTS_DEFAULT, ...IGCSE_SUBJECTS_DEFAULT])).sort();
 
 const DEFAULT_META = {
-  totalFiles: 78820,
-  uniqueFiles: 74958,
-  totalBooks: 154,
-  ialBooks: 60,
-  igcseBooks: 13,
-  cambridgeBooks: 81,
-  dfCount: 46,
-  audioCount: 272,
+  totalFiles: ARCHIVE_FALLBACK_COUNTS.totalFiles,
+  uniqueFiles: ARCHIVE_FALLBACK_COUNTS.uniqueFiles,
+  totalBooks: ARCHIVE_FALLBACK_COUNTS.totalBooks,
+  ialBooks: ARCHIVE_FALLBACK_COUNTS.ialBooks,
+  igcseBooks: ARCHIVE_FALLBACK_COUNTS.igcseBooks,
+  cambridgeBooks: ARCHIVE_FALLBACK_COUNTS.cambridgeBooks,
+  dfCount: ARCHIVE_FALLBACK_COUNTS.dfCount,
+  audioCount: ARCHIVE_FALLBACK_COUNTS.audioCount,
   subjects: DEFAULT_ALL_SUBJECTS,
   ialSubjects: IAL_SUBJECTS_DEFAULT,
   igcseSubjects: IGCSE_SUBJECTS_DEFAULT,
@@ -1775,7 +1776,7 @@ function App() {
         <main id="main-content" className="content-area" tabIndex={-1}>
           {currentTab === 'about' ? (
             <Suspense fallback={<SecondaryPageSkeleton label="Loading About page" />}>
-              <AboutPage onGoHome={() => handleOpenTab('library')} />
+              <AboutPage meta={meta} onGoHome={() => handleOpenTab('library')} />
             </Suspense>
           ) : currentTab === 'changelog' ? (
             <Suspense fallback={<SecondaryPageSkeleton label="Loading Changelog page" />}>

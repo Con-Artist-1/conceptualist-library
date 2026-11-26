@@ -1,4 +1,6 @@
 import {
+  isThinUnitRoute,
+  buildRouteFaqEntries,
   getLegacyEquivalentsForState,
   inferCurriculumForSubject,
   getCurriculumSlug,
@@ -135,6 +137,7 @@ export function buildArchiveContextInfo({
       ).slice().sort((a, b) => compareUnitLabels(a, b, filterSubject));
       for (const uLabel of unitList) {
         if (uLabel === filterUnit) continue;
+        if (isThinUnitRoute(meta, effCurr, filterSubject, uLabel)) continue;
         const uSlug = getUnitSlug(uLabel, { isCambridge: isCie });
         if (!uSlug) continue;
         pushLink({
@@ -159,6 +162,22 @@ export function buildArchiveContextInfo({
         onClick: () => {
           setIsNotFound(false);
           setScopeAllBoards?.(true);
+          setFilterCurriculum('');
+          setFilterSubject('');
+          setFilterUnit('');
+          setFilterDocType('Book');
+          setForceShowTable(true);
+        }
+      });
+    }
+    if (scopeAllBoards || isCie) {
+      pushLink({
+        href: '/textbooks/edexcel',
+        label: 'Edexcel IAL & IGCSE Textbooks',
+        onClick: () => {
+          setIsNotFound(false);
+          setScopeAllBoards?.(false);
+          setActiveBoard?.('edexcel');
           setFilterCurriculum('');
           setFilterSubject('');
           setFilterUnit('');
@@ -342,5 +361,16 @@ export function buildArchiveContextInfo({
             ? 'Listening Audio Tracks (.mp3)'
             : `${filterCurriculum || (isCie ? 'Cambridge International Archive' : 'Edexcel Archive')} Resource Guide`;
 
-  return { heading, legacyInfo, note, links };
+  const faqs = buildRouteFaqEntries({
+    currentTab,
+    activeBoard,
+    scopeAllBoards,
+    filterCurriculum,
+    filterSubject,
+    filterUnit,
+    filterDocType,
+    meta
+  });
+
+  return { heading, legacyInfo, note, links, faqs };
 }

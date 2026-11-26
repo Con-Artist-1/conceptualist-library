@@ -1,7 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/secondary.css';
+import { getArchiveCounts } from '../lib/routeCore.js';
 
-const AboutPage = ({ onGoHome }) => {
+const CITATION_HTML_SNIPPET = '<a href="https://www.conceptualist.uk/">Conceptualist Systems — International Exam Archive</a>';
+
+const AboutPage = ({ meta = null, onGoHome }) => {
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const { uniqueFiles, totalFiles, totalBooks, audioCount, dfCount } = getArchiveCounts(meta);
+
+  const handleCopySnippet = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(CITATION_HTML_SNIPPET).then(() => {
+        setCopiedSnippet(true);
+        setTimeout(() => setCopiedSnippet(false), 2000);
+      }).catch(() => {});
+    }
+  };
+
   return (
     <div className="about-container">
       <div className="about-card">
@@ -46,11 +61,24 @@ const AboutPage = ({ onGoHome }) => {
         </div>
 
         <div className="about-section">
-          <h2>Our Mission</h2>
+          <h2>Our Mission &amp; Archive Scope</h2>
           <p>
             Navigating past papers, mark schemes, examiner reports, grade thresholds, inserts, and reference books should be effortless.
-            Our platform indexes international examination qualifications — including Pearson Edexcel International A-Level (IAL) &amp; IGCSE and Cambridge International (CAIE) AS &amp; A Level, IGCSE, and O Level — into a fast, board-isolated study catalog.
+            Our platform indexes <strong>{uniqueFiles.toLocaleString()}</strong> unique international examination resources ({totalFiles.toLocaleString()} total archived files) across 169 subjects — including Pearson Edexcel International A-Level (IAL) &amp; IGCSE and Cambridge International (CAIE) AS &amp; A Level, IGCSE, and O Level — alongside <strong>{totalBooks}</strong> textbooks &amp; Solution Banks, <strong>{audioCount}</strong> listening audio tracks, and <strong>{dfCount}</strong> practical data packs.
           </p>
+        </div>
+
+        <div className="about-section">
+          <h2>Cite or Link to Conceptualist Systems</h2>
+          <p>
+            Teachers, study guides, and student communities may link directly to the archive homepage using the verified brand citation below:
+          </p>
+          <div className="cite-snippet-box">
+            <code>{CITATION_HTML_SNIPPET}</code>
+            <button type="button" className="cite-copy-btn" onClick={handleCopySnippet}>
+              {copiedSnippet ? 'Copied' : 'Copy HTML'}
+            </button>
+          </div>
         </div>
 
         <div className="about-section">

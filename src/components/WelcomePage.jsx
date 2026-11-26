@@ -1,6 +1,9 @@
 import React, { useMemo } from 'react';
 import '../styles/welcome.css';
 import {
+  ARCHIVE_FALLBACK_COUNTS,
+  isThinUnitRoute,
+  buildRouteFaqEntries,
   getCurriculumSlug,
   getSubjectSlug,
   getUnitSlug,
@@ -48,9 +51,9 @@ const WelcomePage = ({
 }) => {
   const isCie = activeBoard === 'cambridge';
   const hasHistory = Array.isArray(recentHistory) && recentHistory.length > 0;
-  const bookCount = data.meta?.boards?.edexcel?.totalBooks ?? data.meta?.totalBooks ?? 73;
-  const cambridgeBookCount = data.meta?.boards?.cambridge?.totalBooks ?? data.meta?.cambridgeBooks ?? 0;
-  const audioCount = data.meta?.boards?.edexcel?.audioCount ?? data.meta?.audioCount ?? 272;
+  const bookCount = data.meta?.boards?.edexcel?.totalBooks ?? data.meta?.totalBooks ?? ARCHIVE_FALLBACK_COUNTS.edexcelBooks;
+  const cambridgeBookCount = data.meta?.boards?.cambridge?.totalBooks ?? data.meta?.cambridgeBooks ?? ARCHIVE_FALLBACK_COUNTS.cambridgeBooks;
+  const audioCount = data.meta?.boards?.edexcel?.audioCount ?? ARCHIVE_FALLBACK_COUNTS.edexcelAudioCount;
 
   const ialSubjects = data.meta?.ialSubjects || IAL_SUBJECTS_DEFAULT;
   const igcseSubjects = data.meta?.igcseSubjects || IGCSE_SUBJECTS_DEFAULT;
@@ -68,9 +71,12 @@ const WelcomePage = ({
   const edexcelMeta = data.meta?.boards?.edexcel || null;
   const cambridgeMeta = data.meta?.boards?.cambridge || null;
 
-  const edexcelUniqueCount = edexcelMeta?.uniqueFiles ?? data.meta?.uniqueFiles ?? 16051;
-  const cambridgeUniqueCount = cambridgeMeta?.uniqueFiles ?? 0;
+  const edexcelUniqueCount = edexcelMeta?.uniqueFiles ?? ARCHIVE_FALLBACK_COUNTS.edexcelUnique;
+  const cambridgeUniqueCount = cambridgeMeta?.uniqueFiles ?? ARCHIVE_FALLBACK_COUNTS.cambridgeUnique;
   const cambridgeSubjectTotal = cieAlSubjects.length + cieIgcseSubjects.length + cieOlSubjects.length;
+  const homeFaqs = useMemo(() => (
+    selectedSubject ? [] : buildRouteFaqEntries({ activeBoard, meta: data.meta })
+  ), [selectedSubject, activeBoard, data.meta]);
 
   // Instant 0ms units from precomputed meta.wizard
   const availableUnitsMap = useMemo(() => {
@@ -793,10 +799,12 @@ const WelcomePage = ({
                       {units.map((unitName) => {
                         const unitCount = availableUnitsMap[unitName]?.count;
                         const unitHref = `/${getCurriculumSlug(selectedSubject.curriculum)}/${getSubjectSlug(selectedSubject.name)}/${getUnitSlug(unitName, { isCambridge: isCambridgeCurriculum(selectedSubject.curriculum) })}`;
+                        const isThinUnit = isThinUnitRoute(data.meta, selectedSubject.curriculum, selectedSubject.name, unitName);
                         return (
                           <a
                             key={unitName}
                             href={unitHref}
+                            rel={isThinUnit ? 'nofollow' : undefined}
                             className="wizard-option-btn"
                             onClick={(e) => {
                               if (!shouldHandleClientNavigation(e)) return;
@@ -955,6 +963,20 @@ const WelcomePage = ({
             })}
           </div>
         </>
+      )}
+
+      {!selectedSubject && homeFaqs.length > 0 && (
+        <section className="welcome-faq-strip" aria-label="Archive Questions and Scope">
+          <h2 className="welcome-faq-heading">Archive Questions &amp; Study Tools</h2>
+          <div className="welcome-faq-grid">
+            {homeFaqs.map((item) => (
+              <article key={item.q} className="welcome-faq-card">
+                <h3>{item.q}</h3>
+                <p>{item.a}</p>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

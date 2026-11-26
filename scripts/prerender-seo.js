@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import {
   SITE_URL,
+  isThinUnitRoute,
   IGCSE_SPEC_CODES,
   getCurriculumSlug,
   getSubjectSlug,
@@ -214,6 +215,7 @@ function collectAllRoutes(meta, indexLookup) {
     ['/ial/maths', '/ial/mathematics'],
     ['/ial/it', '/ial/information-technology'],
     ['/ial/ict', '/ial/information-technology'],
+    ['/igcse/bengali', '/igcse/bangla'],
     ['/igcse/math', '/igcse/mathematics-a'],
     ['/igcse/maths', '/igcse/mathematics-a'],
     ['/igcse/it', '/igcse/information-technology'],
@@ -243,6 +245,19 @@ function collectAllRoutes(meta, indexLookup) {
     ['/ial/chemistry/practical-chemistry-ii-wch16', '/ial/chemistry/unit-6-practical-chemistry-ii-wch16'],
     ['/ial/english-literature/unit-wet12', '/ial/english-literature/english-literature-unit-2-wet02'],
     ['/ial/english-literature/wet12', '/ial/english-literature/english-literature-unit-2-wet02'],
+    ['/ial/physics/wph07', '/ial/physics/unit-3-practical-physics-i-wph13'],
+    ['/ial/physics/unit-wph07', '/ial/physics/unit-3-practical-physics-i-wph13'],
+    ['/igcse/bengali/paper-1-p1', '/igcse/bangla/paper-1-p1'],
+    ['/igcse/bengali/p1', '/igcse/bangla/paper-1-p1'],
+    ['/igcse/bengali/paper-1', '/igcse/bangla/paper-1-p1'],
+    ['/cambridge/igcse/mathematics-0580/paper-1-core-p1', '/cambridge/igcse/mathematics-0580/paper-1-core'],
+    ['/cambridge/igcse/mathematics-0580/paper-2-extended-p2', '/cambridge/igcse/mathematics-0580/paper-2-extended'],
+    ['/cambridge/igcse/mathematics-0580/paper-3-core-p3', '/cambridge/igcse/mathematics-0580/paper-3-core'],
+    ['/cambridge/igcse/mathematics-0580/paper-4-extended-p4', '/cambridge/igcse/mathematics-0580/paper-4-extended'],
+    ['/cambridge/o-level/islamiyat-2058/paper-1-p1', '/cambridge/o-level/islamiyat-2058/paper-1-major-themes-of-the-qur-an-and-history'],
+    ['/cambridge/o-level/islamiyat-2058/paper-2-p2', '/cambridge/o-level/islamiyat-2058/paper-2-hadith-caliphate-and-articles-of-faith'],
+    ['/cambridge/o-level/mathematics-d-4024/paper-1-non-calculator-p1', '/cambridge/o-level/mathematics-d-4024/paper-1-non-calculator'],
+    ['/cambridge/o-level/mathematics-d-4024/paper-2-calculator-p2', '/cambridge/o-level/mathematics-d-4024/paper-2-calculator'],
     ['/cambridge/a-level/mathematics-9709/pure-mathematics-1-p1-wma11', '/cambridge/a-level/mathematics-9709/pure-mathematics-1-p1'],
     ['/cambridge/a-level/mathematics-9709/pure-mathematics-2-p2-wma12', '/cambridge/a-level/mathematics-9709/pure-mathematics-2-p2'],
     ['/cambridge/a-level/mathematics-9709/pure-mathematics-3-p3-wma13', '/cambridge/a-level/mathematics-9709/pure-mathematics-3-p3']
@@ -511,25 +526,34 @@ function collectAllRoutes(meta, indexLookup) {
           }
         });
 
+        const isThin = isThinUnitRoute(meta, curr, subj, unitLabel);
+        const redirectTarget = isThin ? subjPath : unitPath;
+
         if (!isCie) {
           const unitCode = getUnitCodeFromLabel(unitLabel);
           if (unitCode) {
             const codeSlug = unitCode.toLowerCase();
-            addRedirect(`/${currSlug}/${subjSlug}/${codeSlug}`, unitPath);
+            addRedirect(`/${currSlug}/${subjSlug}/${codeSlug}`, redirectTarget);
             if (isLegacy) {
-              addRedirect(`/${currSlug}/${subjSlug}/unit-${codeSlug}`, unitPath);
+              addRedirect(`/${currSlug}/${subjSlug}/unit-${codeSlug}`, redirectTarget);
             }
           }
           const parenMatch = unitLabel.match(/\(([A-Z0-9]{2,6})\)/i);
           if (parenMatch) {
-            addRedirect(`/${currSlug}/${subjSlug}/${parenMatch[1].toLowerCase()}`, unitPath);
+            addRedirect(`/${currSlug}/${subjSlug}/${parenMatch[1].toLowerCase()}`, redirectTarget);
           }
           if (!isLegacy) {
             const unitNumMatch = unitLabel.match(/\bUnit\s+([1-6])\b/i);
             if (unitNumMatch) {
-              addRedirect(`/${currSlug}/${subjSlug}/u${unitNumMatch[1]}`, unitPath);
-              addRedirect(`/${currSlug}/${subjSlug}/unit-${unitNumMatch[1]}`, unitPath);
+              addRedirect(`/${currSlug}/${subjSlug}/u${unitNumMatch[1]}`, redirectTarget);
+              addRedirect(`/${currSlug}/${subjSlug}/unit-${unitNumMatch[1]}`, redirectTarget);
             }
+          }
+        } else if (!isLegacy) {
+          const ciePaperMatch = unitLabel.match(/\bPaper\s+([1-7])\b/i);
+          if (ciePaperMatch) {
+            addRedirect(`/${currSlug}/${subjSlug}/p${ciePaperMatch[1]}`, redirectTarget);
+            addRedirect(`/${currSlug}/${subjSlug}/paper-${ciePaperMatch[1]}`, redirectTarget);
           }
         }
       }
@@ -643,6 +667,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     }
     links.push(
       '<li><a href="/textbooks">All Edexcel &amp; Cambridge Textbooks</a></li>',
+      '<li><a href="/textbooks/edexcel">Edexcel IAL &amp; IGCSE Textbooks &amp; Solution Banks</a></li>',
       '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
       '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>',
       '<li><a href="/textbooks/cambridge">Cambridge International Coursebooks &amp; Workbooks</a></li>',
@@ -665,6 +690,16 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       links.unshift(
         `<li><a href="/${getCurriculumSlug(filterCurriculum)}/${getSubjectSlug(filterSubject)}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} Past Papers & Mark Schemes`)}</a></li>`
       );
+      const tbUnitsObj = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units || {};
+      const tbCurrSlug = getCurriculumSlug(filterCurriculum);
+      const tbSubjSlug = getSubjectSlug(filterSubject);
+      const tbIsCie = isCambridgeCurriculum(filterCurriculum);
+      for (const u of Object.keys(tbUnitsObj).sort((a, b) => compareUnitLabels(a, b, filterSubject))) {
+        if (isThinUnitRoute(meta, filterCurriculum, filterSubject, u)) continue;
+        links.push(
+          `<li><a href="/${tbCurrSlug}/${tbSubjSlug}/${getUnitSlug(u, { isCambridge: tbIsCie })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${u} Past Papers`)}</a></li>`
+        );
+      }
     }
   } else if (filterDocType === 'DF') {
     const dfItems = [...(indexLookup?.dfAll || [])].sort((a, b) => (Number(b.sortKey) || 0) - (Number(a.sortKey) || 0));
@@ -747,6 +782,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     const siblingUnits = Object.keys(unitsObj).sort((a, b) => compareUnitLabels(a, b, filterSubject));
     for (const sibUnit of siblingUnits) {
       if (sibUnit === filterUnit) continue;
+      if (isThinUnitRoute(meta, filterCurriculum, filterSubject, sibUnit)) continue;
       links.push(
         `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(sibUnit, { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${sibUnit} Past Papers`)}</a></li>`
       );
@@ -756,6 +792,7 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
     const subjSlug = getSubjectSlug(filterSubject);
     const unitsObj = meta?.wizard?.[filterCurriculum]?.[filterSubject]?.units || {};
     for (const u of Object.keys(unitsObj).sort((a, b) => compareUnitLabels(a, b, filterSubject))) {
+      if (isThinUnitRoute(meta, filterCurriculum, filterSubject, u)) continue;
       links.push(
         `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u, { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(filterSubject)} ${u} Past Papers & Mark Schemes`)}</a></li>`
       );
@@ -785,17 +822,20 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
       links.push(
         `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} Past Papers & Mark Schemes`)}</a></li>`
       );
-      const uKeys = Object.keys(subjectsObj[s]?.units || {});
-      if (uKeys.length === 1) {
-        links.push(
-          `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0], { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
-        );
+      const uKeys = Object.keys(subjectsObj[s]?.units || {}).filter((u) => !isThinUnitRoute(meta, filterCurriculum, s, u));
+      if (uKeys.length <= 3) {
+        for (const u of uKeys) {
+          links.push(
+            `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u, { isCambridge: isCieRoute })}">${escapeHtml(`${filterCurriculum} ${formatSubjectName(s)} ${u} Past Papers`)}</a></li>`
+          );
+        }
       }
     }
   } else if (currentTab === 'library') {
     const isCieHome = route.state.activeBoard === 'cambridge';
     if (isCieHome) {
       links.push(
+        '<li><a href="/cambridge/papers">All Cambridge International Past Papers</a></li>',
         '<li><a href="/cambridge/a-level">Cambridge International AS &amp; A Level Past Papers</a></li>',
         '<li><a href="/cambridge/igcse">Cambridge IGCSE Past Papers (A*-G &amp; 9-1)</a></li>',
         '<li><a href="/cambridge/o-level">Cambridge O Level Past Papers</a></li>',
@@ -809,11 +849,21 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
           links.push(
             `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
           );
+          const uKeys = Object.keys(subjectsObj[s]?.units || {}).filter((u) => !isThinUnitRoute(meta, curr, s, u));
+          if (uKeys.length <= 2) {
+            for (const u of uKeys) {
+              links.push(
+                `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u, { isCambridge: true })}">${escapeHtml(`${curr} ${formatSubjectName(s)} ${u} Past Papers`)}</a></li>`
+              );
+            }
+          }
         }
       }
     } else {
       links.push(
         '<li><a href="/cambridge">Cambridge International (CAIE) Past Papers Archive</a></li>',
+        '<li><a href="/cambridge/papers">All Cambridge International Past Papers</a></li>',
+        '<li><a href="/textbooks/edexcel">Edexcel IAL &amp; IGCSE Textbooks &amp; Solution Banks</a></li>',
         '<li><a href="/textbooks/ial">Edexcel IAL Textbooks &amp; Worked Solution Banks</a></li>',
         '<li><a href="/textbooks/igcse">Edexcel IGCSE (9-1) Student Textbooks</a></li>'
       );
@@ -825,11 +875,13 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
           links.push(
             `<li><a href="/${currSlug}/${subjSlug}">${escapeHtml(`${curr} ${formatSubjectName(s)} Past Papers`)}</a></li>`
           );
-          const uKeys = Object.keys(subjectsObj[s]?.units || {});
-          if (uKeys.length === 1) {
-            links.push(
-              `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(uKeys[0])}">${escapeHtml(`${curr} ${formatSubjectName(s)} ${uKeys[0]} Past Papers`)}</a></li>`
-            );
+          const uKeys = Object.keys(subjectsObj[s]?.units || {}).filter((u) => !isThinUnitRoute(meta, curr, s, u));
+          if (uKeys.length <= 2) {
+            for (const u of uKeys) {
+              links.push(
+                `<li><a href="/${currSlug}/${subjSlug}/${getUnitSlug(u)}">${escapeHtml(`${curr} ${formatSubjectName(s)} ${u} Past Papers`)}</a></li>`
+              );
+            }
           }
         }
       }
@@ -864,10 +916,12 @@ function buildStaticSemanticBody(route, seo, meta, indexLookup) {
           <a href="/ial">Edexcel IAL</a> |
           <a href="/igcse">Edexcel IGCSE</a> |
           <a href="/cambridge">Cambridge International</a> |
+          <a href="/cambridge/papers">Cambridge Papers</a> |
           <a href="/cambridge/a-level">Cambridge A-Level</a> |
           <a href="/cambridge/igcse">Cambridge IGCSE</a> |
           <a href="/cambridge/o-level">Cambridge O Level</a> |
           <a href="/textbooks">Textbooks &amp; Solution Banks</a> |
+          <a href="/textbooks/edexcel">Edexcel Textbooks</a> |
           <a href="/data-files">IT &amp; CS Data Files</a> |
           <a href="/audio">Listening Audio MP3s</a> |
           <a href="/about">About</a> |
@@ -1187,10 +1241,25 @@ function run() {
     try {
       const vercelCfg = JSON.parse(fs.readFileSync(VERCEL_CONFIG_PATH, 'utf8'));
       const sortedRedirects = [...aliasRedirects].sort((a, b) => a.source.localeCompare(b.source));
-      vercelCfg.rewrites = [];
+      vercelCfg.rewrites = ['paper', 'year', 'variant', 'type'].map((key) => ({
+        source: '/((?!api/).*)',
+        has: [{ type: 'query', key }],
+        missing: [{ type: 'query', key: 'q' }],
+        destination: '/api/redirect?__pathname=/$1'
+      }));
       vercelCfg.redirects = sortedRedirects;
       if (vercelCfg.functions && vercelCfg.functions['api/*.js']) {
         vercelCfg.functions['api/*.js'].includeFiles = 'api/_allowlist.json';
+      }
+      if (Array.isArray(vercelCfg.headers)) {
+        vercelCfg.headers = vercelCfg.headers.filter(
+          (hRule) => !hRule.headers?.some((h) => h.key === 'X-Robots-Tag')
+        );
+        vercelCfg.headers.unshift({
+          source: '/(.*)',
+          has: [{ type: 'query', key: 'q' }],
+          headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }]
+        });
       }
       if (inlineScriptCspHash && Array.isArray(vercelCfg.headers)) {
         for (const hRule of vercelCfg.headers) {

@@ -1,5 +1,16 @@
 export const CHANGELOG_HISTORY = [
   {
+    version: 'v8.4.0',
+    date: '2026-11-26T23:35:00+06:00',
+    title: 'SEO Roast Remediation, Edge 308 Query Consolidation & SERP Title Overhaul',
+    summary: 'Resolved Google Search Console indexation traps (legacy ?paper=/?year= 308 edge consolidation, visible FAQPage DOM parity, thin noindex canonical cleanup, 13 historical 404 redirects, and >=3 inbound links across all 817 canonical routes) and rewrote all 820 route titles to <= 56 characters.',
+    changes: [
+      'Edge 308 Query Consolidation & 404 Recovery: Added api/redirect.js + query-guarded Vercel rewrites to 308-redirect legacy ?paper=/?year=/?variant=/?type= URLs to clean canonical paths / #paper= hashes, added X-Robots-Tag: noindex, follow on ?q= searches, and added 13 missing 308 redirects (/igcse/bengali, /ial/physics/wph07, and 8 v8.0.0 Cambridge 0580/2058/4024 paper slugs).',
+      'Visible FAQ Parity, Thin-Unit Hygiene & Internal Link Mesh: Rendered data-derived Archive FAQs visibly in WelcomePage and ArchiveContextStrip, scoped FAQPage schema away from repetitive unit child pages, stripped cross-page canonicals and ItemList/dofollow links from thin (<3-file) noindex units, unified archive fallback counts (74,958 unique / 154 books / 591 audio / 212 data files), and linked all orphan/low-inbound hubs (>= 3 inbound links across all 817 indexable routes).',
+      'CTR-First SERP Title Rewrite & Attribution Loop: Rewrote all 820 route titles to <= 56 characters while preserving Edexcel/Cambridge board names, subject names, and high-intent modifiers ("Student Book 1 & 2 PDF + Answers", "Past Papers & MS"), and added a 1-click brand citation snippet on /about.'
+    ]
+  },
+  {
     version: 'v8.3.2',
     date: '2026-11-26T22:50:00+06:00',
     title: 'WebPDF Streaming Crash Fix, Flat Pages O(1) Lookup & Determinate Progress Bar',

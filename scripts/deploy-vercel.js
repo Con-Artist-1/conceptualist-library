@@ -50,6 +50,7 @@ const EXCLUDE = new Set([
   '.git',
   '.data',
   'logs',
+  'seo',
   'pi-deploy',
   'pi-deploy.zip',
   '.DS_Store',

@@ -1,6 +1,8 @@
 // Lightweight core SEO routing, slug resolution & metadata across International Exam Boards
 // (Pearson Edexcel IAL/IGCSE and Cambridge International AS & A Level, IGCSE, O Level).
 import {
+  ARCHIVE_FALLBACK_COUNTS,
+  isThinUnitRoute,
   SUBJECTS_WITH_BOOKS_MAP,
   LEGACY_IAL_UNIT_CODES,
   IGCSE_MODULAR_CODES,
@@ -165,6 +167,7 @@ function resolveSubjectFromSlug(slug, curriculum, meta) {
     return resolveCambridgeSubjectFromSlug(slug, curriculum, meta);
   }
   const clean = slug.toLowerCase().trim();
+  if (clean === 'bengali') return 'Bangla';
   if (clean === 'mathematics' || clean === 'math' || clean === 'maths') {
     if (curriculum === 'Edexcel IGCSE') return 'Mathematics A';
     return 'Math';
@@ -468,22 +471,26 @@ function getCurriculumUniqueCount(meta, curr) {
 }
 
 export function getArchiveCounts(meta) {
-  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || 16051;
-  const totalFiles = meta?.totalFiles || 19912;
-  const totalBooks = meta?.totalBooks || 73;
-  const ialBooks = meta?.ialBooks || 60;
-  const igcseBooks = meta?.igcseBooks || 13;
+  const uniqueFiles = meta?.uniqueFiles || meta?.totalFiles || ARCHIVE_FALLBACK_COUNTS.uniqueFiles;
+  const totalFiles = meta?.totalFiles || ARCHIVE_FALLBACK_COUNTS.totalFiles;
+  const totalBooks = meta?.totalBooks || ARCHIVE_FALLBACK_COUNTS.totalBooks;
+  const ialBooks = meta?.ialBooks || ARCHIVE_FALLBACK_COUNTS.ialBooks;
+  const igcseBooks = meta?.igcseBooks || ARCHIVE_FALLBACK_COUNTS.igcseBooks;
   const edexcelBooks = meta?.boards?.edexcel?.totalBooks ?? (ialBooks + igcseBooks);
-  const cambridgeBooks = meta?.cambridgeBooks ?? meta?.boards?.cambridge?.totalBooks ?? 0;
-  const cieAlBooks = meta?.cieAlBooks ?? meta?.boards?.cambridge?.alBooks ?? 0;
-  const cieIgcseBooks = meta?.cieIgcseBooks ?? meta?.boards?.cambridge?.igcseBooks ?? 0;
-  const cieOlBooks = meta?.cieOlBooks ?? meta?.boards?.cambridge?.olBooks ?? 0;
-  const dfCount = meta?.dfCount || 46;
-  const audioCount = meta?.audioCount || 272;
-  const edexcelUnique = meta?.boards?.edexcel?.uniqueFiles ?? uniqueFiles;
-  const edexcelTotal = meta?.boards?.edexcel?.totalFiles ?? totalFiles;
-  const cambridgeUnique = meta?.boards?.cambridge?.uniqueFiles ?? 0;
-  const cambridgeTotal = meta?.boards?.cambridge?.totalFiles ?? 0;
+  const cambridgeBooks = meta?.cambridgeBooks ?? meta?.boards?.cambridge?.totalBooks ?? ARCHIVE_FALLBACK_COUNTS.cambridgeBooks;
+  const cieAlBooks = meta?.cieAlBooks ?? meta?.boards?.cambridge?.alBooks ?? ARCHIVE_FALLBACK_COUNTS.cieAlBooks;
+  const cieIgcseBooks = meta?.cieIgcseBooks ?? meta?.boards?.cambridge?.igcseBooks ?? ARCHIVE_FALLBACK_COUNTS.cieIgcseBooks;
+  const cieOlBooks = meta?.cieOlBooks ?? meta?.boards?.cambridge?.olBooks ?? ARCHIVE_FALLBACK_COUNTS.cieOlBooks;
+  const dfCount = meta?.dfCount || ARCHIVE_FALLBACK_COUNTS.dfCount;
+  const edexcelDfCount = meta?.boards?.edexcel?.dfCount ?? ARCHIVE_FALLBACK_COUNTS.edexcelDfCount;
+  const cambridgeDfCount = meta?.boards?.cambridge?.dfCount ?? ARCHIVE_FALLBACK_COUNTS.cambridgeDfCount;
+  const audioCount = meta?.audioCount || ARCHIVE_FALLBACK_COUNTS.audioCount;
+  const edexcelAudioCount = meta?.boards?.edexcel?.audioCount ?? ARCHIVE_FALLBACK_COUNTS.edexcelAudioCount;
+  const cambridgeAudioCount = meta?.boards?.cambridge?.audioCount ?? ARCHIVE_FALLBACK_COUNTS.cambridgeAudioCount;
+  const edexcelUnique = meta?.boards?.edexcel?.uniqueFiles ?? ARCHIVE_FALLBACK_COUNTS.edexcelUnique;
+  const edexcelTotal = meta?.boards?.edexcel?.totalFiles ?? ARCHIVE_FALLBACK_COUNTS.edexcelTotal;
+  const cambridgeUnique = meta?.boards?.cambridge?.uniqueFiles ?? ARCHIVE_FALLBACK_COUNTS.cambridgeUnique;
+  const cambridgeTotal = meta?.boards?.cambridge?.totalFiles ?? ARCHIVE_FALLBACK_COUNTS.cambridgeTotal;
   return {
     uniqueFiles,
     totalFiles,
@@ -496,7 +503,11 @@ export function getArchiveCounts(meta) {
     cieIgcseBooks,
     cieOlBooks,
     dfCount,
+    edexcelDfCount,
+    cambridgeDfCount,
     audioCount,
+    edexcelAudioCount,
+    cambridgeAudioCount,
     edexcelUnique,
     edexcelTotal,
     cambridgeUnique,
@@ -504,11 +515,15 @@ export function getArchiveCounts(meta) {
   };
 }
 
-function pickTitleVariant(candidates, maxLen = 65) {
+function pickTitleVariant(candidates, maxLen = 56) {
   for (const c of candidates) {
-    if (c.length <= maxLen) return c;
+    if (c && c.length <= maxLen) return c;
   }
-  return candidates[candidates.length - 1];
+  const fallback = candidates[candidates.length - 1] || '';
+  if (fallback.length <= maxLen) return fallback;
+  const cut = fallback.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 24 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:\-–]+$/, '').trim();
 }
 
 function fitDescription(str, maxLen = 160) {
@@ -516,6 +531,307 @@ function fitDescription(str, maxLen = 160) {
   const trimmed = str.slice(0, maxLen - 1);
   const lastSpace = trimmed.lastIndexOf(' ');
   return `${(lastSpace > 100 ? trimmed.slice(0, lastSpace) : trimmed).replace(/[.,;:\s-]+$/, '')}.`;
+}
+
+export function buildRouteFaqEntries({
+  currentTab = 'library',
+  activeBoard = 'edexcel',
+  scopeAllBoards = false,
+  filterCurriculum = '',
+  filterSubject = '',
+  filterUnit = '',
+  filterDocType = null,
+  searchQuery = '',
+  notFound = false,
+  meta = null
+} = {}) {
+  if (
+    currentTab === 'about' ||
+    currentTab === 'changelog' ||
+    notFound ||
+    (searchQuery && String(searchQuery).trim()) ||
+    Boolean(filterUnit)
+  ) {
+    return [];
+  }
+
+  const {
+    uniqueFiles,
+    totalFiles,
+    totalBooks,
+    ialBooks,
+    igcseBooks,
+    edexcelBooks,
+    cambridgeBooks,
+    cieAlBooks,
+    cieIgcseBooks,
+    cieOlBooks,
+    dfCount,
+    audioCount,
+    edexcelAudioCount,
+    cambridgeAudioCount,
+    edexcelUnique,
+    cambridgeUnique
+  } = getArchiveCounts(meta);
+
+  const subjDisplay = formatSubjectName(filterSubject);
+  const curr = filterCurriculum || (filterSubject ? inferCurriculumForSubject(filterSubject, 'Edexcel IAL') : '');
+  const isCie = isCambridgeCurriculum(curr) || (!curr && !scopeAllBoards && activeBoard === 'cambridge');
+  const faqs = [];
+
+  if (filterDocType === 'Book') {
+    if (filterSubject) {
+      const isIalMath = curr === 'Edexcel IAL' && filterSubject === 'Math';
+      const hasAnswerBooks = curr === 'Edexcel IAL' && ['Accounting', 'Biology', 'Business', 'Chemistry', 'Economics', 'Physics'].includes(filterSubject);
+      faqs.push({
+        q: `How can I read ${curr} ${subjDisplay} ${isCie ? 'coursebooks' : 'textbooks'}${isIalMath ? ' and Solution Banks' : ''} online?`,
+        a: `Open any ${curr} ${subjDisplay} ${isCie ? 'Coursebook, Workbook, or Practical Guide' : `Student Book${isIalMath ? ' or Worked Solution Bank ZIP' : ''}`} directly in our 2-Page WebPDF spread reader with Dark and Pure OLED modes, or download the linearized PDF directly.`
+      });
+      if (isIalMath) {
+        faqs.push({
+          q: 'Which Edexcel IAL Mathematics units have Worked Solution Banks included?',
+          a: 'All 14 Pearson Edexcel IAL Mathematics units are covered chapter-by-chapter: Pure Mathematics 1–4 (WMA11–WMA14), Mechanics 1–3 (WME01–WME03), Statistics 1–3 (WST01–WST03), Decision Mathematics 1 (WDM11), and Further Pure 1–3 (WFM01–WFM03).'
+        });
+      } else {
+        faqs.push({
+          q: `Are ${hasAnswerBooks ? 'Student Book 1 & 2 answer PDFs' : 'worked answers and past papers'} linked with ${curr} ${subjDisplay} books?`,
+          a: `Yes. ${hasAnswerBooks ? `Both Student Book 1 and Student Book 2 PDFs plus official answer booklets for ${curr} ${subjDisplay} are indexed here, ` : `Every ${curr} ${subjDisplay} resource on this page is cover-verified and linearized for fast loading, `}and you can jump straight to the matching past papers and mark schemes below.`
+        });
+      }
+      return faqs;
+    }
+    if (filterCurriculum) {
+      const currLabel = filterCurriculum;
+      const countMap = {
+        'Edexcel IAL': ialBooks,
+        'Edexcel IGCSE': igcseBooks,
+        'Cambridge AS & A Level': cieAlBooks,
+        'Cambridge IGCSE': cieIgcseBooks,
+        'Cambridge O Level': cieOlBooks
+      };
+      const bCount = countMap[currLabel] || (isCie ? cambridgeBooks : edexcelBooks);
+      faqs.push({
+        q: `How many ${currLabel} ${isCie ? 'coursebooks and workbooks' : 'textbooks'} are indexed?`,
+        a: `This collection holds ${bCount} verified ${currLabel} ${isCie ? 'coursebooks, workbooks, practical books, and revision guides' : currLabel === 'Edexcel IAL' ? 'student books, answer PDFs, lab books, and IAL Maths Worked Solution Banks' : 'student textbooks across Sciences, Mathematics, Business, Commerce, and IT'}.`
+      });
+      faqs.push({
+        q: `Can I view ${currLabel} books side-by-side in 2-Page spread mode?`,
+        a: `Yes. Every ${currLabel} PDF is linearized for instant range-streaming and opens in a resizable 2-Page spread layout with optional solo Cover pairing.`
+      });
+      return faqs;
+    }
+    if (isCie) {
+      faqs.push({
+        q: 'Which Cambridge International coursebooks and workbooks are in the archive?',
+        a: `The archive indexes ${cambridgeBooks} verified Cambridge International resources across AS & A Level (${cieAlBooks}), IGCSE (${cieIgcseBooks}), and O Level (${cieOlBooks}), covering 32 syllabuses.`
+      });
+      faqs.push({
+        q: 'Are Cambridge textbooks viewable without downloading the full file first?',
+        a: 'Yes. All 81 Cambridge books are qpdf-linearized so Page 1 streams in 1–2 HTTP byte-range chunks inside the 2-Page WebPDF reader.'
+      });
+      return faqs;
+    }
+    if (scopeAllBoards) {
+      faqs.push({
+        q: 'How many international exam textbooks and Solution Banks are in the archive?',
+        a: `The library indexes ${totalBooks} verified resources across both boards: ${edexcelBooks} Pearson Edexcel (IAL & IGCSE) student books and Worked Solution Banks plus ${cambridgeBooks} Cambridge International (AS & A Level, IGCSE & O Level) coursebooks and workbooks.`
+      });
+      faqs.push({
+        q: 'How do the Edexcel IAL Mathematics Worked Solution Bank ZIPs work?',
+        a: 'All 14 IAL Maths Solution Banks (P1–P4, M1–M3, S1–S3, D1, FP1–FP3) stream their chapter and exercise index on demand via HTTP 206 Range requests without downloading the entire archive.'
+      });
+      return faqs;
+    }
+    faqs.push({
+      q: 'How many Edexcel textbooks and Solution Banks are in the archive?',
+      a: `The Edexcel textbook collection indexes ${edexcelBooks} verified resources (${ialBooks} Edexcel IAL student books, lab books, answer PDFs, and Worked Solution Banks plus ${igcseBooks} Edexcel IGCSE 9–1 student books).`
+    });
+    faqs.push({
+      q: 'Are Edexcel Student Book 1 and Book 2 answer PDFs included?',
+      a: 'Yes. Answer booklets for Edexcel IAL Accounting, Biology, Business, Chemistry, Economics, and Physics sit alongside the Student Books, while IAL Mathematics includes full worked Solution Banks.'
+    });
+    return faqs;
+  }
+
+  if (filterDocType === 'AUD') {
+    faqs.push({
+      q: 'Which language listening exams include audio and synced transcripts?',
+      a: `All ${audioCount} archived MP3 and ZIP listening tracks (${edexcelAudioCount} Edexcel + ${cambridgeAudioCount} Cambridge) stream directly in-browser above the Question Paper with live closed captions (CC).`
+    });
+    faqs.push({
+      q: 'How do synchronized closed captions (CC) work for listening papers?',
+      a: 'All 273 Edexcel IAL and IGCSE listening packs load instant pre-indexed static transcripts, while Cambridge listening tracks support on-demand in-browser Whisper AI caption generation.'
+    });
+    return faqs;
+  }
+
+  if (filterDocType === 'DF') {
+    faqs.push({
+      q: 'Which practical exams require source data files (.zip)?',
+      a: `The archive hosts ${dfCount} practical examination source data archives covering Edexcel IAL IT (WIT12, WIT14), Edexcel IGCSE ICT/CS (4IT1, 4CP0), Cambridge IGCSE ICT (0417), and Cambridge A-Level IT/CS (9626, 9618).`
+    });
+    faqs.push({
+      q: 'Can I pair the Question Paper and Mark Scheme while downloading Data Files?',
+      a: 'Yes. Each practical sitting links its Question Paper, Mark Scheme, Examiner Report, and .zip source files in one row so you can inspect the paper in Split View while extracting the data pack.'
+    });
+    return faqs;
+  }
+
+  if (filterSubject) {
+    const subjWizard = meta?.wizard?.[curr]?.[filterSubject];
+    const docCount = subjWizard?.totalFiles || 100;
+    const unitNames = Object.keys(subjWizard?.units || {});
+    const unitSample = unitNames.slice(0, 5).join(', ');
+    const allYears = subjWizard?.allYears || [];
+    const yrSpan = allYears.length > 0 ? `${allYears[allYears.length - 1]}–${allYears[0]}` : (isCie ? '2002–2026' : '2011–2026');
+    const hasBooks = subjectHasBooks(curr, filterSubject);
+
+    if (isCie) {
+      const code = extractSyllabusCodeFromSubject(filterSubject);
+      const entry = code ? resolveCambridgeSyllabus(code) : null;
+      const legacyNote = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject });
+      faqs.push({
+        q: `How many ${curr} ${subjDisplay} past papers and components are indexed?`,
+        a: `This ${curr} ${subjDisplay} hub indexes ${docCount.toLocaleString()} unique files spanning ${yrSpan} across ${unitNames.length || 'all'} components (${unitSample || 'QP, MS, IN, GT & ER'}), complete with v1/v2/v3 variant filters and Grade Thresholds.${legacyNote ? ` (${legacyNote})` : ''}`
+      });
+      if (entry?.alt91) {
+        faqs.push({
+          q: `Are Cambridge IGCSE ${entry.code} and ${entry.alt91} (9–1) past papers identical?`,
+          a: `Yes. Cambridge IGCSE ${entry.code} (A*–G) and ${entry.alt91} (9–1) share identical question papers, inserts, and mark schemes; only the grading scale differs, so every ${entry.alt91} sitting is unified here.`
+        });
+      } else {
+        faqs.push({
+          q: `How do I compare ${curr} ${subjDisplay} Question Papers with Mark Schemes${hasBooks ? ' or Textbooks' : ' and Inserts'}?`,
+          a: `Click Split View on any ${subjDisplay} sitting to read the Question Paper side-by-side with its Mark Scheme or Insert, inspect session Grade Thresholds (GT)${hasBooks ? `, or open the ${subjDisplay} coursebooks in 2-Page spread mode` : ''}.`
+        });
+      }
+      return faqs;
+    }
+
+    const unitCodes = getUniqueOrderedUnitCodes(unitNames).filter((c) => !LEGACY_IAL_UNIT_CODES.has(c));
+    const igcseCode = curr === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
+    const legacySpec = SUBJECT_LEGACY_SPEC_CODES[curr]?.[filterSubject] || '';
+
+    if (curr === 'Edexcel IGCSE') {
+      faqs.push({
+        q: `What papers and series are included for Edexcel IGCSE ${subjDisplay}${igcseCode ? ` (${igcseCode})` : ''}?`,
+        a: `This Edexcel IGCSE ${subjDisplay} archive indexes ${docCount.toLocaleString()} unique files from ${yrSpan} covering ${unitNames.length || 'all'} papers (${unitSample || 'Paper 1 & Paper 2'}), including Linear, Regional (1R/2R), and ${legacySpec || 'legacy specification'} sittings.`
+      });
+      faqs.push({
+        q: `How can I study Edexcel IGCSE ${subjDisplay} papers with Mark Schemes?`,
+        a: `Every sitting pairs the Question Paper (QP), Mark Scheme (MS), and Examiner Report (ER) on one row—click Split View to view the paper and mark scheme side-by-side${hasBooks ? `, or switch to ${subjDisplay} Student Textbooks` : ''}.`
+      });
+    } else {
+      faqs.push({
+        q: `Which units and codes are covered in Edexcel IAL ${subjDisplay}?`,
+        a: `Edexcel IAL ${subjDisplay} includes ${docCount.toLocaleString()} unique files spanning ${yrSpan} across ${unitNames.length || 'all'} units (${unitCodes.length ? unitCodes.slice(0, 6).join(', ') : unitSample})${legacySpec ? `, plus ${legacySpec}` : ''}.`
+      });
+      faqs.push({
+        q: `Does Edexcel IAL ${subjDisplay} support side-by-side Mark Schemes${hasBooks ? ' and Textbooks' : ''}?`,
+        a: `Yes. Every January, June, and October sitting supports instant Split View between the Question Paper and Mark Scheme${hasBooks ? `, and ${subjDisplay} Student Books${filterSubject === 'Math' ? ' + Worked Solution Banks' : ' & Answers'} are linked directly below` : ' alongside Examiner Reports'}.`
+      });
+    }
+    return faqs;
+  }
+
+  if (filterCurriculum === 'Cambridge AS & A Level') {
+    const alCount = getCurriculumUniqueCount(meta, 'Cambridge AS & A Level');
+    const alSubjCount = meta?.cieAlSubjects?.length || 31;
+    return [
+      {
+        q: 'Which Cambridge AS & A Level syllabuses are covered in this archive?',
+        a: `All ${alSubjCount} international Cambridge AS & A Level syllabuses (${alCount.toLocaleString()} unique files, 2002–2026) are indexed, including Mathematics (9709), Physics (9702), Chemistry (9701), Biology (9700), Computer Science (9618), and Economics (9708).`
+      },
+      {
+        q: 'Can I filter Cambridge A-Level papers by timezone variant and Grade Thresholds?',
+        a: 'Yes. Every sitting displays v1, v2, and v3 timezone variant pills alongside Feb/March, May/June, and Oct/Nov sessions, with one-click Grade Thresholds (GT) and Split View.'
+      }
+    ];
+  }
+
+  if (filterCurriculum === 'Cambridge IGCSE') {
+    const igCount = getCurriculumUniqueCount(meta, 'Cambridge IGCSE');
+    const igSubjCount = meta?.cieIgcseSubjects?.length || 45;
+    return [
+      {
+        q: 'Does the Cambridge IGCSE archive cover both A*–G and 9–1 syllabuses?',
+        a: `Yes. All ${igSubjCount} international Cambridge IGCSE syllabuses (${igCount.toLocaleString()} unique files) unify 9–1 codes (such as 0972 Physics and 0980 Maths) with their identical A*–G papers (0625, 0580).`
+      },
+      {
+        q: 'Are Core, Extended, Practical, and ATP papers separated cleanly?',
+        a: 'Yes. Each syllabus groups Core, Extended, Practical, Alternative to Practical (ATP), and Listening components cleanly with side-by-side QP + Mark Scheme/Insert Split View.'
+      }
+    ];
+  }
+
+  if (filterCurriculum === 'Cambridge O Level') {
+    const olCount = getCurriculumUniqueCount(meta, 'Cambridge O Level');
+    const olSubjCount = meta?.cieOlSubjects?.length || 31;
+    return [
+      {
+        q: 'Which Cambridge O Level subjects are available?',
+        a: `All ${olSubjCount} Cambridge O Level syllabuses (${olCount.toLocaleString()} unique files) are indexed, including Mathematics D (4024), Physics (5054), Chemistry (5070), Biology (5090), English Language (1123), Islamiyat (2058), and Pakistan Studies (2059).`
+      },
+      {
+        q: 'Do Cambridge O Level sittings include Inserts and Grade Thresholds?',
+        a: 'Yes. Paired Question Papers, Mark Schemes, Inserts (for 1123 English), Examiner Reports, and Grade Thresholds (GT) open directly in Split View.'
+      }
+    ];
+  }
+
+  if (filterCurriculum === 'Edexcel IAL') {
+    const ialCount = getCurriculumUniqueCount(meta, 'Edexcel IAL');
+    const ialSubjCount = meta?.ialSubjects?.length || 19;
+    return [
+      {
+        q: 'Which Pearson Edexcel IAL subjects and series are archived?',
+        a: `All ${ialSubjCount} International A-Level subjects (${ialCount.toLocaleString()} unique files, 2003–2026) are indexed, covering current W-codes (WMA11–WMA14, WPH11–WPH16, WCH11–WCH16, WBI11–WBI16) and legacy specs (WMA01–02, C1–C4, WPH01–06).`
+      },
+      {
+        q: 'Are Edexcel IAL textbooks and Maths Worked Solution Banks included?',
+        a: `Yes. ${ialBooks} Edexcel IAL textbooks, answer PDFs, lab books, and all 14 Mathematics Worked Solution Banks open in 2-Page book spread mode.`
+      }
+    ];
+  }
+
+  if (filterCurriculum === 'Edexcel IGCSE') {
+    const igcseCount = getCurriculumUniqueCount(meta, 'Edexcel IGCSE');
+    const igcseSubjCount = meta?.igcseSubjects?.length || 43;
+    return [
+      {
+        q: 'Does Edexcel IGCSE include Regional (R) and Modular (4W*) papers?',
+        a: `Yes. All ${igcseSubjCount} Edexcel IGCSE (9–1) subjects (${igcseCount.toLocaleString()} unique files) index Standard, Regional (1R/2R), Foundation/Higher, and Modular (4WM1, 4WBI1, 4WCH1, 4WPH1) papers.`
+      },
+      {
+        q: 'Can I listen to Edexcel IGCSE language audio with subtitles?',
+        a: 'Yes. Listening audio packs for ESL (4ES1), French, German, Spanish, Chinese, and Swahili play directly above the Question Paper with pre-indexed synced closed captions.'
+      }
+    ];
+  }
+
+  if (isCie) {
+    return [
+      {
+        q: 'Which Cambridge International qualifications are included on Conceptualist Systems?',
+        a: `Conceptualist Systems indexes ${cambridgeUnique.toLocaleString()} unique Cambridge International AS & A Level, IGCSE (A*–G & 9–1), and O Level past papers, mark schemes, inserts, grade thresholds, and ${cambridgeBooks} coursebooks across 107 syllabuses.`
+      },
+      {
+        q: 'How does Cambridge search handle syllabus codes and timezone variants?',
+        a: 'Search directly by 4-digit code, paper + variant (such as "0625 42"), or session shorthand ("9709 s24") with isolated board filtering and side-by-side Split View.'
+      }
+    ];
+  }
+
+  return [
+    {
+      q: 'What is included in the Conceptualist Systems international exam archive?',
+      a: `Conceptualist Systems is an independent study archive (not affiliated with Pearson/Edexcel or Cambridge CAIE) indexing ${uniqueFiles.toLocaleString()} unique resources (${totalFiles.toLocaleString()} total files): ${edexcelUnique.toLocaleString()} Edexcel IAL & IGCSE and ${cambridgeUnique.toLocaleString()} Cambridge International past papers, ${totalBooks} textbooks & Solution Banks, ${audioCount} listening audio tracks, and ${dfCount} data files.`
+    },
+    {
+      q: 'How do Split View, 2-Page Book Spread, and Listening Subtitles work?',
+      a: 'Open any sitting in Split View to read the Question Paper beside its Mark Scheme or Insert, open any textbook in resizable 2-Page spread mode, or stream listening MP3s with live synchronized captions directly in your browser.'
+    }
+  ];
 }
 
 export function parseRouteFromLocation(pathname = '/', search = '', meta = null, hash = '') {
@@ -816,7 +1132,7 @@ export function getSeoMetadata({
 
   if (currentTab === 'about') {
     return {
-      title: 'About Conceptualist Systems | International Exam Archive',
+      title: 'About Conceptualist Systems | Exam Study Archive',
       description: fitDescription(`Learn about Conceptualist Systems, an independent study index of ${uniqueFiles.toLocaleString()}+ Edexcel & Cambridge International past papers, mark schemes, reports & books.`),
       keywords: 'Conceptualist Systems, Edexcel past papers, Cambridge IGCSE past papers, Cambridge A Level past papers, O Level past papers, academic repository',
       canonicalUrl,
@@ -840,7 +1156,7 @@ export function getSeoMetadata({
 
   if (filterDocType === 'DF' && !filterCurriculum && !filterSubject) {
     return {
-      title: 'International IT & CS Practical Data Files (.zip) | Conceptualist',
+      title: 'Edexcel & Cambridge IT/ICT Practical Data Files (.zip)',
       description: `Download ${dfCount} archived practical exam source data files (.zip) for Edexcel IAL IT (WIT12, WIT14), IGCSE ICT/CS (4IT1, 4CP0) and Cambridge ICT/CS.`,
       keywords: 'Edexcel IAL IT data files, WIT12 data files, WIT14 data files, 4IT1 data files, Cambridge ICT 0417 source files',
       canonicalUrl,
@@ -852,7 +1168,7 @@ export function getSeoMetadata({
 
   if (filterDocType === 'AUD' && !filterCurriculum && !filterSubject) {
     return {
-      title: 'Listening Audio MP3s & Synced Transcripts | Conceptualist',
+      title: 'Edexcel & Cambridge Listening Audio MP3s & Transcripts',
       description: `Stream and download ${audioCount} archived Edexcel & Cambridge listening examination MP3s and ZIPs with synchronized closed captions (CC).`,
       keywords: 'Edexcel IAL listening audio, Edexcel IGCSE listening audio, Cambridge ESL 0510 audio, French German Spanish listening mp3',
       canonicalUrl,
@@ -884,20 +1200,22 @@ export function getSeoMetadata({
     'Literature in English': 'English Lit',
     'English Literature': 'English Lit',
     'English Language': 'English Lang',
-    'Co-ordinated Sciences (Double Award)': 'Double Science',
+    'Co-ordinated Sciences (Double Award)': 'Co-ord Science',
     'Combined Science': 'Combined Sci',
     'Sciences (Double Award)': 'Double Science',
     'Sciences (Single Award)': 'Single Science',
     'Environmental Management': 'Env Management',
-    'Global Perspectives & Research': 'Global Perspectives',
+    'Global Perspectives & Research': 'Global Persp',
     'Global Perspectives': 'Global Persp',
     'Design and Technology': 'Design & Tech',
+    'Design & Technology': 'Design & Tech',
     'Physical Education': 'PE',
     'Business Studies': 'Business',
     'Religious Studies': 'RS',
     'Bangladesh Studies': 'Bangladesh St',
     'Pakistan Studies': 'Pakistan St',
-    'Greek (First Language)': 'Greek (1st Lang)'
+    'Travel & Tourism': 'Travel & Tourism',
+    'Greek (First Language)': 'Greek 1st Lang'
   };
   const mappedShortBase = SUBJECT_SHORT_MAP[baseSubjNoCode] || baseSubjNoCode.replace(/\s*\([^)]*\)/g, '').trim();
   const subjShort = cieCodeInSubj ? `${mappedShortBase} (${cieCodeInSubj})` : mappedShortBase;
@@ -924,29 +1242,38 @@ export function getSeoMetadata({
       const title = pickTitleVariant(
         isIalMath
           ? [
-              'Edexcel IAL Maths Solution Banks & Books PDF | Conceptualist',
-              'Edexcel IAL Maths Textbooks & Solution Banks PDF'
+              'Edexcel IAL Maths Books & Solution Banks PDF (P1–FP3)',
+              'Edexcel IAL Maths Solution Banks & Textbooks PDF'
             ]
+          : isIal && filterSubject === 'Information Technology'
+            ? [
+                'Edexcel IAL IT Student Book 1 & 2 PDF (WIT11–WIT14)',
+                'Edexcel IAL IT Student Book 1 & 2 PDF'
+              ]
           : hasAnswerBooks
             ? [
-                `${curr} ${subjDisplay} Textbooks & Answers PDF | Conceptualist`,
-                `${curr} ${subjShort} Student Book 1 & 2 PDF + Answers | Conceptualist`,
-                `${curr} ${subjDisplay} Student Book 1 & 2 PDF & Answers`
+                `Edexcel IAL ${subjDisplay} Student Book 1 & 2 PDF + Answers`,
+                `Edexcel IAL ${subjDisplay} Student Book 1 & 2 PDF`,
+                `Edexcel IAL ${subjShort} Student Book 1 & 2 PDF & Answers`,
+                `Edexcel IAL ${subjDisplay} Textbooks & Answers PDF`
               ]
-            : [
-                `${curr} ${subjDisplay} Textbooks PDF | Conceptualist`,
-                `${currShort} ${subjDisplay} Textbooks PDF | Conceptualist`,
-                `${currShort} ${subjShort} Textbooks PDF | Conceptualist`,
-                `${currTiny} ${subjShort} Textbooks PDF | Conceptualist`,
-                `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjShort} Textbooks PDF | Conceptualist`,
-                cieCodeInSubj
-                  ? `CAIE ${subjShort} Textbooks PDF | Conceptualist`
-                  : `${subjShort} Textbooks PDF | Conceptualist`,
-                cieCodeInSubj
-                  ? `Cambridge ${cieCodeInSubj} Textbooks PDF | Conceptualist`
-                  : `${subjShort} Textbooks PDF`
-              ],
-        62
+            : isCieSubj
+              ? [
+                  `${currShort} ${subjDisplay} Coursebooks & Answers PDF`,
+                  `${currShort} ${subjDisplay} Coursebooks PDF`,
+                  `${currShort} ${subjShort} Coursebooks PDF`,
+                  `${currTiny} ${subjDisplay} Coursebooks PDF`,
+                  `${currTiny} ${subjShort} Coursebooks PDF`,
+                  `${currTiny} ${subjShort} Textbooks PDF`,
+                  `${currTiny} ${subjShort} Books PDF`
+                ]
+              : [
+                  `${curr} ${subjDisplay} Student Textbooks PDF`,
+                  `${curr} ${subjShort} Student Textbooks PDF`,
+                  `${curr} ${subjDisplay} Textbooks PDF`,
+                  `${curr} ${subjShort} Textbooks PDF`
+                ],
+        56
       );
       const description = pickTitleVariant([
         isIalMath
@@ -988,9 +1315,17 @@ export function getSeoMetadata({
               : cieIgcseBooks;
       return {
         title: pickTitleVariant([
-          `${currShort} Textbooks${isIal ? ' & Solution Banks' : isIgcseEdx ? ' (9-1) PDF' : ' & Coursebooks PDF'} | Conceptualist`,
-          `${currShort} Textbooks PDF | Conceptualist`
-        ], 64),
+          isIal
+            ? 'Edexcel IAL Student Books, Answers & Solution Banks'
+            : isIgcseEdx
+              ? 'Edexcel IGCSE (9-1) Student Textbooks & Guides PDF'
+              : filterCurriculum === 'Cambridge AS & A Level'
+                ? 'Cambridge AS & A Level Coursebooks & Workbooks PDF'
+                : filterCurriculum === 'Cambridge IGCSE'
+                  ? 'Cambridge IGCSE Coursebooks, Workbooks & Answers PDF'
+                  : 'Cambridge O Level Textbooks & Revision Guides PDF',
+          `${currShort} Textbooks & Coursebooks PDF`
+        ], 56),
         description: isIal
           ? `Browse ${ialBooks} Edexcel IAL student textbooks, answer books & Maths Solution Banks across 9 subjects in our 2-Page WebPDF reader.`
           : isIgcseEdx
@@ -1005,7 +1340,7 @@ export function getSeoMetadata({
     }
     if (scopeAllBoards) {
       return {
-        title: 'Edexcel & Cambridge Textbooks & Solutions PDF | Conceptualist',
+        title: 'Edexcel & Cambridge Textbooks & Solution Banks PDF',
         description: fitDescription(`Read ${totalBooks} Pearson Edexcel (IAL & IGCSE) and Cambridge International (A-Level, IGCSE & O Level) coursebooks, workbooks & Solution Banks in 2-Page WebPDF reader.`),
         keywords: 'Edexcel IAL textbooks pdf, Cambridge IGCSE coursebooks pdf, Cambridge A Level textbooks pdf, O Level textbooks pdf, Edexcel solution bank',
         canonicalUrl,
@@ -1016,7 +1351,7 @@ export function getSeoMetadata({
     }
     if (isCie) {
       return {
-        title: 'Cambridge IGCSE, O Level & A-Level Textbooks | Conceptualist',
+        title: 'Cambridge IGCSE, O Level & A-Level Coursebooks PDF',
         description: fitDescription(`Read ${cambridgeBooks > 0 ? `${cambridgeBooks} ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE & O Level coursebooks, workbooks, practical books & revision guides in 2-Page WebPDF reader.`),
         keywords: 'Cambridge A Level textbooks pdf, Cambridge IGCSE coursebook pdf, Cambridge O Level textbooks pdf, CAIE biology chemistry physics maths coursebook',
         canonicalUrl,
@@ -1026,7 +1361,7 @@ export function getSeoMetadata({
       };
     }
     return {
-      title: 'Edexcel IAL & IGCSE Textbooks & Solutions | Conceptualist',
+      title: 'Edexcel IAL & IGCSE Textbooks & Solution Banks PDF',
       description: fitDescription(`Read ${edexcelBooks} Edexcel IAL and IGCSE (9-1) student textbooks, answer PDFs, and Maths worked solution banks free online in 2-Page WebPDF reader.`),
       keywords: 'Edexcel IAL textbooks pdf, Edexcel IGCSE textbooks pdf, Edexcel solution bank, Pure Mathematics textbook, Chemistry Physics Biology Edexcel book',
       canonicalUrl,
@@ -1041,11 +1376,13 @@ export function getSeoMetadata({
     const unitCode = getUnitCodeFromLabel(filterUnit, { isCambridge: isCie });
     const cieCode = isCie ? extractSyllabusCodeFromSubject(filterSubject) : '';
     const igcseCode = filterCurriculum === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
-    const unitClean = cleanUnitForContext(subjDisplay, filterUnit);
+    const unitCleanRaw = cleanUnitForContext(subjDisplay, filterUnit);
+    const unitClean = unitCleanRaw.replace(/\b(Paper\s+[1-7])\s*\(P[1-7]\)/i, '$1').trim();
     const unitWithCode = unitCode && !unitClean.includes(unitCode) && !(isCie && /^P\d$/.test(unitCode) && /\bPaper\s+\d\b/i.test(unitClean))
       ? `${unitClean} (${unitCode})`
       : unitClean;
-    const compactClean = compactUnitTitleLabel(unitClean);
+    const compactCleanRaw = compactUnitTitleLabel(unitClean);
+    const compactClean = compactCleanRaw.replace(/\b(Paper\s+[1-7])\s*\(P[1-7]\)/i, '$1').trim();
     const unitShort = unitCode && !compactClean.includes(unitCode) && !(isCie && /^P\d$/.test(unitCode) && /\bPaper\s+\d\b/i.test(compactClean))
       ? `${compactClean} (${unitCode})`
       : compactClean;
@@ -1054,41 +1391,54 @@ export function getSeoMetadata({
     const validParenTok = parenTok && !NON_CODE_PARENS.has(parenTok) ? parenTok : '';
     const ultraShortUnit = validParenTok && unitCode && validParenTok !== unitCode
       ? `${validParenTok} (${unitCode})`
-      : (isCie ? compactClean : (unitCode || unitShort));
+      : isCie
+        ? (/Pre-2020/i.test(unitClean) && unitCode ? `Pre-2020 ${unitCode}` : compactClean)
+        : (unitCode || unitShort);
 
-    const unitObj = meta?.wizard?.[filterCurriculum || 'Edexcel IAL']?.[filterSubject]?.units?.[filterUnit];
+    const currSlug = filterCurriculum || 'Edexcel IAL';
+    const unitObj = meta?.wizard?.[currSlug]?.[filterSubject]?.units?.[filterUnit];
     const docCount = unitObj?.count || 40;
-    let unitCanonicalUrl = canonicalUrl;
-    let consolidatingCanonical = false;
-    if (unitObj && typeof unitObj.count === 'number' && unitObj.count < 3 && !hasSearchQuery) {
+    const isThin = !hasSearchQuery && isThinUnitRoute(meta, currSlug, filterSubject, filterUnit);
+    if (isThin) {
       robots = 'noindex, follow';
-      const parentCurrSlug = getCurriculumSlug(filterCurriculum || 'Edexcel IAL');
-      const parentSubjSlug = getSubjectSlug(filterSubject);
-      if (parentCurrSlug && parentSubjSlug) {
-        unitCanonicalUrl = `${SITE_URL}/${parentCurrSlug}/${parentSubjSlug}`;
-        consolidatingCanonical = true;
-      }
     }
     const years = unitObj?.years || [2025, 2024, 2023, 2022, 2021, 2020];
     const minYr = years[years.length - 1] || 2018;
     const maxYr = years[0] || 2025;
     const yrSpan = `${minYr}–${maxYr}`;
     const igcseTitleCode = igcseCode ? ` (${igcseCode.split(' / ')[0]})` : '';
+    const isIalMathUnit = currSlug === 'Edexcel IAL' && filterSubject === 'Math';
+    const mathCompactUnit = isIalMathUnit
+      ? compactClean
+          .replace(/^Legacy\s+/i, '')
+          .replace(/^Further Pure\s+(\d+)\s*\(FP\d+\)$/i, 'FP$1')
+          .replace(/^Pure\s+(\d+)\s*\(P\d+\)$/i, 'Pure $1 (P$1)')
+          .replace(/^Core\s+(\d+)\s*\(C\d+\)$/i, 'Core $1 (C$1)')
+      : '';
 
-    const title = pickTitleVariant([
-      `${currShort} ${subjDisplay} ${unitWithCode} Past Papers | Conceptualist`,
-      `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
-      `${currShort} ${subjShort} ${unitShort}${igcseTitleCode} Past Papers | Conceptualist`,
-      `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
-      `${currTiny} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
-      `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers | Conceptualist`,
-      cieCode
-        ? `CAIE ${cieCode} ${ultraShortUnit} Past Papers | Conceptualist`
-        : `${currShort} ${subjShort} ${ultraShortUnit} Past Papers`,
-      cieCode
-        ? `CAIE ${cieCode} ${unitCode || ultraShortUnit} Past Papers | Conceptualist`
-        : `${subjShort} ${unitCode || ultraShortUnit} Past Papers`
-    ], 64);
+    const title = pickTitleVariant(
+      isIalMathUnit
+        ? [
+            `Edexcel IAL Maths ${mathCompactUnit}${unitCode ? ` (${unitCode})` : ''} Past Papers & MS`,
+            `Edexcel IAL Maths ${mathCompactUnit}${unitCode ? ` (${unitCode})` : ''} Past Papers`,
+            `Edexcel IAL Maths ${ultraShortUnit} Past Papers & MS`,
+            `Edexcel IAL Maths ${ultraShortUnit} Past Papers`
+          ]
+        : [
+            `${currShort} ${subjDisplay} ${unitWithCode}${igcseTitleCode} Past Papers & MS`,
+            `${currShort} ${subjDisplay} ${unitWithCode}${igcseTitleCode} Past Papers`,
+            `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers & MS`,
+            `${currShort} ${subjDisplay} ${unitShort}${igcseTitleCode} Past Papers`,
+            `${currShort} ${subjShort} ${unitShort}${igcseTitleCode} Past Papers & MS`,
+            `${currShort} ${subjShort} ${unitShort}${igcseTitleCode} Past Papers`,
+            `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers & MS`,
+            `${currShort} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers`,
+            `${currTiny} ${subjShort} ${ultraShortUnit}${igcseTitleCode} Past Papers`,
+            `${currTiny} ${subjShort} ${ultraShortUnit} Past Papers`,
+            cieCode ? `CAIE ${cieCode} ${ultraShortUnit} Past Papers` : `${currTiny} ${subjShort} ${unitCode || ultraShortUnit} Past Papers`
+          ],
+      56
+    );
 
     const codeNote = !unitWithCode.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
     const shortCodeNote = !unitShort.includes(igcseCode) && igcseCode ? ` (${igcseCode})` : '';
@@ -1116,8 +1466,8 @@ export function getSeoMetadata({
       title,
       description,
       keywords,
-      canonicalUrl: unitCanonicalUrl,
-      consolidatingCanonical,
+      canonicalUrl,
+      consolidatingCanonical: false,
       robots,
       h1: `${currShort} ${subjDisplay} — ${unitWithCode} Past Papers (${yrSpan})`,
       subtitle: `${docCount} verified Question Papers, ${extras} covering ${yrSpan}. Click any sitting to study side-by-side in Split View.`
@@ -1158,19 +1508,23 @@ export function getSeoMetadata({
         : '';
     const shortCodeStr = shortCodeToken ? ` (${shortCodeToken})` : '';
 
-    const title = pickTitleVariant([
-      `${currShort} ${subjDisplay}${shortCodeStr} Past Papers & MS | Conceptualist`,
-      `${currShort} ${subjDisplay}${shortCodeStr} Past Papers | Conceptualist`,
-      `${currShort} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
-      `${currTiny} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
-      `${currShort.replace(/^(Edexcel|Cambridge)\s+/, '')} ${subjShort}${shortCodeStr} Past Papers | Conceptualist`,
-      cieCode
-        ? `CAIE ${subjShort} Past Papers | Conceptualist`
-        : `${currShort} ${subjShort} Past Papers | Conceptualist`,
-      cieCode
-        ? `Cambridge ${cieCode} Past Papers & MS | Conceptualist`
-        : `${currShort} ${subjShort} Past Papers`
-    ], 64);
+    const title = pickTitleVariant(
+      curr === 'Edexcel IAL' && filterSubject === 'Math'
+        ? [
+            'Edexcel IAL Maths Past Papers & MS (P1–P4, M1, S1, FP1)',
+            'Edexcel IAL Maths (WMA11–WMA14) Past Papers & MS'
+          ]
+        : [
+            `${currShort} ${subjDisplay}${shortCodeStr} Past Papers & MS`,
+            `${currShort} ${subjDisplay}${shortCodeStr} Past Papers`,
+            `${currShort} ${subjShort}${shortCodeStr} Past Papers & MS`,
+            `${currShort} ${subjShort}${shortCodeStr} Past Papers`,
+            `${currTiny} ${subjShort}${shortCodeStr} Past Papers & MS`,
+            `${currTiny} ${subjShort}${shortCodeStr} Past Papers`,
+            `${currTiny} ${subjShort} Past Papers`
+          ],
+      56
+    );
 
     const resourceTail = isCie
       ? (hasBooks ? 'past papers, mark schemes, inserts, grade thresholds & textbooks' : 'past papers, mark schemes, inserts, grade thresholds & examiner reports')
@@ -1219,7 +1573,7 @@ export function getSeoMetadata({
     const alCount = getCurriculumUniqueCount(meta, 'Cambridge AS & A Level');
     const alSubjCount = meta?.cieAlSubjects?.length || 0;
     return {
-      title: 'Cambridge AS & A Level (CAIE) Past Papers | Conceptualist',
+      title: 'Cambridge International AS & A Level Past Papers & MS',
       description: fitDescription(`Browse ${alCount.toLocaleString()}+ Cambridge International AS & A Level past papers, mark schemes, grade thresholds & reports across ${alSubjCount || 'key'} syllabuses (9709, 9702, 9701, 9700).`),
       keywords: 'Cambridge A Level past papers, CAIE AS A Level past papers, 9709 past papers, 9702 physics, 9701 chemistry, 9700 biology, grade thresholds',
       canonicalUrl,
@@ -1233,7 +1587,7 @@ export function getSeoMetadata({
     const igCount = getCurriculumUniqueCount(meta, 'Cambridge IGCSE');
     const igSubjCount = meta?.cieIgcseSubjects?.length || 0;
     return {
-      title: 'Cambridge IGCSE (CAIE) Past Papers & Mark Schemes | Conceptualist',
+      title: 'Cambridge IGCSE Past Papers, Mark Schemes & Thresholds',
       description: fitDescription(`Browse ${igCount.toLocaleString()}+ Cambridge IGCSE (A*-G & 9-1) past papers, mark schemes, inserts & grade thresholds across ${igSubjCount || 'key'} syllabuses (0625, 0620, 0610, 0580, 0500).`),
       keywords: 'Cambridge IGCSE past papers, CAIE IGCSE past papers, 0625 physics, 0620 chemistry, 0610 biology, 0580 maths, 0972, 0980, grade thresholds',
       canonicalUrl,
@@ -1247,7 +1601,7 @@ export function getSeoMetadata({
     const olCount = getCurriculumUniqueCount(meta, 'Cambridge O Level');
     const olSubjCount = meta?.cieOlSubjects?.length || 0;
     return {
-      title: 'Cambridge O Level (CAIE) Past Papers & MS | Conceptualist',
+      title: 'Cambridge O Level Past Papers, Mark Schemes & GT',
       description: fitDescription(`Browse ${olCount.toLocaleString()}+ Cambridge O Level past papers, mark schemes & grade thresholds across ${olSubjCount || 'key'} syllabuses (4024, 5054, 5070, 5090, 1123, 2058, 2059).`),
       keywords: 'Cambridge O Level past papers, CAIE O Level past papers, 4024 maths D, 5054 physics, 5070 chemistry, 5090 biology, 2058 islamiyat, 2059 pakistan studies',
       canonicalUrl,
@@ -1260,8 +1614,8 @@ export function getSeoMetadata({
   if (isCie && !filterCurriculum && !filterSubject && !filterUnit && !filterDocType) {
     return {
       title: forceShowTable
-        ? 'All Cambridge International Past Papers Archive | Conceptualist'
-        : 'Cambridge IGCSE, O Level & A-Level Past Papers | Conceptualist',
+        ? 'All Cambridge (CAIE) Past Papers & Grade Thresholds'
+        : 'Cambridge IGCSE, O Level & A-Level Past Papers & MS',
       description: forceShowTable
         ? fitDescription(`Search and filter all ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE & O Level past papers, mark schemes & grade thresholds (2002–2026).`)
         : fitDescription(`Study ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International (CAIE) AS & A Level, IGCSE, and O Level past papers, mark schemes, inserts & grade thresholds in Split View.`),
@@ -1280,7 +1634,7 @@ export function getSeoMetadata({
     const ialCount = getCurriculumUniqueCount(meta, 'Edexcel IAL');
     const ialSubjCount = meta?.ialSubjects?.length || 19;
     return {
-      title: 'Edexcel IAL Past Papers, Mark Schemes & Books | Conceptualist',
+      title: 'Edexcel IAL Past Papers, Mark Schemes & Books (2026)',
       description: fitDescription(`Browse ${ialCount.toLocaleString()}+ Edexcel IAL past papers, mark schemes, examiner reports & books across ${ialSubjCount} subjects including Mathematics (WMA11–WMA14), Physics & Biology.`),
       keywords: 'Edexcel IAL past papers, International A Level past papers, Edexcel IAL mark schemes, WMA11, WCH11, WPH11, WBI11, WEC11, WBS11, Edexcel IAL textbooks',
       canonicalUrl,
@@ -1294,7 +1648,7 @@ export function getSeoMetadata({
     const igcseCount = getCurriculumUniqueCount(meta, 'Edexcel IGCSE');
     const igcseSubjCount = meta?.igcseSubjects?.length || 43;
     return {
-      title: 'Edexcel IGCSE Past Papers & Mark Schemes (9-1) | Conceptualist',
+      title: 'Edexcel IGCSE Past Papers & Mark Schemes (9-1 & 2026)',
       description: fitDescription(`Browse ${igcseCount.toLocaleString()}+ Edexcel IGCSE (9-1 & Modular) past papers, mark schemes, examiner reports & textbooks across ${igcseSubjCount} subjects (4MA1, 4PH1, 4CH1, 4BI1).`),
       keywords: 'Edexcel IGCSE past papers, International GCSE Edexcel past papers, 4MA1, 4PH1, 4CH1, 4BI1, Edexcel IGCSE Modular past papers, Regional 1R 2R past papers',
       canonicalUrl,
@@ -1306,7 +1660,7 @@ export function getSeoMetadata({
 
   if (forceShowTable && !filterCurriculum && !filterSubject && !filterUnit && !filterDocType) {
     return {
-      title: 'All Edexcel IAL & IGCSE Past Papers Archive | Conceptualist',
+      title: 'Edexcel IAL & IGCSE Past Papers & Mark Schemes (2026)',
       description: fitDescription(`Browse all ${edexcelUnique.toLocaleString()}+ Edexcel IAL & IGCSE past papers, mark schemes, examiner reports & textbooks (${meta?.boards?.edexcel?.coverage || meta?.coverage || '2003–2026'}) in Split View.`),
       keywords: 'Edexcel past papers archive, Edexcel IAL past papers, Edexcel IGCSE past papers, mark schemes, examiner reports, split view',
       canonicalUrl,
@@ -1318,7 +1672,7 @@ export function getSeoMetadata({
 
   // Default Homepage SEO metadata (front-load Edexcel head query for zero SEO regression)
   return {
-    title: 'Edexcel IAL & IGCSE Past Papers & Textbooks | Conceptualist',
+    title: 'Edexcel IAL & IGCSE Past Papers & Books | Conceptualist',
     description: fitDescription(`Study ${uniqueFiles.toLocaleString()}+ Edexcel IAL, Edexcel IGCSE & Cambridge International past papers, mark schemes, examiner reports & textbooks in Split View.`),
     keywords: 'Edexcel past papers, Edexcel IAL past papers, Edexcel IGCSE past papers, Cambridge IGCSE past papers, Cambridge A Level, Conceptualist Systems, WMA11, WCH11, WPH11, 0625, 9709',
     canonicalUrl: `${SITE_URL}/`,

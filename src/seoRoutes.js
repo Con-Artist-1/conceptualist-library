@@ -2,160 +2,19 @@
 // Re-exports lightweight routeCore.js so build scripts keep identical imports while the browser lazy-loads JSON-LD.
 import { BOOK_CATALOG_BY_PATH } from './bookCatalog.js';
 import { getBoardForCurriculum, isCambridgeCurriculum } from './data/boards.js';
-import { extractSyllabusCodeFromSubject, resolveCambridgeSyllabus } from './data/cambridgeCatalog.js';
 import {
   SITE_URL,
-  IGCSE_SPEC_CODES,
-  LEGACY_IAL_UNIT_CODES,
-  SUBJECT_LEGACY_SPEC_CODES,
+  isThinUnitRoute,
   getCurriculumSlug,
   getSubjectSlug,
   getUnitSlug,
   formatSubjectName,
-  getUnitCodeFromLabel,
-  getLegacyEquivalentsForState,
   inferCurriculumForSubject,
-  getUniqueOrderedUnitCodes,
-  getArchiveCounts
+  getArchiveCounts,
+  buildRouteFaqEntries
 } from './lib/routeCore.js';
 
 export * from './lib/routeCore.js';
-
-export function buildRouteFaqEntries({
-  currentTab = 'library',
-  activeBoard = 'edexcel',
-  scopeAllBoards = false,
-  filterCurriculum = '',
-  filterSubject = '',
-  filterUnit = '',
-  filterDocType = null,
-  meta = null
-} = {}) {
-  const { uniqueFiles, totalFiles, totalBooks, ialBooks, igcseBooks, edexcelBooks, cambridgeBooks, dfCount, audioCount, cambridgeUnique } = getArchiveCounts(meta);
-  const subjDisplay = formatSubjectName(filterSubject);
-  const curr = filterCurriculum || (filterSubject ? inferCurriculumForSubject(filterSubject, 'Edexcel IAL') : '');
-  const isCie = isCambridgeCurriculum(curr) || (!curr && !scopeAllBoards && activeBoard === 'cambridge');
-  const faqs = [];
-
-  if (currentTab === 'about' || currentTab === 'changelog') {
-    return faqs;
-  }
-
-  if (filterDocType === 'Book' && !filterUnit) {
-    if (filterSubject) {
-      const isIalMath = curr === 'Edexcel IAL' && filterSubject === 'Math';
-      faqs.push({
-        q: `How do I read ${curr} ${subjDisplay} textbooks${isIalMath ? ' and Worked Solution Banks' : ''} online?`,
-        a: `Click any ${curr} ${subjDisplay} ${isCie ? 'Coursebook, Workbook, Practical Book, or Answer Guide' : `Student Book${isIalMath ? ' or Worked Solution Bank ZIP (P1-P4, M1-M3, S1-S3, D1, FP1-FP3)' : ' or Answer PDF'}`} on this page to open it directly in our 2-Page side-by-side WebPDF reader with zero ads or downloads required.`
-      });
-      if (isIalMath) {
-        faqs.push({
-          q: 'Which Edexcel IAL Mathematics units have Worked Solution Banks included?',
-          a: 'All 14 Pearson Edexcel IAL Mathematics units are covered chapter-by-chapter: Pure Mathematics 1-4 (WMA11-WMA14), Mechanics 1-3 (WME01-WME03), Statistics 1-3 (WST01-WST03), Decision Mathematics 1 (WDM11), and Further Pure Mathematics 1-3 (WFM01-WFM03).'
-        });
-      }
-    } else if (isCie) {
-      faqs.push({
-        q: 'Which Cambridge International coursebooks and workbooks are in the archive?',
-        a: `The archive indexes ${cambridgeBooks} verified Cambridge International AS & A Level, IGCSE, and O Level coursebooks, workbooks, practical lab books, revision guides, and answer booklets, all viewable online in 2-Page book spread mode.`
-      });
-    } else if (scopeAllBoards) {
-      faqs.push({
-        q: 'How many international exam textbooks and Solution Banks are in the archive?',
-        a: `The library indexes ${totalBooks} verified resources across both boards: ${edexcelBooks} Pearson Edexcel (IAL & IGCSE) student books, lab books, answer PDFs, and Worked Solution Banks plus ${cambridgeBooks} Cambridge International (AS & A Level, IGCSE & O Level) coursebooks, workbooks, and revision guides.`
-      });
-    } else {
-      faqs.push({
-        q: 'How many Edexcel textbooks and Solution Banks are in the archive?',
-        a: `The Edexcel textbook collection indexes ${edexcelBooks} verified resources (${ialBooks} Edexcel IAL student books, lab books, answer PDFs, and Worked Solution Banks plus ${igcseBooks} Edexcel IGCSE 9-1 student books), all viewable in 2-Page book spread mode.`
-      });
-    }
-    return faqs;
-  }
-
-  if (filterDocType === 'AUD') {
-    faqs.push({
-      q: 'Which language listening exams include audio and synced transcripts?',
-      a: `All ${audioCount} archived MP3 and ZIP listening tracks across international French, German, Spanish, ESL, Chinese, and Swahili exams stream directly in-browser above the Question Paper with live closed captions (CC).`
-    });
-    return faqs;
-  }
-
-  if (filterDocType === 'DF') {
-    faqs.push({
-      q: 'Which practical exams require source data files (.zip)?',
-      a: `The archive hosts ${dfCount} practical examination source data file archives for Edexcel IAL Information Technology (WIT12, WIT14), Edexcel IGCSE ICT/CS (4IT1, 4CP0), and Cambridge ICT/CS practical components.`
-    });
-    return faqs;
-  }
-
-  if (filterSubject && filterUnit) {
-    const unitCode = getUnitCodeFromLabel(filterUnit, { isCambridge: isCie });
-    const legacyEq = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject, filterUnit });
-    const unitObj = meta?.wizard?.[curr]?.[filterSubject]?.units?.[filterUnit];
-    const docCount = unitObj?.count || 40;
-    const years = unitObj?.years || [2025, 2024];
-    const yrSpan = `${years[years.length - 1] || 2018}-${years[0] || 2025}`;
-
-    faqs.push({
-      q: `How many ${curr} ${subjDisplay} ${filterUnit} past papers and mark schemes are available?`,
-      a: `This archive indexes ${docCount} verified Question Papers (QP), Mark Schemes (MS), and ${isCie ? 'Grade Thresholds (GT) / Examiner Reports (ER)' : 'Examiner Reports (ER)'} for ${curr} ${subjDisplay} ${filterUnit}${unitCode ? ` (${unitCode})` : ''} spanning ${yrSpan}. Click Split View on any sitting to compare the Question Paper and Mark Scheme side by side.`
-    });
-    if (legacyEq) {
-      faqs.push({
-        q: `What are the specification and equivalent codes for ${curr} ${subjDisplay} ${filterUnit}?`,
-        a: `${legacyEq}. Both current and equivalent/legacy series are indexed so you can practice every compatible past examination paper.`
-      });
-    }
-    return faqs;
-  }
-
-  if (filterSubject) {
-    const subjWizard = meta?.wizard?.[curr]?.[filterSubject];
-    const docCount = subjWizard?.totalFiles || 100;
-    const unitNames = Object.keys(subjWizard?.units || {});
-    if (isCie) {
-      const code = extractSyllabusCodeFromSubject(filterSubject);
-      const entry = code ? resolveCambridgeSyllabus(code) : null;
-      const legacyNote = getLegacyEquivalentsForState({ filterCurriculum: curr, filterSubject });
-      faqs.push({
-        q: `What papers and variants are included in ${curr} ${subjDisplay}?`,
-        a: `This collection indexes ${docCount} unique Cambridge International Question Papers, Mark Schemes, Inserts, Grade Thresholds, and Examiner Reports across ${unitNames.length || 'all'} papers and timezone variants (v1, v2, v3)${legacyNote ? ` (${legacyNote})` : ''}.`
-      });
-      if (entry?.alt91) {
-        faqs.push({
-          q: `Are Cambridge IGCSE ${entry.code} and ${entry.alt91} (9-1) past papers the same?`,
-          a: `Yes. Cambridge IGCSE ${entry.code} (A*-G) and ${entry.alt91} (9-1) share identical examination papers and mark schemes; only the final grade scale differs, so searching either code returns the full verified archive.`
-        });
-      }
-      return faqs;
-    }
-
-    const unitCodes = getUniqueOrderedUnitCodes(unitNames).filter((c) => !LEGACY_IAL_UNIT_CODES.has(c));
-    const igcseCode = curr === 'Edexcel IGCSE' ? (IGCSE_SPEC_CODES[filterSubject] || '') : '';
-    const legacySpec = SUBJECT_LEGACY_SPEC_CODES[curr]?.[filterSubject] || '';
-
-    faqs.push({
-      q: `Which units and specification codes are covered in ${curr} ${subjDisplay}?`,
-      a: `This collection indexes ${docCount} unique past papers, mark schemes, and examiner reports across ${unitNames.length || 'all'} ${curr} ${subjDisplay} units${igcseCode ? ` (specification ${igcseCode})` : unitCodes.length ? ` (${unitCodes.join(', ')})` : ''}${legacySpec ? `, including ${legacySpec}` : ''}.`
-    });
-    return faqs;
-  }
-
-  if (isCie) {
-    faqs.push({
-      q: 'Which Cambridge International qualifications are included on Conceptualist Systems?',
-      a: `Conceptualist Systems indexes ${cambridgeUnique > 0 ? `${cambridgeUnique.toLocaleString()}+ ` : ''}Cambridge International AS & A Level (CIE-AL), Cambridge IGCSE (A*-G and 9-1 equivalents), and Cambridge O Level (CIE-OL) past papers, mark schemes, inserts, grade thresholds, and examiner reports with side-by-side Split View.`
-    });
-    return faqs;
-  }
-
-  faqs.push({
-    q: 'What is included in the Conceptualist Systems international exam archive?',
-    a: `Conceptualist Systems indexes ${uniqueFiles.toLocaleString()} unique Pearson Edexcel (IAL & IGCSE) and Cambridge International (AS & A Level, IGCSE & O Level) Question Papers, Mark Schemes, Examiner Reports, Grade Thresholds, ${totalBooks} Textbooks and Solution Banks, ${audioCount} Listening Audio tracks with synced subtitles, and ${dfCount} practical Data Files (${totalFiles.toLocaleString()} total archived files).`
-  });
-  return faqs;
-}
 
 export function buildJsonLd({
   currentTab = 'library',
@@ -326,7 +185,7 @@ export function buildJsonLd({
     const currSlug = getCurriculumSlug(curr);
     const subjSlug = getSubjectSlug(filterSubject);
     const unitsObj = meta.wizard[curr]?.[filterSubject]?.units || {};
-    const unitKeys = Object.keys(unitsObj);
+    const unitKeys = Object.keys(unitsObj).filter((u) => !isThinUnitRoute(meta, curr, filterSubject, u));
     if (unitKeys.length > 0) {
       graph.push({
         '@type': 'ItemList',
